@@ -71,18 +71,20 @@ async function main() {
 
     const startedAt = performance.now();
     let summary;
+    /** @type {ReturnType<(await import('#copilot/infra/public/composition/runtime')).createInfraRuntime> | null} */
+    let runtime = null;
+    let databaseModule = null;
     try {
-        const [{ default: Database }, registry, database, sqlitePort, core] = await Promise.all([
+        const [{ default: Database }, { createInfraRuntime }, database] = await Promise.all([
             import('better-sqlite3'),
-            import('#copilot/infra/public/cache'),
+            import('#copilot/infra/public/composition/runtime'),
             import('../../src/copilot/db/sqlite.js'),
-            import('#copilot/infra/public/database'),
-            import('../../src/copilot/core/index.js'),
         ]);
+        databaseModule = database;
         await database.ensureCopilotDbDir();
-        sqlitePort.configureInfraSqliteProvider(database.getCopilotDb);
+        runtime = createInfraRuntime({ runtimeId: 'l2-soak', sqliteProvider: database.getCopilotDb });
 
-        const cache = registry.getIoL2Cache();
+        const cache = runtime.coherence.l2.get();
         assert.ok(cache, 'experimental profile must initialize L2');
         cache.clearAll();
 
@@ -150,16 +152,16 @@ async function main() {
 
         cache.set({ key: 'transition:experimental-on', path: '/l2/transition-on', payload: 'transition-on' });
         process.env['IO_L2_CACHE_PROFILE'] = 'on';
-        const onCache = registry.getIoL2Cache();
+        const onCache = runtime.coherence.l2.get();
         assert.ok(onCache && onCache !== cache);
         assert.equal(onCache.get('transition:experimental-on')?.payload.toString('utf8'), 'transition-on');
 
         onCache.set({ key: 'transition:on-off', path: '/l2/transition-off', payload: 'transition-off' });
         process.env['IO_L2_CACHE_PROFILE'] = 'off';
-        assert.equal(registry.getIoL2Cache(), null);
+        assert.equal(runtime.coherence.l2.get(), null);
 
         process.env['IO_L2_CACHE_PROFILE'] = 'on';
-        const resumedCache = registry.getIoL2Cache();
+        const resumedCache = runtime.coherence.l2.get();
         assert.ok(resumedCache && resumedCache !== onCache);
         assert.equal(resumedCache.get('transition:on-off')?.payload.toString('utf8'), 'transition-off');
 
@@ -182,9 +184,10 @@ async function main() {
         const walBytesAfterTruncate = await sizeIfPresent(walPath);
         assert.ok(walBytesAfterTruncate <= walBytesBeforeTruncate);
 
-        core.setShutdownLogger(() => {});
-        await core.runShutdown('copilot-io-l2-soak');
-        const shutdownReport = core.getLastShutdownReport();
+        await runtime.dispose();
+        const disposedLifecycle = runtime.lifecycleSnapshot();
+        runtime = null;
+        database.closeCopilotDb();
 
         const reopened = new Database(dbPath);
         const integrity = reopened.pragma('integrity_check', { simple: true });
@@ -244,14 +247,17 @@ async function main() {
                 heapEndBytes: heapEnd,
                 peakGrowthBytes: Math.max(0, heapPeak - heapStart),
             },
-            shutdown: {
-                ok: shutdownReport?.failedCount === 0 && shutdownReport?.timeoutCount === 0,
-                handlers: shutdownReport?.handlers.map((handler) => handler.name) ?? [],
+            lifecycle: {
+                disposed: disposedLifecycle.state === 'disposed',
+                state: disposedLifecycle.state,
+                registered: disposedLifecycle.registered.length,
             },
             integrity,
             durationMs: rounded(performance.now() - startedAt),
         };
     } finally {
+        if (runtime) await runtime.dispose().catch(() => {});
+        if (databaseModule && typeof databaseModule.closeCopilotDb === 'function') databaseModule.closeCopilotDb();
         if (previousEnv.dbPath === undefined) delete process.env['COPILOT_DB_PATH'];
         else process.env['COPILOT_DB_PATH'] = previousEnv.dbPath;
         if (previousEnv.profile === undefined) delete process.env['IO_L2_CACHE_PROFILE'];

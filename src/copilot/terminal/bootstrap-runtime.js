@@ -38,7 +38,7 @@ if (typeof log.setConsoleLevel === 'function') {
 }
 
 bootCopilot({ terminal, broadcastSse: broadcastBootSse })
-    .then(() => {
-        startDevWatch();
+    .then(async () => {
+        await startDevWatch();
     })
     .catch((err) => void handleTerminalBootFailure(err));

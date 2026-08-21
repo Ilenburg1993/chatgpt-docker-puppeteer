@@ -2,22 +2,22 @@
 /** Read-only projections over active session-scope state. */
 
 import * as nodePath from 'node:path';
-import { MAX_ACTIVE_SCOPES, _registry, getScopeStatus, touchScope } from './state.js';
+import { getScopeStatus, touchScope } from './state.js';
 
 /** @typedef {import('./types.js').ScopeStats} ScopeStats */
 /** @typedef {import('./types.js').ScopeFailureSummary} ScopeFailureSummary */
 /** @typedef {import('./types.js').SymbolSearchResult} SymbolSearchResult */
 
 /**
- * Retorna stats do escopo de sessão.
- *
  * @param {string} sessionId
+ * @param {import('./state.js').ScopeRuntimeState} runtime
+ * @param {boolean} updateAccess
  * @returns {ScopeStats | null}
  */
-export function getScopeStats(sessionId) {
-    const scope = _registry.get(sessionId);
+function projectScopeStats(sessionId, runtime, updateAccess) {
+    const scope = runtime.registry.get(sessionId);
     if (!scope) return null;
-    touchScope(scope);
+    if (updateAccess) touchScope(scope);
     return {
         sessionId,
         pathCount: scope.paths.length,
@@ -38,18 +38,29 @@ export function getScopeStats(sessionId) {
         lastError: scope.lastError,
         startedAt: scope.startedAt,
         completedAt: scope.completedAt,
-        maxActiveScopes: MAX_ACTIVE_SCOPES,
+        maxActiveScopes: runtime.maxActiveScopes,
     };
+}
+
+/** @param {string} sessionId @param {import('./state.js').ScopeRuntimeState} runtime @returns {ScopeStats | null} */
+export function getScopeStats(sessionId, runtime) {
+    return projectScopeStats(sessionId, runtime, true);
+}
+
+/** Read-side projection that never updates LRU/eviction state. @param {string} sessionId @param {import('./state.js').ScopeRuntimeState} runtime */
+export function peekScopeStats(sessionId, runtime) {
+    return projectScopeStats(sessionId, runtime, false);
 }
 
 /**
  * Retorna o índice simbólico completo da sessão.
  *
  * @param {string} sessionId
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {Map<string, import('#copilot/infra/internal/indexing/parser').FileSymbols> | null}
  */
-export function getScopeSymbolIndex(sessionId) {
-    const scope = _registry.get(sessionId);
+export function getScopeSymbolIndex(sessionId, runtime) {
+    const scope = runtime.registry.get(sessionId);
     if (!scope) return null;
     touchScope(scope);
     return scope.symbolIndex;
@@ -60,7 +71,7 @@ export function getScopeSymbolIndex(sessionId) {
  * imports. Conteúdo integral nunca é duplicado no contexto.
  *
  * @param {string} sessionId
- * @param {{ maxFiles?: number; maxBytes?: number }} [options]
+ * @param {{ maxFiles?: number; maxBytes?: number } | undefined} options
  * @returns {{
  *     sessionId: string;
  *     files: number;
@@ -79,9 +90,11 @@ export function getScopeSymbolIndex(sessionId) {
  *     status: ScopeStats['status'];
  *     lastError: ScopeFailureSummary | null;
  * } | null}
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  */
-export function getScopeContext(sessionId, options = {}) {
-    const scope = _registry.get(sessionId);
+export function getScopeContext(sessionId, options, runtime) {
+    options ??= {};
+    const scope = runtime.registry.get(sessionId);
     if (!scope) return null;
     touchScope(scope);
 
@@ -167,11 +180,13 @@ export function getScopeContext(sessionId, options = {}) {
  *
  * @param {string} sessionId
  * @param {string} name - Nome exato ou prefixo do símbolo.
- * @param {{ exactMatch?: boolean }} [opts]
+ * @param {{ exactMatch?: boolean } | undefined} opts
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {SymbolSearchResult[]}
  */
-export function findSymbol(sessionId, name, opts = {}) {
-    const scope = _registry.get(sessionId);
+export function findSymbol(sessionId, name, opts, runtime) {
+    opts ??= {};
+    const scope = runtime.registry.get(sessionId);
     if (!scope) return [];
     touchScope(scope);
 
@@ -192,8 +207,9 @@ export function findSymbol(sessionId, name, opts = {}) {
 /**
  * Lista IDs dos escopos ativos.
  *
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {string[]}
  */
-export function listScopes() {
-    return [..._registry.keys()];
+export function listScopes(runtime) {
+    return [...runtime.registry.keys()];
 }

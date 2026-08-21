@@ -15,15 +15,14 @@
  * - Exit 0 se OK, Exit 1 se degradação detectada
  */
 
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { parseAndCacheSymbols as parseAndCacheSymbolsRaw } from '#copilot/infra/public/diagnostic/indexing/parser';
+import { readBytes as readBytesRaw, readText as readTextRaw } from '#copilot/infra/public/filesystem/read';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { resetIoL1CacheForTest } from '../src/copilot/infra/io-cache.js';
-import { readBytes, readText } from '../src/copilot/infra/io-engine.js';
-import { parseAndCacheSymbols } from '../src/copilot/infra/io-parser.js';
-import { warmCacheForPaths } from '../src/copilot/infra/io-prefetch.js';
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -114,6 +113,25 @@ await fsPromises.writeFile(SMALL_FILE, SMALL_CONTENT);
 await fsPromises.writeFile(MEDIUM_FILE, MEDIUM_CONTENT);
 await fsPromises.writeFile(LARGE_FILE, LARGE_CONTENT);
 
+const runtime = createInfraRuntime({ runtimeId: 'io-ci-gate' });
+const workspace = runtime.workspace(TMP_DIR);
+const readBytes = (filePath) => readBytesRaw(filePath, { cacheRuntime: runtime.coherence });
+const readText = (filePath) =>
+    readTextRaw(filePath, { cacheRuntime: runtime.coherence, readRuntime: runtime.coherence.read });
+const parseAndCacheSymbols = (filePath) =>
+    parseAndCacheSymbolsRaw(filePath, { parserCacheRuntime: runtime.parserCache });
+const warmWorkingSet = (paths) =>
+    Promise.all(
+        paths.map((filePath) =>
+            workspace.indexing.warmReadThroughContext(filePath, {
+                index: false,
+                relatedImports: false,
+                cacheBytes: true,
+                silent: true,
+            }),
+        ),
+    );
+
 // ---------------------------------------------------------------------------
 // Suite de benchmarks
 // ---------------------------------------------------------------------------
@@ -126,12 +144,12 @@ console.log(`  Tmp dir: ${TMP_DIR}\n`);
 const results = [];
 
 // 1. readBytes — L1 miss (cold)
-resetIoL1CacheForTest();
+runtime.coherence.l1.reset();
 results.push(
     await bench(
         'readBytes:small:cold',
         async () => {
-            resetIoL1CacheForTest();
+            runtime.coherence.l1.reset();
             await readBytes(SMALL_FILE);
         },
         ITERATIONS,
@@ -166,13 +184,13 @@ results.push(
 );
 
 // 4. warmCacheForPaths — batch de 3 arquivos
-resetIoL1CacheForTest();
+runtime.coherence.l1.reset();
 results.push(
     await bench(
-        'warmCacheForPaths:3files',
+        'workspaceWarm:3files',
         async () => {
-            resetIoL1CacheForTest();
-            await warmCacheForPaths([SMALL_FILE, MEDIUM_FILE, LARGE_FILE], { silent: true });
+            runtime.coherence.l1.reset();
+            await warmWorkingSet([SMALL_FILE, MEDIUM_FILE, LARGE_FILE]);
         },
         Math.ceil(ITERATIONS / 10),
         Math.ceil(WARMUP / 10),
@@ -180,13 +198,12 @@ results.push(
 );
 
 // 5. parseAndCacheSymbols — cold
-resetIoL1CacheForTest();
+runtime.coherence.l1.reset();
 results.push(
     await bench(
         'parseSymbols:small:cold',
         async () => {
-            const { invalidateParserCache } = await import('../src/copilot/infra/io-parser.js');
-            invalidateParserCache(SMALL_FILE);
+            runtime.parserCache.invalidate(SMALL_FILE);
             await parseAndCacheSymbols(SMALL_FILE);
         },
         Math.ceil(ITERATIONS / 5),
@@ -296,6 +313,7 @@ console.log(`💾 Resultados salvos em: ${nodePath.relative(ROOT, OUTPUT)}\n`);
 // Cleanup
 // ---------------------------------------------------------------------------
 
+await runtime.dispose();
 await fsPromises.rm(TMP_DIR, { recursive: true, force: true });
 
 // ---------------------------------------------------------------------------

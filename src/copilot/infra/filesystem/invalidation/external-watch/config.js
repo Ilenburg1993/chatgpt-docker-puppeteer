@@ -14,15 +14,15 @@ export function readIoExternalWatchConfig(env = process.env) {
     const enabledRaw = String(env['IO_EXTERNAL_WATCH_ENABLED'] ?? (testRuntime ? '0' : '1'))
         .trim()
         .toLowerCase();
-    return {
+    return Object.freeze({
         enabled: !['0', 'false', 'off', 'no'].includes(enabledRaw),
-        debounceMs: Math.min(2_000, readEnvNonNegativeInt('IO_EXTERNAL_WATCH_DEBOUNCE_MS', DEFAULT_DEBOUNCE_MS)),
-        maxBatch: Math.min(HARD_MAX_BATCH, readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_BATCH', DEFAULT_MAX_BATCH)),
+        debounceMs: Math.min(2_000, readEnvNonNegativeInt('IO_EXTERNAL_WATCH_DEBOUNCE_MS', DEFAULT_DEBOUNCE_MS, env)),
+        maxBatch: Math.min(HARD_MAX_BATCH, readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_BATCH', DEFAULT_MAX_BATCH, env)),
         maxPending: Math.min(
             HARD_MAX_PENDING,
-            readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_PENDING', DEFAULT_MAX_PENDING),
+            readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_PENDING', DEFAULT_MAX_PENDING, env),
         ),
-    };
+    });
 }
 
 /** @param {unknown} value @param {number} fallback @param {number} maximum */
@@ -39,14 +39,13 @@ function clampNonNegative(value, fallback, maximum) {
 
 /**
  * @param {{ enabled?: boolean; debounceMs?: number; maxBatch?: number; maxPending?: number }} options
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {ReturnType<typeof readIoExternalWatchConfig>} [base]
  */
-export function resolveIoExternalWatchRuntimeConfig(options = {}, env = process.env) {
-    const base = readIoExternalWatchConfig(env);
-    return {
+export function resolveIoExternalWatchRuntimeConfig(options = {}, base = readIoExternalWatchConfig()) {
+    return Object.freeze({
         enabled: options.enabled ?? base.enabled,
         debounceMs: clampNonNegative(options.debounceMs, base.debounceMs, 2_000),
         maxBatch: clampPositive(options.maxBatch, base.maxBatch, HARD_MAX_BATCH),
         maxPending: clampPositive(options.maxPending, base.maxPending, HARD_MAX_PENDING),
-    };
+    });
 }

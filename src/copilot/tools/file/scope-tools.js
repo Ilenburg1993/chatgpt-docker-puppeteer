@@ -2,9 +2,9 @@
 import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod/v3';
 import { buildTool } from '../infra/tool-factory.js';
-import { validatePath, WORKSPACE_ROOT } from './shared.js';
+import { validatePath, WORKSPACE_INDEXING, WORKSPACE_ROOT } from './shared.js';
 
-import {
+const {
     closeScope,
     declareScope,
     findSymbol,
@@ -13,7 +13,7 @@ import {
     invalidateScopePath,
     listScopes,
     refreshScope,
-} from '#copilot/infra/public/indexing/context';
+} = WORKSPACE_INDEXING.context;
 
 const ScopeDeclareParameters = z.object({
     sessionId: z.string().min(1).describe('ID da sessão/escopo para rastreamento da LLM-B.'),

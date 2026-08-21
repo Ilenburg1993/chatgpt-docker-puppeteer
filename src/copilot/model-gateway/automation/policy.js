@@ -8,11 +8,14 @@
  * @module copilot/model-gateway/automation/policy
  */
 
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =
     'data/copilot/model-gateway/runtime-automation-policy.json';
+const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FILE = resolve(
+    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
+);
 
 export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
     enabled: 'COPILOT_BYOK_GATEWAY_AUTO',
@@ -316,28 +319,67 @@ export function readModelGatewayRuntimeAutomationPolicy(env = process.env) {
 }
 
 /**
- * @param {{ filePath?: string }} [options]
- * @returns {Promise<Record<string, unknown>>}
+ * @typedef {{
+ *     filePath: string;
+ *     read: () => Promise<Record<string, unknown>>;
+ *     write: (policy: Record<string, unknown>) => Promise<{filePath:string;policy:ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>}>;
+ * }} ModelGatewayRuntimeAutomationPolicyStore
  */
-export async function readModelGatewayRuntimeAutomationPolicyFile(options = {}) {
-    const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
-    try {
-        const snapshot = await readTextFreshTrusted(filePath, { caller: 'model-gateway.automation.policy' });
-        return normalizePolicyPatch(record(JSON.parse(snapshot.content)));
-    } catch (error) {
-        if (/** @type {NodeJS.ErrnoException} */ (error)?.code === 'ENOENT') return {};
-        throw error;
-    }
+
+/**
+ * Build a policy store from authority already granted by its composition root. No operational path can mint authority.
+ *
+ * @param {{ filePath: string; io: ReturnType<typeof createConfiguredFsIo> }} binding
+ * @returns {ModelGatewayRuntimeAutomationPolicyStore}
+ */
+export function createModelGatewayRuntimeAutomationPolicyStore(binding) {
+    const filePath = resolve(binding.filePath);
+    const io = binding.io;
+    return Object.freeze({
+        filePath,
+        async read() {
+            try {
+                const snapshot = await io.readTextFresh(filePath);
+                return normalizePolicyPatch(record(JSON.parse(snapshot.content)));
+            } catch (error) {
+                if (/** @type {NodeJS.ErrnoException} */ (error)?.code === 'ENOENT') return {};
+                throw error;
+            }
+        },
+        async write(policy) {
+            const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
+            await io.writeFileAtomic(filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
+            return { filePath, policy: normalized };
+        },
+    });
+}
+
+const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'model-gateway.automation.policy',
+        exactPaths: [DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FILE],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_STORE = createModelGatewayRuntimeAutomationPolicyStore({
+    filePath: DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FILE,
+    io: DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_IO,
+});
+
+/** @returns {Promise<Record<string, unknown>>} */
+export async function readModelGatewayRuntimeAutomationPolicyFile() {
+    return DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_STORE.read();
 }
 
 /**
- * @param {{ env?: Record<string, string | undefined>; filePath?: string }} [options]
+ * @param {{ env?: Record<string, string | undefined>; store?: ModelGatewayRuntimeAutomationPolicyStore }} [options]
  * @returns {Promise<ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>>}
  */
 export async function readModelGatewayRuntimeAutomationEffectivePolicy(options = {}) {
-    const fileOptions = typeof options.filePath === 'string' ? { filePath: options.filePath } : {};
     return mergeModelGatewayRuntimeAutomationPolicy(
-        await readModelGatewayRuntimeAutomationPolicyFile(fileOptions),
+        await (options.store ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_STORE).read(),
         envPolicyPatch(options.env ?? process.env),
     );
 }
@@ -396,15 +438,8 @@ export function validateModelGatewayRuntimeAutomationPolicy(policy) {
 
 /**
  * @param {Record<string, unknown>} policy
- * @param {{ filePath?: string }} [options]
  * @returns {Promise<{ filePath: string; policy: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }>}
  */
-export async function writeModelGatewayRuntimeAutomationPolicyFile(policy, options = {}) {
-    const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
-    const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
-    await writeFileAtomicTrusted(filePath, `${JSON.stringify(normalized, null, 2)}\n`, {
-        caller: 'model-gateway.automation.policy',
-        mode: 0o600,
-    });
-    return { filePath, policy: normalized };
+export async function writeModelGatewayRuntimeAutomationPolicyFile(policy) {
+    return DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_STORE.write(policy);
 }

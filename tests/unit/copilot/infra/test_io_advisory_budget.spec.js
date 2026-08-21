@@ -1,27 +1,32 @@
 // @ts-check
 
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/internal/observability';
-import { beginIoAdvisoryBudget, getIoAdvisoryBudgetStats } from '#copilot/infra/internal/telemetry';
-import { afterEach, describe, expect, it } from 'vitest';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resetIoAdvisoryBudgetForTest } from '#copilot/infra/public/testing';
-afterEach(() => {
-    resetIoAdvisoryBudgetForTest();
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let runtime;
+beforeEach(() => {
+    runtime = createInfraRuntime({ runtimeId: `advisory-budget-test-${Date.now()}-${Math.random()}` });
+});
+afterEach(async () => {
+    await runtime.dispose();
 });
 
-describe('infra/io-advisory-budget', () => {
+describe('infra/io-advisory-budget runtime ownership', () => {
     it('observa pressão concorrente sem bloquear operações', () => {
-        const limit = getIoAdvisoryBudgetStats().limits.maxActive;
+        const budget = runtime.telemetry.advisoryBudget;
+        const limit = budget.stats().limits.maxActive;
         const leases = Array.from({ length: limit + 1 }, (_, index) =>
-            beginIoAdvisoryBudget({ operation: `write-${index}`, estimatedBytes: 1 }),
+            budget.begin({ operation: `write-${index}`, estimatedBytes: 1 }),
         );
 
-        const stats = getIoAdvisoryBudgetStats();
+        const stats = budget.stats();
         expect(stats.active).toBe(limit + 1);
         expect(stats.pressure).toBe(true);
         expect(stats.reasons).toContain('active');
         expect(leases.at(-1)?.pressured).toBe(true);
-        expect(readIoRuntimeHealthSnapshot().alerts).toContainEqual(
+        expect(readIoRuntimeHealthSnapshot(runtime).alerts).toContainEqual(
             expect.objectContaining({ code: 'IO_ADVISORY_BUDGET_PRESSURE', severity: 'medium' }),
         );
 
@@ -29,18 +34,35 @@ describe('infra/io-advisory-budget', () => {
             lease.finish();
             lease.finish();
         }
-        expect(getIoAdvisoryBudgetStats().active).toBe(0);
+        expect(budget.stats().active).toBe(0);
     });
 
     it('mantém a janela limitada e contabiliza bytes estimados', () => {
-        const limit = getIoAdvisoryBudgetStats().limits.maxOperations;
+        const budget = runtime.telemetry.advisoryBudget;
+        const limit = budget.stats().limits.maxOperations;
         for (let index = 0; index <= limit; index++) {
-            beginIoAdvisoryBudget({ operation: 'write', estimatedBytes: 2 }).finish();
+            budget.begin({ operation: 'write', estimatedBytes: 2 }).finish();
         }
 
-        const stats = getIoAdvisoryBudgetStats();
+        const stats = budget.stats();
         expect(stats.operations).toBe(limit + 1);
         expect(stats.estimatedBytes).toBe((limit + 1) * 2);
         expect(stats.reasons).toContain('operations');
+    });
+
+    it('isola pressão entre runtimes', async () => {
+        const other = createInfraRuntime({ runtimeId: 'advisory-budget-isolation-peer' });
+        try {
+            const limit = runtime.telemetry.advisoryBudget.stats().limits.maxActive;
+            const leases = Array.from({ length: limit + 1 }, (_, index) =>
+                runtime.telemetry.advisoryBudget.begin({ operation: `isolated-${index}` }),
+            );
+            expect(runtime.telemetry.advisoryBudget.stats().pressure).toBe(true);
+            expect(other.telemetry.advisoryBudget.stats().pressure).toBe(false);
+            expect(other.telemetry.advisoryBudget.stats().active).toBe(0);
+            for (const lease of leases) lease.finish();
+        } finally {
+            await other.dispose();
+        }
     });
 });

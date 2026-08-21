@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -31,12 +31,38 @@ describe('MCP stateful env manager', () => {
         assert.ok(secretLine);
         assert.equal(JSON.stringify(first).includes(String(secretLine).split('=').slice(1).join('=')), false);
 
-        const env = buildStatefulProcessEnv(testEnvPath);
+        const env = await buildStatefulProcessEnv(testEnvPath);
         assert.equal(env['COPILOT_MCP_HTTP_STATEFUL_SESSIONS'], 'true');
         assert.equal(env['COPILOT_MCP_HTTP_STATELESS_COMPAT'], 'false');
         assert.equal(env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'], 'true');
         assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
         assert.equal(typeof env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'], 'string');
+    });
+
+    it('rejects absolute paths and lexical traversal outside the MCP state root', async () => {
+        await assert.rejects(() => ensureStatefulEnvFile('/tmp/copilot-stateful-session.env'), /repo-relative/u);
+        await assert.rejects(
+            () => ensureStatefulEnvFile('src/copilot/.ai/mcp/../escaped-stateful-session.env'),
+            /inside src\/copilot\/\.ai\/mcp/u,
+        );
+    });
+
+    it('rejects symlink env files even when the link itself is inside the MCP state root', async () => {
+        const targetPath = resolve(process.cwd(), 'src/copilot/.ai/mcp/unit-stateful-target.env');
+        const linkPath = resolve(process.cwd(), 'src/copilot/.ai/mcp/unit-stateful-link.env');
+        rmSync(linkPath, { force: true });
+        rmSync(targetPath, { force: true });
+        writeFileSync(targetPath, `COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET='${`s`.repeat(40)}'\n`, { mode: 0o600 });
+        symlinkSync(targetPath, linkPath);
+        try {
+            await assert.rejects(
+                () => ensureStatefulEnvFile('src/copilot/.ai/mcp/unit-stateful-link.env'),
+                (error) => /** @type {{ code?: unknown }} */ (error)?.code === 'ERR_CONFIGURED_FS_SYMLINK',
+            );
+        } finally {
+            rmSync(linkPath, { force: true });
+            rmSync(targetPath, { force: true });
+        }
     });
 
     it('upgrades an existing low session limit without rotating the secret', async () => {
@@ -55,7 +81,7 @@ describe('MCP stateful env manager', () => {
 
         const result = await ensureStatefulEnvFile(testEnvPath);
         const text = readFileSync(absoluteTestEnvPath, 'utf8');
-        const env = buildStatefulProcessEnv(testEnvPath);
+        const env = await buildStatefulProcessEnv(testEnvPath);
 
         assert.equal(result.warnings.includes('env-file-upgraded'), true);
         assert.equal(text.includes(stableSecret), true);

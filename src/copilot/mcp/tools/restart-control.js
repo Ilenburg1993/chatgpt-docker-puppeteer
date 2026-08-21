@@ -8,12 +8,12 @@
  * @module copilot/mcp/tools/restart-control
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
+    MCP_RELOAD_STATE_FILE,
     appendMcpAuditEvent,
     boundedWriteAnnotations,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
-    MCP_RELOAD_STATE_FILE,
     okResult,
     readMcpReloadState,
     readOnlyAnnotations,
@@ -28,7 +28,7 @@ const MAX_DELAY_MS = 60000;
 const DEFAULT_DELAY_MS = 2500;
 const RESTART_RUNNER = 'src/copilot/mcp/scripts/scheduled-restart-runner.js';
 const restartProfileSchema = z.enum(['current', 'quic', 'h2', 'auto']);
-const workspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const workspaceIo = getMcpWorkspaceIo();
 
 /** @param {unknown} value @returns {number} */
 function normalizeDelayMs(value) {

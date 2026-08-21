@@ -4,6 +4,7 @@
  */
 
 import { getWorkspaceContext } from '#copilot/boot';
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
 import { readSystemPromptStatusSync } from '#copilot/config';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
@@ -224,7 +225,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         objectOrNull(sdkCapabilities?.['tools'])?.['workspace'] === true || toolLoad.hasSdkWorkspaceTooling;
     const canonicalFsReady = toolLoad.hasCanonicalLocalFsTools;
     const sdkFsRouting = buildRuntimeSdkFsRoutingProjection({ canonicalFsReady, sdkWorkspaceAvailable });
-    const ioRuntime = readIoRuntimeHealthSnapshot();
+    const ioRuntime = readIoRuntimeHealthSnapshot(getApplicationInfraRuntime());
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,

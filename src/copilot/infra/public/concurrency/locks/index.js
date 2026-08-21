@@ -1,4 +1,7 @@
 // @ts-check
-/** @module copilot/infra/public/concurrency/locks */
+/**
+ * Bounded public lock surface. Raw acquire/release primitives remain internal implementation details.
+ * @module copilot/infra/public/concurrency/locks
+ */
 
-export * from '../../../concurrency/locks/index.js';
+export { withIoResourceLock } from '../../../concurrency/locks/index.js';

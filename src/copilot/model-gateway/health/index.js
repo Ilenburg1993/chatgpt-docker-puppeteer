@@ -13,10 +13,13 @@ export {
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
     clearByokProviderModelHealth,
+    configureByokProviderHealthPersistenceStoreForTests,
+    createByokProviderHealthPersistenceStore,
     flushByokProviderHealth,
     hydrateByokProviderHealthFromDisk,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    readByokProviderHealthPersistenceFingerprint,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -25,6 +28,8 @@ export {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
+    resolveByokProviderHealthPersistenceBinding,
+    restoreByokProviderHealthPersistenceStoreForTests,
     subscribeByokProviderHealthChanges,
 } from './provider-health.js';
 export {

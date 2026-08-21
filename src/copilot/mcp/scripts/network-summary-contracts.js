@@ -8,12 +8,12 @@
  * @module copilot/mcp/scripts/network-summary-contracts
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
-const networkContractsWorkspaceIo = createWorkspaceIo({ workspaceRoot: REPO_ROOT });
+const networkContractsWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: REPO_ROOT });
 export const DEFAULT_NETWORK_SUMMARY_CONTRACTS_FILE = '.devcontainer/scripts/network/contracts/summary-contracts.jsonc';
 const DEFAULT_COMMAND = `node src/copilot/mcp/scripts/network-summary-contracts.js validate ${DEFAULT_NETWORK_SUMMARY_CONTRACTS_FILE}`;
 const DEFAULT_EXPLAIN_COMMAND = `node src/copilot/mcp/scripts/network-summary-contracts.js explain ${DEFAULT_NETWORK_SUMMARY_CONTRACTS_FILE}`;

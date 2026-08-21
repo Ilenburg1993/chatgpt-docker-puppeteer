@@ -9,11 +9,18 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { writeFileAtomicTrusted } = vi.hoisted(() => ({
-    writeFileAtomicTrusted: vi.fn(() => Promise.resolve()),
+const { readTextFreshConfigured, writeFileAtomicConfigured } = vi.hoisted(() => ({
+    readTextFreshConfigured: vi.fn(() => Promise.resolve({ content: '{}' })),
+    writeFileAtomicConfigured: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({ writeFileAtomicTrusted }));
+vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
+    createConfiguredFsGrant: vi.fn((declaration) => declaration),
+    createConfiguredFsIo: vi.fn(() => ({
+        readTextFresh: readTextFreshConfigured,
+        writeFileAtomic: writeFileAtomicConfigured,
+    })),
+}));
 
 import {
     flushAliasPersistence,
@@ -95,9 +102,9 @@ describe('alias-store setAlias', () => {
 
     it('serializa snapshots fire-and-forget e persiste o estado mais novo por último', async () => {
         await flushAliasPersistence();
-        writeFileAtomicTrusted.mockClear();
+        writeFileAtomicConfigured.mockClear();
         let releaseFirst = () => {};
-        writeFileAtomicTrusted.mockImplementationOnce(
+        writeFileAtomicConfigured.mockImplementationOnce(
             () =>
                 new Promise((resolve) => {
                     releaseFirst = resolve;
@@ -106,19 +113,18 @@ describe('alias-store setAlias', () => {
 
         setAlias('/first', '/echo first');
         setAlias('/second', '/echo second');
-        await vi.waitFor(() => expect(writeFileAtomicTrusted).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(writeFileAtomicConfigured).toHaveBeenCalledTimes(1));
         releaseFirst();
         await flushAliasPersistence();
 
-        expect(writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicTrusted.mock.calls[0] ?? [])[1]);
-        const secondSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicTrusted.mock.calls[1] ?? [])[1]);
+        expect(writeFileAtomicConfigured).toHaveBeenCalledTimes(2);
+        const firstSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicConfigured.mock.calls[0] ?? [])[1]);
+        const secondSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicConfigured.mock.calls[1] ?? [])[1]);
         expect(firstSnapshot).toContain('/first');
         expect(firstSnapshot).not.toContain('/second');
         expect(secondSnapshot).toContain('/first');
         expect(secondSnapshot).toContain('/second');
-        expect(writeFileAtomicTrusted).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
-            caller: 'terminal.stores.alias-store',
+        expect(writeFileAtomicConfigured).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
             mode: 0o600,
         });
     });

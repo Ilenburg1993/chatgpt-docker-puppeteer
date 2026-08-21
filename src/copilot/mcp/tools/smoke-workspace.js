@@ -5,11 +5,15 @@
  * @module copilot/mcp/tools/smoke-workspace
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { getIoIndexStats, parseFileForContext } from '#copilot/infra/public/indexing';
-import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
-import { readCloudflareTunnelConfig, readQuickTunnelState, summarizeQuickTunnelState } from '#copilot/mcp/cloudflare';
 import {
+    createCloudflareStateStore,
+    readCloudflareTunnelConfig,
+    summarizeQuickTunnelState,
+} from '#copilot/mcp/cloudflare';
+import {
+    getMcpWorkspaceIndexRegistry,
+    getMcpWorkspaceIndexing,
+    getMcpWorkspaceIo,
     okResult,
     readMcpMetricsSnapshot,
     readOnlyAnnotations,
@@ -21,10 +25,12 @@ import { WORKSPACE_ROOT } from '#copilot/tools';
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
 
-const { readTextValidated, statPathValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
-const { scanDirectoryValidated, searchTextValidated, searchWorkspaceSymbolsValidated } = createWorkspaceIndexing({
-    workspaceRoot: WORKSPACE_ROOT,
-});
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const readIoIndexStatus = INDEX_REGISTRY.status;
+
+const { readTextValidated, statPathValidated } = getMcpWorkspaceIo();
+const { parseFileForContext, scanDirectoryValidated, searchTextValidated, searchWorkspaceSymbolsValidated } =
+    getMcpWorkspaceIndexing();
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -124,7 +130,7 @@ export const mcpSmokeWorkspaceTool = {
             return { symbols: parsed.symbols.symbols.length, exports: parsed.symbols.exports.length };
         });
         await runCheck(checks, 'repo_index_status', async () => {
-            const stats = getIoIndexStats();
+            const stats = readIoIndexStatus();
             if (stats.enabled !== false && stats.available !== true) {
                 warnings.push('INDEX_UNAVAILABLE: shared IO index is enabled but not available.');
             }
@@ -141,7 +147,7 @@ export const mcpSmokeWorkspaceTool = {
         await runCheck(checks, 'mcp_runtime_health', async () => {
             const metrics = readMcpMetricsSnapshot();
             const tunnelConfig = readCloudflareTunnelConfig();
-            const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
+            const tunnelState = await createCloudflareStateStore(tunnelConfig).readQuickTunnelState();
             const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
             if (tunnelConfig.mode === 'temporary-quick' && tunnel.stale) {
                 warnings.push('Temporary Cloudflare tunnel is stale.');

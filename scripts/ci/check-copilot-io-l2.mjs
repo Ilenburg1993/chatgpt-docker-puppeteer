@@ -35,61 +35,50 @@ function printJson(value) {
 }
 
 async function loadL2Modules() {
-    const [registry, db, sqlitePort, testing] = await Promise.all([
-        import('#copilot/infra/public/cache'),
+    const [{ createInfraRuntime }, db] = await Promise.all([
+        import('#copilot/infra/public/composition/runtime'),
         import('../../src/copilot/db/sqlite.js'),
-        import('#copilot/infra/public/database'),
-        import('#copilot/infra/public/testing'),
     ]);
-    return { registry, db, sqlitePort, testing };
+    return { createInfraRuntime, db };
 }
 
 async function runDefaultPhase() {
-    const { registry } = await loadL2Modules();
-    const configuration = registry.getIoL2CacheConfiguration();
-    assert.deepEqual(
-        {
-            enabled: configuration.enabled,
-            profile: configuration.profile,
-            profileSource: configuration.profileSource,
-        },
-        { enabled: false, profile: 'off', profileSource: 'default' },
-    );
-    assert.equal(registry.getIoL2Cache(), null);
-    printJson({ phase: 'default', profile: configuration.profile, enabled: configuration.enabled });
-}
-
-/**
- * @param {string} dbPath
- */
-async function runSeedPhase(dbPath) {
-    assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { registry, db, sqlitePort, testing } = await loadL2Modules();
-    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
+    const { createInfraRuntime } = await loadL2Modules();
+    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-default' });
     try {
-        const configuration = registry.getIoL2CacheConfiguration();
+        const configuration = runtime.coherence.l2.snapshot();
         assert.deepEqual(
             {
                 enabled: configuration.enabled,
                 profile: configuration.profile,
                 profileSource: configuration.profileSource,
-                ttlMs: configuration.ttlMs,
-                maxEntries: configuration.maxEntries,
-                pruneMs: configuration.pruneMs,
-                minBytes: configuration.minBytes,
             },
-            {
-                enabled: true,
-                profile: 'experimental',
-                profileSource: 'IO_L2_CACHE_PROFILE',
-                ttlMs: 60_000,
-                maxEntries: 10_000,
-                pruneMs: 60_000,
-                minBytes: 0,
-            },
+            { enabled: false, profile: 'off', profileSource: 'default' },
         );
+        assert.equal(runtime.coherence.l2.get(), null);
+        printJson({ phase: 'default', profile: configuration.profile, enabled: configuration.enabled });
+    } finally {
+        await runtime.dispose();
+    }
+}
 
-        const cache = registry.getIoL2Cache();
+/** @param {string} dbPath */
+async function runSeedPhase(dbPath) {
+    assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
+    const { createInfraRuntime, db } = await loadL2Modules();
+    await db.ensureCopilotDbDir();
+    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-seed', sqliteProvider: db.getCopilotDb });
+    try {
+        const configuration = runtime.coherence.l2.snapshot();
+        assert.deepEqual(
+            {
+                enabled: configuration.enabled,
+                profile: configuration.profile,
+                profileSource: configuration.profileSource,
+            },
+            { enabled: true, profile: 'experimental', profileSource: 'IO_L2_CACHE_PROFILE' },
+        );
+        const cache = runtime.coherence.l2.get();
         assert.ok(cache, 'experimental profile must initialize the L2 cache');
         cache.clearAll();
         assert.equal(
@@ -106,7 +95,7 @@ async function runSeedPhase(dbPath) {
         const row = cache.get(CANARY_KEY);
         assert.ok(row, 'seed process must read its freshly persisted entry');
         assert.equal(createHash('sha256').update(row.payload).digest('hex'), PAYLOAD_HASH);
-        const stats = registry.getIoL2CacheStats();
+        const stats = runtime.coherence.l2.stats();
         assert.equal(stats.enabled, true);
         if (!('hits' in stats)) throw new Error('experimental L2 stats unavailable after seed');
         printJson({
@@ -117,46 +106,40 @@ async function runSeedPhase(dbPath) {
             stats,
         });
     } finally {
-        testing.resetIoL2CacheForTest();
-        testing.resetInfraSqliteProviderForTest();
+        await runtime.dispose();
         db.closeCopilotDb();
     }
 }
 
-/**
- * @param {string} dbPath
- */
+/** @param {string} dbPath */
 async function runReadPhase(dbPath) {
     assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { registry, db, sqlitePort, testing } = await loadL2Modules();
-    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
+    const { createInfraRuntime, db } = await loadL2Modules();
+    await db.ensureCopilotDbDir();
+    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-read', sqliteProvider: db.getCopilotDb });
     try {
-        const cache = registry.getIoL2Cache();
+        const cache = runtime.coherence.l2.get();
         assert.ok(cache, 'read process must initialize the experimental L2 cache');
         const row = cache.get(CANARY_KEY);
         assert.ok(row, 'entry seeded by the previous process must persist');
         assert.equal(row.payload.byteLength, PAYLOAD.byteLength);
         assert.equal(createHash('sha256').update(row.payload).digest('hex'), PAYLOAD_HASH);
-        assert.deepEqual(JSON.parse(row.metaJson ?? '{}'), {
-            payloadHash: PAYLOAD_HASH,
-            producer: 'seed-process',
-        });
-        const stats = registry.getIoL2CacheStats();
+        assert.deepEqual(JSON.parse(row.metaJson ?? '{}'), { payloadHash: PAYLOAD_HASH, producer: 'seed-process' });
+        const stats = runtime.coherence.l2.stats();
         assert.equal(stats.enabled, true);
         if (!('hits' in stats)) throw new Error('experimental L2 stats unavailable after cross-process read');
         assert.equal(stats.hits, 1);
         assert.equal(cache.clearAll(), true);
         printJson({
             phase: 'read',
-            profile: registry.getIoL2CacheConfiguration().profile,
+            profile: runtime.coherence.l2.snapshot().profile,
             persistedAcrossProcesses: true,
             payloadBytes: row.payload.byteLength,
             payloadHash: PAYLOAD_HASH,
             stats,
         });
     } finally {
-        testing.resetIoL2CacheForTest();
-        testing.resetInfraSqliteProviderForTest();
+        await runtime.dispose();
         db.closeCopilotDb();
     }
 }
@@ -168,7 +151,6 @@ async function runReadPhase(dbPath) {
 function runChild(phase, dbPath) {
     /** @type {NodeJS.ProcessEnv} */
     const env = { ...process.env, COPILOT_DB_PATH: dbPath };
-    delete env['IO_L2_CACHE_ENABLED'];
     delete env['IO_L2_CACHE_TTL_MS'];
     delete env['IO_L2_CACHE_MAX_ENTRIES'];
     delete env['IO_L2_CACHE_PRUNE_MS'];

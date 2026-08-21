@@ -1,27 +1,38 @@
 // @ts-check
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { appendMcpLatencyDashboardSnapshot, readMcpLatencyDashboardHistory } from '#copilot/mcp/control-plane';
+import { createMcpLatencyHistoryRuntime } from '../../../../src/copilot/mcp/control-plane/latency-history.js';
 
 describe('MCP latency history persistence', () => {
-    it('serializes concurrent append/trim cycles without losing the retained tail', async () => {
+    it('serializes concurrent append/trim cycles through one bound configured store', async () => {
         const id = randomUUID();
         const filePath = path.join(process.cwd(), 'src/copilot/.ai/mcp', `latency-history-test-${id}.jsonl`);
+        const io = createConfiguredFsIo(
+            createConfiguredFsGrant({
+                id: `test.mcp.latency-history.${id}`,
+                exactPaths: [filePath],
+                operations: ['append', 'read', 'write'],
+                symlinkPolicy: 'deny',
+                durability: ['file-and-directory'],
+            }),
+        );
+        const runtime = createMcpLatencyHistoryRuntime({ filePath, io });
         try {
             const writes = await Promise.all(
                 Array.from({ length: 20 }, (_, index) =>
-                    appendMcpLatencyDashboardSnapshot(
+                    runtime.appendSnapshot(
                         {
                             timestamp: `2026-06-12T00:00:${String(index).padStart(2, '0')}.000Z`,
                             status: `sample-${index}`,
                             summary: { totalCalls: index },
                         },
-                        { filePath, maxSnapshots: 7 },
+                        { maxSnapshots: 7 },
                     ),
                 ),
             );
@@ -29,7 +40,7 @@ describe('MCP latency history persistence', () => {
             assert.ok(writes.every((result) => result.persisted));
             assert.ok(writes.every((result) => !result.persisted || result.retainedSnapshots <= 7));
 
-            const history = await readMcpLatencyDashboardHistory({ filePath, limit: 20 });
+            const history = await runtime.readHistory({ limit: 20 });
             assert.equal(history.ok, true);
             assert.equal(history.entries.length, 7);
             assert.equal(new Set(history.entries.map((entry) => entry.snapshot.status)).size, 7);

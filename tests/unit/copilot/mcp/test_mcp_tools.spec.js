@@ -9,10 +9,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/p
 import { join, relative } from 'node:path';
 import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
-import { getIoL1Cache } from '#copilot/infra/public/cache';
-import { invalidateIoCoherencePath } from '#copilot/infra/public/filesystem/invalidation';
-
-import { configureInfraSqliteProvider } from '#copilot/infra/public/database';
+import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot';
 import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
     getTtlCacheStats,
@@ -27,21 +24,18 @@ import {
     resetRepoReadResponseCacheForTest,
 } from '../../../../src/copilot/mcp/tools/repo-read-cache.js';
 
-import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
 /** @type {import('better-sqlite3').Database | null} */
 let testInfraDb = null;
 
 beforeAll(() => {
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
     testInfraDb = new Database(':memory:');
     ensureIoIndexSchema(testInfraDb);
-    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testInfraDb));
+    const provider = () => /** @type {import('better-sqlite3').Database} */ (testInfraDb);
+    configureApplicationInfraSqliteProvider(provider);
 });
 
 afterAll(() => {
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+    getApplicationInfraRuntime().database.reset();
     if (testInfraDb?.open) testInfraDb.close();
     testInfraDb = null;
 });
@@ -288,7 +282,7 @@ describe('copilot MCP tools', () => {
         assert.equal(afterSecond.size, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
-        if (resolved.ok) invalidateIoCoherencePath(resolved.resolved);
+        if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['clears'], 1);
@@ -316,7 +310,7 @@ describe('copilot MCP tools', () => {
             assert.equal(insideWindow.structuredContent?.['content'], 'alpha\n');
 
             vi.setSystemTime(1_026);
-            getIoL1Cache().clear();
+            getApplicationInfraRuntime().coherence.l1.clear();
             const afterFixedWindow = await tool.handler({ path: relativePath });
             const stats = readRepoReadFileResultCacheStats();
             assert.equal(afterFixedWindow.structuredContent?.['content'], 'omega\n');
@@ -351,7 +345,7 @@ describe('copilot MCP tools', () => {
             await utimes(filePath, originalStats.atime, originalStats.mtime);
             // Clear only the lower process-local L1 so this regression isolates the shaped response cache. No bus event
             // is published here, therefore the response cache must reject its own stale entry by rich fingerprint.
-            getIoL1Cache().clear();
+            getApplicationInfraRuntime().coherence.l1.clear();
 
             const second = await tool.handler({ path: relativePath });
             const cacheStats = readRepoReadFileResultCacheStats();
@@ -602,7 +596,7 @@ describe('copilot MCP tools', () => {
         assert.equal(afterSecond.chunkSize, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
-        if (resolved.ok) invalidateIoCoherencePath(resolved.resolved);
+        if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['chunkClears'], 1);
@@ -797,7 +791,7 @@ describe('copilot MCP tools', () => {
                     "import '#copilot/sdk/di';",
                     "import '#copilot/sdk/agents';",
                     "import '#copilot/sdk/session-runtime';",
-                    "await import('#copilot/infra/public/cache');",
+                    "await import('#copilot/infra/public/cache/keys');",
                     'export const value = 1;',
                     '',
                 ].join('\n'),
@@ -850,7 +844,7 @@ describe('copilot MCP tools', () => {
             assert.equal(first.structuredContent?.['totalOrphans'], 0);
 
             await rm(targetPath);
-            invalidateIoCoherencePath(relativeTargetPath);
+            getApplicationInfraRuntime().coherence.invalidation.invalidatePath(relativeTargetPath);
 
             const second = await orphanImportsTool.handler({
                 path: relativeImporterPath,
@@ -1662,6 +1656,50 @@ describe('copilot MCP tools', () => {
             assert.equal(appliedRows[0]?.['groupedSameFile'], true);
             assert.equal(appliedRows[1]?.['groupedSameFile'], true);
             assert.equal(await readFile(absolutePath, 'utf8'), 'gamma\nomega\n');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('repo_apply_patch_batch distinguishes virtual same-file state from disk baseline on failure', async () => {
+        const jobsRoot = join(process.cwd(), 'src/copilot/.ai/jobs');
+        await mkdir(jobsRoot, { recursive: true });
+        const tempDir = await mkdtemp(join(jobsRoot, 'same-file-patch-failure-'));
+        const absolutePath = join(tempDir, 'sample.txt');
+        const repoPath = relative(process.cwd(), absolutePath).replaceAll('\\', '/');
+        const initial = 'alpha beta gamma\n';
+        await writeFile(absolutePath, initial, 'utf8');
+        try {
+            const tool = findTool('repo_apply_patch_batch');
+            const result = await tool.handler({
+                operations: [
+                    { path: repoPath, old_string: 'alpha', new_string: 'ALPHA' },
+                    { path: repoPath, old_string: 'missing', new_string: 'MISSING' },
+                ],
+                dryRun: false,
+                confirmBatch: true,
+                resultMode: 'detailed',
+            });
+            assert.equal(result.isError, undefined);
+            assert.equal(result.structuredContent?.['success'], false);
+            assert.equal(result.structuredContent?.['partial'], false);
+            const failures = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['failures']);
+            assert.equal(failures.length, 2);
+            const causal = failures.find((row) => row['causalFailure'] === true);
+            const aborted = failures.find((row) => row['causalFailure'] === false);
+            assert.equal(causal?.['failureClass'], 'virtual-batch-context');
+            assert.equal(causal?.['retryability'], 'manual-decision');
+            assert.equal(causal?.['recoveryRequired'], false);
+            assert.equal(aborted?.['failureClass'], 'dependency-abort');
+            const details = /** @type {Record<string, unknown>} */ (causal?.['details']);
+            assert.equal(details['currentStateKind'], 'virtual-batch');
+            assert.equal(details['currentBytes'], Buffer.byteLength('ALPHA beta gamma\n', 'utf8'));
+            assert.equal(details['diskBaselineBytes'], Buffer.byteLength(initial, 'utf8'));
+            assert.equal(typeof details['currentHash'], 'string');
+            assert.equal(typeof details['diskBaselineHash'], 'string');
+            assert.notEqual(details['currentHash'], details['diskBaselineHash']);
+            assert.match(String(causal?.['nextAction']), /in-memory virtual state/u);
+            assert.equal(await readFile(absolutePath, 'utf8'), initial);
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }

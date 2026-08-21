@@ -2,10 +2,7 @@
 /** Operational parser health projection. */
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { fileContextCache, fileContextCacheStats, isFileContextCacheEnabled, symbolCache } from '../cache/index.js';
 import {
-    FILE_CONTEXT_CACHE_MAX_BYTES,
-    FILE_CONTEXT_CACHE_MAX_ENTRIES,
     MAX_PARSE_DURATION_MS,
     MAX_PARSE_LINE_GUARD,
     PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
@@ -15,28 +12,26 @@ import {
     PARSER_WORKER_QUEUE_MAX,
     PARSER_WORKER_QUEUE_POLICY,
     PARSER_WORKER_REQUEST_TIMEOUT_MS,
-    parserRuntimeStats,
-    SYMBOL_CACHE_MAX_BYTES,
-    SYMBOL_CACHE_MAX_ENTRIES,
+    getParserRuntimeStatsSnapshot,
 } from '../foundation/index.js';
-import { getParserWorkerRuntimeStatus } from '../worker/index.js';
-
-export function getParserCacheStats() {
-    const worker = getParserWorkerRuntimeStatus();
+/** @param {ReturnType<typeof import('../cache/runtime/index.js').createParserCacheRuntime>} parserCacheRuntime */
+export function getParserCacheStats(parserCacheRuntime) {
+    if (!parserCacheRuntime) throw new TypeError('getParserCacheStats requires an explicit ParserCacheRuntime.');
+    const worker = parserCacheRuntime.workerRuntime?.status() ?? {
+        queueLength: 0,
+        poolInitialized: false,
+        poolDisabledByError: false,
+        poolShuttingDown: false,
+        poolRestarting: 0,
+        consecutiveInitFailures: 0,
+        nextInitAttemptAtMs: null,
+    };
+    const cache = parserCacheRuntime.snapshot();
     return {
         parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
         parserProfile: 'symbols',
-        size: symbolCache.size,
-        maxSize: SYMBOL_CACHE_MAX_ENTRIES,
-        calculatedSize: symbolCache.calculatedSize,
-        maxBytes: SYMBOL_CACHE_MAX_BYTES,
         fileContext: {
-            enabled: isFileContextCacheEnabled(),
-            size: fileContextCache.size,
-            maxSize: FILE_CONTEXT_CACHE_MAX_ENTRIES,
-            calculatedSize: fileContextCache.calculatedSize,
-            maxBytes: FILE_CONTEXT_CACHE_MAX_BYTES,
-            ...fileContextCacheStats,
+            ...cache.fileContext,
         },
         maxParseDurationMs: MAX_PARSE_DURATION_MS,
         maxParseLines: MAX_PARSE_LINE_GUARD,
@@ -54,7 +49,8 @@ export function getParserCacheStats() {
         workerPoolRestarting: worker.poolRestarting,
         workerPoolConsecutiveInitFailures: worker.consecutiveInitFailures,
         workerPoolNextInitAttemptAtMs: worker.nextInitAttemptAtMs,
-        ...parserRuntimeStats,
+        ...cache.symbol,
+        ...getParserRuntimeStatsSnapshot(),
         mainThreadFallbackMaxBytes: PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
     };
 }

@@ -1,4 +1,23 @@
 // @ts-check
 /** @module copilot/infra/public/operations */
 
-export * from '../../operations/index.js';
+export {
+    abortIoChangeSet,
+    appendIoChangeSetEntry,
+    applyIoChangeSet,
+    beginIoChangeSet,
+    buildIoMutationAuditRecord,
+    buildIoRollbackPlan,
+    cleanupRollbackSidecars,
+    completeIoOperationEnvelope,
+    createIoOperationEnvelope,
+    createIoRollbackToken,
+    executeIoRollbackToken,
+    failIoChangeSet,
+    failIoOperationEnvelope,
+    listRollbackSidecars,
+    parseIoRollbackToken,
+    rollbackIoChangeSet,
+    serializeIoRollbackToken,
+    verifyIoRollbackToken,
+} from '../../operations/index.js';

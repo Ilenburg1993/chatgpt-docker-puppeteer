@@ -14,6 +14,7 @@
  *     | 'inventory'
  *     | 'documentation'
  *     | 'governance'
+ *     | 'composition'
  *     | 'platform-foundation'
  *     | 'filesystem-capability'
  *     | 'database-foundation'
@@ -37,7 +38,6 @@
  *     tier: InfraModuleTier;
  *     risk: InfraModuleRisk;
  *     public: boolean;
- *     legacy?: boolean;
  *     summary: string;
  * }} InfraModuleDescriptor
  */
@@ -72,6 +72,16 @@ export const INFRA_ARCHITECTURE_MANIFEST = /** @type {readonly InfraModuleDescri
                 risk: 'stable',
                 public: false,
                 summary: 'Architecture manifest, scorecard and machine-enforced ownership metadata.',
+            },
+            {
+                path: 'composition/',
+                kind: 'directory',
+                role: 'composition',
+                tier: 'primary',
+                risk: 'watch',
+                public: false,
+                summary:
+                    'Explicit ProcessInfra, InfraRuntime, WorkspaceInfra and OperationContext ownership/lifecycle scopes.',
             },
             {
                 path: 'platform/',
@@ -204,8 +214,4 @@ export const INFRA_PRIMARY_CAPABILITY_PATHS = Object.freeze(
 
 export const INFRA_PUBLIC_ENTRY_PATHS = Object.freeze(
     INFRA_ARCHITECTURE_MANIFEST.filter((entry) => entry.public).map((entry) => entry.path),
-);
-
-export const INFRA_LEGACY_ROOT_PATHS = Object.freeze(
-    INFRA_ARCHITECTURE_MANIFEST.filter((entry) => entry.legacy === true).map((entry) => entry.path),
 );

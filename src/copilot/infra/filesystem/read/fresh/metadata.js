@@ -3,7 +3,12 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { lstatPathSnapshot, readDirectoryNamesSnapshot, statPathSnapshot } from '../snapshot/index.js';
 
 /**
@@ -36,6 +41,8 @@ export async function listDirectoryNamesFresh(dirPath, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { path: dirPath, entries, io };
     } catch (error) {
@@ -52,6 +59,7 @@ export async function listDirectoryNamesFresh(dirPath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -83,6 +91,8 @@ export async function lstatPath(filePath, options = {}) {
                 advisoryLimits: { ...(options.advisoryLimits ?? {}), followSymlinks: false },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { path: filePath, stats, io };
     } catch (error) {
@@ -99,6 +109,7 @@ export async function lstatPath(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -128,6 +139,8 @@ export async function statPath(filePath, options = {}) {
                 ...(options.advisoryLimits !== undefined ? { advisoryLimits: options.advisoryLimits } : {}),
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { path: filePath, stats, io };
     } catch (error) {
@@ -143,6 +156,7 @@ export async function statPath(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

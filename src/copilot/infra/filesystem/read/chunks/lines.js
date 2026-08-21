@@ -1,11 +1,6 @@
 // @ts-check
 /** Low-level public line-chunk API: retry orchestration plus Web ReadableStream delivery. */
 
-import {
-    discardStaleByteLineIndex,
-    ensureByteLineIndexInvalidationHook,
-    rememberByteLineIndexStreamSeed,
-} from '../line-index/index.js';
 import { createStaleChunkSnapshotError, isStaleChunkSnapshotError } from '../snapshot/index.js';
 import { readTextLineChunksByByteIndex } from './byte-seek.js';
 import { throwAbortError } from './codec.js';
@@ -24,6 +19,7 @@ const DEFAULT_CHUNK_SNAPSHOT_RETRIES = 2;
  *     signal?: AbortSignal;
  *     maxRetries?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     readRuntime?: {byteLineIndex:ReturnType<typeof import('../line-index/index.js').createByteLineIndexRuntime>};
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -55,7 +51,8 @@ const DEFAULT_CHUNK_SNAPSHOT_RETRIES = 2;
  * }>}
  */
 export async function readTextLineChunks(filePath, options = {}) {
-    ensureByteLineIndexInvalidationHook();
+    const byteLineIndex = options.readRuntime?.byteLineIndex ?? null;
+    byteLineIndex?.ensureInvalidationHook();
     if (options.signal?.aborted) throwAbortError();
     const startLine = Math.max(1, options.startLine ?? 1);
     const maxRetries =
@@ -66,7 +63,7 @@ export async function readTextLineChunks(filePath, options = {}) {
     for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
         try {
             const attemptOptions = { ...options, attempt, deliveryMode: /** @type {const} */ ('materialized') };
-            if (startLine > 1) {
+            if (startLine > 1 && byteLineIndex) {
                 const seekSnapshot = await readTextLineChunksByByteIndex(filePath, attemptOptions);
                 if (seekSnapshot) return { ...seekSnapshot, attempts: attempt };
             }
@@ -100,7 +97,7 @@ export async function readTextLineChunks(filePath, options = {}) {
                 throw createStaleChunkSnapshotError(filePath, attempt);
             }
 
-            rememberByteLineIndexStreamSeed(filePath, state);
+            byteLineIndex?.rememberStreamSeed(filePath, state);
 
             return {
                 path: filePath,
@@ -134,7 +131,7 @@ export async function readTextLineChunks(filePath, options = {}) {
             };
         } catch (error) {
             if (!isStaleChunkSnapshotError(error) || attempt > maxRetries) throw error;
-            discardStaleByteLineIndex(filePath);
+            byteLineIndex?.discardStale(filePath);
         }
     }
 
@@ -152,11 +149,11 @@ export async function readTextLineChunks(filePath, options = {}) {
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     readRuntime?: {byteLineIndex:ReturnType<typeof import('../line-index/index.js').createByteLineIndexRuntime>};
  * }} [options]
  * @returns {ReadableStream<TextLineChunk>}
  */
 export function readTextLineChunksStream(filePath, options = {}) {
-    ensureByteLineIndexInvalidationHook();
     const state = {
         totalLines: 0,
         bytesRead: 0,

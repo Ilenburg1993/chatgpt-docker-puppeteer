@@ -26,10 +26,11 @@ export function readEnvBoolean(key, fallback, env = process.env) {
  *
  * @param {string} key
  * @param {number} fallback
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {number}
  */
-export function readEnvPositiveInt(key, fallback) {
-    const raw = process.env[key];
+export function readEnvPositiveInt(key, fallback, env = process.env) {
+    const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -40,10 +41,11 @@ export function readEnvPositiveInt(key, fallback) {
  *
  * @param {string} key
  * @param {number} fallback
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {number}
  */
-export function readEnvNonNegativeInt(key, fallback) {
-    const raw = process.env[key];
+export function readEnvNonNegativeInt(key, fallback, env = process.env) {
+    const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
@@ -55,10 +57,11 @@ export function readEnvNonNegativeInt(key, fallback) {
  * @param {string} key
  * @param {number} fallback
  * @param {number} minimum
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {number}
  */
-export function readEnvIntAtLeast(key, fallback, minimum) {
-    const raw = process.env[key];
+export function readEnvIntAtLeast(key, fallback, minimum, env = process.env) {
+    const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);
     return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= minimum ? parsed : fallback;

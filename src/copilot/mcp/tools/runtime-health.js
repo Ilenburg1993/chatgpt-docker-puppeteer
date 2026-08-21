@@ -5,19 +5,19 @@
  * @module copilot/mcp/tools/runtime-health
  */
 
-import { buildIoCacheTierPlan } from '#copilot/infra/public/cache';
-import { getIoIndexStats } from '#copilot/infra/public/indexing';
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
+import { buildIoCacheTierPlan } from '#copilot/infra/public/cache/tiering';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { getCopilotNodeCompileCacheHealth } from '#copilot/infra/public/platform/node';
 import {
+    createCloudflareStateStore,
     readCloudflareTunnelConfig,
-    readConnectorSmokeState,
-    readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
 } from '#copilot/mcp/cloudflare';
 import {
     buildAiArtifactsReport,
+    getMcpWorkspaceIndexRegistry,
     getMcpWorkspaceRoot,
     getTtlCacheStats,
     okResult,
@@ -37,6 +37,9 @@ import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime
 import { readMcpStartupMaintenanceState } from '../control-plane/startup-maintenance.js';
 import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
+
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const readIoIndexStatus = INDEX_REGISTRY.status;
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const WORKSPACE_STATUS_CACHE_TTL_MS = 5 * 1000;
@@ -647,21 +650,25 @@ export const mcpRuntimeHealthTool = {
         const authConfigCache = readMcpAuthConfigCacheStats();
         const authDecisionCache = readMcpAuthDecisionCacheStats();
         const repoReadFileCache = readRepoReadFileResultCacheStats();
-        const ioRuntime = readIoRuntimeHealthSnapshot();
+        const ioRuntime = readIoRuntimeHealthSnapshot(getApplicationInfraRuntime());
         const ioCacheBenchmarkState = await readIoCacheBenchmarkState();
         const ioCacheBenchmark = summarizeIoCacheBenchmark(ioCacheBenchmarkState);
         const ioCachePlanWithBenchmark = buildEvidenceAwareIoCachePlan(ioRuntime, ioCacheBenchmarkState);
         const aiArtifacts = await buildAiArtifactsReport();
         const tunnelConfig = readCloudflareTunnelConfig();
-        const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
+        const tunnelStateStore = createCloudflareStateStore(tunnelConfig);
+        const [tunnelState, connectorSmokeState] = await Promise.all([
+            tunnelStateStore.readQuickTunnelState(),
+            tunnelStateStore.readConnectorSmokeState(),
+        ]);
         const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
         const connectorSmoke = summarizeConnectorSmokeState(
-            await readConnectorSmokeState(tunnelConfig.smokeStateFile),
+            connectorSmokeState,
             tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl,
         );
         const permanentMode = tunnelConfig.mode === 'named-permanent';
         const workspace = await summarizeWorkspaceStatus();
-        const indexStats = getIoIndexStats();
+        const indexStats = readIoIndexStatus();
         const index = summarizeIndexHealth(indexStats);
         const indexAutoBuild = readMcpIndexAutoBuildState();
         const startupMaintenance = readMcpStartupMaintenanceState();

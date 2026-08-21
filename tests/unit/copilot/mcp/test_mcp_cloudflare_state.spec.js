@@ -9,12 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import {
-    readQuickTunnelState,
-    saveQuickTunnelState,
-    summarizeQuickTunnelState,
-    updateQuickTunnelLastSmoke,
-} from '#copilot/mcp/cloudflare';
+import { createCloudflareStateStore, summarizeQuickTunnelState } from '#copilot/mcp/cloudflare';
 
 /** @type {import('#copilot/mcp/cloudflare').QuickTunnelState} */
 const baseState = {
@@ -83,9 +78,13 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
     it('summarizes and persists the last successful remote smoke', async () => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-cloudflare-state-'));
         const stateFile = path.join(dir, 'quick-tunnel.json');
+        const stateStore = createCloudflareStateStore({
+            stateFile,
+            smokeStateFile: path.join(dir, 'connector-smoke.json'),
+        });
         await fs.writeFile(stateFile, `${JSON.stringify(baseState, null, 2)}\n`, 'utf8');
 
-        const updated = await updateQuickTunnelLastSmoke(stateFile, baseState, {
+        const updated = await stateStore.updateQuickTunnelLastSmoke(baseState, {
             checkedAt: '2026-05-22T12:02:00.000Z',
             ok: true,
             connectorUrl: baseState.connectorUrl,
@@ -104,7 +103,7 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
         });
         assert.equal(updated, true);
 
-        const persisted = await readQuickTunnelState(stateFile);
+        const persisted = await stateStore.readQuickTunnelState();
         const summary = summarizeQuickTunnelState(persisted, Date.parse('2026-05-22T12:05:00.000Z'), 10 * 60 * 1000);
 
         assert.equal(summary.lastSmokeOk, true);
@@ -116,17 +115,21 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
     it('atomically serializes concurrent state writes with private permissions', async () => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-cloudflare-state-atomic-'));
         const stateFile = path.join(dir, 'quick-tunnel.json');
+        const stateStore = createCloudflareStateStore({
+            stateFile,
+            smokeStateFile: path.join(dir, 'connector-smoke.json'),
+        });
         try {
             await Promise.all(
                 Array.from({ length: 20 }, (_, index) =>
-                    saveQuickTunnelState(stateFile, {
+                    stateStore.saveQuickTunnelState({
                         ...baseState,
                         connectorUrl: `${baseState.connectorUrl}?writer=${index}`,
                     }),
                 ),
             );
 
-            const persisted = await readQuickTunnelState(stateFile);
+            const persisted = await stateStore.readQuickTunnelState();
             assert.ok(persisted && !('error' in persisted));
             assert.match(persisted.connectorUrl, /\?writer=\d+$/u);
             assert.equal((await fs.stat(stateFile)).mode & 0o777, 0o600);

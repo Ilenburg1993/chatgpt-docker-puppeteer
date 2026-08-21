@@ -5,7 +5,7 @@
  * @module copilot/mcp/scripts/scheduled-io-cache-benchmark-runner
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceIo } from '#copilot/infra/public/composition/workspace/io';
 import { getIoCacheBenchmarkStateFile } from '#copilot/mcp/control-plane';
 import { spawn } from 'node:child_process';
 import path from 'node:path';

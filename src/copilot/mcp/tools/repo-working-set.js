@@ -10,15 +10,8 @@
  */
 
 import {
-    closeScope,
-    declareScope,
-    findSymbol,
-    getScopeContext,
-    getScopeStats,
-    refreshScope,
-} from '#copilot/infra/public/indexing/context';
-import {
     errorResult,
+    getMcpWorkspaceIndexing,
     getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
@@ -34,6 +27,8 @@ const DEFAULT_CONTEXT_FILES = 40;
 const DEFAULT_CONTEXT_BYTES = 16 * 1024;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_MCP_WORKING_SETS = 8;
+const MCP_SCOPE_CONTEXT = getMcpWorkspaceIndexing().context;
+const { closeScope, declareScope, findSymbol, getScopeContext, getScopeStats, refreshScope } = MCP_SCOPE_CONTEXT;
 
 /** @type {Map<string, { scopeId: string; createdAtMs: number; lastAccessAtMs: number }>} */
 const mcpWorkingSets = new Map();

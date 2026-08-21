@@ -20,6 +20,7 @@
  * @see EventBus
  */
 
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
 import { decideSdkFsRouting, hasCanonicalLocalFsTools, redactSecretRecord } from '#copilot/core';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { Router } from 'express';
@@ -215,7 +216,7 @@ export default function createObservabilityRouter(deps) {
                 convergenceTraceSnapshot?.traces.filter(
                     (trace) => trace.status === 'failed' || trace.status === 'mixed',
                 ).length ?? 0;
-            const ioRuntime = readIoRuntimeHealthSnapshot();
+            const ioRuntime = readIoRuntimeHealthSnapshot(getApplicationInfraRuntime());
             const l1HitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0);
             const l2Enabled = Boolean(ioRuntime.cache.l2?.['enabled']);
             const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});

@@ -191,6 +191,7 @@ export function resetIoPathPolicyCacheForTest() {
  *     blockedSegments?: readonly string[];
  *     blockedPatterns?: readonly RegExp[];
  *     allowOutsideWorkspace?: boolean;
+ *     preserveFinalSymlink?: boolean;
  *     mode?:
  *         | 'read'
  *         | 'write'
@@ -268,12 +269,13 @@ export async function evaluateIoPathPolicyAsync(inputPath, options = {}) {
     if (!base.ok) return base;
 
     const allowOutsideWorkspace = options.allowOutsideWorkspace === true;
+    const preserveFinalSymlink = options.preserveFinalSymlink === true && base.absolutePath !== base.workspaceRoot;
     const mode = normalizePathPolicyMode(options.mode);
     const blockedSegments = normalizeBlockedSegments(options.blockedSegments || DEFAULT_BLOCKED_PATH_SEGMENTS);
     const blockedPatterns = normalizeBlockedPatterns(options.blockedPatterns, mode);
     const cacheConfig = readIoPathPolicyCacheConfig();
     const cacheKey =
-        mode === 'read' && !allowOutsideWorkspace && cacheConfig.ttlMs > 0
+        mode === 'read' && !allowOutsideWorkspace && !preserveFinalSymlink && cacheConfig.ttlMs > 0
             ? buildIoPathPolicyCacheKey(base, blockedSegments, blockedPatterns)
             : null;
     if (cacheKey) {
@@ -283,23 +285,29 @@ export async function evaluateIoPathPolicyAsync(inputPath, options = {}) {
         ioPathPolicyCacheStats.bypasses += 1;
     }
 
-    const realTarget = await resolveRealTargetForPolicy(base.absolutePath);
-    const containment = evaluatePathContainment(base.workspaceRoot, realTarget.realPath);
+    // Metadata operations such as lstat must validate every ancestor without dereferencing the final component itself.
+    // This preserves symlink identity while still rejecting an ancestor symlink that escapes the workspace.
+    const resolutionPath = preserveFinalSymlink ? path.dirname(base.absolutePath) : base.absolutePath;
+    const resolvedTarget = await resolveRealTargetForPolicy(resolutionPath);
+    const normalizedTargetPath = preserveFinalSymlink
+        ? path.join(resolvedTarget.realPath, path.basename(base.absolutePath))
+        : resolvedTarget.realPath;
+    const containment = evaluatePathContainment(base.workspaceRoot, normalizedTargetPath);
 
     if (!allowOutsideWorkspace && containment.outsideWorkspace) {
         return fail('Path resolves outside workspace after symlink normalization', 'PATH_SYMLINK_OUTSIDE');
     }
 
-    const blockedHit = splitPathSegments(containment.relativePath || realTarget.realPath).find((segment) =>
+    const blockedHit = splitPathSegments(containment.relativePath || normalizedTargetPath).find((segment) =>
         blockedSegments.includes(segment.toLowerCase()),
     );
     if (blockedHit) {
         return fail(`Access to protected real path segment "${blockedHit}" is blocked`, 'PATH_BLOCKED');
     }
-    const blockedPattern = findBlockedPathPattern(realTarget.realPath, blockedPatterns);
+    const blockedPattern = findBlockedPathPattern(normalizedTargetPath, blockedPatterns);
     if (blockedPattern) {
         return fail(
-            `Access to protected real path basename "${path.basename(realTarget.realPath)}" is blocked`,
+            `Access to protected real path basename "${path.basename(normalizedTargetPath)}" is blocked`,
             'PATH_BLOCKED',
         );
     }
@@ -307,8 +315,8 @@ export async function evaluateIoPathPolicyAsync(inputPath, options = {}) {
     const result = {
         ...base,
         relativePath: containment.relativePath,
-        realPath: realTarget.realPath,
-        symlinkResolved: realTarget.realPath !== base.absolutePath,
+        realPath: normalizedTargetPath,
+        symlinkResolved: normalizedTargetPath !== base.absolutePath,
     };
     if (cacheKey) rememberIoPathPolicyCacheEntry(cacheKey, result, cacheConfig.maxEntries);
     return result;

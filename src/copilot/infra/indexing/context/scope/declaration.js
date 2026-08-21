@@ -2,26 +2,18 @@
 /** Scope allocation, bounded-registry eviction and initial state construction. */
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { closeScope } from './refresh.js';
-import {
-    MAX_ACTIVE_SCOPES,
-    _registry,
-    _warmControllers,
-    _warmPromises,
-    abortWarmForSession,
-    ensureScopeInvalidationHook,
-    normalizeScopePath,
-} from './state.js';
+import { abortWarmForSession, ensureScopeInvalidationHook, normalizeScopePath } from './state.js';
 
 /** @typedef {import('./types.js').ScopeDeclareOptions} ScopeDeclareOptions */
 /** @typedef {import('./types.js')._InternalScope} _InternalScope */
 
-/** @param {string} incomingSessionId */
-function enforceScopeLimit(incomingSessionId) {
-    if (_registry.has(incomingSessionId)) return;
-    while (_registry.size >= MAX_ACTIVE_SCOPES) {
+/** @param {string} incomingSessionId @param {import('./state.js').ScopeRuntimeState} runtime */
+function enforceScopeLimit(incomingSessionId, runtime) {
+    if (runtime.registry.has(incomingSessionId)) return;
+    while (runtime.registry.size >= runtime.maxActiveScopes) {
         let oldestSessionId = null;
         let oldestAccess = Number.POSITIVE_INFINITY;
-        for (const [sessionId, scope] of _registry.entries()) {
+        for (const [sessionId, scope] of runtime.registry.entries()) {
             if (scope.lastAccessAt < oldestAccess) {
                 oldestAccess = scope.lastAccessAt;
                 oldestSessionId = sessionId;
@@ -30,20 +22,20 @@ function enforceScopeLimit(incomingSessionId) {
         if (!oldestSessionId) break;
         publishIoLifecycleEvent('scope', 'evicted', {
             sessionId: oldestSessionId,
-            activeScopes: _registry.size,
-            maxActiveScopes: MAX_ACTIVE_SCOPES,
+            activeScopes: runtime.registry.size,
+            maxActiveScopes: runtime.maxActiveScopes,
         });
-        closeScope(oldestSessionId);
+        closeScope(oldestSessionId, runtime);
     }
 }
 
-/** @param {ScopeDeclareOptions} opts */
-export function allocateScope(opts) {
-    const previousWarmPromise = _warmPromises.get(opts.sessionId) ?? null;
+/** @param {ScopeDeclareOptions} opts @param {import('./state.js').ScopeRuntimeState} runtime */
+export function allocateScope(opts, runtime) {
+    const previousWarmPromise = runtime.warmPromises.get(opts.sessionId) ?? null;
     const warmController = new AbortController();
-    enforceScopeLimit(opts.sessionId);
-    abortWarmForSession(opts.sessionId);
-    ensureScopeInvalidationHook();
+    enforceScopeLimit(opts.sessionId, runtime);
+    abortWarmForSession(opts.sessionId, runtime);
+    ensureScopeInvalidationHook(runtime);
 
     const explicitPaths = opts.paths;
     const directory = opts.directory;
@@ -90,7 +82,7 @@ export function allocateScope(opts) {
         completedAt: null,
         lastAccessAt: Date.now(),
     };
-    _registry.set(opts.sessionId, scope);
-    _warmControllers.set(opts.sessionId, warmController);
+    runtime.registry.set(opts.sessionId, scope);
+    runtime.warmControllers.set(opts.sessionId, warmController);
     return { scope, warmController, previousWarmPromise };
 }

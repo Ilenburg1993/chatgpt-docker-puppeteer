@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import {

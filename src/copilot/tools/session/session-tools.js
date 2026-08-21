@@ -1,8 +1,8 @@
 // @ts-check
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { logSwallowed, toError } from '#copilot/core';
 import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -20,9 +20,8 @@ import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
  */
 
 const HOOKS_STATE = resolveHooksStateDir();
-const { createOrReplaceFileAtomic, mkdirPathLocked, readText } = createWorkspaceIo({
-    workspaceRoot: resolveWorkspacePath(),
-});
+const { createOrReplaceFileAtomic, mkdirPathLocked, readText } =
+    getApplicationWorkspaceInfra(resolveWorkspacePath()).io;
 const GIT_INFO_TIMEOUT_MS = 8_000;
 const GIT_INFO_MAX_BUFFER = 8 * 1024 * 1024;
 

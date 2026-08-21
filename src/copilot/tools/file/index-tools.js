@@ -1,7 +1,7 @@
 // @ts-check
 import { z } from 'zod/v3';
 import { buildTool } from '../infra/tool-factory.js';
-import { validatePath, WORKSPACE_ROOT } from './shared.js';
+import { validatePath, WORKSPACE_INDEXING, WORKSPACE_IO, WORKSPACE_ROOT } from './shared.js';
 /**
  * Tools canônicas para o índice L2 de arquivos.
  *
@@ -12,22 +12,24 @@ import { validatePath, WORKSPACE_ROOT } from './shared.js';
  */
 
 import { toError } from '#copilot/core';
+import { windowFileContext } from '#copilot/infra/public/indexing/file-context';
 import {
-    buildIoIndexForDirectory,
     filterIndexRowsByGlob,
-    findIoIndexImports,
-    findIoIndexSymbol,
     formatIndexImportRows,
     formatIndexSearchRows,
     formatIndexSymbolRows,
-    getIoIndexStats,
-    invalidateIoIndexPath,
     normalizeSearchWindow,
     paginateSearchItems,
-    parseFileForContext,
-    searchIoIndex,
-    windowFileContext,
-} from '#copilot/infra/public/indexing';
+} from '#copilot/infra/public/indexing/search';
+
+const INDEX_REGISTRY = WORKSPACE_INDEXING.registry;
+if (!INDEX_REGISTRY) throw new Error('File tools workspace is not attached to an InfraRuntime index registry.');
+const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
+const invalidateIoIndexPath = INDEX_REGISTRY.invalidatePath;
+const findIoIndexImports = INDEX_REGISTRY.findImports;
+const findIoIndexSymbol = INDEX_REGISTRY.findSymbol;
+const searchIoIndex = INDEX_REGISTRY.search;
+const readIoIndexStatus = INDEX_REGISTRY.status;
 
 const IndexBuildParameters = z.object({
     directory: z.string().min(1).describe('Diretório local a indexar.'),
@@ -128,7 +130,7 @@ export const workspaceIndexStatusTool = buildTool({
     name: 'workspace_index_status',
     description: 'Retorna disponibilidade e metadados do índice L2 local de arquivos.',
     parameters: z.object({}),
-    handler: async () => getIoIndexStats(),
+    handler: async () => readIoIndexStatus(),
 });
 
 export const workspaceIndexSearchTool = buildTool({
@@ -138,7 +140,7 @@ export const workspaceIndexSearchTool = buildTool({
         'Retorna `output` string formatada com highlights (**match**), `matchCount`, `totalMatches` e `nextCursor` para paginação.',
     parameters: IndexSearchParameters,
     handler: async ({ query, path: searchPath, maxResults, cursor, includePattern, excludePattern }) => {
-        const stats = getIoIndexStats();
+        const stats = readIoIndexStatus();
         if (!stats.available) {
             return {
                 query,
@@ -186,7 +188,7 @@ export const workspaceIndexFindSymbolTool = buildTool({
         'Retorna `output` string formatada com arquivo:linha e tipo de símbolo, `matchCount` e `nextCursor` para paginação.',
     parameters: IndexSymbolParameters,
     handler: async ({ symbol, maxResults, cursor, exactMatch }) => {
-        const stats = getIoIndexStats();
+        const stats = readIoIndexStatus();
         if (!stats.available) {
             return {
                 symbol,
@@ -237,7 +239,7 @@ export const workspaceIndexInvalidateTool = buildTool({
             success: true,
             path: pathCheck.resolved,
             invalidated,
-            stats: getIoIndexStats(),
+            stats: readIoIndexStatus(),
         };
     },
 });
@@ -249,7 +251,7 @@ export const workspaceIndexFindImportsTool = buildTool({
         'Retorna `output` string formatada com arquivo:linha, especificadores e módulo do import, `matchCount` e `nextCursor`.',
     parameters: IndexImportParameters,
     handler: async ({ source, maxResults, cursor, exactSource }) => {
-        const stats = getIoIndexStats();
+        const stats = readIoIndexStatus();
         if (!stats.available) {
             return {
                 source,
@@ -339,16 +341,14 @@ export const workspaceParseFileTool = buildTool({
         let content;
         let contentHash;
         try {
-            const { createWorkspaceIo } = await import('#copilot/infra/public/filesystem/workspace');
-            const { readText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
-            const snapshot = await readText(pathCheck.resolved);
+            const snapshot = await WORKSPACE_IO.readText(pathCheck.resolved);
             content = snapshot.content;
             contentHash = snapshot.contentHash;
         } catch (err) {
             return { path: filePath, error: toError(err).message, success: false };
         }
 
-        const parsed = await parseFileForContext(pathCheck.resolved, content, {
+        const parsed = await WORKSPACE_INDEXING.parseFileForContext(pathCheck.resolved, content, {
             ...(typeof contentHash === 'string' ? { contentHash } : {}),
         });
         const windowed = windowFileContext(parsed, {

@@ -1,39 +1,58 @@
 // @ts-check
-/** Rollback opt-in, retention quotas, TTL and storage-directory policy. */
+/** Pure rollback configuration projection. No operational function in this module reads process.env. */
 
 import { booleanValueOr, positiveIntegerOr } from '#copilot/infra/internal/platform';
 import path from 'node:path';
 
-const DEFAULT_ROLLBACK_ENABLED = false;
-const DEFAULT_ROLLBACK_TTL_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_ROLLBACK_MAX_ENTRIES = 32;
-const DEFAULT_ROLLBACK_MAX_BYTES = 32 * 1024 * 1024;
+export const DEFAULT_ROLLBACK_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_ROLLBACK_MAX_ENTRIES = 32;
+export const DEFAULT_ROLLBACK_MAX_BYTES = 32 * 1024 * 1024;
 
-export function isIoRollbackEnabled() {
-    return booleanValueOr(process.env['COPILOT_IO_ROLLBACK_ENABLED'], DEFAULT_ROLLBACK_ENABLED);
+/**
+ * @typedef {Readonly<{
+ *   enabled:boolean;
+ *   directory:string;
+ *   ttlMs:number;
+ *   maxEntries:number;
+ *   maxBytes:number;
+ * }>} IoRollbackPolicy
+ */
+
+/** @param {string} cwd */
+function defaultRollbackDirectory(cwd) {
+    return path.join(path.resolve(cwd), 'src', 'copilot', '.ai', 'rollback');
 }
-/** @param {boolean} requested */
-export function shouldCaptureIoRollback(requested = true) {
-    return requested === true && isIoRollbackEnabled();
+
+/**
+ * Environment-independent default used by raw primitives when no composition policy was supplied.
+ * Raw operations never enable rollback implicitly.
+ * @param {string} [cwd]
+ * @returns {IoRollbackPolicy}
+ */
+export function createDefaultIoRollbackPolicy(cwd = process.cwd()) {
+    return Object.freeze({
+        enabled: false,
+        directory: defaultRollbackDirectory(cwd),
+        ttlMs: DEFAULT_ROLLBACK_TTL_MS,
+        maxEntries: DEFAULT_ROLLBACK_MAX_ENTRIES,
+        maxBytes: DEFAULT_ROLLBACK_MAX_BYTES,
+    });
 }
-export function getRollbackSidecarMaxEntries() {
-    return positiveIntegerOr(process.env['COPILOT_IO_ROLLBACK_MAX_ENTRIES'], DEFAULT_ROLLBACK_MAX_ENTRIES);
-}
-export function getRollbackSidecarMaxBytes() {
-    return positiveIntegerOr(process.env['COPILOT_IO_ROLLBACK_MAX_BYTES'], DEFAULT_ROLLBACK_MAX_BYTES);
-}
-export function getRollbackSidecarDirectory() {
-    const configured = String(process.env['COPILOT_IO_ROLLBACK_DIR'] ?? '').trim();
-    return configured ? path.resolve(configured) : path.join(process.cwd(), 'src', 'copilot', '.ai', 'rollback');
-}
-export function getRollbackSidecarTtlMs() {
-    return positiveIntegerOr(process.env['COPILOT_IO_ROLLBACK_TTL_MS'], DEFAULT_ROLLBACK_TTL_MS);
-}
-export function getIoRollbackPolicy() {
-    return {
-        enabled: isIoRollbackEnabled(),
-        ttlMs: getRollbackSidecarTtlMs(),
-        maxEntries: getRollbackSidecarMaxEntries(),
-        maxBytes: getRollbackSidecarMaxBytes(),
-    };
+
+/**
+ * Project an explicit environment snapshot into one immutable runtime rollback policy.
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
+ * @param {string} [cwd]
+ * @returns {IoRollbackPolicy}
+ */
+export function readIoRollbackPolicy(env, cwd = process.cwd()) {
+    const source = env ?? {};
+    const configuredDirectory = String(source['COPILOT_IO_ROLLBACK_DIR'] ?? '').trim();
+    return Object.freeze({
+        enabled: booleanValueOr(source['COPILOT_IO_ROLLBACK_ENABLED'], false),
+        directory: configuredDirectory ? path.resolve(configuredDirectory) : defaultRollbackDirectory(cwd),
+        ttlMs: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_TTL_MS'], DEFAULT_ROLLBACK_TTL_MS),
+        maxEntries: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_MAX_ENTRIES'], DEFAULT_ROLLBACK_MAX_ENTRIES),
+        maxBytes: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_MAX_BYTES'], DEFAULT_ROLLBACK_MAX_BYTES),
+    });
 }

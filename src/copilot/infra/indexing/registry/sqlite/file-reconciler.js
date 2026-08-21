@@ -5,7 +5,7 @@ import { fingerprintMatches, sha256 } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { extname } from 'node:path';
 import { SYMBOL_EXTENSIONS } from './content.js';
-import { normalizeIndexPath } from './paths.js';
+import { normalizeIndexPath } from './path/index.js';
 
 /**
  * @typedef {object} DirectoryBuildCounters

@@ -3,26 +3,66 @@
  * Testes unitários para io-prefetch.js
  */
 
-import { getIoCacheStats } from '#copilot/infra/internal/cache';
-import { readBytes, readText } from '#copilot/infra/internal/filesystem/read';
+import { readBytes as readBytesRaw, readText as readTextRaw } from '#copilot/infra/internal/filesystem/read';
 import {
-    endSessionScope,
-    getSessionScopeStats,
-    listSessionScopes,
-    startSessionScope,
-    warmCacheForPaths,
-    warmFromDirectory,
-    warmReadThroughContext,
+    createPrefetchSessionRegistry as createPrefetchSessionRegistryRaw,
+    warmCacheForPaths as warmCacheForPathsRaw,
+    warmFromDirectory as warmFromDirectoryRaw,
+    warmReadThroughContext as warmReadThroughContextRaw,
 } from '#copilot/infra/internal/indexing/context';
-import { getParserCacheStats } from '#copilot/infra/internal/indexing/parser';
+import { getParserCacheStats as getParserCacheStatsRaw } from '#copilot/infra/internal/indexing/parser';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it } from 'vitest';
 
-import { resetIoL1CacheForTest, resetParserCacheForTest } from '#copilot/infra/public/testing';
 let tmpDir = '';
+/** @type {ReturnType<typeof createPrefetchSessionRegistryRaw>} */
+let sessionRegistry;
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let infraRuntime;
+/** @param {string} filePath @param {Parameters<typeof readBytesRaw>[1]} [options] */
+const readBytes = (filePath, options = {}) =>
+    readBytesRaw(filePath, { ...options, cacheRuntime: infraRuntime.coherence });
+/** @param {string} filePath @param {Parameters<typeof readTextRaw>[1]} [options] */
+const readText = (filePath, options = {}) =>
+    readTextRaw(filePath, {
+        ...options,
+        cacheRuntime: infraRuntime.coherence,
+        readRuntime: infraRuntime.coherence.read,
+    });
+/** @param {string[]} paths @param {Parameters<typeof warmCacheForPathsRaw>[1]} [options] */
+const warmCacheForPaths = (paths, options = {}) =>
+    warmCacheForPathsRaw(paths, { ...options, cacheRuntime: infraRuntime.coherence });
+/** @param {string} filePath @param {Parameters<typeof warmReadThroughContextRaw>[1]} [options] */
+const warmReadThroughContext = (filePath, options = {}) =>
+    warmReadThroughContextRaw(filePath, {
+        ...options,
+        indexRegistry: infraRuntime.indexRegistry,
+        cacheRuntime: infraRuntime.coherence,
+        parserCacheRuntime: infraRuntime.parserCache,
+    });
+/** @param {string} directory @param {Parameters<typeof warmFromDirectoryRaw>[1]} [options] */
+const warmFromDirectory = (directory, options = {}) =>
+    warmFromDirectoryRaw(directory, options, { cacheRuntime: infraRuntime.coherence });
+const getParserCacheStats = () => getParserCacheStatsRaw(infraRuntime.parserCache);
+
+const startSessionScope = (...args) => sessionRegistry.start(...args);
+const getSessionScopeStats = (sessionId) => sessionRegistry.getStats(sessionId);
+const endSessionScope = (sessionId) => sessionRegistry.end(sessionId);
+const listSessionScopes = () => sessionRegistry.list();
+
+beforeEach(() => {
+    infraRuntime = createInfraRuntime({ runtimeId: `prefetch-test-${Date.now()}-${Math.random()}` });
+    sessionRegistry = createPrefetchSessionRegistryRaw({ cacheRuntime: infraRuntime.coherence });
+});
+
+afterEach(async () => {
+    sessionRegistry.dispose();
+    await infraRuntime.dispose();
+});
 
 beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'io-prefetch-test-'));
@@ -31,17 +71,14 @@ beforeAll(async () => {
     await fs.writeFile(path.join(tmpDir, 'b.js'), 'export const b = 2;');
     await fs.writeFile(path.join(tmpDir, 'c.json'), '{"key": "value"}');
     await fs.writeFile(path.join(tmpDir, 'data.bin'), Buffer.from([0x00, 0x01, 0x02]));
-    resetIoL1CacheForTest();
 });
 
 afterAll(async () => {
-    await resetParserCacheForTest({ teardownWorkers: true });
     await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
 describe('warmCacheForPaths', () => {
     it('carrega arquivos no cache L1', async () => {
-        resetIoL1CacheForTest();
         const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js')];
         const result = await warmCacheForPaths(paths, { textMode: true });
         assert.ok(result.preloaded >= 1, `preloaded=${result.preloaded}`);
@@ -49,13 +86,12 @@ describe('warmCacheForPaths', () => {
         assert.ok(result.durationMs >= 0);
 
         // Cache deve ter hits agora
-        const stats = getIoCacheStats();
+        const stats = infraRuntime.coherence.l1.stats();
         assert.ok(stats !== null);
         assert.ok(stats.size >= 1);
     });
 
     it('retorna snapshots textuais efêmeros e os reutiliza do L1 sem reread', async () => {
-        resetIoL1CacheForTest();
         const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js')];
         const first = await warmCacheForPaths(paths, {
             captureTextSnapshots: true,
@@ -91,7 +127,6 @@ describe('warmCacheForPaths', () => {
     });
 
     it('controla concorrência (concurrency=2)', async () => {
-        resetIoL1CacheForTest();
         const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js'), path.join(tmpDir, 'c.json')];
         const result = await warmCacheForPaths(paths, { concurrency: 2 });
         assert.ok(result.preloaded >= 1);
@@ -107,7 +142,6 @@ describe('warmCacheForPaths', () => {
     });
 
     it('aquece texto mesmo quando bytes já estavam quentes', async () => {
-        resetIoL1CacheForTest();
         const filePath = path.join(tmpDir, 'a.js');
         await readBytes(filePath);
 
@@ -120,7 +154,6 @@ describe('warmCacheForPaths', () => {
     });
 
     it('não cria cache textual para bytes inválidos em UTF-8', async () => {
-        resetIoL1CacheForTest();
         const filePath = path.join(tmpDir, 'invalid-utf8.bin');
         await fs.writeFile(filePath, Buffer.from([0xff, 0xfe, 0xfd]));
 
@@ -132,8 +165,6 @@ describe('warmCacheForPaths', () => {
     });
 
     it('warmReadThroughContext indexa arquivo lido e aquece import relativo direto', async () => {
-        resetIoL1CacheForTest();
-        await resetParserCacheForTest();
         const dep = path.join(tmpDir, 'dep.js');
         const entry = path.join(tmpDir, 'entry.js');
         await fs.writeFile(dep, 'export const dep = 1;\n', 'utf8');
@@ -157,8 +188,6 @@ describe('warmCacheForPaths', () => {
     });
 
     it('reutiliza texto L1 verificado e evita cópia binária quando solicitado', async () => {
-        resetIoL1CacheForTest();
-        await resetParserCacheForTest();
         const entry = path.join(tmpDir, 'entry-cached.js');
         await fs.writeFile(entry, 'export const cachedValue = 1;\n', 'utf8');
         const firstRead = await readText(entry);
@@ -183,7 +212,6 @@ describe('warmCacheForPaths', () => {
 
 describe('startSessionScope / getSessionScopeStats / endSessionScope', () => {
     it('ciclo completo: start → stats → end', async () => {
-        resetIoL1CacheForTest();
         const sessionId = 'test-session-prefetch-1';
         const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js')];
 
@@ -204,6 +232,52 @@ describe('startSessionScope / getSessionScopeStats / endSessionScope', () => {
         assert.strictEqual(getSessionScopeStats(sessionId), null);
     });
 
+    it('remove scope se warm falha ou é abortado antes de ficar ready', async () => {
+        const failedId = 'scope-open-failure';
+        await assert.rejects(
+            () => startSessionScope(failedId, [path.join(tmpDir, 'missing-prefetch.js')], { silent: false }),
+            Error,
+        );
+        assert.strictEqual(getSessionScopeStats(failedId), null);
+        assert.ok(!listSessionScopes().includes(failedId));
+
+        const abortedId = 'scope-open-aborted';
+        const controller = new AbortController();
+        controller.abort();
+        await assert.rejects(
+            () => startSessionScope(abortedId, [path.join(tmpDir, 'a.js')], { signal: controller.signal }),
+            (error) => error instanceof Error && error.name === 'AbortError',
+        );
+        assert.strictEqual(getSessionScopeStats(abortedId), null);
+        assert.ok(!listSessionScopes().includes(abortedId));
+    });
+
+    it('não sobrescreve uma session ativa com o mesmo ID', async () => {
+        const sessionId = 'scope-duplicate-active';
+        const first = await startSessionScope(sessionId, [path.join(tmpDir, 'a.js')]);
+        assert.strictEqual(first.state, 'ready');
+        await assert.rejects(
+            () => startSessionScope(sessionId, [path.join(tmpDir, 'b.js')]),
+            (error) =>
+                Boolean(
+                    error && typeof error === 'object' && 'code' in error && error.code === 'ESESSION_SCOPE_ACTIVE',
+                ),
+        );
+        assert.strictEqual(listSessionScopes().filter((id) => id === sessionId).length, 1);
+        const closed = endSessionScope(sessionId);
+        assert.strictEqual(closed?.state, 'closed');
+    });
+
+    it('mantém session degradada ativa quando silent warm contabiliza falhas sem lançar', async () => {
+        const sessionId = 'scope-degraded';
+        const stats = await startSessionScope(sessionId, [path.join(tmpDir, 'missing-degraded.js')], { silent: true });
+        assert.strictEqual(stats.state, 'degraded');
+        assert.strictEqual(stats.active, true);
+        assert.strictEqual(stats.failed, 1);
+        assert.strictEqual(getSessionScopeStats(sessionId)?.state, 'degraded');
+        endSessionScope(sessionId);
+    });
+
     it('listSessionScopes retorna IDs ativos', async () => {
         const id1 = 'scope-list-test-1';
         const id2 = 'scope-list-test-2';
@@ -221,7 +295,6 @@ describe('startSessionScope / getSessionScopeStats / endSessionScope', () => {
 
 describe('warmFromDirectory', () => {
     it('escaneia diretório e aquece arquivos por extensão', async () => {
-        resetIoL1CacheForTest();
         const result = await warmFromDirectory(tmpDir, {
             extensions: ['.js', '.json'],
             maxFiles: 10,
@@ -232,7 +305,6 @@ describe('warmFromDirectory', () => {
     });
 
     it('enforce maxFiles como hard cap no scan de aquecimento', async () => {
-        resetIoL1CacheForTest();
         const result = await warmFromDirectory(tmpDir, { maxFiles: 1 });
         assert.ok(result.preloaded + result.skipped <= 1, `preloaded=${result.preloaded}`);
         assert.strictEqual(result.advisoryLimits['requestedMaxFiles'], 1);
@@ -247,7 +319,6 @@ describe('warmFromDirectory', () => {
             await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
             await fs.writeFile(path.join(root, bucket, 'two.js'), `export const ${bucket}Two = true;`, 'utf8');
         }
-        resetIoL1CacheForTest();
 
         const result = await warmFromDirectory(root, {
             extensions: ['.js'],
@@ -273,7 +344,6 @@ describe('warmFromDirectory', () => {
         await fs.mkdir(path.join(bucket, 'deep'), { recursive: true });
         await fs.writeFile(path.join(bucket, 'README.md'), '# docs', 'utf8');
         await fs.writeFile(path.join(bucket, 'deep', 'runtime.js'), 'export const runtime = true;', 'utf8');
-        resetIoL1CacheForTest();
 
         const result = await warmFromDirectory(root, {
             extensions: ['.js', '.md'],
@@ -292,7 +362,6 @@ describe('warmFromDirectory', () => {
             await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
             await fs.writeFile(path.join(root, bucket, 'two.js'), `export const ${bucket}Two = true;`, 'utf8');
         }
-        resetIoL1CacheForTest();
 
         const full = await warmFromDirectory(root, {
             extensions: ['.js'],
@@ -317,7 +386,6 @@ describe('warmFromDirectory', () => {
             await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
         }
         const preferred = path.join(root, 'gamma', 'one.js');
-        resetIoL1CacheForTest();
 
         const result = await warmFromDirectory(root, {
             extensions: ['.js'],
@@ -344,7 +412,6 @@ describe('warmFromDirectory', () => {
         await fs.writeFile(path.join(nested, 'match.ts'), 'export const match = true;', 'utf8');
         await fs.writeFile(path.join(nested, 'skip.md'), '# skip', 'utf8');
         await fs.writeFile(path.join(excluded, 'hidden.js'), 'export const hidden = true;', 'utf8');
-        resetIoL1CacheForTest();
 
         const result = await warmFromDirectory(tmpDir, {
             extensions: ['.js', '.ts', '.md'],

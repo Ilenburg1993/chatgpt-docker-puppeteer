@@ -2,16 +2,20 @@
 /** Cached L1/L2 UTF-8 text read service and line projection. */
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import {
-    getIoL1Cache,
-    getIoL2Cache,
-    getVerifiedIoL1Entry,
-    makeTextKey,
-    normalizeIoCacheKey,
-} from '#copilot/infra/internal/cache';
-import { bufferIsUtf8, isBufferValue, splitPhysicalTextLines } from '#copilot/infra/internal/platform';
+    bufferIsUtf8,
+    isBufferValue,
+    slicePhysicalTextLines,
+    splitPhysicalTextLines,
+} from '#copilot/infra/internal/platform';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { readBytesFileSnapshot, statPathSnapshot } from '../snapshot/index.js';
 import {
     hasRichCacheFingerprint,
@@ -21,7 +25,6 @@ import {
     stringifyCacheMeta,
 } from './entry.js';
 import { normalizeTextHashMode, resolveTextHashes } from './hash-policy.js';
-import { sliceTextByCachedLineOffsets } from './line-offset.js';
 
 /** @typedef {import('./hash-policy.js').TextHashMode} TextHashMode */
 
@@ -36,6 +39,8 @@ import { sliceTextByCachedLineOffsets } from './line-offset.js';
  *     advisoryLimits?: Record<string, unknown>;
  *     signal?: AbortSignal;
  *     hashMode?: TextHashMode;
+ *     cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2CacheRuntime>};
+ *     readRuntime?: {hashes:ReturnType<typeof import('./hash-runtime.js').createIoReadHashRuntime>;lineOffsets:ReturnType<typeof import('./line-offset-runtime.js').createLineOffsetCacheRuntime>};
  * }} [options]
  */
 export async function readText(filePath, options = {}) {
@@ -45,13 +50,15 @@ export async function readText(filePath, options = {}) {
     const startedAt = nowIoMs();
     let failurePublished = false;
     try {
-        const _l1 = getIoL1Cache();
-        const l2Cache = getIoL2Cache();
+        const _l1 = options.cacheRuntime?.l1 ?? null;
+        const l2Cache = options.cacheRuntime?.l2.get() ?? null;
+        const hashRuntime = options.readRuntime?.hashes ?? null;
+        const lineOffsetRuntime = options.readRuntime?.lineOffsets ?? null;
         const _normalizedPath = normalizeIoCacheKey(filePath);
         const _textKey = makeTextKey(_normalizedPath, undefined, undefined);
-        const _cachedText = await getVerifiedIoL1Entry(_textKey, filePath);
-        /** @type {'l1-hit' | 'l1-miss'} */
-        let _cacheState = 'l1-miss';
+        const _cachedText = _l1 ? await _l1.getVerified(_textKey, filePath) : null;
+        /** @type {'l1-hit' | 'l1-miss' | 'bypass'} */
+        let _cacheState = _l1 ? 'l1-miss' : 'bypass';
         /** @type {Buffer | null} */
         let raw = null;
         /** @type {number} */
@@ -66,26 +73,42 @@ export async function readText(filePath, options = {}) {
         if (_cachedText !== null && typeof _cachedText.content === 'string') {
             _cacheState = 'l1-hit';
             const cachedContent = _cachedText.content;
-            const sliced = sliceTextByCachedLineOffsets(
-                filePath,
-                cachedContent,
-                {
-                    sizeBytes: Number.isFinite(_cachedText.size) ? Number(_cachedText.size) : _cachedText.bytes,
-                    mtimeMs: Number.isFinite(_cachedText.mtime) ? Number(_cachedText.mtime) : null,
-                },
-                { startLine: options.startLine, endLine: options.endLine },
-            );
+            const sliced = lineOffsetRuntime
+                ? lineOffsetRuntime.slice(
+                      filePath,
+                      cachedContent,
+                      {
+                          sizeBytes: Number.isFinite(_cachedText.size) ? Number(_cachedText.size) : _cachedText.bytes,
+                          mtimeMs: Number.isFinite(_cachedText.mtime) ? Number(_cachedText.mtime) : null,
+                      },
+                      { startLine: options.startLine, endLine: options.endLine },
+                  )
+                : {
+                      ...slicePhysicalTextLines(cachedContent, {
+                          startLine: options.startLine,
+                          endLine: options.endLine,
+                      }),
+                      cache: /** @type {const} */ ('line-offset-bypass'),
+                  };
             totalLines = sliced.totalLines;
             sliceStart = sliced.returnedLines.start;
             sliceEnd = sliced.returnedLines.end;
             content = sliced.content;
-            const hashes = resolveTextHashes(
-                cachedContent,
-                content,
-                sliceStart === 1 && sliceEnd === totalLines,
-                hashMode,
-                _cachedText.contentHash,
-            );
+            const hashes = hashRuntime
+                ? hashRuntime.resolve(
+                      cachedContent,
+                      content,
+                      sliceStart === 1 && sliceEnd === totalLines,
+                      hashMode,
+                      _cachedText.contentHash,
+                  )
+                : resolveTextHashes(
+                      cachedContent,
+                      content,
+                      sliceStart === 1 && sliceEnd === totalLines,
+                      hashMode,
+                      _cachedText.contentHash,
+                  );
             if (!_cachedText.contentHash && hashes.reusableFullHash) _cachedText.contentHash = hashes.reusableFullHash;
             const io = publishIoOperationResult(
                 buildIoMeta({
@@ -105,6 +128,8 @@ export async function readText(filePath, options = {}) {
                     },
                 }),
                 true,
+                undefined,
+                getIoTelemetryRuntimeOption(options),
             );
             return {
                 path: filePath,
@@ -136,29 +161,47 @@ export async function readText(filePath, options = {}) {
                         ? 'l2-mtime-size-ctime-dev-ino'
                         : 'l2-mtime-size';
                     const text = l2Entry.payload.toString('utf8');
-                    const sliced = sliceTextByCachedLineOffsets(
-                        filePath,
-                        text,
-                        {
-                            sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
-                            mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
-                        },
-                        { startLine: options.startLine, endLine: options.endLine },
-                    );
+                    const sliced = lineOffsetRuntime
+                        ? lineOffsetRuntime.slice(
+                              filePath,
+                              text,
+                              {
+                                  sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
+                                  mtimeMs: Number.isFinite(Number(metadata?.mtimeMs))
+                                      ? Number(metadata?.mtimeMs)
+                                      : null,
+                              },
+                              { startLine: options.startLine, endLine: options.endLine },
+                          )
+                        : {
+                              ...slicePhysicalTextLines(text, {
+                                  startLine: options.startLine,
+                                  endLine: options.endLine,
+                              }),
+                              cache: /** @type {const} */ ('line-offset-bypass'),
+                          };
                     const totalLines = sliced.totalLines;
                     const sliceStart = sliced.returnedLines.start;
                     const sliceEnd = sliced.returnedLines.end;
                     const content = sliced.content;
-                    const hashes = resolveTextHashes(
-                        text,
-                        content,
-                        sliceStart === 1 && sliceEnd === totalLines,
-                        hashMode,
-                        l2ContentHash,
-                    );
+                    const hashes = hashRuntime
+                        ? hashRuntime.resolve(
+                              text,
+                              content,
+                              sliceStart === 1 && sliceEnd === totalLines,
+                              hashMode,
+                              l2ContentHash,
+                          )
+                        : resolveTextHashes(
+                              text,
+                              content,
+                              sliceStart === 1 && sliceEnd === totalLines,
+                              hashMode,
+                              l2ContentHash,
+                          );
 
                     const _now = Date.now();
-                    _l1.set(_textKey, {
+                    _l1?.set(_textKey, {
                         content: text,
                         bytes: l2Entry.payload.byteLength,
                         cachedAt: _now,
@@ -191,6 +234,8 @@ export async function readText(filePath, options = {}) {
                             },
                         }),
                         true,
+                        undefined,
+                        getIoTelemetryRuntimeOption(options),
                     );
                     return {
                         path: filePath,
@@ -234,30 +279,31 @@ export async function readText(filePath, options = {}) {
         };
         if (!bufferIsUtf8(raw)) {
             const error = new Error('Arquivo binário detectado (bytes inválidos para UTF-8).');
-            publishIoOperationResult(buildIoMeta(baseMeta), false, error);
+            publishIoOperationResult(buildIoMeta(baseMeta), false, error, getIoTelemetryRuntimeOption(options));
             failurePublished = true;
             throw error;
         }
         const text = raw.toString('utf8');
-        const sliced = sliceTextByCachedLineOffsets(
-            filePath,
-            text,
-            { sizeBytes: textSnapshot.sizeBytes, mtimeMs: textSnapshot.mtimeMs },
-            { startLine: options.startLine, endLine: options.endLine },
-        );
+        const sliced = lineOffsetRuntime
+            ? lineOffsetRuntime.slice(
+                  filePath,
+                  text,
+                  { sizeBytes: textSnapshot.sizeBytes, mtimeMs: textSnapshot.mtimeMs },
+                  { startLine: options.startLine, endLine: options.endLine },
+              )
+            : {
+                  ...slicePhysicalTextLines(text, { startLine: options.startLine, endLine: options.endLine }),
+                  cache: /** @type {const} */ ('line-offset-bypass'),
+              };
         totalLines = sliced.totalLines;
         sliceStart = sliced.returnedLines.start;
         sliceEnd = sliced.returnedLines.end;
         content = sliced.content;
-        const hashes = resolveTextHashes(
-            text,
-            content,
-            sliceStart === 1 && sliceEnd === totalLines,
-            hashMode,
-            undefined,
-        );
+        const hashes = hashRuntime
+            ? hashRuntime.resolve(text, content, sliceStart === 1 && sliceEnd === totalLines, hashMode, undefined)
+            : resolveTextHashes(text, content, sliceStart === 1 && sliceEnd === totalLines, hashMode, undefined);
         const _textNow = Date.now();
-        /** @type {import('#copilot/infra/internal/cache').IoCacheEntry} */
+        /** @type {import('#copilot/infra/internal/cache/memory').IoCacheEntry} */
         const _textEntry = {
             content: text,
             bytes: raw.byteLength,
@@ -272,7 +318,7 @@ export async function readText(filePath, options = {}) {
             ...(hashes.reusableFullHash ? { contentHash: hashes.reusableFullHash } : {}),
             fingerprintStrategy: 'fs-read',
         };
-        _l1.set(_textKey, _textEntry);
+        _l1?.set(_textKey, _textEntry);
         if (l2Cache) {
             l2Cache.set({
                 key: _textKey,
@@ -291,7 +337,12 @@ export async function readText(filePath, options = {}) {
                 }),
             });
         }
-        const io = publishIoOperationResult(buildIoMeta(baseMeta), true);
+        const io = publishIoOperationResult(
+            buildIoMeta(baseMeta),
+            true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
+        );
         return {
             path: filePath,
             content,
@@ -322,6 +373,7 @@ export async function readText(filePath, options = {}) {
                 }),
                 false,
                 error,
+                getIoTelemetryRuntimeOption(options),
             );
         }
         throw error;

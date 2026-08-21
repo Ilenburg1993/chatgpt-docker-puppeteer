@@ -10,30 +10,21 @@
  */
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { readEnvPositiveInt, richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform';
 import { createIoIndexDirectoryBuilder } from './directory-builder.js';
 import { createIoIndexMetadataPolicy } from './metadata.js';
-import { normalizeIndexPath } from './paths.js';
+import { normalizeIndexPath } from './path/index.js';
 import { createIoIndexQueryApi } from './query-api.js';
 import { createIoIndexSnapshotVerifier } from './snapshot-verifier.js';
 import { createIoIndexStatements } from './statements.js';
 import { createIoIndexStatsReader } from './stats.js';
 import { createIoIndexWriter } from './writer.js';
 
-const DEFAULT_INDEX_HASH_VERIFY_MAX_BYTES = readEnvPositiveInt('IO_INDEX_HASH_VERIFY_MAX_BYTES', 1024 * 1024);
-// Content hashing is a cryptographic safety net, not a 30-second freshness clock. Canonical invalidation, Git evidence
-// and rich fs fingerprints catch normal changes; a 6h default keeps periodic verification without turning each
-// 30-minute safety reconcile into a full workspace read/hash sweep.
-const DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS = readEnvPositiveInt(
-    'IO_INDEX_HASH_VERIFY_INTERVAL_MS',
-    6 * 60 * 60 * 1000,
-);
-const DEFAULT_INDEX_RECHECK_UNCHANGED_SNAPSHOT = !['0', 'false', 'off'].includes(
-    String(process.env['IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT'] ?? '0')
-        .trim()
-        .toLowerCase(),
-);
+const DEFAULT_INDEX_HASH_VERIFY_MAX_BYTES = 1024 * 1024;
+const DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_INDEX_RECHECK_UNCHANGED_SNAPSHOT = false;
 const DEFAULT_INDEX_SNAPSHOT_RETRIES = 2;
+const DEFAULT_INDEX_QUERY_POLICY = Object.freeze({ defaultMaxResults: 50, hardMaxResults: 500 });
 
 /**
  * Read the version of an index schema already prepared by the database owner. Indexing never migrates the shared
@@ -69,7 +60,9 @@ function readPreparedIoIndexSchemaVersion(db) {
  *     hashVerifyIntervalMs?: number;
  *     recheckUnchangedSnapshot?: boolean;
  *     snapshotRetries?: number;
+ *     queryPolicy?: {defaultMaxResults:number;hardMaxResults:number};
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     parserWorkerRuntime?: ReturnType<typeof import('../../parser/worker/index.js').createParserWorkerRuntime>;
  * }} options
  */
 export function createIoIndexSqlite(options) {
@@ -92,6 +85,7 @@ export function createIoIndexSqlite(options) {
         Number.isInteger(options?.snapshotRetries) && Number(options.snapshotRetries) >= 0
             ? Math.min(10, Number(options.snapshotRetries))
             : DEFAULT_INDEX_SNAPSHOT_RETRIES;
+    const queryPolicy = options.queryPolicy ?? DEFAULT_INDEX_QUERY_POLICY;
 
     const schemaVersion = readPreparedIoIndexSchemaVersion(db);
 
@@ -136,6 +130,7 @@ export function createIoIndexSqlite(options) {
         now,
         buildIndexMetadataJson,
         assertCurrentFileSnapshot,
+        ...(options.parserWorkerRuntime ? { parserWorkerRuntime: options.parserWorkerRuntime } : {}),
     });
     const indexDirectory = createIoIndexDirectoryBuilder({
         stats,
@@ -153,7 +148,7 @@ export function createIoIndexSqlite(options) {
         pruneMissingRows,
         indexTextFile,
     });
-    const queryApi = createIoIndexQueryApi({ db, statements, stats });
+    const queryApi = createIoIndexQueryApi({ db, statements, stats, queryPolicy });
     const getStats = createIoIndexStatsReader({ statements, stats, schemaVersion, freshnessPolicy });
 
     return {

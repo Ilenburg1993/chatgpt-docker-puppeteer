@@ -9,6 +9,7 @@
 
 import { bridgeEmitter, EVENT_BUS } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { log } from '#copilot/observability';
 import { PinnedFilesLoader } from '../../config/pinned-files.js';
 import { container } from '../../core/di-container.js';
@@ -30,7 +31,17 @@ function countLabel(count, singular, plural) {
  * @returns {Promise<void>}
  */
 export async function runTerminalPinnedContextPhase(ctx) {
-    const pinnedLoader = new PinnedFilesLoader(ctx.bootConfig.skills.pinnedContextDirectories);
+    const pinnedDirs = ctx.bootConfig.skills.pinnedContextDirectories;
+    const pinnedIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'terminal.boot.pinned-context',
+            roots: pinnedDirs,
+            operations: ['list', 'read', 'stat', 'watch'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    const pinnedLoader = new PinnedFilesLoader({ dirs: pinnedDirs, io: pinnedIo });
     ctx.pinnedLoader = pinnedLoader;
     recordTerminalActivity('boot', 'Carregando arquivos pinados', { source: 'terminal', recordHistory: false });
     await pinnedLoader.start().catch((e) => {

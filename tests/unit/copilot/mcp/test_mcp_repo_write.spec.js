@@ -9,10 +9,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
-import { getValidatedMutableWorkspacePathStats } from '#copilot/infra/public/filesystem/workspace';
 import { repoWriteTestHarness, repoWriteTools } from '#copilot/mcp/tools';
 
-import { resetValidatedMutableWorkspacePathStatsForTest } from '#copilot/infra/public/testing';
+import {
+    getValidatedMutableWorkspacePathStats,
+    resetValidatedMutableWorkspacePathStatsForTest,
+} from '#copilot/infra/public/testing';
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
 const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
 const applyFileBatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch');
@@ -52,6 +54,7 @@ describe('copilot MCP repo write tools', () => {
             issued: 1,
             accepted: 1,
             rejectedUnbranded: 0,
+            rejectedAuthority: 0,
             rejectedWorkspace: 0,
             rejectedMode: 0,
             compatibleModes: ['write', 'patch', 'metadata'],
@@ -176,6 +179,7 @@ describe('copilot MCP repo write tools', () => {
             issued: 2,
             accepted: 2,
             rejectedUnbranded: 0,
+            rejectedAuthority: 0,
             rejectedWorkspace: 0,
             rejectedMode: 0,
             compatibleModes: ['write', 'patch', 'metadata'],

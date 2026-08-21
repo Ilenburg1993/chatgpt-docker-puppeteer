@@ -2,26 +2,32 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../../../src/copilot/tools/file/shared.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        WORKSPACE_INDEXING: {
+            ...actual.WORKSPACE_INDEXING,
+            registry: {
+                buildDirectory: mocks.buildIoIndexForDirectory,
+                status: mocks.readIoIndexStatus,
+                search: mocks.searchIoIndex,
+                findSymbol: mocks.findIoIndexSymbol,
+                findImports: mocks.findIoIndexImports,
+                invalidatePath: mocks.invalidateIoIndexPath,
+            },
+        },
+    };
+});
+
 const mocks = vi.hoisted(() => ({
     buildIoIndexForDirectory: vi.fn(),
-    getIoIndexStats: vi.fn(),
+    readIoIndexStatus: vi.fn(),
     searchIoIndex: vi.fn(),
     findIoIndexSymbol: vi.fn(),
     findIoIndexImports: vi.fn(),
+    invalidateIoIndexPath: vi.fn(() => true),
 }));
-
-vi.mock('#copilot/infra/public/indexing', async (importOriginal) => {
-    // formatters e paginators são funções puras — usamos a implementação real
-    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
-    return {
-        ...actual,
-        buildIoIndexForDirectory: mocks.buildIoIndexForDirectory,
-        getIoIndexStats: mocks.getIoIndexStats,
-        searchIoIndex: mocks.searchIoIndex,
-        findIoIndexSymbol: mocks.findIoIndexSymbol,
-        findIoIndexImports: mocks.findIoIndexImports,
-    };
-});
 
 import {
     indexTools,
@@ -40,10 +46,11 @@ function getHandler(tool) {
 describe('tools/file/index-tools', () => {
     beforeEach(() => {
         mocks.buildIoIndexForDirectory.mockReset();
-        mocks.getIoIndexStats.mockReset();
+        mocks.readIoIndexStatus.mockReset();
         mocks.searchIoIndex.mockReset();
         mocks.findIoIndexSymbol.mockReset();
         mocks.findIoIndexImports.mockReset();
+        mocks.invalidateIoIndexPath.mockReset().mockReturnValue(true);
     });
 
     it('exports canonical index tool names', () => {
@@ -61,21 +68,21 @@ describe('tools/file/index-tools', () => {
     // --- available: false ---
 
     it('returns available: false when index not available for search', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: false });
+        mocks.readIoIndexStatus.mockReturnValue({ available: false });
         const result = await getHandler(workspaceIndexSearchTool)({ query: 'alpha' });
         expect(result).toMatchObject({ available: false, matchCount: 0, output: '', engine: 'fts5-index' });
         expect(mocks.searchIoIndex).not.toHaveBeenCalled();
     });
 
     it('returns available: false when index not available for symbol lookup', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: false });
+        mocks.readIoIndexStatus.mockReturnValue({ available: false });
         const result = await getHandler(workspaceIndexFindSymbolTool)({ symbol: 'MyClass' });
         expect(result).toMatchObject({ available: false, matchCount: 0, output: '', engine: 'fts5-index' });
         expect(mocks.findIoIndexSymbol).not.toHaveBeenCalled();
     });
 
     it('returns available: false when index not available for imports lookup', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: false });
+        mocks.readIoIndexStatus.mockReturnValue({ available: false });
         const result = await getHandler(workspaceIndexFindImportsTool)({ source: 'react' });
         expect(result).toMatchObject({ available: false, matchCount: 0, output: '', engine: 'fts5-index' });
         expect(mocks.findIoIndexImports).not.toHaveBeenCalled();
@@ -84,7 +91,7 @@ describe('tools/file/index-tools', () => {
     // --- output formatting ---
 
     it('formats search results as output string with FTS5 highlights as **bold**', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.searchIoIndex.mockReturnValue([
             {
                 filePath: '/ws/src/a.js',
@@ -110,7 +117,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('formats symbol results as output string with file:line and kind', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexSymbol.mockReturnValue([
             {
                 filePath: '/ws/src/b.js',
@@ -134,7 +141,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('formats import results as output string with specifiers', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexImports.mockReturnValue([
             {
                 filePath: '/ws/src/App.js',
@@ -157,7 +164,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('marks dynamic imports in output', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 3 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 3 });
         mocks.findIoIndexImports.mockReturnValue([
             {
                 filePath: '/ws/src/lazy.js',
@@ -176,7 +183,7 @@ describe('tools/file/index-tools', () => {
     // --- filtering ---
 
     it('applies exactMatch filter for symbol lookup', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexSymbol.mockReturnValue([
             {
                 filePath: '/ws/a.js',
@@ -206,7 +213,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('includes all results when exactMatch is false (default)', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexSymbol.mockReturnValue([
             {
                 filePath: '/ws/a.js',
@@ -234,7 +241,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('applies includePattern filtering for search', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.searchIoIndex.mockReturnValue([
             { filePath: '/ws/src/a.ts', relativePath: 'src/a.ts', snippet: '[match]', rank: 1 },
             { filePath: '/ws/src/b.js', relativePath: 'src/b.js', snippet: '[match]', rank: 1 },
@@ -248,7 +255,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('applies excludePattern filtering for search', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.searchIoIndex.mockReturnValue([
             { filePath: '/ws/src/a.ts', relativePath: 'src/a.ts', snippet: '[match]', rank: 1 },
             { filePath: '/ws/node_modules/lib.ts', relativePath: 'node_modules/lib.ts', snippet: '[match]', rank: 1 },
@@ -264,7 +271,7 @@ describe('tools/file/index-tools', () => {
     // --- pagination ---
 
     it('respects maxResults and returns nextCursor when truncated', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 10 });
         // commandMaxCount = 0 + 2 + 1 = 3, but we return 3 to signal truncation
         mocks.searchIoIndex.mockReturnValue([
             { filePath: '/ws/a.js', relativePath: 'a.js', snippet: '[x]', rank: 1 },
@@ -283,7 +290,7 @@ describe('tools/file/index-tools', () => {
 
     it('delegates build/status calls to io index registry', async () => {
         mocks.buildIoIndexForDirectory.mockResolvedValue({ available: true, indexed: 2 });
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 2 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 2 });
 
         await getHandler(workspaceIndexBuildTool)({
             directory: 'src/copilot',
@@ -309,7 +316,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('passes commandMaxCount to searchIoIndex for over-fetch detection', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 10 });
         mocks.searchIoIndex.mockReturnValue([]);
 
         await getHandler(workspaceIndexSearchTool)({ query: 'foo', maxResults: 10 });
@@ -321,7 +328,7 @@ describe('tools/file/index-tools', () => {
     // --- exactSource filter for workspace_find_imports ---
 
     it('applies exactSource filter for imports lookup', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 10 });
         // Mock simulates io-index-sqlite filtering behavior
         mocks.findIoIndexImports.mockImplementation((source, options) => {
             const rows = [
@@ -354,7 +361,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('includes all results when exactSource is false (default)', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 10 });
         mocks.findIoIndexImports.mockReturnValue([
             {
                 filePath: '/ws/a.js',
@@ -380,7 +387,7 @@ describe('tools/file/index-tools', () => {
     });
 
     it('does not pass exactSource to findIoIndexImports when undefined', async () => {
-        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.readIoIndexStatus.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexImports.mockReturnValue([]);
 
         await getHandler(workspaceIndexFindImportsTool)({ source: 'zod' });

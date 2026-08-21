@@ -3,61 +3,58 @@
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeEach, describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
-import { refreshIoIndexPaths } from '#copilot/infra/internal/indexing';
-import {
-    closeScope,
-    declareScope,
-    findSymbol,
-    getScopeContext,
-    refreshScope,
-} from '#copilot/infra/internal/indexing/context';
+import { createWorkspaceScopeRuntime } from '#copilot/infra/internal/indexing/context';
 import { getParserCacheStats } from '#copilot/infra/internal/indexing/parser';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
-import {
-    resetInfraSqliteProviderForTest,
-    resetIoIndexForTest,
-    resetIoL1CacheForTest,
-    resetParserCacheForTest,
-} from '#copilot/infra/public/testing';
 const WORKSPACE_ROOT = process.cwd();
 const TOOLS_DIR = join(WORKSPACE_ROOT, 'src/copilot/mcp/tools');
 
 /** @type {import('better-sqlite3').Database | null} */
 let testInfraDb = null;
+/** @type {ReturnType<typeof createWorkspaceScopeRuntime>} */
+let scopeRuntime;
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let infraRuntime;
+const closeScope = (sessionId) => scopeRuntime.closeScope(sessionId);
+const declareScope = (options) => scopeRuntime.declareScope(options);
+const findSymbol = (sessionId, name, options = {}) => scopeRuntime.findSymbol(sessionId, name, options);
+const getScopeContext = (sessionId, options = {}) => scopeRuntime.getScopeContext(sessionId, options);
+const refreshScope = (sessionId, paths) => scopeRuntime.refreshScope(sessionId, paths);
 
-beforeEach(async () => {
-    closeScope('working-set-integration');
-    closeScope('working-set-symbol-seed');
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+beforeEach(() => {
     testInfraDb = new Database(':memory:');
     ensureIoIndexSchema(testInfraDb);
-    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testInfraDb));
-    resetIoL1CacheForTest();
-    await resetParserCacheForTest();
+    infraRuntime = createInfraRuntime({
+        runtimeId: `working-set-infra-${Date.now()}-${Math.random()}`,
+        sqliteProvider: () => /** @type {import('better-sqlite3').Database} */ (testInfraDb),
+    });
+    scopeRuntime = createWorkspaceScopeRuntime({
+        runtimeId: `working-set-test-${Date.now()}-${Math.random()}`,
+        workspaceRoot: WORKSPACE_ROOT,
+        indexRegistry: infraRuntime.indexRegistry,
+        cacheRuntime: infraRuntime.coherence,
+        invalidationBus: infraRuntime.coherence.invalidation,
+        parserCacheRuntime: infraRuntime.parserCache,
+    });
 });
 
-afterEach(() => {
-    closeScope('working-set-integration');
-    closeScope('working-set-symbol-seed');
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+afterEach(async () => {
+    await scopeRuntime.dispose();
+    await infraRuntime.dispose();
     if (testInfraDb?.open) testInfraDb.close();
     testInfraDb = null;
-});
-
-afterAll(async () => {
-    await resetParserCacheForTest({ teardownWorkers: true });
 });
 
 describe('Working Set V2 integration', () => {
     it('seedSymbols resolve um arquivo profundo pelo índice dentro do mesmo hard cap', async () => {
         const repoWritePath = join(TOOLS_DIR, 'repo-write.js');
-        const indexed = await refreshIoIndexPaths([repoWritePath], { workspaceRoot: WORKSPACE_ROOT });
+        const indexed = await infraRuntime.indexRegistry.refreshPaths([repoWritePath], {
+            workspaceRoot: WORKSPACE_ROOT,
+        });
         assert.equal(indexed.available, true);
 
         const sessionId = 'working-set-symbol-seed';
@@ -98,7 +95,7 @@ describe('Working Set V2 integration', () => {
         }).awaitReady();
         const openMs = performance.now() - startedAt;
 
-        const parserStats = getParserCacheStats();
+        const parserStats = getParserCacheStats(infraRuntime.parserCache);
         const contextStartedAt = performance.now();
         const context = getScopeContext(sessionId, { maxFiles: 40, maxBytes: 16 * 1024 });
         const contextMs = performance.now() - contextStartedAt;

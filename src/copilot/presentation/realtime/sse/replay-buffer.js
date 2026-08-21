@@ -9,7 +9,7 @@
  */
 
 import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 
 /** Tamanho padrão do buffer circular (configurável via SSE_REPLAY_BUFFER_SIZE). */
 const DEFAULT_BUFFER_SIZE = SSE_REPLAY_BUFFER_SIZE;

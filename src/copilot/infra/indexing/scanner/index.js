@@ -13,5 +13,5 @@ export {
     matchesGlobPattern,
     matchesPlainPathPattern,
     simpleGlobToRegExp,
-} from './glob.js';
+} from './glob-match/index.js';
 export { getIoScanBasename, scanDirectory } from './service.js';

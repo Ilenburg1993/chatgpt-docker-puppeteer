@@ -99,6 +99,9 @@ describe('Patch Batch V2 low-level contract', () => {
             details: {
                 currentHash: sha256('ALPHA beta gamma'),
                 currentBytes: Buffer.byteLength('ALPHA beta gamma', 'utf8'),
+                currentStateKind: 'virtual-batch',
+                diskBaselineHash: sha256(initial),
+                diskBaselineBytes: Buffer.byteLength(initial, 'utf8'),
                 desiredTextPresent: false,
                 convergenceCandidate: false,
             },

@@ -5,18 +5,24 @@
  * @module copilot/mcp/control-plane/paths
  */
 
-import { WORKSPACE_ROOT, validatePath } from '#copilot/tools';
+import { getApplicationWorkspaceInfra } from '#copilot/boot';
+import { WORKSPACE_ROOT } from '#copilot/tools';
 import path from 'node:path';
+
+const MCP_WORKSPACE_INFRA = getApplicationWorkspaceInfra(WORKSPACE_ROOT || process.cwd());
+const MCP_WORKSPACE_PATH_AUTHORITY = MCP_WORKSPACE_INFRA.authority;
+const MCP_WORKSPACE_IO = MCP_WORKSPACE_INFRA.io;
+const MCP_WORKSPACE_INDEXING = MCP_WORKSPACE_INFRA.indexing;
 
 /**
  * @typedef {{
  *     ok: true;
  *     resolved: string;
  *     relative: string;
- *     validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath;
- *     validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath;
+ *     validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath;
+ *     validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath;
  * }} McpPathOk
- * @typedef {McpPathOk & { validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} McpValidatedReadPathOk
+ * @typedef {McpPathOk & { validatedReadPath: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} McpValidatedReadPathOk
  *
  * @typedef {{
  *     ok: false;
@@ -32,7 +38,37 @@ import path from 'node:path';
  * @returns {string}
  */
 export function getMcpWorkspaceRoot() {
-    return WORKSPACE_ROOT || process.cwd();
+    return MCP_WORKSPACE_PATH_AUTHORITY.workspaceRoot;
+}
+
+/** Return the composition-owned MCP workspace I/O facade. */
+export function getMcpWorkspaceIo() {
+    return MCP_WORKSPACE_IO;
+}
+
+/** Return the composition-owned MCP workspace indexing facade. */
+export function getMcpWorkspaceIndexing() {
+    return MCP_WORKSPACE_INDEXING;
+}
+
+/** Return the runtime-owned persistent index registry used by the MCP workspace. */
+export function getMcpWorkspaceIndexRegistry() {
+    const registry = MCP_WORKSPACE_INDEXING.registry;
+    if (!registry) throw new Error('MCP workspace is not attached to an InfraRuntime index registry.');
+    return registry;
+}
+
+/** @param {(filePath:string,event:{recursive:boolean;source:string})=>void} hook */
+export function registerMcpWorkspaceInvalidationHook(hook) {
+    return MCP_WORKSPACE_INFRA.registerInvalidationHook(hook);
+}
+
+/**
+ * Start a workspace-owned external watcher after canonical workspace authorization.
+ * @param {string} [relativeRoot]
+ */
+export function startMcpWorkspaceExternalWatch(relativeRoot = 'src/copilot') {
+    return MCP_WORKSPACE_INFRA.startExternalWatch(path.resolve(getMcpWorkspaceRoot(), relativeRoot));
 }
 
 /**
@@ -42,13 +78,12 @@ export function getMcpWorkspaceRoot() {
  * @returns {Promise<McpPathOk | McpPathError>}
  */
 export async function resolveReadPath(filePath) {
-    const result = await validatePath(filePath, { mode: 'read' });
-    if (!result.ok) return pathError(filePath, 'read', result.reason ?? 'Path denied.');
-    return {
-        ok: true,
-        resolved: result.resolved,
-        relative: toWorkspaceRelativePath(result.resolved),
-    };
+    try {
+        const resolved = await MCP_WORKSPACE_PATH_AUTHORITY.resolvePath(filePath, 'read');
+        return { ok: true, resolved, relative: toWorkspaceRelativePath(resolved) };
+    } catch (error) {
+        return pathError(filePath, 'read', authorityFailureReason(error));
+    }
 }
 
 /**
@@ -58,17 +93,17 @@ export async function resolveReadPath(filePath) {
  * @returns {Promise<McpValidatedReadPathOk | McpPathError>}
  */
 export async function resolveValidatedReadPath(filePath) {
-    const result = await validatePath(filePath, { mode: 'read', issueReadCapability: true });
-    if (!result.ok) return pathError(filePath, 'read', result.reason ?? 'Path denied.');
-    if (!result.validatedReadPath) {
-        return pathError(filePath, 'read', 'Validated read capability was not issued.');
+    try {
+        const validatedReadPath = await MCP_WORKSPACE_PATH_AUTHORITY.authorizeRead(filePath, 'read');
+        return {
+            ok: true,
+            resolved: validatedReadPath.realPath,
+            relative: toWorkspaceRelativePath(validatedReadPath.realPath),
+            validatedReadPath,
+        };
+    } catch (error) {
+        return pathError(filePath, 'read', authorityFailureReason(error));
     }
-    return {
-        ok: true,
-        resolved: result.resolved,
-        relative: toWorkspaceRelativePath(result.resolved),
-        validatedReadPath: result.validatedReadPath,
-    };
 }
 
 /**
@@ -77,17 +112,21 @@ export async function resolveValidatedReadPath(filePath) {
  * @returns {Promise<McpPathOk | McpPathError>}
  */
 export async function resolveWritePath(filePath, options = {}) {
-    const result = await validatePath(filePath, {
-        mode: 'write',
-        issueMutableCapability: options.issueMutableCapability === true,
-    });
-    if (!result.ok) return pathError(filePath, 'write', result.reason ?? 'Path denied.');
-    return {
-        ok: true,
-        resolved: result.resolved,
-        relative: toWorkspaceRelativePath(result.resolved),
-        ...(result.validatedWritePath === undefined ? {} : { validatedWritePath: result.validatedWritePath }),
-    };
+    try {
+        const validatedWritePath = options.issueMutableCapability
+            ? await MCP_WORKSPACE_PATH_AUTHORITY.authorizeMutation(filePath, 'write')
+            : undefined;
+        const resolved =
+            validatedWritePath?.realPath ?? (await MCP_WORKSPACE_PATH_AUTHORITY.resolvePath(filePath, 'write'));
+        return {
+            ok: true,
+            resolved,
+            relative: toWorkspaceRelativePath(resolved),
+            ...(validatedWritePath === undefined ? {} : { validatedWritePath }),
+        };
+    } catch (error) {
+        return pathError(filePath, 'write', authorityFailureReason(error));
+    }
 }
 
 /**
@@ -97,6 +136,15 @@ export async function resolveWritePath(filePath, options = {}) {
 export function toWorkspaceRelativePath(absolutePath) {
     const relative = path.relative(getMcpWorkspaceRoot(), absolutePath);
     return relative === '' ? '.' : relative;
+}
+
+/** @param {unknown} error */
+function authorityFailureReason(error) {
+    const failure = /** @type {Error & { code?: string; policyReason?: string }} */ (error);
+    if (failure.code === 'PATH_REQUIRED') return 'Caminho inválido: path vazio.';
+    if (failure.code === 'PATH_NULL_BYTE') return 'Caminho inválido: contém byte nulo.';
+    const reason = failure.policyReason ?? failure.message ?? 'Path denied.';
+    return `Acesso negado: ${reason}`;
 }
 
 /**

@@ -59,7 +59,7 @@ export function sanitizeSearchOutput(stdout) {
 }
 
 /**
- * @param {import('./pagination.js').SearchWindow} searchWindow
+ * @param {ReturnType<typeof import('../projection/index.js').normalizeSearchWindow>} searchWindow
  */
 export function createStreamingSearchCollector(searchWindow) {
     /** @type {string[]} */

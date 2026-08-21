@@ -1,17 +1,16 @@
 // @ts-check
-/** Process supervision helpers for Cloudflare MCP CLI. */
-import { spawn, spawnSync } from 'node:child_process';
+/**
+ * Bound process supervision for the Cloudflare MCP control plane.
+ *
+ * Filesystem authority is minted once from `CloudflareTunnelConfig`. Operational methods never accept PID, metadata or
+ * log paths, so callers cannot retarget privileged IO after controller construction.
+ *
+ * @module copilot/mcp/cloudflare/cli-process
+ */
 
-import { moveFileLocked } from '#copilot/infra/public/filesystem/mutation';
-import {
-    deleteFileTrusted,
-    mkdirPathTrusted,
-    openDetachedAppendSinkTrusted,
-    readTextFreshTrusted,
-    statPathTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
-import path from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { spawn, spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
@@ -19,19 +18,31 @@ const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 const DEFAULT_KILL_TIMEOUT_MS = 2_000;
 const STOP_POLL_INTERVAL_MS = 100;
 const DEFAULT_DETACHED_LOG_ROTATE_BYTES = 2 * 1024 * 1024;
+const DEFAULT_LOG_TAIL_BYTES = 64 * 1024;
+const MAX_LOG_TAIL_BYTES = 1024 * 1024;
 
 /**
  * @typedef {{ ok: true; version: string; parsedVersion?: string } | { ok: false; error: string }} CloudflaredVersion
- *
+ * @typedef {'mcpHttp'|'cloudflared'} CloudflareManagedProcessKey
  * @typedef {{
  *     name: string;
  *     command: string;
  *     args: string[];
- *     pidFile: string;
- *     logFile: string;
  *     env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
- *     stateWriter?: (filePath: string, content: string) => Promise<void>;
- * }} DetachedProcessOptions
+ *     beforePidPublish?: (() => void | Promise<void>) | undefined;
+ * }} BoundDetachedProcessOptions
+ * @typedef {{
+ *     key: CloudflareManagedProcessKey;
+ *     name: string;
+ *     pidFile: string;
+ *     metadataFile: string;
+ *     logFile: string;
+ *     rotatedLogFile: string;
+ *     resolvedPidFile: string;
+ *     resolvedMetadataFile: string;
+ *     resolvedLogFile: string;
+ *     resolvedRotatedLogFile: string;
+ * }} BoundProcessPaths
  */
 
 /** @returns {CloudflaredVersion} */
@@ -90,112 +101,212 @@ function compareVersions(left, right) {
 }
 
 /**
- * @param {string} pidFile
- * @returns {Promise<{
- *     pidFile: string;
- *     pid: number | null;
- *     alive: boolean;
- *     state: 'alive' | 'dead' | 'missing' | 'invalid';
- *     error: string | null;
- * }>}
+ * Create the only filesystem authority used by managed MCP/cloudflared process supervision.
+ *
+ * The configured PID/log paths are resolved eagerly. A later `cwd` change therefore cannot retarget process state.
+ * Metadata and the single rotated log generation are derived inside this owner and included in the exact-path grant.
+ *
+ * @param {import('./config.js').CloudflareTunnelConfig} config
  */
-export async function readPidFileStatus(pidFile) {
+export function createCloudflareManagedProcessController(config) {
+    const mcpHttpPaths = createBoundProcessPaths('mcpHttp', 'mcp-http', config.mcpHttpPidFile, config.mcpHttpLogFile);
+    const cloudflaredPaths = createBoundProcessPaths(
+        'cloudflared',
+        'cloudflared',
+        config.managedTunnelPidFile,
+        config.managedTunnelLogFile,
+    );
+    const directories = [
+        ...new Set([
+            dirname(mcpHttpPaths.resolvedPidFile),
+            dirname(mcpHttpPaths.resolvedLogFile),
+            dirname(cloudflaredPaths.resolvedPidFile),
+            dirname(cloudflaredPaths.resolvedLogFile),
+        ]),
+    ];
+    const exactPaths = [
+        ...directories,
+        ...flatResolvedProcessPaths(mcpHttpPaths),
+        ...flatResolvedProcessPaths(cloudflaredPaths),
+    ];
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.cloudflare.cli-process',
+            exactPaths,
+            operations: ['read', 'stat', 'write', 'mkdir', 'delete', 'append', 'move'],
+            symlinkPolicy: 'deny',
+        }),
+    );
+
+    const mcpHttp = createBoundProcessFacade(mcpHttpPaths, io);
+    const cloudflared = createBoundProcessFacade(cloudflaredPaths, io);
+    return Object.freeze({
+        mcpHttp,
+        cloudflared,
+        logs: Object.freeze({
+            mcpHttp: mcpHttpPaths.logFile,
+            cloudflared: cloudflaredPaths.logFile,
+        }),
+        async readCloudflaredLogTail(maxBytes = DEFAULT_LOG_TAIL_BYTES) {
+            return readBoundLogTail(cloudflaredPaths, io, maxBytes);
+        },
+    });
+}
+
+/**
+ * @param {CloudflareManagedProcessKey} key
+ * @param {string} name
+ * @param {string} pidFile
+ * @param {string} logFile
+ * @returns {Readonly<BoundProcessPaths>}
+ */
+function createBoundProcessPaths(key, name, pidFile, logFile) {
+    const metadataFile = `${pidFile}.json`;
+    const rotatedLogFile = `${logFile}.1`;
+    return Object.freeze({
+        key,
+        name,
+        pidFile,
+        metadataFile,
+        logFile,
+        rotatedLogFile,
+        resolvedPidFile: resolve(pidFile),
+        resolvedMetadataFile: resolve(metadataFile),
+        resolvedLogFile: resolve(logFile),
+        resolvedRotatedLogFile: resolve(rotatedLogFile),
+    });
+}
+
+/** @param {BoundProcessPaths} paths */
+function flatResolvedProcessPaths(paths) {
+    return [paths.resolvedPidFile, paths.resolvedMetadataFile, paths.resolvedLogFile, paths.resolvedRotatedLogFile];
+}
+
+/**
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
+ */
+function createBoundProcessFacade(paths, io) {
+    return Object.freeze({
+        name: paths.name,
+        pidFile: paths.pidFile,
+        metadataFile: paths.metadataFile,
+        logFile: paths.logFile,
+        rotatedLogFile: paths.rotatedLogFile,
+        status: () => readBoundPidFileStatus(paths, io),
+        ensure: (/** @type {BoundDetachedProcessOptions} */ options) => ensureBoundDetachedProcess(paths, io, options),
+        stop: () => stopBoundPidFileProcess(paths, io),
+        readMetadata: () => readBoundProcessMetadata(paths, io),
+        rotateLogIfOversized: (/** @type {{maxBytes?:number}} */ options = {}) =>
+            rotateBoundProcessLogIfOversized(paths, io, options),
+        readLogTail: (/** @type {number} */ maxBytes = DEFAULT_LOG_TAIL_BYTES) => readBoundLogTail(paths, io, maxBytes),
+    });
+}
+
+/**
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
+ */
+async function readBoundPidFileStatus(paths, io) {
     try {
-        const pid = Number(
-            (await readTextFreshTrusted(pidFile, { caller: 'mcp.cloudflare.cli-process' })).content.trim(),
-        );
-        if (!Number.isInteger(pid) || pid <= 0)
-            return { pidFile, pid: null, alive: false, state: 'invalid', error: 'invalid-pid-file' };
+        const pid = Number((await io.readTextFresh(paths.resolvedPidFile)).content.trim());
+        if (!Number.isInteger(pid) || pid <= 0) {
+            return {
+                pidFile: paths.pidFile,
+                pid: null,
+                alive: false,
+                state: /** @type {const} */ ('invalid'),
+                error: 'invalid-pid-file',
+            };
+        }
         try {
             process.kill(pid, 0);
-            return { pidFile, pid, alive: true, state: 'alive', error: null };
+            return {
+                pidFile: paths.pidFile,
+                pid,
+                alive: true,
+                state: /** @type {const} */ ('alive'),
+                error: null,
+            };
         } catch (error) {
             return {
-                pidFile,
+                pidFile: paths.pidFile,
                 pid,
                 alive: false,
-                state: 'dead',
+                state: /** @type {const} */ ('dead'),
                 error: error instanceof Error ? error.message : String(error),
             };
         }
     } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
-            return { pidFile, pid: null, alive: false, state: 'missing', error: null };
+        if (isNotFoundError(error)) {
+            return {
+                pidFile: paths.pidFile,
+                pid: null,
+                alive: false,
+                state: /** @type {const} */ ('missing'),
+                error: null,
+            };
+        }
         return {
-            pidFile,
+            pidFile: paths.pidFile,
             pid: null,
             alive: false,
-            state: 'invalid',
+            state: /** @type {const} */ ('invalid'),
             error: error instanceof Error ? error.message : String(error),
         };
     }
 }
 
 /**
- * Rotaciona apenas antes de um novo processo abrir o log. Isso evita renomear o inode atualmente mantido por um
- * processo vivo e mantém uma única geração `.1` para diagnóstico pós-restart.
+ * Rotate only before a new process opens the log. Both source and destination are exact paths in the same grant.
  *
- * @param {string} logFile
- * @param {{ maxBytes?: number }} [options]
- * @returns {Promise<{ rotated: boolean; previousBytes: number; rotatedPath: string | null }>}
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
+ * @param {{maxBytes?:number}} [options]
  */
-export async function rotateDetachedProcessLogIfOversized(logFile, options = {}) {
+async function rotateBoundProcessLogIfOversized(paths, io, options = {}) {
     const maxBytes =
         Number.isFinite(options.maxBytes) && Number(options.maxBytes) > 0
             ? Math.trunc(Number(options.maxBytes))
             : DEFAULT_DETACHED_LOG_ROTATE_BYTES;
     let currentStats;
     try {
-        currentStats = (await statPathTrusted(logFile, { caller: 'mcp.cloudflare.cli-process' })).stats;
+        currentStats = (await io.statPath(paths.resolvedLogFile)).stats;
     } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-            return { rotated: false, previousBytes: 0, rotatedPath: null };
-        }
+        if (isNotFoundError(error)) return { rotated: false, previousBytes: 0, rotatedPath: null };
         throw error;
     }
     if (!currentStats.isFile() || currentStats.size <= maxBytes) {
         return { rotated: false, previousBytes: currentStats.size, rotatedPath: null };
     }
-    const rotatedPath = `${logFile}.1`;
-    await moveFileLocked(logFile, rotatedPath, { overwrite: true });
-    return { rotated: true, previousBytes: currentStats.size, rotatedPath };
+    await io.moveFile(paths.resolvedLogFile, paths.resolvedRotatedLogFile, { overwrite: true });
+    return { rotated: true, previousBytes: currentStats.size, rotatedPath: paths.rotatedLogFile };
 }
 
 /**
- * @param {DetachedProcessOptions} options
- * @returns {Promise<{
- *     name: string;
- *     pidFile: string;
- *     logFile: string;
- *     metadataFile: string;
- *     pid: number;
- *     alreadyRunning: boolean;
- *     restarted: boolean;
- * }>}
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
+ * @param {BoundDetachedProcessOptions} options
  */
-export async function ensureDetachedProcess(options) {
-    const metadataFile = `${options.pidFile}.json`;
+async function ensureBoundDetachedProcess(paths, io, options) {
     const signature = { command: options.command, args: options.args, env: redactEnv(options.env ?? {}) };
-    const existing = await readPidFileStatus(options.pidFile);
-    if (existing.alive && existing.pid !== null)
+    const existing = await readBoundPidFileStatus(paths, io);
+    if (existing.alive && existing.pid !== null) {
         return {
             name: options.name,
-            pidFile: options.pidFile,
-            logFile: options.logFile,
-            metadataFile,
+            pidFile: paths.pidFile,
+            logFile: paths.logFile,
+            metadataFile: paths.metadataFile,
             pid: existing.pid,
             alreadyRunning: true,
             restarted: false,
         };
-    await mkdirPathTrusted(path.dirname(options.pidFile), {
-        caller: 'mcp.cloudflare.cli-process',
-        recursive: true,
-    });
-    await rotateDetachedProcessLogIfOversized(options.logFile);
-    const logSink = await openDetachedAppendSinkTrusted(options.logFile, {
-        caller: 'mcp.cloudflare.cli-process',
-        mode: 0o600,
-    });
+    }
+
+    const parentDirectories = [...new Set([dirname(paths.resolvedPidFile), dirname(paths.resolvedLogFile)])];
+    await Promise.all(parentDirectories.map((directory) => io.mkdirPath(directory, { recursive: true })));
+    await rotateBoundProcessLogIfOversized(paths, io);
+    const logSink = await io.openDetachedAppendSink(paths.resolvedLogFile, { mode: 0o600 });
     let child;
     try {
         child = spawn(options.command, options.args, {
@@ -208,13 +319,10 @@ export async function ensureDetachedProcess(options) {
     }
     if (!child.pid) throw new Error(`Could not start ${options.name}`);
     child.unref();
-    const stateWriter =
-        options.stateWriter ??
-        ((filePath, content) =>
-            writeFileAtomicTrusted(filePath, content, { caller: 'mcp.cloudflare.cli-process', mode: 0o600 }));
+
     try {
-        await stateWriter(
-            metadataFile,
+        await io.writeFileAtomic(
+            paths.resolvedMetadataFile,
             `${JSON.stringify(
                 {
                     schemaVersion: 2,
@@ -226,32 +334,31 @@ export async function ensureDetachedProcess(options) {
                 null,
                 2,
             )}\n`,
+            { mode: 0o600 },
         );
-        // PID is the readiness marker and must be published only after metadata is durable.
-        await stateWriter(options.pidFile, `${child.pid}\n`);
+        // PID remains the readiness marker and is published only after metadata is durable.
+        await options.beforePidPublish?.();
+        await io.writeFileAtomic(paths.resolvedPidFile, `${child.pid}\n`, { mode: 0o600 });
     } catch (error) {
         await terminateDetachedProcess(child.pid);
         await Promise.all([
-            deleteFileTrusted(options.pidFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
-            deleteFileTrusted(metadataFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+            io.deleteFile(paths.resolvedPidFile, { ignoreMissing: true }),
+            io.deleteFile(paths.resolvedMetadataFile, { ignoreMissing: true }),
         ]);
         throw error;
     }
     return {
         name: options.name,
-        pidFile: options.pidFile,
-        logFile: options.logFile,
-        metadataFile,
+        pidFile: paths.pidFile,
+        logFile: paths.logFile,
+        metadataFile: paths.metadataFile,
         pid: child.pid,
         alreadyRunning: false,
         restarted: existing.state === 'dead',
     };
 }
 
-/**
- * @param {number} pid
- * @returns {Promise<void>}
- */
+/** @param {number} pid */
 async function terminateDetachedProcess(pid) {
     try {
         process.kill(-pid, 'SIGTERM');
@@ -276,23 +383,14 @@ async function terminateDetachedProcess(pid) {
 }
 
 /**
- * @param {string} pidFile
- * @returns {Promise<{
- *     pidFile: string;
- *     pid: number | null;
- *     wasAlive: boolean;
- *     stopped: boolean;
- *     error: string | null;
- *     processGroupSignalled: boolean;
- *     forcedKilled: boolean;
- *     stopWaitMs: number;
- * }>}
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
  */
-export async function stopPidFileProcess(pidFile) {
-    const status = await readPidFileStatus(pidFile);
+async function stopBoundPidFileProcess(paths, io) {
+    const status = await readBoundPidFileStatus(paths, io);
     if (!status.pid) {
         return {
-            pidFile,
+            pidFile: paths.pidFile,
             pid: null,
             wasAlive: false,
             stopped: true,
@@ -314,7 +412,7 @@ export async function stopPidFileProcess(pidFile) {
                 process.kill(status.pid, 'SIGTERM');
             } catch (error) {
                 return {
-                    pidFile,
+                    pidFile: paths.pidFile,
                     pid: status.pid,
                     wasAlive: true,
                     stopped: false,
@@ -337,7 +435,7 @@ export async function stopPidFileProcess(pidFile) {
         }
         if (!stopped) {
             return {
-                pidFile,
+                pidFile: paths.pidFile,
                 pid: status.pid,
                 wasAlive: true,
                 stopped: false,
@@ -349,11 +447,11 @@ export async function stopPidFileProcess(pidFile) {
         }
     }
     await Promise.all([
-        deleteFileTrusted(pidFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
-        deleteFileTrusted(`${pidFile}.json`, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+        io.deleteFile(paths.resolvedPidFile, { ignoreMissing: true }),
+        io.deleteFile(paths.resolvedMetadataFile, { ignoreMissing: true }),
     ]);
     return {
-        pidFile,
+        pidFile: paths.pidFile,
         pid: status.pid,
         wasAlive: status.alive,
         stopped: true,
@@ -365,10 +463,39 @@ export async function stopPidFileProcess(pidFile) {
 }
 
 /**
- * @param {number} pid
- * @param {number} timeoutMs
- * @returns {Promise<boolean>}
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
  */
+async function readBoundProcessMetadata(paths, io) {
+    try {
+        return JSON.parse((await io.readTextFresh(paths.resolvedMetadataFile)).content);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {BoundProcessPaths} paths
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
+ * @param {number} maxBytes
+ */
+async function readBoundLogTail(paths, io, maxBytes) {
+    const requested = Number(maxBytes);
+    const boundedMaxBytes = Number.isFinite(requested)
+        ? Math.min(MAX_LOG_TAIL_BYTES, Math.max(1, Math.trunc(requested)))
+        : DEFAULT_LOG_TAIL_BYTES;
+    const stats = (await io.statPath(paths.resolvedLogFile)).stats;
+    if (!stats.isFile()) throw new Error(`Managed process log is not a regular file: ${paths.logFile}`);
+    const start = Math.max(0, stats.size - boundedMaxBytes);
+    const snapshot = await io.readBytesRangeFresh(paths.resolvedLogFile, {
+        start,
+        maxBytes: boundedMaxBytes,
+        rejectSymlink: true,
+    });
+    return new TextDecoder('utf-8', { fatal: false }).decode(snapshot.content);
+}
+
+/** @param {number} pid @param {number} timeoutMs */
 async function waitForPidExit(pid, timeoutMs) {
     const deadline = Date.now() + Math.max(0, timeoutMs);
     while (isPidAlive(pid)) {
@@ -378,10 +505,7 @@ async function waitForPidExit(pid, timeoutMs) {
     return true;
 }
 
-/**
- * @param {number} pid
- * @returns {boolean}
- */
+/** @param {number} pid */
 function isPidAlive(pid) {
     try {
         process.kill(pid, 0);
@@ -391,33 +515,23 @@ function isPidAlive(pid) {
     }
 }
 
-/**
- * @param {number} ms
- * @returns {Promise<void>}
- */
+/** @param {number} ms */
 function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-/**
- * @param {NodeJS.ProcessEnv} env
- * @returns {number}
- */
+/** @param {NodeJS.ProcessEnv} env */
 function readStopTimeoutMs(env) {
     const parsed = Number(env['COPILOT_MCP_PROCESS_STOP_TIMEOUT_MS'] ?? DEFAULT_STOP_TIMEOUT_MS);
     return Number.isFinite(parsed) && parsed >= 500 ? Math.floor(parsed) : DEFAULT_STOP_TIMEOUT_MS;
 }
 
-/** @param {string} metadataFile @returns {Promise<unknown | null>} */
-export async function readProcessMetadata(metadataFile) {
-    try {
-        return JSON.parse((await readTextFreshTrusted(metadataFile, { caller: 'mcp.cloudflare.cli-process' })).content);
-    } catch {
-        return null;
-    }
+/** @param {unknown} error */
+function isNotFoundError(error) {
+    return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
 }
 
-/** @param {NodeJS.ProcessEnv | Record<string, string | undefined>} env @returns {Record<string, string | undefined>} */
+/** @param {NodeJS.ProcessEnv | Record<string, string | undefined>} env */
 function redactEnv(env) {
     return Object.fromEntries(
         Object.entries(env).map(([key, value]) => [key, /TOKEN|SECRET|PASSWORD|KEY/u.test(key) ? '<redacted>' : value]),

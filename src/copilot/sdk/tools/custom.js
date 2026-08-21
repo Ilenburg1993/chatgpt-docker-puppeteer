@@ -19,7 +19,7 @@
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { CustomToolsFileSchema } from '#copilot/core/schemas';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -69,6 +69,14 @@ function requireCustomToolsBuilder() {
 
 /** Caminho canônico do arquivo de persistência. @type {string} */
 const CUSTOM_TOOLS_PATH = resolvePersistentConfigFile('custom-tools.json');
+const CUSTOM_TOOLS_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'sdk.tools.custom',
+        exactPaths: [CUSTOM_TOOLS_PATH],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+    }),
+);
 
 /**
  * Lê o arquivo de registry no caminho canônico.
@@ -77,7 +85,7 @@ const CUSTOM_TOOLS_PATH = resolvePersistentConfigFile('custom-tools.json');
  */
 async function _readRegistryFile() {
     try {
-        return (await readTextFreshTrusted(CUSTOM_TOOLS_PATH, { caller: 'sdk.tools.custom' })).content;
+        return (await CUSTOM_TOOLS_IO.readTextFresh(CUSTOM_TOOLS_PATH)).content;
     } catch (e) {
         if (toError(e).code === 'ENOENT') return null;
         throw e;
@@ -240,7 +248,7 @@ function _persistCustomToolsAsync() {
     const content = `${JSON.stringify([..._registry.values()], null, 2)}\n`;
     _persistQueue = _persistQueue
         .catch(() => undefined)
-        .then(() => writeFileAtomicTrusted(CUSTOM_TOOLS_PATH, content, { caller: 'sdk.tools.custom', mode: 0o600 }))
+        .then(() => CUSTOM_TOOLS_IO.writeFileAtomic(CUSTOM_TOOLS_PATH, content, { mode: 0o600 }))
         .catch((err) => {
             log(
                 'WARN',

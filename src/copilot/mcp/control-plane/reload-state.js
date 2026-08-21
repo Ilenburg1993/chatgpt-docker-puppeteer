@@ -5,7 +5,7 @@
  * @module copilot/mcp/control-plane/reload-state
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_RELOAD_STATE_FILE = 'src/copilot/.ai/mcp/mcp-reload-state.json';
@@ -15,7 +15,7 @@ export const MCP_RELOAD_STATE_FILE = 'src/copilot/.ai/mcp/mcp-reload-state.json'
  * @returns {Promise<Record<string, unknown> | null>}
  */
 export async function readMcpReloadState(options = {}) {
-    const workspaceIo = createWorkspaceIo({ workspaceRoot: options.workspaceRoot ?? getMcpWorkspaceRoot() });
+    const workspaceIo = getApplicationWorkspaceInfra(options.workspaceRoot ?? getMcpWorkspaceRoot()).readIo;
     try {
         const file = await workspaceIo.readText(MCP_RELOAD_STATE_FILE);
         const parsed = JSON.parse(file.content);

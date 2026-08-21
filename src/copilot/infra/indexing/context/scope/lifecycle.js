@@ -5,7 +5,7 @@ import { convergeScopeIndex } from './index-convergence.js';
 import { materializeScopeSymbols } from './materialization.js';
 import { getScopeStats } from './query.js';
 import { selectAndWarmScopePaths } from './selection.js';
-import { MAX_ACTIVE_SCOPES, _warmControllers, _warmPromises, markScopeReady, recordScopeFailure } from './state.js';
+import { markScopeReady, recordScopeFailure } from './state.js';
 
 /** @typedef {import('./types.js').ScopeDeclareOptions} ScopeDeclareOptions */
 /** @typedef {import('./types.js').ScopeStats} ScopeStats */
@@ -13,10 +13,11 @@ import { MAX_ACTIVE_SCOPES, _warmControllers, _warmPromises, markScopeReady, rec
 /**
  * Declares a bounded session working set and starts warm/parse/index convergence in the background.
  * @param {ScopeDeclareOptions} opts
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {{ sessionId: string; ready: boolean; awaitReady: () => Promise<ScopeStats> }}
  */
-export function declareScope(opts) {
-    const { scope, warmController, previousWarmPromise } = allocateScope(opts);
+export function declareScope(opts, runtime) {
+    const { scope, warmController, previousWarmPromise } = allocateScope(opts, runtime);
     const silent = opts.silent ?? true;
     const parseSymbols = opts.parseSymbols ?? true;
     const sessionId = opts.sessionId;
@@ -24,15 +25,21 @@ export function declareScope(opts) {
     const warmPromise = (async () => {
         try {
             if (previousWarmPromise) await previousWarmPromise.catch(() => undefined);
-            const { resolvedPaths, warmSnapshots } = await selectAndWarmScopePaths(scope, opts, warmController.signal);
+            const { resolvedPaths, warmSnapshots } = await selectAndWarmScopePaths(
+                scope,
+                opts,
+                warmController.signal,
+                runtime,
+            );
             if (warmController.signal.aborted) return;
             await materializeScopeSymbols(scope, resolvedPaths, warmSnapshots, {
                 parseSymbols,
                 silent,
                 signal: warmController.signal,
+                ...(runtime.parserCacheRuntime ? { parserCacheRuntime: runtime.parserCacheRuntime } : {}),
             });
             if (warmController.signal.aborted) return;
-            await convergeScopeIndex(scope, resolvedPaths, warmSnapshots, opts, warmController.signal);
+            await convergeScopeIndex(scope, resolvedPaths, warmSnapshots, opts, warmController.signal, runtime);
             if (warmController.signal.aborted) return;
             if (scope.failed > 0) {
                 if (!scope.degraded) {
@@ -54,18 +61,18 @@ export function declareScope(opts) {
                 scope.completedAt = Date.now();
             }
         } finally {
-            if (_warmControllers.get(sessionId) === warmController) _warmControllers.delete(sessionId);
+            if (runtime.warmControllers.get(sessionId) === warmController) runtime.warmControllers.delete(sessionId);
         }
     })();
-    _warmPromises.set(sessionId, warmPromise);
+    runtime.warmPromises.set(sessionId, warmPromise);
 
     return {
         sessionId,
         ready: false,
         awaitReady: async () => {
-            await (_warmPromises.get(sessionId) ?? Promise.resolve());
+            await (runtime.warmPromises.get(sessionId) ?? Promise.resolve());
             return (
-                getScopeStats(sessionId) ?? {
+                getScopeStats(sessionId, runtime) ?? {
                     sessionId,
                     pathCount: 0,
                     candidateFiles: 0,
@@ -91,7 +98,7 @@ export function declareScope(opts) {
                     },
                     startedAt: scope.startedAt,
                     completedAt: Date.now(),
-                    maxActiveScopes: MAX_ACTIVE_SCOPES,
+                    maxActiveScopes: runtime.maxActiveScopes,
                 }
             );
         },

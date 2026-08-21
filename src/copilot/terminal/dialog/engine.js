@@ -14,7 +14,7 @@ import {
     TERMINAL_LIVE_STATUS_ENABLED,
 } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import {
     classifyByokProviderFailure,
     readModelGatewayRuntimeAutomationEffectivePolicy,

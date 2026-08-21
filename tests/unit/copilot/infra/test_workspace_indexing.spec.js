@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-    createValidatedReadWorkspacePath,
+    createWorkspacePathAuthority,
     getValidatedReadWorkspacePathStats,
 } from '#copilot/infra/internal/filesystem/workspace';
 import { createWorkspaceIndexing } from '#copilot/infra/internal/indexing/workspace';
@@ -23,7 +23,8 @@ afterEach(async () => {
 async function createFixture() {
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'copilot-workspace-indexing-root-'));
     cleanupPaths.push(workspaceRoot);
-    return { workspaceRoot, indexing: createWorkspaceIndexing({ workspaceRoot }) };
+    const authority = createWorkspacePathAuthority({ workspaceRoot });
+    return { workspaceRoot, authority, indexing: createWorkspaceIndexing(authority) };
 }
 
 describe('workspace indexing capability', () => {
@@ -40,12 +41,12 @@ describe('workspace indexing capability', () => {
     });
 
     it('reusa capability read-only no scanner sem segunda policy async', async () => {
-        const { workspaceRoot, indexing } = await createFixture();
+        const { workspaceRoot, authority, indexing } = await createFixture();
         const nested = join(workspaceRoot, 'nested');
         await mkdir(nested);
         await writeFile(join(nested, 'entry.txt'), 'entry', 'utf8');
         resetValidatedReadWorkspacePathStatsForTest();
-        const capability = createValidatedReadWorkspacePath({ realPath: nested, workspaceRoot });
+        const capability = await authority.authorizeRead(nested, 'read');
 
         const scan = await indexing.scanDirectoryValidated(capability, { depth: 1, maxEntries: 10 });
 
@@ -58,11 +59,11 @@ describe('workspace indexing capability', () => {
     });
 
     it('reusa a mesma capability read-only para search sem alterar ownership do filesystem', async () => {
-        const { workspaceRoot, indexing } = await createFixture();
+        const { workspaceRoot, authority, indexing } = await createFixture();
         const filePath = join(workspaceRoot, 'sample.js');
         await writeFile(filePath, 'export const workspaceIndexingNeedle = 1;\n', 'utf8');
         resetValidatedReadWorkspacePathStatsForTest();
-        const capability = createValidatedReadWorkspacePath({ realPath: workspaceRoot, workspaceRoot });
+        const capability = await authority.authorizeRead(workspaceRoot, 'read');
 
         const result = await indexing.searchTextValidated(capability, {
             pattern: 'workspaceIndexingNeedle',

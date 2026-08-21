@@ -5,12 +5,7 @@
  * @module copilot/mcp/cloudflare/edge-backup
  */
 
-import {
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-    readTextFreshTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR } from './config.js';
@@ -18,19 +13,31 @@ import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
 
 const BACKUP_SCHEMA_VERSION = 1;
 const BACKUP_KIND = 'cloudflare-edge-snapshot-backup';
+const CLOUDFLARE_EDGE_BACKUP_ROOT = path.resolve(DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR);
+const CLOUDFLARE_EDGE_BACKUP_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.cloudflare.edge-backup',
+        roots: [CLOUDFLARE_EDGE_BACKUP_ROOT],
+        operations: ['list', 'read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const CLOUDFLARE_EDGE_BACKUP_STORE = createCloudflareEdgeBackupStore({
+    dir: CLOUDFLARE_EDGE_BACKUP_ROOT,
+    io: CLOUDFLARE_EDGE_BACKUP_IO,
+});
 
 /**
  * @typedef {object} CloudflareEdgeBackupOptions
  * @property {NodeJS.ProcessEnv} [env]
  * @property {Date} [now]
- * @property {string} [dir]
  * @property {string} [label]
  * @property {boolean} [includeSnapshot]
  */
 
 /**
  * @typedef {object} CloudflareEdgeBackupListOptions
- * @property {string} [dir]
  * @property {number} [limit]
  */
 
@@ -43,7 +50,6 @@ export async function createCloudflareEdgeBackup(options = {}) {
     const now = options.now ?? new Date();
     const snapshot = await buildCloudflareEdgeSnapshot({ ...childOptions, now });
     const backupOptions = {
-        ...(typeof options.dir === 'string' ? { dir: options.dir } : {}),
         ...(typeof options.label === 'string' ? { label: options.label } : {}),
         ...(typeof options.includeSnapshot === 'boolean' ? { includeSnapshot: options.includeSnapshot } : {}),
         now,
@@ -51,17 +57,53 @@ export async function createCloudflareEdgeBackup(options = {}) {
     return writeCloudflareEdgeBackup(snapshot, backupOptions);
 }
 
+/** @typedef {ReturnType<typeof createConfiguredFsIo>} ConfiguredFsIo */
+
+/**
+ * Build a backup store from an already-authorized IO capability. The factory never mints filesystem authority.
+ * @param {{dir:string;io:ConfiguredFsIo}} options
+ */
+export function createCloudflareEdgeBackupStore(options) {
+    const absoluteDir = path.resolve(String(options.dir).trim());
+    if (!String(options.dir).trim() || String(options.dir).includes('\0')) {
+        throw new Error('Cloudflare edge backup directory is invalid.');
+    }
+    const context = Object.freeze({ dir: absoluteDir, io: options.io });
+    return Object.freeze({
+        /** @param {Record<string, unknown> & {ok?:boolean}} snapshot @param {{label?:string;includeSnapshot?:boolean;now?:Date}} [writeOptions] */
+        write: (snapshot, writeOptions = {}) => writeCloudflareEdgeBackupBound(context, snapshot, writeOptions),
+        /** @param {CloudflareEdgeBackupListOptions} [listOptions] */
+        list: (listOptions = {}) => listCloudflareEdgeBackupsBound(context, listOptions),
+    });
+}
+
 /**
  * @param {Record<string, unknown> & { ok?: boolean }} snapshot
- * @param {{ dir?: string; label?: string; includeSnapshot?: boolean; now?: Date }} [options]
+ * @param {{ label?: string; includeSnapshot?: boolean; now?: Date }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
+    return CLOUDFLARE_EDGE_BACKUP_STORE.write(snapshot, options);
+}
+
+/**
+ * @param {CloudflareEdgeBackupListOptions} [options]
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+export async function listCloudflareEdgeBackups(options = {}) {
+    return CLOUDFLARE_EDGE_BACKUP_STORE.list(options);
+}
+
+/**
+ * @param {{dir:string;io:ConfiguredFsIo}} context
+ * @param {Record<string, unknown> & { ok?: boolean }} snapshot
+ * @param {{ label?: string; includeSnapshot?: boolean; now?: Date }} options
+ */
+async function writeCloudflareEdgeBackupBound(context, snapshot, options) {
     const now = options.now ?? new Date();
-    const dir = normalizeBackupDir(options.dir);
     const label = normalizeBackupLabel(options.label);
     const fileName = buildCloudflareEdgeBackupFileName(now, label);
-    const absolutePath = path.resolve(dir, fileName);
+    const absolutePath = resolveBoundBackupPath(context.dir, fileName);
     const relativePath = normalizeRelativePath(absolutePath);
     const snapshotJson = `${JSON.stringify(snapshot, null, 2)}\n`;
     const snapshotSha256 = sha256(snapshotJson);
@@ -71,17 +113,12 @@ export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
         createdAt: now.toISOString(),
         mode: 'local-json-backup',
         appliesChanges: false,
-        backup: {
-            label,
-            fileName,
-            relativePath,
-            snapshotSha256,
-        },
+        backup: { label, fileName, relativePath, snapshotSha256 },
         snapshot,
     };
     const content = `${JSON.stringify(payload, null, 2)}\n`;
     const contentSha256 = sha256(content);
-    await writeFileAtomicTrusted(absolutePath, content, { caller: 'mcp.cloudflare.edge-backup', mode: 0o600 });
+    await context.io.writeFileAtomic(absolutePath, content, { mode: 0o600 });
 
     const readiness = asRecord(snapshot['readiness']);
     const policyDiff = asRecord(snapshot['policyDiff']);
@@ -92,13 +129,7 @@ export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
         mode: 'local-json-backup',
         appliesChanges: false,
         backupWritten: true,
-        backup: {
-            label,
-            fileName,
-            relativePath,
-            snapshotSha256,
-            contentSha256,
-        },
+        backup: { label, fileName, relativePath, snapshotSha256, contentSha256 },
         snapshotSummary: {
             capturedAt: snapshot['capturedAt'] ?? null,
             endpoint: snapshot['endpoint'] ?? null,
@@ -114,28 +145,19 @@ export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
     };
 }
 
-/**
- * @param {CloudflareEdgeBackupListOptions} [options]
- * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
- */
-export async function listCloudflareEdgeBackups(options = {}) {
-    const dir = normalizeBackupDir(options.dir);
+/** @param {{dir:string;io:ConfiguredFsIo}} context @param {CloudflareEdgeBackupListOptions} options */
+async function listCloudflareEdgeBackupsBound(context, options) {
     const limit = normalizeLimit(options.limit);
-    const absoluteDir = path.resolve(dir);
     let entries;
     try {
-        entries = (
-            await listDirectoryNamesFreshTrusted(absoluteDir, {
-                caller: 'mcp.cloudflare.edge-backup',
-            })
-        ).entries;
+        entries = (await context.io.listDirectoryNamesFresh(context.dir)).entries;
     } catch (error) {
         if (isMissingBackupPathError(error)) {
             return {
                 ok: true,
                 success: true,
                 mode: 'local-json-backup-list',
-                directory: normalizeRelativePath(absoluteDir),
+                directory: normalizeRelativePath(context.dir),
                 backups: [],
                 total: 0,
             };
@@ -146,14 +168,14 @@ export async function listCloudflareEdgeBackups(options = {}) {
     const backups = [];
     for (const entryName of entries) {
         if (!entryName.endsWith('.json')) continue;
-        const absolutePath = path.join(absoluteDir, entryName);
+        const absolutePath = resolveBoundBackupPath(context.dir, entryName);
         try {
-            const { stats } = await lstatPathTrusted(absolutePath, { caller: 'mcp.cloudflare.edge-backup' });
-            if (!stats.isFile() || stats.isSymbolicLink()) continue;
-            backups.push(await summarizeBackupFile(absolutePath, stats.size, stats.mtime.toISOString()));
+            const { stats } = await context.io.lstatPath(absolutePath);
+            if (!stats.isFile()) continue;
+            backups.push(await summarizeBackupFile(context.io, absolutePath, stats.size, stats.mtime.toISOString()));
         } catch (error) {
-            // Concurrent retention may remove a candidate between listing and lstat.
-            if (isMissingBackupPathError(error)) continue;
+            // Concurrent retention may remove a candidate between listing and lstat; symlink candidates are never read.
+            if (isMissingBackupPathError(error) || isConfiguredSymlinkError(error)) continue;
             throw error;
         }
     }
@@ -162,7 +184,7 @@ export async function listCloudflareEdgeBackups(options = {}) {
         ok: true,
         success: true,
         mode: 'local-json-backup-list',
-        directory: normalizeRelativePath(absoluteDir),
+        directory: normalizeRelativePath(context.dir),
         backups: backups.slice(0, limit),
         total: backups.length,
         limit,
@@ -177,16 +199,6 @@ export async function listCloudflareEdgeBackups(options = {}) {
 export function buildCloudflareEdgeBackupFileName(now, label) {
     const timestamp = now.toISOString().replace(/[:.]/gu, '-');
     return label ? `cloudflare-edge-snapshot-${timestamp}-${label}.json` : `cloudflare-edge-snapshot-${timestamp}.json`;
-}
-
-/**
- * @param {string | undefined} dir
- * @returns {string}
- */
-function normalizeBackupDir(dir) {
-    const value = String(dir ?? DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR).trim();
-    if (!value || value.includes('\0')) throw new Error('Cloudflare edge backup directory is invalid.');
-    return value;
 }
 
 /**
@@ -218,16 +230,15 @@ function normalizeLimit(limit) {
 }
 
 /**
+ * @param {ConfiguredFsIo} io
  * @param {string} absolutePath
  * @param {number} bytes
  * @param {string} modifiedAt
  * @returns {Promise<Record<string, unknown>>}
  */
-async function summarizeBackupFile(absolutePath, bytes, modifiedAt) {
+async function summarizeBackupFile(io, absolutePath, bytes, modifiedAt) {
     try {
-        const parsed = JSON.parse(
-            (await readTextFreshTrusted(absolutePath, { caller: 'mcp.cloudflare.edge-backup' })).content,
-        );
+        const parsed = JSON.parse((await io.readTextFresh(absolutePath)).content);
         const record = asRecord(parsed);
         const backup = asRecord(record['backup']);
         const snapshot = asRecord(record['snapshot']);
@@ -255,10 +266,34 @@ async function summarizeBackupFile(absolutePath, bytes, modifiedAt) {
     }
 }
 
+/**
+ * Resolve one backup child beneath the store root without permitting traversal or absolute redirection.
+ * @param {string} boundDir
+ * @param {string} fileName
+ */
+function resolveBoundBackupPath(boundDir, fileName) {
+    const absolutePath = path.resolve(boundDir, fileName);
+    const relative = path.relative(boundDir, absolutePath);
+    if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new Error('Cloudflare edge backup path escaped its bound directory.');
+    }
+    return absolutePath;
+}
+
+/** @param {unknown} error */
+function errorCode(error) {
+    return error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+}
+
 /** @param {unknown} error */
 function isMissingBackupPathError(error) {
-    const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+    const code = errorCode(error);
     return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
+/** @param {unknown} error */
+function isConfiguredSymlinkError(error) {
+    return errorCode(error) === 'ERR_CONFIGURED_FS_SYMLINK';
 }
 
 /**

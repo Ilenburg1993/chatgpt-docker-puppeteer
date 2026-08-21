@@ -6,15 +6,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { IO_PATH_POLICY_VERSION } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/internal/filesystem/workspace';
 import {
-    createValidatedMutableWorkspacePath,
-    createValidatedReadWorkspacePath,
+    createWorkspaceIo,
+    createWorkspacePathAuthority,
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
     resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
-} from '../../../../src/copilot/infra/filesystem/workspace/validated-path.js';
+} from '#copilot/infra/internal/filesystem/workspace';
 
 import {
     resetValidatedMutableWorkspacePathStatsForTest,
@@ -33,7 +32,8 @@ async function createWorkspaceFixture() {
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'copilot-workspace-io-root-'));
     const outsideRoot = await mkdtemp(join(tmpdir(), 'copilot-workspace-io-outside-'));
     cleanupPaths.push(workspaceRoot, outsideRoot);
-    return { workspaceRoot, outsideRoot, io: createWorkspaceIo({ workspaceRoot }) };
+    const authority = createWorkspacePathAuthority({ workspaceRoot });
+    return { workspaceRoot, outsideRoot, authority, io: createWorkspaceIo(authority) };
 }
 
 describe('workspace IO capability', () => {
@@ -50,7 +50,7 @@ describe('workspace IO capability', () => {
     });
 
     it('recusa path absoluto externo e symlink que resolve para fora', async () => {
-        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, outsideRoot, authority, io } = await createWorkspaceFixture();
         const outsideFile = join(outsideRoot, 'outside.txt');
         await io.writeFileAtomic(join(workspaceRoot, 'inside.txt'), 'inside');
         await writeFile(outsideFile, 'outside');
@@ -63,8 +63,84 @@ describe('workspace IO capability', () => {
         await expect(readFile(outsideFile, 'utf8')).resolves.toBe('outside');
     });
 
+    it('lstat preserva o symlink final, mas continua recusando symlink ancestral para fora', async () => {
+        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const insideTarget = join(workspaceRoot, 'lstat-target.txt');
+        const insideLink = join(workspaceRoot, 'lstat-inside-link.txt');
+        const outsideTarget = join(outsideRoot, 'lstat-outside.txt');
+        const outsideLink = join(workspaceRoot, 'lstat-outside-link.txt');
+        await Promise.all([writeFile(insideTarget, 'inside', 'utf8'), writeFile(outsideTarget, 'outside', 'utf8')]);
+        await Promise.all([symlink(insideTarget, insideLink), symlink(outsideTarget, outsideLink)]);
+
+        const [insideMetadata, outsideMetadata] = await Promise.all([
+            io.lstatPath(insideLink),
+            io.lstatPath(outsideLink),
+        ]);
+        expect(insideMetadata.stats.isSymbolicLink()).toBe(true);
+        expect(outsideMetadata.stats.isSymbolicLink()).toBe(true);
+        await expect(io.statPath(outsideLink)).rejects.toMatchObject({ code: 'PATH_SYMLINK_OUTSIDE' });
+
+        await symlink(outsideRoot, join(workspaceRoot, 'lstat-escape-parent'));
+        await expect(io.lstatPath('lstat-escape-parent/file.txt')).rejects.toMatchObject({
+            code: 'PATH_SYMLINK_OUTSIDE',
+        });
+    });
+
+    it('não permite cunhar capability externa nem expõe constructors crus na API pública', async () => {
+        const { outsideRoot, authority } = await createWorkspaceFixture();
+        const outsideFile = join(outsideRoot, 'outside.txt');
+        await writeFile(outsideFile, 'outside', 'utf8');
+
+        await expect(authority.authorizeRead(outsideFile, 'read')).rejects.toMatchObject({ code: 'PATH_TRAVERSAL' });
+        await expect(authority.authorizeMutation(outsideFile, 'write')).rejects.toMatchObject({
+            code: 'PATH_TRAVERSAL',
+        });
+
+        const publicWorkspace = await import('#copilot/infra/public/composition/workspace/io');
+        expect(publicWorkspace).not.toHaveProperty('createValidatedReadWorkspacePath');
+        expect(publicWorkspace).not.toHaveProperty('createValidatedMutableWorkspacePath');
+        expect(publicWorkspace).not.toHaveProperty('resolveValidatedReadWorkspacePath');
+        expect(publicWorkspace).not.toHaveProperty('resolveValidatedMutableWorkspacePath');
+    });
+
+    it('liga tokens à authority exata, inclusive quando duas authorities usam o mesmo root', async () => {
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
+        const sameRootAuthority = createWorkspacePathAuthority({ workspaceRoot });
+        const sameRootIo = createWorkspaceIo(sameRootAuthority);
+        const filePath = join(workspaceRoot, 'authority-bound.txt');
+        await io.writeFileAtomic(filePath, 'inside');
+
+        const readToken = await authority.authorizeRead(filePath, 'read');
+        const writeToken = await authority.authorizeMutation(filePath, 'write');
+
+        await expect(sameRootIo.readTextValidated(readToken)).rejects.toMatchObject({
+            code: 'EVALIDATEDPATHAUTHORITY',
+        });
+        await expect(sameRootIo.writeFileAtomicValidated(writeToken, 'outside')).rejects.toMatchObject({
+            code: 'EVALIDATEDMUTABLEPATHAUTHORITY',
+        });
+        await expect(io.readTextValidated(readToken)).resolves.toMatchObject({ content: 'inside' });
+    });
+
+    it('abre detached append sink apenas após workspace mutation authority', async () => {
+        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const logPath = join(workspaceRoot, 'detached.log');
+        const sink = await io.openDetachedAppendSink(logPath, { mode: 0o600 });
+        try {
+            await sink.handle.write('detached-output');
+            await sink.handle.sync();
+        } finally {
+            await sink.handle.close();
+        }
+
+        await expect(readFile(logPath, 'utf8')).resolves.toBe('detached-output');
+        await expect(io.openDetachedAppendSink(join(outsideRoot, 'outside.log'))).rejects.toMatchObject({
+            code: 'PATH_TRAVERSAL',
+        });
+    });
+
     it('publica e lê paths internos após policy async', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'inside.txt');
 
         await io.writeFileAtomic(filePath, 'inside');
@@ -74,11 +150,11 @@ describe('workspace IO capability', () => {
     });
 
     it('aceita capability opaca read-only e evita uma segunda policy async', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'inside.txt');
         await io.writeFileAtomic(filePath, 'inside');
         resetValidatedReadWorkspacePathStatsForTest();
-        const capability = createValidatedReadWorkspacePath({ realPath: filePath, workspaceRoot });
+        const capability = await authority.authorizeRead(filePath, 'read');
         expect(capability.policyVersion).toBe(IO_PATH_POLICY_VERSION);
 
         const [snapshot, statSnapshot] = await Promise.all([
@@ -92,13 +168,13 @@ describe('workspace IO capability', () => {
     });
 
     it('compõe duas capabilities read em diff sem segunda policy async', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
         const pathA = join(workspaceRoot, 'diff-a.txt');
         const pathB = join(workspaceRoot, 'diff-b.txt');
         await Promise.all([writeFile(pathA, 'alpha\n', 'utf8'), writeFile(pathB, 'beta\n', 'utf8')]);
         resetValidatedReadWorkspacePathStatsForTest();
-        const capA = createValidatedReadWorkspacePath({ realPath: pathA, workspaceRoot });
-        const capB = createValidatedReadWorkspacePath({ realPath: pathB, workspaceRoot });
+        const capA = await authority.authorizeRead(pathA, 'read');
+        const capB = await authority.authorizeRead(pathB, 'read');
 
         const diff = await io.diffTextValidated(capA, capB, { contextLines: 1 });
 
@@ -109,11 +185,11 @@ describe('workspace IO capability', () => {
     });
 
     it('aceita capability mutável opaca em write/patch sem revalidar a path no workspace facade', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'mutable.txt');
         await io.writeFileAtomic(filePath, 'before');
         resetValidatedMutableWorkspacePathStatsForTest();
-        const capability = createValidatedMutableWorkspacePath({ realPath: filePath, workspaceRoot });
+        const capability = await authority.authorizeMutation(filePath, 'write');
         expect(capability.policyVersion).toBe(IO_PATH_POLICY_VERSION);
 
         await io.writeFileAtomicValidated(capability, 'middle', { requireExists: true });
@@ -128,7 +204,7 @@ describe('workspace IO capability', () => {
     });
 
     it('compõe capabilities pair sem revalidar copy/move e mantém read/write separados', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, authority, io } = await createWorkspaceFixture();
         const sourcePath = join(workspaceRoot, 'pair-source.txt');
         const copiedPath = join(workspaceRoot, 'pair-copied.txt');
         const movedPath = join(workspaceRoot, 'pair-moved.txt');
@@ -136,14 +212,14 @@ describe('workspace IO capability', () => {
         resetValidatedReadWorkspacePathStatsForTest();
         resetValidatedMutableWorkspacePathStatsForTest();
 
-        const copySource = createValidatedReadWorkspacePath({ realPath: sourcePath, workspaceRoot });
-        const copyDestination = createValidatedMutableWorkspacePath({ realPath: copiedPath, workspaceRoot });
+        const copySource = await authority.authorizeRead(sourcePath, 'read');
+        const copyDestination = await authority.authorizeMutation(copiedPath, 'write');
         const copied = await io.copyFileLockedValidated(copySource, copyDestination, { overwrite: false });
         expect(copied.sourceHash).toBeTruthy();
         await expect(readFile(copiedPath, 'utf8')).resolves.toBe('pair-content');
 
-        const moveSource = createValidatedMutableWorkspacePath({ realPath: copiedPath, workspaceRoot });
-        const moveDestination = createValidatedMutableWorkspacePath({ realPath: movedPath, workspaceRoot });
+        const moveSource = await authority.authorizeMutation(copiedPath, 'write');
+        const moveDestination = await authority.authorizeMutation(movedPath, 'write');
         const moved = await io.moveFileLockedValidated(moveSource, moveDestination, { overwrite: false });
         expect(moved.sourceHash).toBeTruthy();
         await expect(readFile(movedPath, 'utf8')).resolves.toBe('pair-content');
@@ -161,10 +237,10 @@ describe('workspace IO capability', () => {
     });
 
     it('rejeita capability mutável sem brand, de outro workspace e em modo incompatível', async () => {
-        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, outsideRoot, authority, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'mutable.txt');
         await io.writeFileAtomic(filePath, 'inside');
-        const capability = createValidatedMutableWorkspacePath({ realPath: filePath, workspaceRoot });
+        const capability = await authority.authorizeMutation(filePath, 'write');
 
         await expect(
             io.patchTextLockedValidated(
@@ -179,14 +255,14 @@ describe('workspace IO capability', () => {
             ),
         ).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDMUTABLEPATH' });
 
-        const otherWorkspaceCapability = createValidatedMutableWorkspacePath({
-            realPath: filePath,
-            workspaceRoot: outsideRoot,
-        });
+        const outsideFile = join(outsideRoot, 'outside-mutable.txt');
+        await writeFile(outsideFile, 'outside', 'utf8');
+        const otherAuthority = createWorkspacePathAuthority({ workspaceRoot: outsideRoot });
+        const otherWorkspaceCapability = await otherAuthority.authorizeMutation(outsideFile, 'write');
         await expect(io.writeFileAtomicValidated(otherWorkspaceCapability, 'outside')).rejects.toMatchObject({
-            code: 'EVALIDATEDMUTABLEPATHWORKSPACE',
+            code: 'EVALIDATEDMUTABLEPATHAUTHORITY',
         });
-        expect(() => resolveValidatedMutableWorkspacePath(capability, { workspaceRoot, mode: 'delete' })).toThrowError(
+        expect(() => resolveValidatedMutableWorkspacePath(capability, authority, 'delete')).toThrowError(
             expect.objectContaining({ code: 'EVALIDATEDMUTABLEPATHMODE' }),
         );
         await expect(io.readTextValidated(capability)).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDPATH' });
@@ -194,10 +270,10 @@ describe('workspace IO capability', () => {
     });
 
     it('rejeita lookalike sem brand, workspace divergente e uso em modo mutável', async () => {
-        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const { workspaceRoot, outsideRoot, authority, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'inside.txt');
         await io.writeFileAtomic(filePath, 'inside');
-        const capability = createValidatedReadWorkspacePath({ realPath: filePath, workspaceRoot });
+        const capability = await authority.authorizeRead(filePath, 'read');
 
         await expect(
             io.readTextValidated({
@@ -208,14 +284,14 @@ describe('workspace IO capability', () => {
             }),
         ).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDPATH' });
 
-        const otherWorkspaceCapability = createValidatedReadWorkspacePath({
-            realPath: filePath,
-            workspaceRoot: outsideRoot,
-        });
+        const outsideFile = join(outsideRoot, 'outside-read.txt');
+        await writeFile(outsideFile, 'outside', 'utf8');
+        const otherAuthority = createWorkspacePathAuthority({ workspaceRoot: outsideRoot });
+        const otherWorkspaceCapability = await otherAuthority.authorizeRead(outsideFile, 'read');
         await expect(io.readTextValidated(otherWorkspaceCapability)).rejects.toMatchObject({
-            code: 'EVALIDATEDPATHWORKSPACE',
+            code: 'EVALIDATEDPATHAUTHORITY',
         });
-        expect(() => resolveValidatedReadWorkspacePath(capability, { workspaceRoot, mode: 'write' })).toThrowError(
+        expect(() => resolveValidatedReadWorkspacePath(capability, authority, 'write')).toThrowError(
             expect.objectContaining({ code: 'EVALIDATEDPATHMODE' }),
         );
     });

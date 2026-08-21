@@ -5,13 +5,5 @@
 
 export { listRollbackSidecars } from './inventory.js';
 export { cleanupExpiredRollbackSidecars, cleanupRollbackSidecars } from './maintenance.js';
-export {
-    getIoRollbackPolicy,
-    getRollbackSidecarDirectory,
-    getRollbackSidecarMaxBytes,
-    getRollbackSidecarMaxEntries,
-    getRollbackSidecarTtlMs,
-    isIoRollbackEnabled,
-    shouldCaptureIoRollback,
-} from './policy.js';
+export { createDefaultIoRollbackPolicy, readIoRollbackPolicy } from './policy.js';
 export { createRollbackSidecarWriter, persistRollbackSidecar, readVerifiedRollbackSidecar } from './storage.js';

@@ -1,9 +1,6 @@
-import {
-    buildCloudflareEdgeBackupFileName,
-    listCloudflareEdgeBackups,
-    writeCloudflareEdgeBackup,
-} from '#copilot/mcp/cloudflare';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { buildCloudflareEdgeBackupFileName, createCloudflareEdgeBackupStore } from '#copilot/mcp/cloudflare';
+import { mkdtemp, readFile, rm, stat, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,7 +22,17 @@ describe('mcp/cloudflare/edge-backup', () => {
 
     it('writes and lists local Cloudflare edge snapshot backups', async () => {
         tempDir = await mkdtemp(path.join(os.tmpdir(), 'mcp-cloudflare-edge-backup-'));
-        const result = await writeCloudflareEdgeBackup(
+        const io = createConfiguredFsIo(
+            createConfiguredFsGrant({
+                id: 'test.mcp.cloudflare.edge-backup',
+                roots: [tempDir],
+                operations: ['list', 'read', 'stat', 'write'],
+                symlinkPolicy: 'deny',
+                durability: ['file-and-directory'],
+            }),
+        );
+        const store = createCloudflareEdgeBackupStore({ dir: tempDir, io });
+        const result = await store.write(
             {
                 ok: true,
                 capturedAt: '2026-05-24T17:45:01.123Z',
@@ -34,7 +41,6 @@ describe('mcp/cloudflare/edge-backup', () => {
                 policyDiff: { summary: { diffCount: 3, criticalDiffs: 0 } },
             },
             {
-                dir: tempDir,
                 label: 'Before Rate Limit!',
                 now: new Date('2026-05-24T17:45:01.123Z'),
             },
@@ -53,9 +59,14 @@ describe('mcp/cloudflare/edge-backup', () => {
         expect(persisted.snapshot.readiness.mutationReady).toBe(true);
         expect((await stat(String(backup.relativePath))).mode & 0o777).toBe(0o600);
 
-        const listed = await listCloudflareEdgeBackups({ dir: tempDir, limit: 10 });
+        await symlink(
+            path.basename(String(backup.relativePath)),
+            path.join(tempDir, 'cloudflare-edge-snapshot-symlink.json'),
+        );
+        const listed = await store.list({ limit: 10 });
         expect(listed.ok).toBe(true);
         expect(listed['total']).toBe(1);
+        expect(/** @type {Array<Record<string, unknown>>} */ (listed['backups'])).toHaveLength(1);
         expect(listed['backups']).toEqual([
             expect.objectContaining({
                 valid: true,

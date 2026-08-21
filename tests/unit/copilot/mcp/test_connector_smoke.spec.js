@@ -83,10 +83,7 @@ function requireFixtureIndex(values, index, label) {
 
 describe('canonical connector smoke', () => {
     it('fails the canonical gate when authenticated OAuth fails even if the public challenge is healthy', async () => {
-        /** @type {{
-    path: string;
-    state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState;
-}[]} */
+        /** @type {{ state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
@@ -101,8 +98,8 @@ describe('canonical connector smoke', () => {
                         authenticatedSse: { ok: false, status: 500 },
                     },
                 }),
-                writeState: async (path, state) => {
-                    persisted.push({ path, state });
+                writeState: async (state) => {
+                    persisted.push({ state });
                 },
             },
         });
@@ -116,18 +113,15 @@ describe('canonical connector smoke', () => {
     });
 
     it('persists authenticated tool-registry evidence instead of the expected unauthenticated 401 tools response', async () => {
-        /** @type {{
-    path: string;
-    state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState;
-}[]} */
+        /** @type {{ state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
             deps: {
                 runUnauthenticatedSmoke: async () => healthyUnauthenticatedSmoke(),
                 runOauthSmoke: async () => healthyOauthSmoke(),
-                writeState: async (path, state) => {
-                    persisted.push({ path, state });
+                writeState: async (state) => {
+                    persisted.push({ state });
                 },
             },
         });

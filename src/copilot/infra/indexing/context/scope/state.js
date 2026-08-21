@@ -1,48 +1,66 @@
 // @ts-check
-/** Registry, bounded state and invariants for session scopes. No lifecycle orchestration lives here. */
+/** Registry state, bounded invariants and pure scope helpers. @module copilot/infra/indexing/context/scope/state */
 
-import { registerIoInvalidationHook } from '#copilot/infra/internal/filesystem/invalidation';
 import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import * as nodePath from 'node:path';
+import { createPrefetchSessionRegistry } from '../prefetch/index.js';
 
 /** @typedef {import('./types.js')._InternalScope} _InternalScope */
 /** @typedef {import('./types.js').ScopeFailureSummary} ScopeFailureSummary */
+/**
+ * @typedef {{
+ *   registry: Map<string, _InternalScope>;
+ *   warmPromises: Map<string, Promise<void>>;
+ *   warmControllers: Map<string, AbortController>;
+ *   refreshingPaths: Map<string, Promise<'refreshed' | 'removed' | 'removed-failed' | 'failed'>>;
+ *   scopeInvalidationUnregister: (() => void) | null;
+ *   maxActiveScopes: number;
+ *   prefetchSessions: ReturnType<typeof createPrefetchSessionRegistry>;
+ *   indexRegistry: ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime> | null;
+ *   cacheRuntime: {l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>};
+ *   invalidationBus: ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime> | null;
+ *   parserCacheRuntime: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime> | null;
+ * }} ScopeRuntimeState
+ */
 
-/** @type {Map<string, _InternalScope>} */
-export const _registry = new Map();
-/** @type {Map<string, Promise<void>>} */
-export const _warmPromises = new Map();
-/** @type {Map<string, AbortController>} */
-export const _warmControllers = new Map();
-/** @type {Map<string, Promise<'refreshed' | 'removed' | 'removed-failed' | 'failed'>>} */
-export const _refreshingPaths = new Map();
-/** @type {(() => void) | null} */
-let _scopeInvalidationUnregister = null;
-
-export const MAX_ACTIVE_SCOPES = readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
+/** @param {{
+ * maxActiveScopes?: number;
+ * indexRegistry?: ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime>;
+ * cacheRuntime: {l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>};
+ * invalidationBus?: ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime>;
+ * parserCacheRuntime?: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime>;
+ * }} options @returns {ScopeRuntimeState} */
+export function createScopeRuntimeState(options) {
+    if (!options?.cacheRuntime) throw new TypeError('createScopeRuntimeState requires runtime-owned cacheRuntime.');
+    const configuredMax = options.maxActiveScopes ?? readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
+    return {
+        registry: new Map(),
+        warmPromises: new Map(),
+        warmControllers: new Map(),
+        refreshingPaths: new Map(),
+        scopeInvalidationUnregister: null,
+        maxActiveScopes: Math.max(1, Math.floor(configuredMax)),
+        prefetchSessions: createPrefetchSessionRegistry({ cacheRuntime: options.cacheRuntime }),
+        indexRegistry: options.indexRegistry ?? null,
+        cacheRuntime: options.cacheRuntime,
+        invalidationBus: options.invalidationBus ?? null,
+        parserCacheRuntime: options.parserCacheRuntime ?? null,
+    };
+}
 
 const SYMBOL_PARSE_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs', '.jsx', '.tsx', '.mts', '.cts']);
 
-/**
- * @param {string} filePath
- * @returns {string}
- */
+/** @param {string} filePath @returns {string} */
 export function normalizeScopePath(filePath) {
     return nodePath.normalize(nodePath.resolve(filePath));
 }
 
-/**
- * @param {string} filePath
- * @returns {boolean}
- */
+/** @param {string} filePath @returns {boolean} */
 export function isSymbolParseTarget(filePath) {
     return SYMBOL_PARSE_EXTENSIONS.has(nodePath.extname(filePath).toLowerCase());
 }
 
-/**
- * @param {import('#copilot/infra/internal/indexing/parser').FileSymbols} symbols
- * @returns {number}
- */
+/** @param {import('#copilot/infra/internal/indexing/parser').FileSymbols} symbols @returns {number} */
 function estimateSymbolBytes(symbols) {
     try {
         return Buffer.byteLength(JSON.stringify(symbols), 'utf8');
@@ -51,11 +69,7 @@ function estimateSymbolBytes(symbols) {
     }
 }
 
-/**
- * @param {_InternalScope} scope
- * @param {string} filePath
- * @param {import('#copilot/infra/internal/indexing/parser').FileSymbols} symbols
- */
+/** @param {_InternalScope} scope @param {string} filePath @param {import('#copilot/infra/internal/indexing/parser').FileSymbols} symbols */
 export function setScopeSymbols(scope, filePath, symbols) {
     const previous = scope.symbolBytesByPath.get(filePath) ?? 0;
     const next = estimateSymbolBytes(symbols);
@@ -64,10 +78,7 @@ export function setScopeSymbols(scope, filePath, symbols) {
     scope.symbolBytes = Math.max(0, scope.symbolBytes - previous + next);
 }
 
-/**
- * @param {_InternalScope} scope
- * @param {string} filePath
- */
+/** @param {_InternalScope} scope @param {string} filePath */
 function deleteScopeSymbols(scope, filePath) {
     const previous = scope.symbolBytesByPath.get(filePath) ?? 0;
     scope.symbolIndex.delete(filePath);
@@ -75,13 +86,7 @@ function deleteScopeSymbols(scope, filePath) {
     scope.symbolBytes = Math.max(0, scope.symbolBytes - previous);
 }
 
-/**
- * Remove um arquivo que deixou de existir (ou deixou de ser arquivo) do working set sem fazer backfill silencioso.
- * `candidateFiles`/selection permanecem como evidência da seleção original; `selectedFiles` acompanha o conjunto vivo.
- *
- * @param {_InternalScope} scope
- * @param {string} filePath
- */
+/** @param {_InternalScope} scope @param {string} filePath */
 export function removeScopePath(scope, filePath) {
     const normalized = normalizeScopePath(filePath);
     deleteScopeSymbols(scope, filePath);
@@ -92,21 +97,13 @@ export function removeScopePath(scope, filePath) {
     scope.selectedFiles = scope.paths.length;
 }
 
-/**
- * @param {unknown} error
- * @returns {boolean}
- */
+/** @param {unknown} error @returns {boolean} */
 export function isScopePathRemovalError(error) {
     const code = error && typeof error === 'object' && 'code' in error ? String(error.code ?? '') : '';
     return code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR';
 }
 
-/**
- * @param {_InternalScope} scope
- * @param {string} filePath
- * @param {{ recursive?: boolean }} [options]
- * @returns {boolean}
- */
+/** @param {_InternalScope} scope @param {string} filePath @param {{ recursive?: boolean }} [options] */
 export function scopeContainsPath(scope, filePath, options = {}) {
     const normalized = normalizeScopePath(filePath);
     return scope.paths.some((candidate) => {
@@ -118,12 +115,7 @@ export function scopeContainsPath(scope, filePath, options = {}) {
     });
 }
 
-/**
- * @param {_InternalScope} scope
- * @param {string} filePath
- * @param {{ recursive?: boolean }} [options]
- * @returns {void}
- */
+/** @param {_InternalScope} scope @param {string} filePath @param {{ recursive?: boolean }} [options] */
 function markScopePathInvalidated(scope, filePath, options = {}) {
     if (!scopeContainsPath(scope, filePath, options)) return;
     const normalized = normalizeScopePath(filePath);
@@ -148,22 +140,14 @@ function markScopePathInvalidated(scope, filePath, options = {}) {
     scope.ready = false;
 }
 
-/**
- * @param {_InternalScope} scope
- * @returns {'warming' | 'ready' | 'stale' | 'degraded'}
- */
+/** @param {_InternalScope} scope @returns {'warming' | 'ready' | 'stale' | 'degraded'} */
 export function getScopeStatus(scope) {
     if (scope.degraded) return 'degraded';
     if (scope.invalidatedPaths.size > 0) return 'stale';
     return scope.ready ? 'ready' : 'warming';
 }
 
-/**
- * @param {_InternalScope} scope
- * @param {unknown} error
- * @param {ScopeFailureSummary['phase']} phase
- * @param {string} summary
- */
+/** @param {_InternalScope} scope @param {unknown} error @param {ScopeFailureSummary['phase']} phase @param {string} summary */
 export function recordScopeFailure(scope, error, phase, summary) {
     const record = /** @type {{ code?: unknown; name?: unknown }} */ (error);
     scope.degraded = true;
@@ -177,9 +161,7 @@ export function recordScopeFailure(scope, error, phase, summary) {
     };
 }
 
-/**
- * @param {_InternalScope} scope
- */
+/** @param {_InternalScope} scope */
 export function markScopeReady(scope) {
     scope.degraded = false;
     scope.ready = true;
@@ -187,35 +169,30 @@ export function markScopeReady(scope) {
     scope.completedAt = Date.now();
 }
 
-/**
- * @param {_InternalScope} scope
- * @returns {void}
- */
+/** @param {_InternalScope} scope */
 export function touchScope(scope) {
     scope.lastAccessAt = Date.now();
 }
 
-/**
- * @param {string} sessionId
- * @returns {void}
- */
-export function abortWarmForSession(sessionId) {
-    const controller = _warmControllers.get(sessionId);
-    if (controller && !controller.signal.aborted) {
-        controller.abort();
-    }
-    _warmControllers.delete(sessionId);
+/** @param {string} sessionId @param {ScopeRuntimeState} runtime */
+export function abortWarmForSession(sessionId, runtime) {
+    const controller = runtime.warmControllers.get(sessionId);
+    if (controller && !controller.signal.aborted) controller.abort();
+    runtime.warmControllers.delete(sessionId);
 }
 
-export function ensureScopeInvalidationHook() {
-    if (_scopeInvalidationUnregister) return;
-    _scopeInvalidationUnregister = registerIoInvalidationHook((filePath, event) => {
-        for (const scope of _registry.values()) markScopePathInvalidated(scope, filePath, event);
+/** @param {ScopeRuntimeState} runtime */
+export function ensureScopeInvalidationHook(runtime) {
+    if (runtime.scopeInvalidationUnregister) return;
+    if (!runtime.invalidationBus) return;
+    runtime.scopeInvalidationUnregister = runtime.invalidationBus.registerHook((filePath, event) => {
+        for (const scope of runtime.registry.values()) markScopePathInvalidated(scope, filePath, event);
     });
 }
 
-export function releaseScopeInvalidationHookIfIdle() {
-    if (_registry.size !== 0 || !_scopeInvalidationUnregister) return;
-    _scopeInvalidationUnregister();
-    _scopeInvalidationUnregister = null;
+/** @param {ScopeRuntimeState} runtime */
+export function releaseScopeInvalidationHookIfIdle(runtime) {
+    if (runtime.registry.size !== 0 || !runtime.scopeInvalidationUnregister) return;
+    runtime.scopeInvalidationUnregister();
+    runtime.scopeInvalidationUnregister = null;
 }

@@ -5,13 +5,7 @@
  * @module copilot/mcp/control-plane/jobs
  */
 
-import {
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-    readBytesRangeFreshTrusted,
-    readTextFreshTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
-import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/platform/node';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 import { getMcpWorkspaceRoot, resolveReadPath } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
+const MCP_WORKSPACE_ROOT = getMcpWorkspaceRoot();
+const FOCUSED_UNIT_TEST_ROOT = path.join(MCP_WORKSPACE_ROOT, 'tests/unit/copilot');
 const DEFAULT_JOB_TIMEOUT_MS = 20 * 60 * 1000;
 const MIN_JOB_TIMEOUT_MS = 1_000;
 const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
@@ -34,6 +30,34 @@ const VALIDATOR_RUNTIME_EPOCH = randomUUID();
 const CGROUP_V2_MEMORY_CURRENT = '/sys/fs/cgroup/memory.current';
 const CGROUP_V2_MEMORY_MAX = '/sys/fs/cgroup/memory.max';
 const CGROUP_V2_MEMORY_EVENTS = '/sys/fs/cgroup/memory.events';
+
+const JOB_ARTIFACT_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.jobs.artifacts',
+        roots: [MCP_JOBS_DIR],
+        operations: ['append', 'list', 'mkdir', 'read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const CGROUP_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.jobs.cgroup',
+        exactPaths: [CGROUP_V2_MEMORY_CURRENT, CGROUP_V2_MEMORY_MAX, CGROUP_V2_MEMORY_EVENTS],
+        operations: ['read'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const FOCUSED_TEST_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.jobs.focused-tests',
+        roots: [FOCUSED_UNIT_TEST_ROOT],
+        operations: ['stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 let validatorSpawnReserved = false;
 const FOCUSED_UNIT_TEST_PREFIX = 'tests/unit/copilot/';
 const FOCUSED_UNIT_TEST_SUFFIX = '.spec.js';
@@ -259,10 +283,10 @@ export function resolveFocusedUnitTestCommand(testFiles) {
  * @returns {Promise<void>}
  */
 async function assertFocusedUnitTestFilesExist(testFiles) {
-    const workspaceRoot = getMcpWorkspaceRoot();
+    const workspaceRoot = MCP_WORKSPACE_ROOT;
     for (const testFile of testFiles) {
         const candidatePath = path.join(workspaceRoot, testFile);
-        const { stats } = await lstatPathTrusted(candidatePath, { caller: 'mcp.control-plane.jobs.focused-test' });
+        const { stats } = await FOCUSED_TEST_IO.lstatPath(candidatePath);
         if (stats.isSymbolicLink() || !stats.isFile()) {
             throw new Error(`Focused unit-test path must resolve to a regular non-symlink file: ${testFile}`);
         }
@@ -387,14 +411,11 @@ export async function spawnValidatorJob(validator, options = {}) {
     }
     validatorSpawnReserved = true;
     try {
-        await mkdirPathLocked(MCP_JOBS_DIR, {
-            recursive: true,
-            advisoryLimits: { domain: 'mcp-validator-jobs' },
-        });
-        await writeFileAtomic(
+        await JOB_ARTIFACT_IO.mkdirPath(MCP_JOBS_DIR, { recursive: true });
+        await JOB_ARTIFACT_IO.writeFileAtomic(
             logFile,
             `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
-            { encoding: 'utf8', mode: 0o600, failIfExists: true, riskClass: 'medium' },
+            { mode: 0o600, failIfExists: true },
         );
 
         const resourceBefore = await readValidatorResourceSnapshot();
@@ -559,7 +580,7 @@ export function parseCgroupMemoryLimit(text) {
 /** @param {string} filePath */
 async function readOptionalCgroupText(filePath) {
     try {
-        return (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.jobs.cgroup' })).content;
+        return (await CGROUP_IO.readTextFresh(filePath)).content;
     } catch {
         return null;
     }
@@ -707,7 +728,7 @@ export async function listJobs(options = {}) {
     for (const record of JOBS.values()) {
         records.set(record.id, publicJobRecord(record));
     }
-    const entries = await listDirectoryNamesFreshTrusted(MCP_JOBS_DIR, { caller: 'mcp.control-plane.jobs' })
+    const entries = await JOB_ARTIFACT_IO.listDirectoryNamesFresh(MCP_JOBS_DIR)
         .then((result) => result.entries)
         .catch(() => []);
     for (const entry of entries) {
@@ -746,16 +767,14 @@ function publicJobRecord(record) {
  * @returns {Promise<void>}
  */
 async function persistJobRecord(record) {
-    await mkdirPathLocked(MCP_JOBS_DIR, {
-        recursive: true,
-        advisoryLimits: { domain: 'mcp-validator-job-manifest-parent' },
-    });
-    await writeFileAtomic(record.manifestFile, `${JSON.stringify(publicJobRecord(record), null, 2)}\n`, {
-        encoding: 'utf8',
-        mode: 0o600,
-        riskClass: 'medium',
-        advisoryLimits: { domain: 'mcp-validator-job-manifest' },
-    });
+    await JOB_ARTIFACT_IO.mkdirPath(MCP_JOBS_DIR, { recursive: true });
+    await JOB_ARTIFACT_IO.writeFileAtomic(
+        record.manifestFile,
+        `${JSON.stringify(publicJobRecord(record), null, 2)}\n`,
+        {
+            mode: 0o600,
+        },
+    );
 }
 
 /**
@@ -767,11 +786,9 @@ async function readJobManifest(id) {
     if (!artifacts) return null;
     const { logFile, manifestFile } = artifacts;
     try {
-        const { stats } = await lstatPathTrusted(manifestFile, { caller: 'mcp.control-plane.jobs' });
+        const { stats } = await JOB_ARTIFACT_IO.lstatPath(manifestFile);
         if (stats.isSymbolicLink() || !stats.isFile() || stats.size > MAX_JOB_MANIFEST_BYTES) return null;
-        const parsed = JSON.parse(
-            (await readTextFreshTrusted(manifestFile, { caller: 'mcp.control-plane.jobs' })).content,
-        );
+        const parsed = JSON.parse((await JOB_ARTIFACT_IO.readTextFresh(manifestFile)).content);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
         if (!('id' in parsed) || parsed.id !== id) return null;
         return /** @type {JobRecord} */ ({ ...parsed, logFile, manifestFile, process: null });
@@ -796,8 +813,7 @@ async function readJobLogTail(id, requestedTailBytes) {
         ),
     );
     try {
-        const snapshot = await readBytesRangeFreshTrusted(artifacts.logFile, {
-            caller: 'mcp.control-plane.jobs',
+        const snapshot = await JOB_ARTIFACT_IO.readBytesRangeFresh(artifacts.logFile, {
             maxBytes: tailBytes,
             fromEnd: true,
             rejectSymlink: true,
@@ -815,8 +831,5 @@ async function readJobLogTail(id, requestedTailBytes) {
  * @returns {Promise<void>}
  */
 async function appendJobLog(logFile, chunk) {
-    await appendTextLocked(logFile, String(chunk), {
-        mode: 0o600,
-        advisoryLimits: { domain: 'mcp-validator-job-log' },
-    });
+    await JOB_ARTIFACT_IO.appendText(logFile, String(chunk), { mode: 0o600 });
 }

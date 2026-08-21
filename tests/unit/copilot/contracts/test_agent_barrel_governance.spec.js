@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 
-import { resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
+import { resolveBabelParserOptions } from '#copilot/infra/public/diagnostic/code-analysis';
 import { parse } from '@babel/parser';
 import { describe, it } from 'vitest';
 

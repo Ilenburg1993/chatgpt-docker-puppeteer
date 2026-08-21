@@ -19,6 +19,7 @@ import {
     configureHttp1ServerTiming,
     createMcpHttpRequestHandler,
     notifyMcpHttpStarted,
+    prepareMcpHttpRuntime,
     readMcpHttpServerTimingPolicy,
     readMcpHttpSessionPolicy,
     readMcpHttpSessionRuntimeState,
@@ -182,6 +183,7 @@ export async function startHttpMcpServer(opts = {}) {
     installHttp1GracefulClose(httpServer, policy);
 
     const timingPolicy = configureHttp1ServerTiming(httpServer);
+    await prepareMcpHttpRuntime();
     await listenHttpServer(httpServer, policy.host, policy.port);
     logMcp('INFO', 'MCP HTTP/1.1 fallback server listening.', {
         adapter: { name: MCP_HTTP1_ADAPTER_NAME, version: MCP_HTTP1_ADAPTER_VERSION },
@@ -191,7 +193,7 @@ export async function startHttpMcpServer(opts = {}) {
         policy: sanitizeHttp1PolicyForLog(policy),
         standardTransport: 'https-http2-plus',
     });
-    notifyMcpHttpStarted();
+    await notifyMcpHttpStarted();
     return httpServer;
 }
 

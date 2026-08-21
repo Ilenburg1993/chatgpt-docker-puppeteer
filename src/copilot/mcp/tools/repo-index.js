@@ -8,33 +8,27 @@
  * @module copilot/mcp/tools/repo-index
  */
 
-import { normalizeIoCacheKey } from '#copilot/infra/public/cache';
-import { registerIoInvalidationHook } from '#copilot/infra/public/filesystem/invalidation';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { normalizeIoCacheKey } from '#copilot/infra/public/cache/keys';
 import {
-    buildIoIndexForDirectory,
     filterIndexRowsByGlob,
-    findIoIndexImports,
-    findIoIndexImportsByPath,
-    findIoIndexSymbol,
     formatIndexImportRows,
     formatIndexSearchRows,
     formatIndexSymbolRows,
-    getIoIndexStats,
-    invalidateIoIndexPath,
     normalizeSearchWindow,
     paginateSearchItems,
-    parseFileForContext,
-    searchIoIndex,
-} from '#copilot/infra/public/indexing';
+} from '#copilot/infra/public/indexing/search';
 import {
     boundedWriteAnnotations,
     createTtlCache,
     errorResult,
+    getMcpWorkspaceIndexRegistry,
+    getMcpWorkspaceIndexing,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
     okResult,
     readMcpIndexAutoBuildState,
     readOnlyAnnotations,
+    registerMcpWorkspaceInvalidationHook,
     resolveReadPath,
     resolveValidatedReadPath,
 } from '#copilot/mcp/control-plane';
@@ -42,9 +36,16 @@ import { WORKSPACE_ROOT } from '#copilot/tools';
 import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
 
-const { readText, readTextValidated, statPath, statPathValidated } = createWorkspaceIo({
-    workspaceRoot: getMcpWorkspaceRoot(),
-});
+const { readText, readTextValidated, statPath, statPathValidated } = getMcpWorkspaceIo();
+const { parseFileForContext } = getMcpWorkspaceIndexing();
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
+const invalidateIoIndexPath = INDEX_REGISTRY.invalidatePath;
+const findIoIndexImports = INDEX_REGISTRY.findImports;
+const findIoIndexImportsByPath = INDEX_REGISTRY.findImportsByPath;
+const findIoIndexSymbol = INDEX_REGISTRY.findSymbol;
+const searchIoIndex = INDEX_REGISTRY.search;
+const readIoIndexStatus = INDEX_REGISTRY.status;
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
@@ -62,7 +63,7 @@ const importTargetExistsCache = createTtlCache({
     maxEntries: IMPORT_TARGET_EXISTS_CACHE_MAX_ENTRIES,
 });
 
-registerIoInvalidationHook((filePath, event) => {
+registerMcpWorkspaceInvalidationHook((filePath, event) => {
     try {
         if (event?.recursive === true) {
             importTargetExistsCache.clear();
@@ -175,7 +176,9 @@ async function readPackageImportEntries() {
             })
             .catch(() => []);
     }
-    return packageImportEntriesPromise;
+    const pending = packageImportEntriesPromise;
+    if (pending === null) return [];
+    return await pending;
 }
 
 /**
@@ -343,7 +346,7 @@ export const repoIndexTools = [
                 success: true,
                 workspaceRoot: getMcpWorkspaceRoot(),
                 defaultPath: DEFAULT_INDEX_PATH,
-                stats: getIoIndexStats(),
+                stats: readIoIndexStatus(),
                 autoBuild: readMcpIndexAutoBuildState(),
             }),
     },
@@ -408,7 +411,7 @@ export const repoIndexTools = [
                 path: resolved.relative,
                 workspaceRoot: getMcpWorkspaceRoot(),
                 result,
-                stats: getIoIndexStats(),
+                stats: readIoIndexStatus(),
             });
         },
     },
@@ -436,7 +439,7 @@ export const repoIndexTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ query, path, maxResults, cursor, includePattern, excludePattern }) => {
-            const stats = getIoIndexStats();
+            const stats = readIoIndexStatus();
             if (!stats.available) {
                 return okResult({
                     success: true,
@@ -505,7 +508,7 @@ export const repoIndexTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ symbol, maxResults, cursor, exactMatch }) => {
-            const stats = getIoIndexStats();
+            const stats = readIoIndexStatus();
             if (!stats.available) {
                 return okResult({
                     success: true,
@@ -567,7 +570,7 @@ export const repoIndexTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ source, maxResults, cursor, exactSource }) => {
-            const stats = getIoIndexStats();
+            const stats = readIoIndexStatus();
             if (!stats.available) {
                 return okResult({
                     success: true,
@@ -741,7 +744,7 @@ export const repoIndexTools = [
                     }
                 }
             } else {
-                const indexStats = getIoIndexStats();
+                const indexStats = readIoIndexStatus();
                 if (!indexStats.available) {
                     return errorResult('MCP IO index is unavailable; build the index before scanning directories.', {
                         code: 'MCP_IO_INDEX_UNAVAILABLE',
@@ -864,7 +867,7 @@ export const repoIndexTools = [
                 success: true,
                 path: resolved.relative,
                 invalidated,
-                stats: getIoIndexStats(),
+                stats: readIoIndexStatus(),
             });
         },
     },

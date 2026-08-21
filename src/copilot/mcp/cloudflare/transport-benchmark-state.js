@@ -5,12 +5,20 @@
  * @module copilot/mcp/cloudflare/transport-benchmark-state
  */
 
-import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { fileURLToPath } from 'node:url';
 
 export const TRANSPORT_BENCHMARK_STATE_PATH = 'src/copilot/.ai/mcp/transport-benchmark-state.json';
 const TRANSPORT_BENCHMARK_STATE_FILE = fileURLToPath(
     new URL('../../.ai/mcp/transport-benchmark-state.json', import.meta.url),
+);
+const TRANSPORT_BENCHMARK_STATE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.cloudflare.transport-benchmark-state',
+        exactPaths: [TRANSPORT_BENCHMARK_STATE_FILE],
+        operations: ['read', 'stat'],
+        symlinkPolicy: 'deny',
+    }),
 );
 const MAX_STATE_BYTES = 512 * 1024;
 
@@ -24,11 +32,7 @@ export function getTransportBenchmarkStateFile() {
  */
 export async function readTransportBenchmarkState() {
     try {
-        const stats = (
-            await lstatPathTrusted(TRANSPORT_BENCHMARK_STATE_FILE, {
-                caller: 'mcp.cloudflare.transport-benchmark-state',
-            })
-        ).stats;
+        const stats = (await TRANSPORT_BENCHMARK_STATE_IO.lstatPath(TRANSPORT_BENCHMARK_STATE_FILE)).stats;
         if (stats.isSymbolicLink() || !stats.isFile()) {
             return { schemaVersion: 1, status: 'unreadable', error: 'Benchmark state is not a regular file.' };
         }
@@ -40,11 +44,7 @@ export async function readTransportBenchmarkState() {
             };
         }
         const parsed = JSON.parse(
-            (
-                await readTextFreshTrusted(TRANSPORT_BENCHMARK_STATE_FILE, {
-                    caller: 'mcp.cloudflare.transport-benchmark-state',
-                })
-            ).content,
+            (await TRANSPORT_BENCHMARK_STATE_IO.readTextFresh(TRANSPORT_BENCHMARK_STATE_FILE)).content,
         );
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             return { schemaVersion: 1, status: 'unreadable', error: 'Benchmark state JSON is not an object.' };

@@ -10,12 +10,11 @@
  */
 
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
-import { truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../shared.js';
+import { truncateUtf8Text, validatePath, WORKSPACE_IO } from '../shared.js';
 
-const { readTextValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { readTextValidated } = WORKSPACE_IO;
 
 const MAX_BATCH_READS = 32;
 const MAX_BATCH_READ_CONCURRENCY = 8;

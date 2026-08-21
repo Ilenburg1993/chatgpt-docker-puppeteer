@@ -4,6 +4,5 @@
 /** @typedef {import('./types.js').ScopeDeclareOptions} ScopeDeclareOptions */
 /** @typedef {import('./types.js').ScopeStats} ScopeStats */
 
-export { declareScope } from './lifecycle.js';
-export { findSymbol, getScopeContext, getScopeStats, getScopeSymbolIndex, listScopes } from './query.js';
-export { closeScope, invalidateScopePath, refreshScope } from './refresh.js';
+export { readScopeRuntimeRegistrySnapshot } from './runtime-registry.js';
+export { createWorkspaceScopeRuntime } from './runtime.js';

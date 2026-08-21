@@ -9,9 +9,8 @@
  */
 
 import {
+    createCloudflareStateStore,
     readCloudflareTunnelConfig,
-    readConnectorSmokeState,
-    readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
     validateConfiguredPublicUrl,
@@ -787,10 +786,13 @@ function buildAuthReadiness(config) {
  */
 async function buildConnectorStateSummary(cloudflareConfig) {
     const nowMs = Date.now();
-    const state = await readQuickTunnelState(cloudflareConfig.stateFile);
+    const stateStore = createCloudflareStateStore(cloudflareConfig);
+    const [state, smokeState] = await Promise.all([
+        stateStore.readQuickTunnelState(),
+        stateStore.readConnectorSmokeState(),
+    ]);
     const temporaryTunnel = summarizeQuickTunnelState(state, nowMs, cloudflareConfig.staleAfterMs);
     const currentUrl = cloudflareConfig.publicMcpUrl ?? temporaryTunnel.connectorUrl ?? null;
-    const smokeState = await readConnectorSmokeState(cloudflareConfig.smokeStateFile);
     const smoke = summarizeConnectorSmokeState(smokeState, currentUrl, nowMs);
     const validation = currentUrl
         ? validatePublicConnectorUrl(currentUrl)

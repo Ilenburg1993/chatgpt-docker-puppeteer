@@ -11,8 +11,8 @@
  */
 
 import { redactSecretText } from '#copilot/core';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { join } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { isAbsolute, join, resolve } from 'node:path';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
 const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 3;
@@ -94,20 +94,92 @@ let _byokProviderHealthLastError = null;
 let _byokProviderHealthPersistedRecords = 0;
 
 /**
- * @returns {boolean}
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {string} [cwd]
  */
-function isByokProviderHealthPersistenceEnabled() {
-    if (process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PERSIST_DISABLED'] === 'true') return false;
-    if (process.env['VITEST'] === 'true' && !process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH']) return false;
-    return true;
+export function resolveByokProviderHealthPersistenceBinding(env = process.env, cwd = process.cwd()) {
+    const configured = String(env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'] ?? '').trim();
+    const path = configured
+        ? isAbsolute(configured)
+            ? configured
+            : resolve(cwd, configured)
+        : resolve(cwd, DEFAULT_BYOK_PROVIDER_HEALTH_PATH);
+    const enabled =
+        env['TERMINAL_BYOK_PROVIDER_HEALTH_PERSIST_DISABLED'] !== 'true' &&
+        !(env['VITEST'] === 'true' && configured.length === 0);
+    return Object.freeze({ enabled, path });
 }
 
 /**
- * @returns {string}
+ * @param {{
+ *     binding: Readonly<{enabled:boolean;path:string}>;
+ *     io: ReturnType<typeof createConfiguredFsIo>;
+ * }} input
  */
+export function createByokProviderHealthPersistenceStore(input) {
+    const binding = Object.freeze({ enabled: input.binding.enabled, path: resolve(input.binding.path) });
+    const io = input.io;
+    return Object.freeze({
+        ...binding,
+        async readText() {
+            return (await io.readTextFresh(binding.path)).content;
+        },
+        async writeText(/** @type {string} */ content) {
+            await io.writeFileAtomic(binding.path, content, { mode: 0o600 });
+        },
+        async stat() {
+            return (await io.statPath(binding.path)).stats;
+        },
+    });
+}
+
+const DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_BINDING = resolveByokProviderHealthPersistenceBinding();
+const DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'model-gateway.health.provider-health.persistence',
+        exactPaths: [DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_BINDING.path],
+        operations: ['read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_STORE = createByokProviderHealthPersistenceStore({
+    binding: DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_BINDING,
+    io: DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_IO,
+});
+let _byokProviderHealthPersistenceStore = DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_STORE;
+
+/** @param {ReturnType<typeof createByokProviderHealthPersistenceStore>} store */
+export function configureByokProviderHealthPersistenceStoreForTests(store) {
+    _byokProviderHealthPersistenceStore = store;
+}
+
+export function restoreByokProviderHealthPersistenceStoreForTests() {
+    _byokProviderHealthPersistenceStore = DEFAULT_BYOK_PROVIDER_HEALTH_PERSISTENCE_STORE;
+}
+
+function isByokProviderHealthPersistenceEnabled() {
+    return _byokProviderHealthPersistenceStore.enabled;
+}
+
 function resolveByokProviderHealthPath() {
-    const configured = process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
-    return typeof configured === 'string' && configured.trim() ? configured : DEFAULT_BYOK_PROVIDER_HEALTH_PATH;
+    return _byokProviderHealthPersistenceStore.path;
+}
+
+/**
+ * Return a storage-owner fingerprint suitable for cache invalidation without exposing or reauthorizing the backing path.
+ *
+ * @returns {Promise<string>}
+ */
+export async function readByokProviderHealthPersistenceFingerprint() {
+    if (!_byokProviderHealthPersistenceStore.enabled) return 'disabled';
+    try {
+        const stats = await _byokProviderHealthPersistenceStore.stat();
+        return `${stats.size}:${Math.trunc(stats.mtimeMs)}`;
+    } catch (error) {
+        const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
+        return code === 'ENOENT' ? 'missing' : `error:${code ?? 'unknown'}`;
+    }
 }
 
 /**
@@ -505,10 +577,8 @@ export function hydrateByokProviderHealthFromDisk() {
             _byokProviderHealthHydrated = true;
             return;
         }
-        const filePath = resolveByokProviderHealthPath();
         try {
-            const raw = (await readTextFreshTrusted(filePath, { caller: 'model-gateway.health.provider-health' }))
-                .content;
+            const raw = await _byokProviderHealthPersistenceStore.readText();
             const parsed = JSON.parse(raw);
             if (
                 !isRecord(parsed) ||
@@ -568,7 +638,6 @@ export async function flushByokProviderHealth() {
         return;
     }
     _byokProviderHealthFlushInFlight = true;
-    const filePath = resolveByokProviderHealthPath();
     const flushPromise = (async () => {
         try {
             _byokProviderHealthDirty = false;
@@ -578,10 +647,7 @@ export async function flushByokProviderHealth() {
                 updatedAt: new Date().toISOString(),
                 records,
             };
-            await writeFileAtomicTrusted(filePath, `${JSON.stringify(payload, null, 2)}\n`, {
-                caller: 'model-gateway.health.provider-health',
-                mode: 0o600,
-            });
+            await _byokProviderHealthPersistenceStore.writeText(`${JSON.stringify(payload, null, 2)}\n`);
             _byokProviderHealthPersistedRecords = records.length;
             _byokProviderHealthLastError = null;
         } catch (error) {

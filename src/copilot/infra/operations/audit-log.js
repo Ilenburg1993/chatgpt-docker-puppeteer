@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Audit log append-only para operações agentic de I/O.
+ * Runtime-owned append-only mutation audit capability.
  *
- * O writer é opt-in por ambiente para evitar side effects obrigatórios em testes e runtimes mínimos. Quando
- * `COPILOT_IO_MUTATION_AUDIT_LOG_PATH` está definido, cada envelope de mutação pode ser registrado em JSONL.
+ * The factory owns one lazy JSONL writer for one immutable configured path. Application composition owns the instance
+ * through `InfraRuntime`; no process-default or one-shot implicit writer exists.
  *
  * @module copilot/infra/operations/audit-log
  */
@@ -12,36 +12,6 @@ import { toError } from '#copilot/core';
 import { createJsonlFileWriter } from '#copilot/infra/internal/persistence/jsonl';
 
 const IO_MUTATION_AUDIT_SCHEMA_VERSION = 1;
-/** @type {Map<string, ReturnType<typeof createJsonlFileWriter>>} */
-const mutationAuditWriters = new Map();
-
-/**
- * @param {string} filePath
- */
-function getMutationAuditWriter(filePath) {
-    let writer = mutationAuditWriters.get(filePath);
-    if (!writer) {
-        writer = createJsonlFileWriter({
-            filePath,
-            autoFlush: false,
-            // Audit de mutações é evidência de segurança: persistimos conteúdo e a entrada de diretório antes de confirmar.
-            durability: 'file-and-directory',
-            maxQueueLines: 10_000,
-            softQueueLines: 8_000,
-        });
-        mutationAuditWriters.set(filePath, writer);
-    }
-    return writer;
-}
-
-/**
- * @returns {string | null}
- */
-export function getIoMutationAuditLogPath() {
-    const raw = process.env['COPILOT_IO_MUTATION_AUDIT_LOG_PATH'];
-    const path = raw === undefined ? '' : String(raw).trim();
-    return path.length > 0 ? path : null;
-}
 
 /**
  * @param {import('./operation.js').IoOperationEnvelope} envelope
@@ -83,29 +53,86 @@ export function buildIoMutationAuditRecord(envelope, context = {}) {
 }
 
 /**
- * @param {import('./operation.js').IoOperationEnvelope} envelope
- * @param {{
- *     tool?: string;
- *     io?: import('#copilot/core/io-contracts').IoMeta | null;
- *     result?: Record<string, unknown>;
- * }} [context]
- * @returns {Promise<{ enabled: boolean; path: string | null; written: boolean; error?: string }>}
+ * @param {{ filePath?: string | null; runtimeId?: string }} [options]
  */
-export async function recordIoMutationAudit(envelope, context = {}) {
-    const filePath = getIoMutationAuditLogPath();
-    if (!filePath) return { enabled: false, path: null, written: false };
-    try {
-        const record = buildIoMutationAuditRecord(envelope, context);
-        const writer = getMutationAuditWriter(filePath);
-        writer.enqueueLine(JSON.stringify(record));
-        await writer.flush();
-        return { enabled: true, path: filePath, written: true };
-    } catch (error) {
-        return {
-            enabled: true,
-            path: filePath,
-            written: false,
-            error: toError(error).message,
-        };
+export function createIoMutationAuditRuntime(options = {}) {
+    const runtimeId = options.runtimeId?.trim() || 'io-mutation-audit';
+    const filePath = typeof options.filePath === 'string' && options.filePath.trim() ? options.filePath.trim() : null;
+    /** @type {ReturnType<typeof createJsonlFileWriter> | null} */
+    let writer = null;
+    let disposed = false;
+
+    function getWriter() {
+        if (!filePath || disposed) return null;
+        if (!writer) {
+            writer = createJsonlFileWriter({
+                filePath,
+                autoFlush: false,
+                // Mutation audit is security evidence: persist data and the directory entry before acknowledging.
+                durability: 'file-and-directory',
+                maxQueueLines: 10_000,
+                softQueueLines: 8_000,
+            });
+        }
+        return writer;
     }
+
+    /**
+     * @param {import('./operation.js').IoOperationEnvelope} envelope
+     * @param {{tool?:string;io?:import('#copilot/core/io-contracts').IoMeta|null;result?:Record<string,unknown>}} [context]
+     * @returns {Promise<{ enabled:boolean; path:string|null; written:boolean; error?:string }>}
+     */
+    async function record(envelope, context = {}) {
+        if (!filePath) return { enabled: false, path: null, written: false };
+        if (disposed) {
+            return {
+                enabled: true,
+                path: filePath,
+                written: false,
+                error: `Mutation audit runtime ${runtimeId} is disposed.`,
+            };
+        }
+        try {
+            const activeWriter = getWriter();
+            if (!activeWriter) return { enabled: false, path: null, written: false };
+            activeWriter.enqueueLine(JSON.stringify(buildIoMutationAuditRecord(envelope, context)));
+            await activeWriter.flush();
+            return { enabled: true, path: filePath, written: true };
+        } catch (error) {
+            return { enabled: true, path: filePath, written: false, error: toError(error).message };
+        }
+    }
+
+    async function flush() {
+        if (writer) await writer.flush();
+    }
+
+    function snapshot() {
+        return Object.freeze({
+            runtimeId,
+            enabled: filePath !== null,
+            path: filePath,
+            materialized: writer !== null,
+            disposed,
+            writer: writer ? Object.freeze({ ...writer.getState() }) : null,
+        });
+    }
+
+    /** @type {Promise<void> | null} */
+    let disposePromise = null;
+    function dispose() {
+        if (disposePromise) return disposePromise;
+        disposePromise = (async () => {
+            try {
+                await flush();
+            } finally {
+                writer?.clearQueue();
+                writer = null;
+                disposed = true;
+            }
+        })();
+        return disposePromise;
+    }
+
+    return Object.freeze({ runtimeId, enabled: filePath !== null, path: filePath, record, flush, snapshot, dispose });
 }

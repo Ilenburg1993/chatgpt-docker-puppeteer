@@ -18,7 +18,7 @@ export {
     truncateBufferView,
     truncateUtf8String,
     utf8ByteLength,
-} from './buffer.js';
+} from './buffer/index.js';
 export { booleanValueOr, boundedIntegerOr, nonNegativeIntegerOr, positiveIntegerOr } from './config-values.js';
 export { readEnvBoolean, readEnvIntAtLeast, readEnvNonNegativeInt, readEnvPositiveInt } from './env.js';
 export { fingerprintMatches, richFingerprintMatches } from './fingerprint.js';
@@ -29,13 +29,13 @@ export {
     readBoundedResponseBytes,
     readBoundedResponseJson,
     readBoundedResponseText,
-} from './http-response.js';
+} from './http-response/index.js';
 export {
     BoundedProcessOutputCapture,
     DEFAULT_PROCESS_OUTPUT_MAX_BYTES,
     MAX_PROCESS_OUTPUT_MAX_BYTES,
     createBoundedProcessOutputCapture,
-} from './process-output.js';
+} from './process-output/index.js';
 export {
     collectPhysicalLineStarts,
     countPhysicalTextLines,

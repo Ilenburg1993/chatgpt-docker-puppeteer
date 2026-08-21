@@ -4,7 +4,12 @@
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { decodeUtf8Buffer, sha256 } from '#copilot/infra/internal/platform';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { readBytesFileRangeSnapshot, readBytesFileSnapshot } from '../snapshot/index.js';
 
 /**
@@ -40,6 +45,8 @@ export async function readBytesFresh(filePath, options = {}) {
                 advisoryLimits: { ...(options.advisoryLimits ?? {}), freshness: 'physical-snapshot' },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return {
             path: filePath,
@@ -71,6 +78,7 @@ export async function readBytesFresh(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -118,6 +126,8 @@ export async function readBytesRangeFresh(filePath, options) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { ...snapshot, io };
     } catch (error) {
@@ -135,6 +145,7 @@ export async function readBytesRangeFresh(filePath, options) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

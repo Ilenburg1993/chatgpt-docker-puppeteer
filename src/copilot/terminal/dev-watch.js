@@ -19,7 +19,7 @@
  */
 
 import { toError } from '#copilot/core';
-import { watchPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
@@ -32,6 +32,15 @@ import { log } from '../observability/logger.js';
  * @type {string}
  */
 const _COPILOT_SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DEV_WATCH_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'terminal.dev-watch',
+        roots: [_COPILOT_SRC_DIR],
+        operations: ['watch'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 /**
  * @param {number} count
@@ -48,7 +57,6 @@ function countLabel(count, singular, plural) {
  *
  * @typedef {{
  *     mode?: DevWatchMode;
- *     watchPath?: string;
  *     debounceMs?: number;
  * }} DevWatchOptions
  *
@@ -88,13 +96,13 @@ export function getDevWatchStatus() {
  * shutdown para fechar o watcher sem file descriptors pendentes.
  *
  * @param {DevWatchOptions} [opts]
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function startDevWatch(opts = {}) {
+export async function startDevWatch(opts = {}) {
     const mode = opts.mode ?? _resolveMode();
     if (!mode) return;
 
-    const watchPath = opts.watchPath ?? _COPILOT_SRC_DIR;
+    const watchPath = _COPILOT_SRC_DIR;
     const debounceMs = typeof opts.debounceMs === 'number' && opts.debounceMs >= 0 ? opts.debounceMs : 500;
 
     _status.active = true;
@@ -104,9 +112,9 @@ export function startDevWatch(opts = {}) {
     log('INFO', `[dev-watch] Monitor activo em "${watchPath}" (mode=${mode}, debounce=${debounceMs}ms)`);
 
     if (mode === 'notify') {
-        _startNotifyWatcher(watchPath, debounceMs);
+        await _startNotifyWatcher(watchPath, debounceMs);
     } else {
-        _startAutoWatcher(watchPath, debounceMs);
+        await _startAutoWatcher(watchPath, debounceMs);
     }
 }
 
@@ -118,28 +126,24 @@ export function startDevWatch(opts = {}) {
  * @param {string} watchPath
  * @param {number} debounceMs
  */
-function _startNotifyWatcher(watchPath, debounceMs) {
+async function _startNotifyWatcher(watchPath, debounceMs) {
     /** @type {Set<string>} */
     const pendingFiles = new Set();
     /** @type {ReturnType<typeof setTimeout> | null} */
     let debounceTimer = null;
 
-    const watcher = watchPathTrusted(
-        watchPath,
-        { caller: 'terminal.dev-watch', recursive: true },
-        (_eventType, filename) => {
-            if (isShuttingDown()) return;
-            const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
-            pendingFiles.add(rel);
+    const watcher = await DEV_WATCH_IO.watchPath(watchPath, { recursive: true }, (_eventType, filename) => {
+        if (isShuttingDown()) return;
+        const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
+        pendingFiles.add(rel);
 
-            if (debounceTimer) clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                const files = [...pendingFiles];
-                pendingFiles.clear();
-                _recordChanges(files, watchPath);
-            }, debounceMs);
-        },
-    );
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const files = [...pendingFiles];
+            pendingFiles.clear();
+            _recordChanges(files, watchPath);
+        }, debounceMs);
+    });
 
     watcher.on('error', (/** @type {Error} */ err) => {
         log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);
@@ -157,30 +161,26 @@ function _startNotifyWatcher(watchPath, debounceMs) {
  * @param {string} watchPath
  * @param {number} debounceMs
  */
-function _startAutoWatcher(watchPath, debounceMs) {
+async function _startAutoWatcher(watchPath, debounceMs) {
     let triggered = false;
     /** @type {ReturnType<typeof setTimeout> | null} */
     let debounceTimer = null;
 
     log('WARN', '[dev-watch] Modo AUTO activo — mudanças em src/copilot/** reiniciarão o processo.');
 
-    const watcher = watchPathTrusted(
-        watchPath,
-        { caller: 'terminal.dev-watch', recursive: true },
-        (eventType, filename) => {
+    const watcher = await DEV_WATCH_IO.watchPath(watchPath, { recursive: true }, (eventType, filename) => {
+        if (triggered || isShuttingDown()) return;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
             if (triggered || isShuttingDown()) return;
-            if (debounceTimer) clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                if (triggered || isShuttingDown()) return;
-                triggered = true;
-                const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
-                log('INFO', `[dev-watch] Mudança detectada (${eventType}: ${rel}) — graceful restart.`);
-                runShutdown('dev_watch_reload')
-                    .catch(() => {})
-                    .finally(() => process.exit(0));
-            }, debounceMs);
-        },
-    );
+            triggered = true;
+            const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
+            log('INFO', `[dev-watch] Mudança detectada (${eventType}: ${rel}) — graceful restart.`);
+            runShutdown('dev_watch_reload')
+                .catch(() => {})
+                .finally(() => process.exit(0));
+        }, debounceMs);
+    });
 
     watcher.on('error', (/** @type {Error} */ err) => {
         log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);

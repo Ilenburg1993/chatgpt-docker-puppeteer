@@ -6,11 +6,15 @@ import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks
 import {
     invalidateIoCoherencePath,
     invalidateIoCoherenceSubtree,
-} from '#copilot/infra/internal/filesystem/invalidation';
-import { shouldCaptureIoRollback } from '#copilot/infra/internal/filesystem/transaction';
+} from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { deleteFileUnlocked, removePathUnlocked } from '#copilot/infra/internal/filesystem/write';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { readMutationSnapshot } from './rollback/index.js';
 
 /**
@@ -20,6 +24,7 @@ import { readMutationSnapshot } from './rollback/index.js';
  * @param {{
  *     expectedHash?: string;
  *     captureRollback?: boolean;
+ *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
@@ -36,12 +41,13 @@ import { readMutationSnapshot } from './rollback/index.js';
  *     rollbackCaptureEnabled: boolean;
  *     durability: Awaited<ReturnType<typeof deleteFileUnlocked>>;
  * }>}
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function deleteFileLocked(filePath, options = {}) {
+export async function deleteFileLocked(filePath, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
-    const captureRollback = shouldCaptureIoRollback(options.captureRollback !== false);
+    const captureRollback = options.captureRollback ?? options.rollbackPolicy?.enabled ?? false;
     try {
         const lease = await acquireIoResourceLock(filePath, {
             operation: 'delete',
@@ -51,7 +57,7 @@ export async function deleteFileLocked(filePath, options = {}) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
-                    const snapshot = await readMutationSnapshot(filePath, captureRollback);
+                    const snapshot = await readMutationSnapshot(filePath, captureRollback, options.rollbackPolicy);
                     assertExpectedSha256Digest(snapshot.contentHash, options.expectedHash);
                     const durability = await deleteFileUnlocked(filePath, {
                         ...(options.durability === undefined ? {} : { durability: options.durability }),
@@ -64,7 +70,7 @@ export async function deleteFileLocked(filePath, options = {}) {
             }
         })();
         const waitMs = lease.waitMs;
-        invalidateIoCoherencePath(filePath);
+        invalidateIoCoherencePath(filePath, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'delete',
@@ -90,6 +96,8 @@ export async function deleteFileLocked(filePath, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return withIoMeta(
             {
@@ -119,6 +127,7 @@ export async function deleteFileLocked(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -143,8 +152,9 @@ export async function deleteFileLocked(filePath, options = {}) {
  *     lockWaitMs: number;
  *     durability: Awaited<ReturnType<typeof removePathUnlocked>>;
  * }>}
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function removePathLocked(filePath, options = {}) {
+export async function removePathLocked(filePath, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
@@ -171,7 +181,7 @@ export async function removePathLocked(filePath, options = {}) {
             await lease.releaseAsync();
         }
         const waitMs = lease.waitMs;
-        invalidateIoCoherenceSubtree(filePath);
+        invalidateIoCoherenceSubtree(filePath, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'delete',
@@ -190,6 +200,8 @@ export async function removePathLocked(filePath, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return withIoMeta({ path: filePath, deleted: /** @type {const} */ (true), lockWaitMs: waitMs, durability }, io);
     } catch (error) {
@@ -205,6 +217,7 @@ export async function removePathLocked(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

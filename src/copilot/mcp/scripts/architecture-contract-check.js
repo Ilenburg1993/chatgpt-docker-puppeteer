@@ -8,12 +8,12 @@
  * @module copilot/mcp/scripts/architecture-contract-check
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
-const architectureWorkspaceIo = createWorkspaceIo({ workspaceRoot: ROOT });
+const architectureWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: ROOT });
 const PRESENTATION_ROOT = 'src/copilot/presentation';
 const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts']);
 

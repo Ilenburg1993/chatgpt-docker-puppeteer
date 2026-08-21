@@ -26,6 +26,7 @@ import { decodeUtf8Chunk } from './codec.js';
  *     attempt?: number;
  *     deliveryMode?: 'materialized' | 'stream';
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     readRuntime?: {byteLineIndex:{enabled:boolean}};
  * }} [options]
  * @param {{
  *     totalLines: number;
@@ -96,7 +97,7 @@ export async function* iterateTextLineChunks(
         options.deliveryMode === 'materialized' &&
         startLine === 1 &&
         Number.isFinite(options.endLine) &&
-        process.env['COPILOT_IO_BYTE_LINE_INDEX_DISABLE'] !== 'true';
+        options.readRuntime?.byteLineIndex.enabled === true;
     if (seedByteLineIndex) {
         state.byteLineStarts = [0];
         state.byteLinePendingCrOffset = null;

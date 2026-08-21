@@ -3,15 +3,14 @@
 
 export {
     acquireFileResourceLock,
-    acquireLock,
+    getFileResourceLockConfigurationError,
     getFileResourceLockDir,
     getFileResourceLockPath,
     getFileResourceLockProfile,
     getFileResourceLockStats,
     hashFileResourceLockKey,
-    isFileResourceLockEnabledByEnv,
-    releaseLock,
-    releaseLockAsync,
+    isFileResourceLockEnabled,
+    readFileResourceLockPolicy,
     shouldAcquireFileResourceLock,
 } from './file/index.js';
 export {

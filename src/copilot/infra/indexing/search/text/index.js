@@ -4,12 +4,12 @@
 /** @typedef {import('./types.js').TextSearchOptions} TextSearchOptions */
 /** @typedef {import('./types.js').TextSearchResult} TextSearchResult */
 
-export { buildGrepArgs } from './grep.js';
 export {
     canUseIndexSearch,
     filterIndexRowsByGlob,
     formatIndexImportRows,
     formatIndexSearchRows,
     formatLiteralIndexSearchRows,
-} from './indexed-format.js';
+} from '../projection/index.js';
+export { buildGrepArgs } from './grep.js';
 export { searchText } from './service.js';

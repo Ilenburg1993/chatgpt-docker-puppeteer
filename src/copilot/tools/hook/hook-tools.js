@@ -1,7 +1,7 @@
 // @ts-check
 import { getAuditTail } from '#copilot/audit';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { execFile } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,7 +65,7 @@ const execFileAsync = promisify(execFile);
  * @type {string}
  */
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
-const { readText, statPath } = createWorkspaceIo({ workspaceRoot: ROOT });
+const { readText, statPath } = getApplicationWorkspaceInfra(ROOT).readIo;
 
 /**
  * Diretório de estado do hook system.

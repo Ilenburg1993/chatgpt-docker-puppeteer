@@ -11,26 +11,23 @@
 
 import { getCopilotDb } from '#copilot/db';
 import {
-    openDetachedAppendSinkTrusted,
-    readTextFreshTrusted,
-    statPathTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
     destructiveAnnotations,
     errorResult,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
     okResult,
+    readLinuxProcessArgv,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { isAbsolute, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { readByokProviderHealthPersistenceFingerprint } from '../../model-gateway/health/provider-health.js';
 
 const execFileAsync = promisify(execFile);
 const LIVE_RUNNER = 'scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs';
@@ -145,7 +142,7 @@ function detachedLiveRunsDirectory() {
 }
 
 function llmbLiveWorkspaceIo() {
-    return createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+    return getMcpWorkspaceIo();
 }
 
 /** @param {string} runId */
@@ -177,14 +174,20 @@ async function inspectDetachedLiveRunProcessIdentity(manifest) {
     if (!isProcessAlive(manifest.pid)) {
         return { alive: false, verified: false, reason: 'process-not-alive', argv: [] };
     }
-    if (process.platform === 'win32') {
-        return { alive: true, verified: false, reason: 'process-identity-unavailable-on-win32', argv: [] };
+    if (process.platform !== 'linux') {
+        return {
+            alive: true,
+            verified: false,
+            reason: `process-identity-unavailable-on-${process.platform}`,
+            argv: [],
+        };
     }
     try {
-        const cmdline = (
-            await readTextFreshTrusted(`/proc/${manifest.pid}/cmdline`, { caller: 'mcp.tools.llm-b-live.proc' })
-        ).content;
-        const argv = cmdline.split('\0').filter(Boolean);
+        const processIdentity = await readLinuxProcessArgv(manifest.pid);
+        if (processIdentity.truncated) {
+            return { alive: true, verified: false, reason: 'process-command-line-truncated', argv: [] };
+        }
+        const argv = [...processIdentity.argv];
         const expectedOutDirArg = `--out-dir=${manifest.outDir}`;
         const runnerMatch = argv.some((arg) => arg === LIVE_RUNNER || arg.endsWith(`/${LIVE_RUNNER}`));
         const outDirMatch = argv.includes(expectedOutDirArg);
@@ -245,10 +248,7 @@ async function spawnDetachedLiveRun(input) {
     const workspaceIo = llmbLiveWorkspaceIo();
     await workspaceIo.mkdirPathLocked(stateDir, { recursive: true });
     await workspaceIo.mkdirPathLocked(absoluteOutDir, { recursive: true });
-    const logSink = await openDetachedAppendSinkTrusted(absoluteLogPath, {
-        caller: 'mcp.tools.llm-b-live',
-        mode: 0o600,
-    });
+    const logSink = await workspaceIo.openDetachedAppendSink(absoluteLogPath, { mode: 0o600 });
     /** @type {import('node:child_process').ChildProcess | undefined} */
     let child;
     try {
@@ -467,21 +467,12 @@ function parseJsonOutput(text) {
 /** @param {string} filePath */
 async function readinessFileFingerprint(filePath) {
     try {
-        const info = (await statPathTrusted(filePath, { caller: 'mcp.tools.llm-b-live' })).stats;
+        const info = (await llmbLiveWorkspaceIo().statPath(filePath)).stats;
         return `${info.size}:${Math.trunc(info.mtimeMs)}`;
     } catch (error) {
         const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
         return code === 'ENOENT' ? 'missing' : `error:${code ?? 'unknown'}`;
     }
-}
-
-/** @param {string} root */
-function readinessHealthPath(root) {
-    const configured = process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
-    if (typeof configured !== 'string' || !configured.trim()) {
-        return join(root, 'data', 'copilot-terminal', 'byok-provider-health.json');
-    }
-    return isAbsolute(configured) ? configured : resolve(root, configured);
 }
 
 function modelGatewaySqliteFingerprint() {
@@ -548,7 +539,7 @@ async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
     const root = getMcpWorkspaceRoot();
     const [catalogFile, byokHealthFile] = await Promise.all([
         readinessFileFingerprint(join(root, 'data', 'copilot', 'model-gateway', 'catalog.json')),
-        readinessFileFingerprint(readinessHealthPath(root)),
+        readByokProviderHealthPersistenceFingerprint(),
     ]);
     const sqliteLogical = modelGatewaySqliteFingerprint();
     return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;

@@ -1,4 +1,7 @@
 // @ts-check
-/** @module copilot/infra/public/filesystem/write */
+/**
+ * Bounded public write surface. Unlocked/portable primitives remain internal implementation details.
+ * @module copilot/infra/public/filesystem/write
+ */
 
-export * from '../../../filesystem/write/index.js';
+export { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '../../../filesystem/write/index.js';

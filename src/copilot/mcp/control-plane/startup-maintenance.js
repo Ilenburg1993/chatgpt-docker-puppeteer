@@ -5,9 +5,10 @@
  * @module copilot/mcp/control-plane/startup-maintenance
  */
 
-import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/operations';
+import { getApplicationInfraRuntime } from '#copilot/boot';
+import { cleanupRollbackSidecars } from '#copilot/infra/public/operations';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
-import { cleanupStaleQuickTunnelState } from '../cloudflare/state.js';
+import { createCloudflareStateStore } from '../cloudflare/state.js';
 import { logMcp } from './audit.js';
 
 const DEFAULT_STARTUP_SMOKE_DELAY_MS = 15_000;
@@ -48,7 +49,7 @@ export function scheduleMcpStartupMaintenance(options = {}) {
     const delayMs = normalizeDelay(options.delayMs ?? Number(process.env['COPILOT_MCP_STARTUP_SMOKE_DELAY_MS']));
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const smokeRunner = options.smokeRunner ?? runWorkspaceSmoke;
-    const cleanupRunner = options.cleanupRunner ?? cleanupLegacyQuickTunnelState;
+    const cleanupRunner = options.cleanupRunner ?? cleanupQuickTunnelStateAtStartup;
     const rollbackCleanupRunner = options.rollbackCleanupRunner ?? cleanupRollbackStateAtStartup;
     const detachedLiveReaper = options.detachedLiveReaper ?? reapCompletedDetachedLiveRunsAtStartup;
 
@@ -164,9 +165,9 @@ async function runWorkspaceSmoke() {
     return /** @type {Record<string, unknown>} */ (result.structuredContent ?? {});
 }
 
-async function cleanupLegacyQuickTunnelState() {
+async function cleanupQuickTunnelStateAtStartup() {
     const config = readCloudflareTunnelConfig();
-    return cleanupStaleQuickTunnelState(config.stateFile, { staleAfterMs: config.staleAfterMs });
+    return createCloudflareStateStore(config).cleanupStaleQuickTunnelState({ staleAfterMs: config.staleAfterMs });
 }
 
 async function reapCompletedDetachedLiveRunsAtStartup() {
@@ -181,13 +182,23 @@ async function reapCompletedDetachedLiveRunsAtStartup() {
  * @returns {Promise<Record<string, unknown>>}
  */
 async function cleanupRollbackStateAtStartup() {
-    const policy = getIoRollbackPolicy();
+    const policy = getApplicationInfraRuntime().config.rollback;
     const cleanup = await cleanupRollbackSidecars({
+        policy,
+        directory: policy.directory,
         enforceBudget: policy.enabled,
         maxEntries: policy.maxEntries,
         maxBytes: policy.maxBytes,
     });
-    return { policy, ...cleanup };
+    return {
+        policy: {
+            enabled: policy.enabled,
+            ttlMs: policy.ttlMs,
+            maxEntries: policy.maxEntries,
+            maxBytes: policy.maxBytes,
+        },
+        ...cleanup,
+    };
 }
 
 /**

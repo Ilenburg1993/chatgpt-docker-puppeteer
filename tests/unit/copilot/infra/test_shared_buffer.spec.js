@@ -14,7 +14,7 @@ import {
     truncateBufferView,
     truncateUtf8String,
     utf8ByteLength,
-} from '../../../../src/copilot/infra/platform/buffer.js';
+} from '../../../../src/copilot/infra/platform/buffer/index.js';
 
 describe('infra/shared/buffer', () => {
     it('toBufferView respeita byteOffset/byteLength de Uint8Array', () => {

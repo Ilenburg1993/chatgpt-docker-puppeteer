@@ -2,10 +2,33 @@
 /** diagnostics_channel publication for IO operations and lifecycle events. */
 import { logSwallowed, toError } from '#copilot/core';
 import { channel } from 'node:diagnostics_channel';
-import { recordIoDurability } from './durability.js';
-import { recordIoLatency } from './latency.js';
-import { recordIoMutationState } from './mutation-state.js';
 
+/** @typedef {{ recordOperation(io:import('#copilot/core/io-contracts').IoMeta, opts:{success:boolean;error?:unknown}):void }} IoTelemetryRuntime */
+
+const IO_TELEMETRY_RUNTIME = Symbol('copilot.io.telemetry-runtime');
+
+/**
+ * Internal-only carrier used by composed IO facades. The symbol is module-private and never appears on public
+ * telemetry surfaces; raw callers cannot forge it without receiving the exact runtime object through composition.
+ * @template T
+ * @param {T} options
+ * @param {IoTelemetryRuntime | undefined} runtime
+ * @returns {T}
+ */
+export function withIoTelemetryRuntimeOption(options, runtime) {
+    if (!runtime) return options;
+    const base = options && typeof options === 'object' ? options : {};
+    return /** @type {T} */ ({ ...base, [IO_TELEMETRY_RUNTIME]: runtime });
+}
+
+/** @param {unknown} options @returns {IoTelemetryRuntime | undefined} */
+export function getIoTelemetryRuntimeOption(options) {
+    if (!options || typeof options !== 'object') return undefined;
+    const value = /** @type {Record<PropertyKey, unknown>} */ (options)[IO_TELEMETRY_RUNTIME];
+    return value && typeof value === 'object' && 'recordOperation' in value
+        ? /** @type {IoTelemetryRuntime} */ (value)
+        : undefined;
+}
 const ioOperationChannel = channel('copilot.io.operation');
 const lifecycleChannels = {
     budget: channel('copilot.io.budget'),
@@ -16,12 +39,10 @@ const lifecycleChannels = {
     scan: channel('copilot.io.scan'),
 };
 
-/** @param {import('#copilot/core/io-contracts').IoMeta} io @param {{ success: boolean; error?: unknown }} opts */
-export function publishIoOperation(io, opts) {
+/** @param {import('#copilot/core/io-contracts').IoMeta} io @param {{success:boolean;error?:unknown}} opts @param {IoTelemetryRuntime} [telemetryRuntime] */
+export function publishIoOperation(io, opts, telemetryRuntime) {
     try {
-        recordIoLatency(io.operation, io.durationMs);
-        recordIoDurability(io);
-        recordIoMutationState(io, opts.error);
+        telemetryRuntime?.recordOperation(io, opts);
         ioOperationChannel.publish({
             ts: Date.now(),
             success: opts.success,
@@ -38,21 +59,13 @@ export function publishIoOperation(io, opts) {
     }
 }
 
-/**
- * @param {import('#copilot/core/io-contracts').IoMeta} io
- * @param {boolean} success
- * @param {unknown} [error]
- */
-export function publishIoOperationResult(io, success, error) {
-    publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
+/** @param {import('#copilot/core/io-contracts').IoMeta} io @param {boolean} success @param {unknown} [error] @param {IoTelemetryRuntime} [telemetryRuntime] */
+export function publishIoOperationResult(io, success, error, telemetryRuntime) {
+    publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) }, telemetryRuntime);
     return io;
 }
 
-/**
- * @param {'budget' | 'cache' | 'index' | 'lock' | 'scope' | 'scan'} domain
- * @param {string} phase
- * @param {Record<string, unknown>} payload
- */
+/** @param {'budget'|'cache'|'index'|'lock'|'scope'|'scan'} domain @param {string} phase @param {Record<string,unknown>} payload */
 export function publishIoLifecycleEvent(domain, phase, payload = {}) {
     try {
         lifecycleChannels[domain].publish({ ts: Date.now(), domain, phase, ...payload });

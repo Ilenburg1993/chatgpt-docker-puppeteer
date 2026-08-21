@@ -1,25 +1,26 @@
 // @ts-check
 
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { publishIoInvalidation } from '../../../../src/copilot/infra/filesystem/invalidation/bus/index.js';
-import {
-    getIoExternalWatchStats,
-    startIoExternalWatch,
-    stopIoExternalWatch,
-} from '../../../../src/copilot/infra/filesystem/invalidation/external-watch/index.js';
-
-import { resetIoExternalWatchForTest, resetIoInvalidationBusForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const TEMP_DIRS = [];
+/** @type {ReturnType<typeof createInfraRuntime>[]} */
+const RUNTIMES = [];
 
 async function createTempDir() {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-external-watch-'));
     TEMP_DIRS.push(dir);
     return dir;
+}
+
+function createTestRuntime() {
+    const runtime = createInfraRuntime({ runtimeId: `external-watch-test-${Date.now()}-${Math.random()}` });
+    RUNTIMES.push(runtime);
+    return runtime;
 }
 
 /** @param {() => boolean} predicate */
@@ -33,30 +34,34 @@ async function waitUntil(predicate) {
 }
 
 afterEach(async () => {
-    resetIoExternalWatchForTest();
-    resetIoInvalidationBusForTest();
+    await Promise.allSettled(RUNTIMES.splice(0).map((runtime) => runtime.dispose()));
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
     }
 });
 
-describe('infra/filesystem/invalidation/external-watch', () => {
+describe('infra/filesystem/invalidation/external-watch runtime ownership', () => {
     it('publica hint bounded para alteração nested e filtra domínio hidden', async () => {
         const root = await createTempDir();
         const nested = join(root, 'nested');
         const file = join(nested, 'module.js');
         await mkdir(nested, { recursive: true });
+        const runtime = createTestRuntime();
+        const workspace = runtime.workspace(root);
         /** @type {{ filePath: string; source: string }[]} */
         const invalidations = [];
 
-        const started = startIoExternalWatch(root, {
+        const started = await workspace.startExternalWatch(root, {
             enabled: true,
             debounceMs: 20,
             onInvalidate: (filePath, event) => invalidations.push({ filePath, source: event.source }),
         });
         expect(started).toMatchObject({ started: true, reused: false });
-        expect(startIoExternalWatch(root, { enabled: true })).toMatchObject({ started: true, reused: true });
+        expect(await workspace.startExternalWatch(root, { enabled: true })).toMatchObject({
+            started: true,
+            reused: true,
+        });
 
         await writeFile(file, 'export const watched = true;\n', 'utf8');
         await waitUntil(() => invalidations.some((entry) => entry.filePath === file));
@@ -69,36 +74,33 @@ describe('infra/filesystem/invalidation/external-watch', () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
 
         expect(invalidations.some((entry) => entry.filePath === hiddenFile)).toBe(false);
-        expect(getIoExternalWatchStats()).toMatchObject({
-            watching: true,
-            invalidated: expect.any(Number),
-            errors: 0,
-            dropped: 0,
-        });
-        expect(getIoExternalWatchStats().invalidated).toBeGreaterThanOrEqual(1);
-        expect(getIoExternalWatchStats().filtered).toBeGreaterThanOrEqual(1);
-        stopIoExternalWatch();
-        expect(getIoExternalWatchStats().watching).toBe(false);
+        const stats = workspace.externalWatchStats()[0];
+        expect(stats).toMatchObject({ watching: true, invalidated: expect.any(Number), errors: 0, dropped: 0 });
+        expect(stats?.invalidated).toBeGreaterThanOrEqual(1);
+        expect(stats?.filtered).toBeGreaterThanOrEqual(1);
     });
 
-    it('suprime hint do mesmo evento quando invalidation canônica já o cobriu', async () => {
+    it('suprime hint do mesmo evento quando invalidation canônica da instância já o cobriu', async () => {
         const root = await createTempDir();
         const file = join(root, 'canonical.js');
+        const runtime = createTestRuntime();
+        const workspace = runtime.workspace(root);
         /** @type {string[]} */
         const invalidations = [];
-        startIoExternalWatch(root, {
+        await workspace.startExternalWatch(root, {
             enabled: true,
             debounceMs: 100,
             onInvalidate: (filePath) => invalidations.push(filePath),
         });
 
         await writeFile(file, 'export const canonical = true;\n', 'utf8');
-        await waitUntil(() => getIoExternalWatchStats().queued >= 1);
-        publishIoInvalidation(file, { source: 'canonical-test' });
+        await waitUntil(() => Number(workspace.externalWatchStats()[0]?.queued ?? 0) >= 1);
+        runtime.coherence.invalidation.publish(file, { source: 'canonical-test' });
         await new Promise((resolve) => setTimeout(resolve, 180));
 
+        const stats = workspace.externalWatchStats()[0];
         expect(invalidations).not.toContain(file);
-        expect(getIoExternalWatchStats().canonicalSuppressed).toBeGreaterThanOrEqual(1);
-        expect(getIoExternalWatchStats().invalidated).toBe(0);
+        expect(stats?.canonicalSuppressed).toBeGreaterThanOrEqual(1);
+        expect(stats?.invalidated).toBe(0);
     });
 });

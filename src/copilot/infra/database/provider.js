@@ -1,42 +1,44 @@
 // @ts-check
 /**
- * Process-local provider state for SQLite-backed infra capabilities.
+ * Instance-local SQLite provider binding.
  *
- * This leaf owns only composition state. Database lifecycle, schema and migrations remain outside infra.
+ * Database lifecycle, schema and migrations remain owned by the caller. Composition roots create isolated bindings.
  *
  * @module copilot/infra/database/provider
  */
 
 /** @typedef {() => import('better-sqlite3').Database} InfraSqliteProvider */
 
-/** @type {InfraSqliteProvider | null} */
-let _provider = null;
-let _revision = 0;
+/** @param {InfraSqliteProvider | null} [initialProvider=null] */
+export function createInfraSqliteProviderBinding(initialProvider = null) {
+    /** @type {InfraSqliteProvider | null} */
+    let provider = null;
+    let revision = 0;
 
-/** @param {InfraSqliteProvider} provider */
-export function configureInfraSqliteProvider(provider) {
-    if (typeof provider !== 'function') throw new TypeError('configureInfraSqliteProvider requires a function');
-    if (_provider === provider) return;
-    _provider = provider;
-    _revision += 1;
-}
-
-/** @returns {import('better-sqlite3').Database} */
-export function getInfraSqliteDatabase() {
-    if (!_provider) {
-        const error = new Error('Infra SQLite provider is not configured by the runtime composition root.');
-        Object.assign(error, { code: 'ERR_INFRA_SQLITE_PROVIDER_UNCONFIGURED' });
-        throw error;
+    /** @param {InfraSqliteProvider} nextProvider */
+    function configure(nextProvider) {
+        if (typeof nextProvider !== 'function') throw new TypeError('SQLite provider binding requires a function');
+        if (provider === nextProvider) return revision;
+        provider = nextProvider;
+        revision += 1;
+        return revision;
     }
-    return _provider();
-}
-
-export function getInfraSqliteProviderStatus() {
-    return Object.freeze({ configured: _provider !== null, revision: _revision });
-}
-
-/** Test-only reset. Capability registries must be reset before replacing an already-materialized database. */
-export function resetInfraSqliteProviderForTest() {
-    _provider = null;
-    _revision += 1;
+    function get() {
+        if (!provider) {
+            const error = new Error('Infra SQLite provider is not configured by the runtime composition root.');
+            Object.assign(error, { code: 'ERR_INFRA_SQLITE_PROVIDER_UNCONFIGURED' });
+            throw error;
+        }
+        return provider();
+    }
+    function status() {
+        return Object.freeze({ configured: provider !== null, revision });
+    }
+    function reset() {
+        provider = null;
+        revision += 1;
+        return revision;
+    }
+    if (initialProvider !== null) configure(initialProvider);
+    return Object.freeze({ configure, get, reset, status });
 }

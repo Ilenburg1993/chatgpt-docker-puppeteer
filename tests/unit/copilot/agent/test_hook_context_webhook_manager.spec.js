@@ -86,18 +86,19 @@ vi.mock(
         ),
 );
 vi.mock('#copilot/observability/metrics', () => ({ defaultMetrics: mocks.defaultMetrics }));
-vi.mock('#copilot/tools/todo/store', async (importOriginal) => ({
-    ...(await importOriginal()),
-    readStore: mocks.readTodoStore,
+vi.mock('../../../../src/copilot/agent/ports/tool-port.js', () => ({
+    readAgentTodoStore: mocks.readTodoStore,
 }));
 
-vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
-    createWorkspaceIo: () => ({
-        readBytesRangeFresh: mocks.readBytesRangeFresh,
-        readTextFresh: mocks.readTextFresh,
+vi.mock('#copilot/boot/application-infra', () => ({
+    getApplicationWorkspaceInfra: () => ({
+        readIo: {
+            readBytesRangeFresh: mocks.readBytesRangeFresh,
+            readTextFresh: mocks.readTextFresh,
+        },
     }),
 }));
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
+vi.mock('#copilot/infra/public/filesystem/skills', () => ({
     readConfiguredSkillCatalog: mocks.readSkillCatalog,
 }));
 

@@ -7,10 +7,6 @@
 /** @typedef {import('./types.js').SymbolCacheEntry} SymbolCacheEntry */
 
 export {
-    FILE_CONTEXT_CACHE_DISABLED_VALUES,
-    FILE_CONTEXT_CACHE_MAX_BYTES,
-    FILE_CONTEXT_CACHE_MAX_ENTRIES,
-    FILE_CONTEXT_CACHE_TTL_MS,
     MAX_PARSE_BYTES,
     MAX_PARSE_DURATION_MS,
     MAX_PARSE_LINE_GUARD,
@@ -22,10 +18,15 @@ export {
     PARSER_WORKER_QUEUE_POLICY,
     PARSER_WORKER_REQUEST_TIMEOUT_MS,
     PARSER_WORKER_RESTART_BACKOFF_MS,
-    SYMBOL_CACHE_MAX_BYTES,
-    SYMBOL_CACHE_MAX_ENTRIES,
+    readParserProcessConfig,
     resolveParserWorkerPoolPolicy,
     resolveParserWorkerQueuePolicy,
 } from './config.js';
 export { classifyParserExtension, normalizeParserPath } from './path.js';
-export { parserRuntimeStats } from './runtime-state.js';
+export {
+    getParserRuntimeStatsSnapshot,
+    incrementParserRuntimeCounter,
+    recordParserRuntimeDuration,
+    recordParserWorkerQueueDepth,
+    recordParserWorkerQueueWait,
+} from './runtime-state.js';

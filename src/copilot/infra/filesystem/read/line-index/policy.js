@@ -15,21 +15,27 @@ const BYTE_LINE_INDEX_MEDIUM_EXTENSION_MAX_BYTES = 1024 * 1024;
 const DEFAULT_BYTE_LINE_INDEX_MAX_LINES = 1_000_000;
 const HARD_BYTE_LINE_INDEX_MAX_LINES = 5_000_000;
 
-export function readByteLineIndexMaxBytes() {
-    const configured = Number(process.env['COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_BYTES);
-    if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_BYTE_LINE_INDEX_MAX_BYTES;
-    return Math.min(HARD_BYTE_LINE_INDEX_MAX_BYTES, Math.max(1024, Math.floor(configured)));
+/** @param {NodeJS.ProcessEnv} [env] */
+export function readByteLineIndexConfig(env = process.env) {
+    const configuredBytes = Number(env['COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_BYTES);
+    const configuredLines = Number(env['COPILOT_IO_BYTE_LINE_INDEX_MAX_LINES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_LINES);
+    return Object.freeze({
+        enabled: env['COPILOT_IO_BYTE_LINE_INDEX_DISABLE'] !== 'true',
+        maxEntries: BYTE_LINE_INDEX_MAX_ENTRIES,
+        maxBytes:
+            Number.isFinite(configuredBytes) && configuredBytes > 0
+                ? Math.min(HARD_BYTE_LINE_INDEX_MAX_BYTES, Math.max(1024, Math.floor(configuredBytes)))
+                : DEFAULT_BYTE_LINE_INDEX_MAX_BYTES,
+        maxLines:
+            Number.isFinite(configuredLines) && configuredLines > 0
+                ? Math.min(HARD_BYTE_LINE_INDEX_MAX_LINES, Math.floor(configuredLines))
+                : DEFAULT_BYTE_LINE_INDEX_MAX_LINES,
+    });
 }
 
 /** @param {ByteLineIndexEntry} entry */
 export function estimateByteLineIndexEntryBytes(entry) {
     return BYTE_LINE_INDEX_ENTRY_OVERHEAD_BYTES + entry.lineStarts.length * BYTE_LINE_INDEX_ESTIMATED_BYTES_PER_OFFSET;
-}
-
-export function readByteLineIndexMaxLines() {
-    const configured = Number(process.env['COPILOT_IO_BYTE_LINE_INDEX_MAX_LINES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_LINES);
-    if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_BYTE_LINE_INDEX_MAX_LINES;
-    return Math.min(HARD_BYTE_LINE_INDEX_MAX_LINES, Math.floor(configured));
 }
 
 /**

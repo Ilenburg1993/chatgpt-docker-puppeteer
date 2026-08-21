@@ -1,172 +1,115 @@
 // @ts-check
 
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { afterEach, describe, expect, it } from 'vitest';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import Database from 'better-sqlite3';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-    getRecentIoInvalidation,
-    publishIoInvalidation,
-    registerIoInvalidationHook,
-} from '#copilot/infra/internal/filesystem/invalidation';
+/** @type {ReturnType<typeof createInfraRuntime>[]} */
+const runtimes = [];
 
-import { resetIoInvalidationBusForTest } from '#copilot/infra/public/testing';
-const execFileAsync = promisify(execFile);
-const INVALIDATION_BUS_MODULE_URL = new URL(
-    '../../../../src/copilot/infra/filesystem/invalidation/index.js',
-    import.meta.url,
-).href;
-const READ_CHUNKS_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/read/chunks/index.js', import.meta.url)
-    .href;
-const BYTE_LINE_INDEX_MODULE_URL = new URL(
-    '../../../../src/copilot/infra/filesystem/read/line-index/index.js',
-    import.meta.url,
-).href;
-const LINE_OFFSET_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/read/cache/index.js', import.meta.url)
-    .href;
-const REPO_READ_CACHE_MODULE_URL = new URL('../../../../src/copilot/mcp/tools/repo-read-cache.js', import.meta.url)
-    .href;
-const SQLITE_PORT_MODULE_URL = new URL('../../../../src/copilot/infra/database/index.js', import.meta.url).href;
-const INFRA_TESTING_MODULE_URL = new URL('../../../../src/copilot/infra/testing/index.js', import.meta.url).href;
+function createTestRuntime(options = {}) {
+    const runtime = createInfraRuntime({
+        runtimeId: `invalidation-test-${Date.now()}-${Math.random()}`,
+        ...options,
+    });
+    runtimes.push(runtime);
+    return runtime;
+}
 
-afterEach(() => {
-    resetIoInvalidationBusForTest();
+afterEach(async () => {
+    await Promise.allSettled(runtimes.splice(0).map((runtime) => runtime.dispose()));
+    vi.unstubAllEnvs();
 });
 
-describe('infra/filesystem/invalidation bus', () => {
+describe('infra/filesystem/invalidation bus runtime ownership', () => {
     it('publica evento normalizado para hooks registrados', () => {
+        const runtime = createTestRuntime();
         /** @type {{ filePath: string; recursive: boolean; source: string }[]} */
         const seen = [];
-        const unregister = registerIoInvalidationHook((filePath, event) => {
+        const unregister = runtime.coherence.invalidation.registerHook((filePath, event) => {
             seen.push({ filePath, recursive: event.recursive, source: event.source });
         });
 
-        publishIoInvalidation('/tmp/a.txt', { recursive: true, source: 'test' });
+        runtime.coherence.invalidation.publish('/tmp/a.txt', { recursive: true, source: 'test' });
         unregister();
 
         expect(seen).toEqual([{ filePath: '/tmp/a.txt', recursive: true, source: 'test' }]);
     });
 
-    it('expõe invalidation recém-despachada apenas como hint de deduplicação', () => {
-        publishIoInvalidation('/tmp/recent.txt', { source: 'canonical-test' });
-        const recent = getRecentIoInvalidation('/tmp/recent.txt');
+    it('expõe invalidation recém-despachada apenas como hint de deduplicação da própria instância', () => {
+        const first = createTestRuntime();
+        const second = createTestRuntime();
+        first.coherence.invalidation.publish('/tmp/recent.txt', { source: 'canonical-test' });
 
+        const recent = first.coherence.invalidation.recent('/tmp/recent.txt');
         expect(recent?.source).toBe('canonical-test');
         expect(typeof recent?.atMs).toBe('number');
-        expect(getRecentIoInvalidation('/tmp/missing.txt')).toBeNull();
+        expect(first.coherence.invalidation.recent('/tmp/missing.txt')).toBeNull();
+        expect(second.coherence.invalidation.recent('/tmp/recent.txt')).toBeNull();
     });
 
     it('unregister remove hook sem afetar publicações posteriores', () => {
+        const runtime = createTestRuntime();
         let calls = 0;
-        const unregister = registerIoInvalidationHook(() => {
+        const unregister = runtime.coherence.invalidation.registerHook(() => {
             calls += 1;
         });
 
-        publishIoInvalidation('/tmp/a.txt');
+        runtime.coherence.invalidation.publish('/tmp/a.txt');
         unregister();
-        publishIoInvalidation('/tmp/b.txt');
+        runtime.coherence.invalidation.publish('/tmp/b.txt');
 
         expect(calls).toBe(1);
     });
 
-    it('imports de caches são side-effect free e o journal faz retry após composição tardia do SQLite', async () => {
-        const script = `
-            const [
-                { default: Database },
-                _chunks,
-                byteLineIndex,
-                _lineOffsets,
-                _repoReadCache,
-                bus,
-                sqlitePort,
-                testing,
-            ] = await Promise.all([
-                import('better-sqlite3'),
-                import(${JSON.stringify(READ_CHUNKS_MODULE_URL)}),
-                import(${JSON.stringify(BYTE_LINE_INDEX_MODULE_URL)}),
-                import(${JSON.stringify(LINE_OFFSET_MODULE_URL)}),
-                import(${JSON.stringify(REPO_READ_CACHE_MODULE_URL)}),
-                import(${JSON.stringify(INVALIDATION_BUS_MODULE_URL)}),
-                import(${JSON.stringify(SQLITE_PORT_MODULE_URL)}),
-                import(${JSON.stringify(INFRA_TESTING_MODULE_URL)}),
-            ]);
-            const before = bus.getIoInvalidationBusStats();
-            byteLineIndex.ensureByteLineIndexInvalidationHook();
-            const beforeComposition = bus.getIoInvalidationBusStats();
-            const db = new Database(':memory:');
-            sqlitePort.configureInfraSqliteProvider(() => db);
-            bus.publishIoInvalidation('/tmp/retry-after-composition.js', { source: 'retry-proof' });
-            const afterComposition = bus.getIoInvalidationBusStats();
-            testing.resetIoInvalidationBusForTest();
-            testing.resetInfraSqliteProviderForTest();
-            db.close();
-            console.log(JSON.stringify({ before, beforeComposition, afterComposition }));
-        `;
-        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
-            env: {
-                ...process.env,
-                NODE_ENV: 'production',
-                VITEST: 'false',
-                IO_INVALIDATION_DEBOUNCE_MS: '0',
-                IO_CROSS_PROCESS_INVALIDATION_ENABLED: '1',
-                IO_CROSS_PROCESS_INVALIDATION_POLL_MS: '25',
-            },
-            timeout: 10_000,
-            maxBuffer: 1024 * 1024,
-        });
-        const result = JSON.parse(stdout.trim());
+    it('derived caches são lazy e o journal materializa após configuração tardia do binding SQLite', () => {
+        vi.stubEnv('IO_INVALIDATION_DEBOUNCE_MS', '0');
+        vi.stubEnv('IO_CROSS_PROCESS_INVALIDATION_ENABLED', '1');
+        vi.stubEnv('IO_CROSS_PROCESS_INVALIDATION_POLL_MS', '25');
+        const runtime = createTestRuntime();
 
-        expect(result.before).toMatchObject({ hooks: 0 });
-        expect(result.before.crossProcess).toMatchObject({ initialized: false, initializationErrors: 0 });
-        expect(result.beforeComposition).toMatchObject({ hooks: 1 });
-        expect(result.beforeComposition.crossProcess).toMatchObject({ initialized: false, initializationErrors: 0 });
-        expect(result.afterComposition.crossProcess).toMatchObject({
+        const before = runtime.coherence.invalidation.snapshot();
+        runtime.coherence.read.byteLineIndex.ensureInvalidationHook();
+        const beforeComposition = runtime.coherence.invalidation.snapshot();
+        const db = new Database(':memory:');
+        runtime.database.configure(() => db);
+        runtime.coherence.invalidation.publish('/tmp/retry-after-composition.js', { source: 'retry-proof' });
+        const afterComposition = runtime.coherence.invalidation.snapshot();
+
+        expect(before).toMatchObject({ hooks: 0 });
+        expect(before.crossProcess).toMatchObject({ initialized: false, initializationErrors: 0 });
+        expect(beforeComposition).toMatchObject({ hooks: 1 });
+        expect(beforeComposition.crossProcess).toMatchObject({ initialized: false, initializationErrors: 0 });
+        expect(afterComposition.crossProcess).toMatchObject({
             initialized: true,
             initializationErrors: 0,
             published: 1,
         });
+        db.close();
     });
 
-    it('despacha localmente antes de debouncar a replicação cross-process', async () => {
-        const script = `
-            import {
-                flushIoInvalidationQueue,
-                getIoInvalidationBusStats,
-                publishIoInvalidation,
-                registerIoInvalidationHook,
-            } from ${JSON.stringify(INVALIDATION_BUS_MODULE_URL)};
-            import { resetIoInvalidationBusForTest } from ${JSON.stringify(INFRA_TESTING_MODULE_URL)};
-            const seen = [];
-            registerIoInvalidationHook((filePath, event) => seen.push({ filePath, source: event.source }));
-            publishIoInvalidation('/tmp/deferred-replication.js', { source: 'child-test' });
-            const before = getIoInvalidationBusStats();
-            flushIoInvalidationQueue();
-            const after = getIoInvalidationBusStats();
-            resetIoInvalidationBusForTest();
-            console.log(JSON.stringify({ seen, before, after }));
-        `;
-        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
-            env: {
-                ...process.env,
-                NODE_ENV: 'production',
-                VITEST: 'false',
-                IO_INVALIDATION_DEBOUNCE_MS: '1000',
-                IO_CROSS_PROCESS_INVALIDATION_ENABLED: '0',
-            },
-            timeout: 10_000,
-            maxBuffer: 1024 * 1024,
-        });
-        const result = JSON.parse(stdout.trim());
+    it('despacha localmente antes de debouncar a replicação da própria instância', () => {
+        vi.stubEnv('IO_INVALIDATION_DEBOUNCE_MS', '1000');
+        vi.stubEnv('IO_CROSS_PROCESS_INVALIDATION_ENABLED', '0');
+        const runtime = createTestRuntime();
+        /** @type {{filePath:string;source:string}[]} */
+        const seen = [];
+        runtime.coherence.invalidation.registerHook((filePath, event) => seen.push({ filePath, source: event.source }));
 
-        expect(result.seen).toEqual([{ filePath: '/tmp/deferred-replication.js', source: 'child-test' }]);
-        expect(result.before).toMatchObject({
+        runtime.coherence.invalidation.publish('/tmp/deferred-replication.js', { source: 'runtime-test' });
+        const before = runtime.coherence.invalidation.snapshot();
+        runtime.coherence.invalidation.flush();
+        const after = runtime.coherence.invalidation.snapshot();
+
+        expect(seen).toEqual([{ filePath: '/tmp/deferred-replication.js', source: 'runtime-test' }]);
+        expect(before).toMatchObject({
             localDispatches: 1,
             pending: 1,
             pendingReplications: 1,
             replicationQueued: 1,
             replicationFlushes: 0,
         });
-        expect(result.after).toMatchObject({
+        expect(after).toMatchObject({
             localDispatches: 1,
             pending: 0,
             pendingReplications: 0,

@@ -1,113 +1,85 @@
 // @ts-check
-/**
- * Orçamento advisory de I/O local.
- *
- * Mede pressão recente de operações mutáveis e builds de índice sem bloquear, atrasar ou rejeitar trabalho.
- *
- * @module copilot/infra/telemetry/advisory-budget
- */
+/** Instance-owned advisory IO pressure budget. @module copilot/infra/telemetry/advisory-budget */
 
 import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
-import { publishIoLifecycleEvent } from './publisher.js';
 
-const WINDOW_MS = readEnvPositiveInt('IO_ADVISORY_BUDGET_WINDOW_MS', 60_000);
-const MAX_OPERATIONS = readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_OPERATIONS', 120);
-const MAX_BYTES = readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_BYTES', 64 * 1024 * 1024);
-const MAX_ACTIVE = readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_ACTIVE', 12);
-const EVENT_COOLDOWN_MS = readEnvPositiveInt('IO_ADVISORY_BUDGET_EVENT_COOLDOWN_MS', 5_000);
-const MAX_SAMPLES = 10_000;
-
-/** @type {{ id: number; at: number; operation: string; estimatedBytes: number }[]} */
-let _samples = [];
-let _active = 0;
-let _nextId = 1;
-let _lastPressureEventAt = 0;
-
-/**
- * @param {number} now
- */
-function pruneSamples(now) {
-    const cutoff = now - WINDOW_MS;
-    let firstRetained = 0;
-    while ((_samples[firstRetained]?.at ?? Number.POSITIVE_INFINITY) < cutoff) firstRetained += 1;
-    if (firstRetained > 0) _samples = _samples.slice(firstRetained);
-    if (_samples.length > MAX_SAMPLES) _samples = _samples.slice(-MAX_SAMPLES);
-}
-
-/**
- * @param {number} now
- */
-function buildStats(now) {
-    pruneSamples(now);
-    const estimatedBytes = _samples.reduce((total, sample) => total + sample.estimatedBytes, 0);
-    const reasons = [];
-    if (_samples.length > MAX_OPERATIONS) reasons.push('operations');
-    if (estimatedBytes > MAX_BYTES) reasons.push('bytes');
-    if (_active > MAX_ACTIVE) reasons.push('active');
-    return {
-        windowMs: WINDOW_MS,
-        operations: _samples.length,
-        estimatedBytes,
-        active: _active,
-        pressure: reasons.length > 0,
-        reasons,
-        limits: {
-            maxOperations: MAX_OPERATIONS,
-            maxBytes: MAX_BYTES,
-            maxActive: MAX_ACTIVE,
-        },
-    };
-}
-
-/**
- * Registra uma operação no orçamento advisory.
- *
- * @param {{ operation: string; estimatedBytes?: number; nowMs?: number }} input
- * @returns {{ id: number; pressured: boolean; finish: () => void }}
- */
-export function beginIoAdvisoryBudget(input) {
-    const now = input.nowMs ?? Date.now();
-    const id = _nextId++;
-    const estimatedBytes = Math.max(0, Math.trunc(Number(input.estimatedBytes) || 0));
-    _samples.push({
-        id,
-        at: now,
-        operation: String(input.operation || 'unknown').slice(0, 80),
-        estimatedBytes,
+/** @param {NodeJS.ProcessEnv} [env] */
+export function readIoAdvisoryBudgetConfig(env = process.env) {
+    return Object.freeze({
+        windowMs: readEnvPositiveInt('IO_ADVISORY_BUDGET_WINDOW_MS', 60_000, env),
+        maxOperations: readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_OPERATIONS', 120, env),
+        maxBytes: readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_BYTES', 64 * 1024 * 1024, env),
+        maxActive: readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_ACTIVE', 12, env),
+        eventCooldownMs: readEnvPositiveInt('IO_ADVISORY_BUDGET_EVENT_COOLDOWN_MS', 5_000, env),
     });
-    _active += 1;
+}
 
-    const stats = buildStats(now);
-    if (stats.pressure && now - _lastPressureEventAt >= EVENT_COOLDOWN_MS) {
-        _lastPressureEventAt = now;
-        publishIoLifecycleEvent('budget', 'pressure', {
-            operation: String(input.operation || 'unknown').slice(0, 80),
-            ...stats,
+/** @param {{onPressure?:(operation:string,stats:ReturnType<ReturnType<typeof createIoAdvisoryBudgetRuntime>['stats']>)=>void;config?:ReturnType<typeof readIoAdvisoryBudgetConfig>}} [options] */
+export function createIoAdvisoryBudgetRuntime(options = {}) {
+    const { windowMs, maxOperations, maxBytes, maxActive, eventCooldownMs } =
+        options.config ?? readIoAdvisoryBudgetConfig();
+    const maxSamples = 10_000;
+    /** @type {{ id:number; at:number; operation:string; estimatedBytes:number }[]} */
+    let samples = [];
+    let active = 0;
+    let nextId = 1;
+    let lastPressureEventAt = 0;
+
+    /** @param {number} now */
+    function prune(now) {
+        const cutoff = now - windowMs;
+        let firstRetained = 0;
+        while ((samples[firstRetained]?.at ?? Number.POSITIVE_INFINITY) < cutoff) firstRetained += 1;
+        if (firstRetained > 0) samples = samples.slice(firstRetained);
+        if (samples.length > maxSamples) samples = samples.slice(-maxSamples);
+    }
+    /** @param {number} now */
+    function stats(now = Date.now()) {
+        prune(now);
+        const estimatedBytes = samples.reduce((total, sample) => total + sample.estimatedBytes, 0);
+        /** @type {string[]} */ const reasons = [];
+        if (samples.length > maxOperations) reasons.push('operations');
+        if (estimatedBytes > maxBytes) reasons.push('bytes');
+        if (active > maxActive) reasons.push('active');
+        return Object.freeze({
+            windowMs,
+            operations: samples.length,
+            estimatedBytes,
+            active,
+            pressure: reasons.length > 0,
+            reasons: Object.freeze(reasons),
+            limits: Object.freeze({ maxOperations, maxBytes, maxActive }),
         });
     }
-
-    let finished = false;
-    return {
-        id,
-        pressured: stats.pressure,
-        finish() {
-            if (finished) return;
-            finished = true;
-            _active = Math.max(0, _active - 1);
-        },
-    };
-}
-
-/**
- * @returns {ReturnType<typeof buildStats>}
- */
-export function getIoAdvisoryBudgetStats() {
-    return buildStats(Date.now());
-}
-
-export function resetIoAdvisoryBudgetForTest() {
-    _samples = [];
-    _active = 0;
-    _nextId = 1;
-    _lastPressureEventAt = 0;
+    /** @param {{operation:string;estimatedBytes?:number;nowMs?:number}} input */
+    function begin(input) {
+        const now = input.nowMs ?? Date.now();
+        const id = nextId++;
+        const operation = String(input.operation || 'unknown').slice(0, 80);
+        const estimatedBytes = Math.max(0, Math.trunc(Number(input.estimatedBytes) || 0));
+        samples.push({ id, at: now, operation, estimatedBytes });
+        active += 1;
+        const current = stats(now);
+        if (current.pressure && now - lastPressureEventAt >= eventCooldownMs) {
+            lastPressureEventAt = now;
+            options.onPressure?.(operation, current);
+        }
+        let finished = false;
+        return Object.freeze({
+            id,
+            pressured: current.pressure,
+            finish() {
+                if (finished) return;
+                finished = true;
+                active = Math.max(0, active - 1);
+            },
+        });
+    }
+    function reset() {
+        samples = [];
+        active = 0;
+        nextId = 1;
+        lastPressureEventAt = 0;
+    }
+    return Object.freeze({ begin, stats, reset, dispose: reset });
 }

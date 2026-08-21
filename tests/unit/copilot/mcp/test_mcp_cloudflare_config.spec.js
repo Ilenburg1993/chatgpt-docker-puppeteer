@@ -41,6 +41,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
         assert.equal(config.publicMcpUrl, DEFAULT_CLOUDFLARE_PUBLIC_URL);
         assert.equal(config.managedTunnelPidFile, 'src/copilot/.ai/cloudflare/cloudflared.pid');
         assert.equal(config.mcpHttpPidFile, 'src/copilot/.ai/cloudflare/mcp-http.pid');
+        assert.equal(config.managedTunnelLogFile, 'src/copilot/.ai/cloudflare/cloudflared.log');
+        assert.equal(config.mcpHttpLogFile, 'src/copilot/.ai/cloudflare/mcp-http.log');
         assert.equal(config.metricsAddr, '127.0.0.1:60123');
         assert.equal(config.loglevel, 'info');
         assert.deepEqual(buildQuickTunnelArgs(config), [

@@ -5,7 +5,11 @@ import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import process from 'node:process';
 import { getCanonicalMcpTools } from '../registry.js';
 import { probeHealth } from './cli-probe.js';
-import { assessCloudflaredCompatibility, readCloudflaredVersion, readPidFileStatus } from './cli-process.js';
+import {
+    assessCloudflaredCompatibility,
+    createCloudflareManagedProcessController,
+    readCloudflaredVersion,
+} from './cli-process.js';
 import {
     buildCloudflareLogReport,
     buildCloudflareMetricsReport,
@@ -36,9 +40,8 @@ import { auditCloudflarePlanCapabilities } from './plan-capabilities-audit.js';
 import { auditCloudflareRemoteTunnel } from './remote-api.js';
 import { auditCloudflareSkipPosture } from './skip-audit.js';
 import {
+    createCloudflareStateStore,
     isQuickTunnelState,
-    readConnectorSmokeState,
-    readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
 } from './state.js';
@@ -176,12 +179,15 @@ async function runDoctor({ env }) {
 /** @param {CloudflareCliContext} context */
 async function runStatus({ env }) {
     const config = readCloudflareTunnelConfig(env);
-    const quick = await readQuickTunnelState(config.stateFile);
-    const smoke = await readConnectorSmokeState(config.smokeStateFile);
+    const stateStore = createCloudflareStateStore(config);
+    const [quick, smoke] = await Promise.all([stateStore.readQuickTunnelState(), stateStore.readConnectorSmokeState()]);
     const authentication = formatChatGptConnectorAuthentication(readMcpAuthConfig(env));
-    const mcpHttp = await readPidFileStatus(config.mcpHttpPidFile);
-    const cloudflared = await readPidFileStatus(config.managedTunnelPidFile);
-    const runtime = await readRuntimeOriginSummary(config, env);
+    const processes = createCloudflareManagedProcessController(config);
+    const [mcpHttp, cloudflared, runtime] = await Promise.all([
+        processes.mcpHttp.status(),
+        processes.cloudflared.status(),
+        readRuntimeOriginSummary(config, env),
+    ]);
     await writeJsonAndSetExit({
         ok: true,
         version: CLOUDFLARE_CLI_VERSION,
@@ -192,7 +198,7 @@ async function runStatus({ env }) {
         connectorSmoke: summarizeConnectorSmokeState(smoke, config.publicMcpUrl ?? null),
         processes: { mcpHttp, cloudflared },
         runtime,
-        logs: buildCloudflareLogReport(),
+        logs: buildCloudflareLogReport(config),
         metrics: buildCloudflareMetricsReport(config),
     });
 }

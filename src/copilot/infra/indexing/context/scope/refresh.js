@@ -1,16 +1,12 @@
 // @ts-check
 /** Invalidation, delta refresh and scope shutdown lifecycle. */
 
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
-import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser';
-import { refreshIoIndexPaths } from '#copilot/infra/internal/indexing/registry';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
+import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser/cache';
 import pLimit from 'p-limit';
-import { endSessionScope, warmCacheForPaths } from '../prefetch/index.js';
+import { warmCacheForPaths } from '../prefetch/index.js';
 import { getScopeStats } from './query.js';
 import {
-    _refreshingPaths,
-    _registry,
-    _warmPromises,
     abortWarmForSession,
     isScopePathRemovalError,
     markScopeReady,
@@ -31,13 +27,14 @@ import {
  *
  * @param {string} sessionId
  * @param {string} filePath
+ * @param {import('./state.js').ScopeRuntimeState | undefined} runtime
  * @returns {void}
  */
-export function invalidateScopePath(sessionId, filePath) {
+export function invalidateScopePath(sessionId, filePath, runtime) {
     // O bus é o SSOT de coerência local: invalidar L1 publica sincronicamente para parser, todos os scopes e índice.
-    // `sessionId` permanece na API por compatibilidade/semântica do caller; o path físico é compartilhado entre sessões.
+    // `sessionId` identifica a visão lógica do caller; o path físico pode ser compartilhado entre sessões.
     void sessionId;
-    invalidateIoCoherencePath(filePath);
+    invalidateIoCoherencePath(filePath, {}, runtime?.invalidationBus ?? undefined);
 }
 
 /**
@@ -45,11 +42,13 @@ export function invalidateScopePath(sessionId, filePath) {
  * refresh integral exige que o caller forneça explicitamente os paths.
  *
  * @param {string} sessionId
- * @param {string[]} [modifiedPaths] - Paths explicitamente alterados; quando omitido usa somente invalidatedPaths.
+ * @param {string[] | undefined} modifiedPaths - Paths explicitamente alterados; quando omitido usa somente invalidatedPaths.
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {Promise<{ refreshed: number; removed: number; failed: number; skipped: number }>}
  */
-export async function refreshScope(sessionId, modifiedPaths) {
-    const scope = _registry.get(sessionId);
+export async function refreshScope(sessionId, modifiedPaths, runtime) {
+    const scope = runtime.registry.get(sessionId);
+    const refreshIndexPaths = runtime.indexRegistry?.refreshPaths ?? null;
     if (!scope) return { refreshed: 0, removed: 0, failed: 0, skipped: 0 };
     touchScope(scope);
 
@@ -69,7 +68,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
                     return;
                 }
                 const refreshKey = `${sessionId}\u0000${p}`;
-                const inProgress = _refreshingPaths.get(refreshKey);
+                const inProgress = runtime.refreshingPaths.get(refreshKey);
                 if (inProgress) {
                     await inProgress;
                     return;
@@ -77,18 +76,22 @@ export async function refreshScope(sessionId, modifiedPaths) {
                 const refreshPromise = (async () => {
                     try {
                         // Um único evento canônico limpa L1 e todo estado derivado (parser/scopes/index) no processo atual.
-                        invalidateIoCoherencePath(p);
+                        invalidateIoCoherencePath(p, {}, runtime.invalidationBus ?? undefined);
                         const warm = await warmCacheForPaths([p], {
                             concurrency: 1,
                             silent: false,
                             captureTextSnapshots: true,
                             cacheBytes: false,
+                            ...(runtime.cacheRuntime ? { cacheRuntime: runtime.cacheRuntime } : {}),
                         });
                         const snapshot = warm.snapshots?.get(p);
                         if (!snapshot) throw new Error('scope refresh snapshot unavailable');
-                        const symbols = await parseAndCacheSymbols(p, { snapshot });
-                        if (scope.indexMode !== 'off' && scope.workspaceRoot) {
-                            const indexResult = await refreshIoIndexPaths([p], {
+                        const symbols = await parseAndCacheSymbols(p, {
+                            snapshot,
+                            ...(runtime.parserCacheRuntime ? { parserCacheRuntime: runtime.parserCacheRuntime } : {}),
+                        });
+                        if (scope.indexMode !== 'off' && scope.workspaceRoot && refreshIndexPaths) {
+                            const indexResult = await refreshIndexPaths([p], {
                                 workspaceRoot: scope.workspaceRoot,
                                 snapshots: new Map([[p, snapshot]]),
                                 parsedSymbols: new Map([[p, symbols]]),
@@ -103,9 +106,9 @@ export async function refreshScope(sessionId, modifiedPaths) {
                     } catch (error) {
                         if (isScopePathRemovalError(error)) {
                             let indexFailed = false;
-                            if (scope.indexMode !== 'off' && scope.workspaceRoot) {
+                            if (scope.indexMode !== 'off' && scope.workspaceRoot && refreshIndexPaths) {
                                 try {
-                                    const indexResult = await refreshIoIndexPaths([p], {
+                                    const indexResult = await refreshIndexPaths([p], {
                                         workspaceRoot: scope.workspaceRoot,
                                     });
                                     if (Number(indexResult.failed ?? 0) > 0) {
@@ -136,7 +139,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
                         return /** @type {const} */ ('failed');
                     }
                 })();
-                _refreshingPaths.set(refreshKey, refreshPromise);
+                runtime.refreshingPaths.set(refreshKey, refreshPromise);
                 try {
                     const outcome = await refreshPromise;
                     if (outcome === 'refreshed') refreshed++;
@@ -146,7 +149,8 @@ export async function refreshScope(sessionId, modifiedPaths) {
                         failed++;
                     } else failed++;
                 } finally {
-                    if (_refreshingPaths.get(refreshKey) === refreshPromise) _refreshingPaths.delete(refreshKey);
+                    if (runtime.refreshingPaths.get(refreshKey) === refreshPromise)
+                        runtime.refreshingPaths.delete(refreshKey);
                 }
             }),
         ),
@@ -166,15 +170,15 @@ export async function refreshScope(sessionId, modifiedPaths) {
  * Encerra escopo de sessão e libera recursos.
  *
  * @param {string} sessionId
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  * @returns {ScopeStats | null}
  */
-export function closeScope(sessionId) {
-    const stats = getScopeStats(sessionId);
-    abortWarmForSession(sessionId);
-    _registry.delete(sessionId);
-    _warmPromises.delete(sessionId);
-    // Tenta encerrar escopo de prefetch também (best-effort)
-    endSessionScope(sessionId);
-    releaseScopeInvalidationHookIfIdle();
+export function closeScope(sessionId, runtime) {
+    const stats = getScopeStats(sessionId, runtime);
+    abortWarmForSession(sessionId, runtime);
+    runtime.registry.delete(sessionId);
+    runtime.warmPromises.delete(sessionId);
+    runtime.prefetchSessions.end(sessionId);
+    releaseScopeInvalidationHookIfIdle(runtime);
     return stats;
 }

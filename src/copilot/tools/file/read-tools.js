@@ -1,7 +1,5 @@
 // @ts-check
 import { toError, withIoMeta } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
@@ -21,15 +19,14 @@ import {
     FILE_TOOLS_OUTPUT_POLICY,
     truncateUtf8Text,
     validatePath,
-    WORKSPACE_ROOT,
+    WORKSPACE_INDEXING,
+    WORKSPACE_IO,
 } from './shared.js';
 
-const { diffText, diffTextValidated, statPath, statPathValidated } = createWorkspaceIo({
-    workspaceRoot: WORKSPACE_ROOT,
-});
-const { scanDirectory, scanDirectoryValidated } = createWorkspaceIndexing({ workspaceRoot: WORKSPACE_ROOT });
+const { diffText, diffTextValidated, statPath, statPathValidated } = WORKSPACE_IO;
+const { scanDirectory, scanDirectoryValidated } = WORKSPACE_INDEXING;
 
-/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} target @param {Parameters<typeof scanDirectory>[1]}
+/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} target @param {Parameters<typeof scanDirectory>[1]}
   options */
 function scanValidatedOrString(target, options) {
     return target.validatedReadPath
@@ -37,14 +34,14 @@ function scanValidatedOrString(target, options) {
         : scanDirectory(target.resolved, options);
 }
 
-/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} pathA @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} pathB @param {Parameters<typeof diffText>[2]} options */
+/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} pathA @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} pathB @param {Parameters<typeof diffText>[2]} options */
 function diffValidatedPairOrString(pathA, pathB, options) {
     return pathA.validatedReadPath && pathB.validatedReadPath
         ? diffTextValidated(pathA.validatedReadPath, pathB.validatedReadPath, options)
         : diffText(pathA.resolved, pathB.resolved, options);
 }
 
-/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} target */
+/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} target */
 function statValidatedOrString(target) {
     return target.validatedReadPath ? statPathValidated(target.validatedReadPath) : statPath(target.resolved);
 }

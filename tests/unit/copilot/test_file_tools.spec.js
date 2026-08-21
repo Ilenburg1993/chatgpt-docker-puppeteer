@@ -329,7 +329,7 @@ describe('write_file_content', () => {
             content: 'algo',
         });
         assert.equal(result.success, false);
-        assert.ok(result.error?.includes('não encontrado') || result.error?.includes('create_file'));
+        assert.match(String(result.error), /não encontrado|create_file|ENOENT|no such file/iu);
     });
 
     it('retorna success=false para path fora do workspace', async () => {

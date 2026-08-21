@@ -14,11 +14,13 @@
  * @see EventBus
  */
 
-import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
+
+const TERMINAL_ATTACH_WORKSPACE = getApplicationWorkspaceInfra(process.cwd());
 
 /**
  * @param {number} count
@@ -147,7 +149,7 @@ export async function cmdAttach({ println }, arg) {
     // Adicionar arquivo
     const filePath = trimmed;
     try {
-        const info = (await statPathTrusted(filePath, { caller: 'terminal.commands.attach' })).stats;
+        const info = (await TERMINAL_ATTACH_WORKSPACE.readIo.statPath(filePath)).stats;
         if (info.size > MAX_EMBED_BYTES) {
             println(
                 terminalThemeRow(

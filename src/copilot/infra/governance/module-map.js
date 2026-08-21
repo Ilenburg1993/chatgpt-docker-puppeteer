@@ -3,28 +3,22 @@
  * Query surface for infra architecture metadata.
  *
  * The semantic source of truth lives in `architecture-manifest.js`. This module intentionally contains no
- * second hand-maintained topology; it only exposes the historical query API and compares the manifest with the real
+ * second hand-maintained topology; it exposes architecture queries and compares the manifest with the real
  * top-level filesystem when a scorecard is requested.
  *
  * @module copilot/infra/governance/module-map
  */
 
 import { readdirSync } from 'node:fs';
-import {
-    INFRA_ARCHITECTURE_MANIFEST,
-    INFRA_LEGACY_ROOT_PATHS,
-    INFRA_PRIMARY_CAPABILITY_PATHS,
-} from './architecture-manifest.js';
+import { INFRA_ARCHITECTURE_MANIFEST, INFRA_PRIMARY_CAPABILITY_PATHS } from './architecture-manifest.js';
 
 /** @typedef {import('./architecture-manifest.js').InfraModuleDescriptor} InfraModuleDescriptor */
 /** @typedef {InfraModuleDescriptor['role']} InfraModuleRole */
 /** @typedef {InfraModuleDescriptor['risk']} InfraModuleRisk */
 
-/**
- * Historical export retained for callers/tests. It now aliases the architecture manifest rather than duplicating it.
- */
+/** Canonical query view over the architecture manifest. */
 export const INFRA_MODULE_LAYOUT = INFRA_ARCHITECTURE_MANIFEST;
-export { INFRA_LEGACY_ROOT_PATHS, INFRA_PRIMARY_CAPABILITY_PATHS };
+export { INFRA_PRIMARY_CAPABILITY_PATHS };
 
 /**
  * @template T
@@ -77,7 +71,6 @@ export function getInfraModuleDescriptor(path) {
  *     publicEntries: string[];
  *     hotspots: string[];
  *     primaryCapabilities: readonly string[];
- *     legacyRoots: readonly string[];
  *     drift: {
  *         available: boolean;
  *         missingInLayout: string[];
@@ -125,7 +118,6 @@ export function buildInfraModuleScorecard() {
         publicEntries,
         hotspots,
         primaryCapabilities: INFRA_PRIMARY_CAPABILITY_PATHS,
-        legacyRoots: INFRA_LEGACY_ROOT_PATHS,
         drift,
     };
 }

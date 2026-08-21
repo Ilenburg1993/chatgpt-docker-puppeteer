@@ -1,13 +1,14 @@
 // @ts-check
 /** @module copilot/infra/concurrency/locks/file */
 
-export { acquireLock, releaseLock, releaseLockAsync } from './legacy.js';
 export {
+    getFileResourceLockConfigurationError,
     getFileResourceLockDir,
     getFileResourceLockPath,
     getFileResourceLockProfile,
     hashFileResourceLockKey,
-    isFileResourceLockEnabledByEnv,
+    isFileResourceLockEnabled,
+    readFileResourceLockPolicy,
     shouldAcquireFileResourceLock,
 } from './policy.js';
 export { acquireFileResourceLock } from './resource-lock.js';

@@ -8,8 +8,8 @@
  * @module copilot/config/system-prompt/status
  */
 
-import { readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadLiveSystemPromptSections } from './live-loader.js';
@@ -17,7 +17,13 @@ import { readSystemPromptModeState } from './mode.js';
 import { buildSystemPromptProfile } from './profile.js';
 import { getSystemPromptSdkCompatibility } from './sdk-introspection.js';
 import { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } from './sections-registry.js';
-import { readResolvedSystemPromptUserConfig, readResolvedSystemPromptUserConfigSync } from './user-config.js';
+import {
+    readBoundSystemPromptAppendFileStatuses,
+    readResolvedSystemPromptUserConfig,
+    readResolvedSystemPromptUserConfigSync,
+    readUserAppendContent,
+    readUserAppendContentSync,
+} from './user-config.js';
 
 /**
  * @typedef {import('../sdk-config-port.js').SectionOverrideAction} SectionOverrideAction
@@ -79,9 +85,21 @@ import { readResolvedSystemPromptUserConfig, readResolvedSystemPromptUserConfigS
  * }} SystemPromptStatus
  */
 
-/** Snapshot caches hydrated only by async status reads; sync status is a pure in-memory projection. */
+/** Snapshot cache hydrated only by async status reads; sync status is a pure in-memory projection. */
 const trackedFileStatusSnapshots = new Map();
-const trackedAppendTextSnapshots = new Map();
+
+const SYSTEM_PROMPT_SECTION_PATHS = Object.values(SYSTEM_PROMPT_SECTION_FILES).map((fileName) =>
+    fileURLToPath(new URL(`./sections/${fileName}`, import.meta.url)),
+);
+const SYSTEM_PROMPT_SECTION_STATUS_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'config.system-prompt.status.sections',
+        exactPaths: SYSTEM_PROMPT_SECTION_PATHS,
+        operations: ['stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 /**
  * @param {string} fileName
@@ -127,47 +145,13 @@ function readTrackedFileStatusSync(path) {
 async function readTrackedFileStatus(path) {
     let snapshot;
     try {
-        const info = (await statPathTrusted(path, { caller: 'config.system-prompt.status' })).stats;
+        const info = (await SYSTEM_PROMPT_SECTION_STATUS_IO.statPath(path)).stats;
         snapshot = { path, exists: true, bytes: info.size, mtimeMs: info.mtimeMs };
     } catch {
         snapshot = { path, exists: false, bytes: null, mtimeMs: null };
     }
     trackedFileStatusSnapshots.set(path, snapshot);
     return { ...snapshot };
-}
-
-/**
- * @param {string[]} filePaths
- * @returns {string}
- */
-function readUserAppendContentSyncByPaths(filePaths) {
-    return filePaths
-        .map((filePath) => trackedAppendTextSnapshots.get(filePath) ?? '')
-        .map((content) => content.trim())
-        .filter(Boolean)
-        .join('\n\n');
-}
-
-/**
- * @param {string[]} filePaths
- * @returns {Promise<string>}
- */
-async function readUserAppendContentByPaths(filePaths) {
-    /** @type {string[]} */
-    const parts = [];
-    for (const filePath of filePaths) {
-        try {
-            const content = (
-                await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.status' })
-            ).content.trim();
-            trackedAppendTextSnapshots.set(filePath, content);
-            if (content) parts.push(content);
-        } catch {
-            trackedAppendTextSnapshots.delete(filePath);
-            // silencioso por design
-        }
-    }
-    return parts.join('\n\n');
 }
 
 /**
@@ -312,9 +296,7 @@ export function readSystemPromptStatusSync() {
     const modeState = readSystemPromptModeState();
     const sdkCompatibility = getSystemPromptSdkCompatibility();
     const appendFiles = userConfig.appendFiles.map((filePath) => readTrackedFileStatusSync(filePath));
-    const userAppendContent = [readUserAppendContentSyncByPaths(userConfig.appendFiles), userConfig.appendText]
-        .filter(Boolean)
-        .join('\n\n');
+    const userAppendContent = readUserAppendContentSync(userConfig);
     const sectionStatuses = SYSTEM_PROMPT_SECTION_ORDER.map((sectionId) => {
         const { fileName, section } = resolveSectionRegistryEntry(sectionId);
         const file = readTrackedFileStatusSync(resolveSectionFilePath(fileName));
@@ -346,9 +328,10 @@ export async function readSystemPromptStatus() {
     const sdkCompatibility = getSystemPromptSdkCompatibility();
     const [sections, appendFiles, userAppendContent] = await Promise.all([
         loadLiveSystemPromptSections(),
-        Promise.all(userConfig.appendFiles.map((filePath) => readTrackedFileStatus(filePath))),
-        readUserAppendContentByPaths(userConfig.appendFiles),
+        readBoundSystemPromptAppendFileStatuses(userConfig),
+        readUserAppendContent(userConfig),
     ]);
+    for (const file of appendFiles) trackedFileStatusSnapshots.set(file.path, file);
     const sectionStatuses = await Promise.all(
         SYSTEM_PROMPT_SECTION_ORDER.map(async (sectionId) => {
             const { fileName, section } = resolveSectionRegistryEntry(sectionId);

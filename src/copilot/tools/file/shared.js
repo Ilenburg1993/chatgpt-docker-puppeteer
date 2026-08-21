@@ -1,11 +1,11 @@
 // @ts-check
-import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
-import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
 import {
-    createValidatedMutableWorkspacePath,
-    createValidatedReadWorkspacePath,
-} from '#copilot/infra/public/filesystem/workspace';
-import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
+    WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT,
+    getApplicationInfraRuntime,
+    getApplicationWorkspaceInfra,
+} from '#copilot/boot';
+import { DEFAULT_BLOCKED_READ_PATH_PATTERNS } from '#copilot/core';
+import { hasNullByte } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../infra/logger.js';
@@ -24,12 +24,24 @@ import {
     concatBufferViews,
     truncateBufferView,
     truncateUtf8String,
-} from '#copilot/infra/public/platform';
+} from '#copilot/infra/public/platform/buffer';
 
 export const execFileAsync = promisify(execFile);
 
 /** Raiz canonica do workspace definida pelo boot. */
 export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
+
+/** Canonical path authority shared by all file-tool fast paths in this workspace. */
+export const WORKSPACE_INFRA = getApplicationWorkspaceInfra(WORKSPACE_ROOT);
+export const WORKSPACE_PATH_AUTHORITY = WORKSPACE_INFRA.authority;
+/** Workspace-bound IO facade composed once for all file tools. */
+export const WORKSPACE_IO = WORKSPACE_INFRA.io;
+/** Workspace-bound indexing facade composed once for all file tools. */
+export const WORKSPACE_INDEXING = WORKSPACE_INFRA.indexing;
+/** Runtime-owned mutation audit used by all file-tool mutation envelopes. */
+export const WORKSPACE_MUTATION_AUDIT = getApplicationInfraRuntime().mutationAudit;
+/** Immutable rollback policy captured by the canonical application InfraRuntime. */
+export const WORKSPACE_ROLLBACK_POLICY = getApplicationInfraRuntime().config.rollback;
 
 const FILE_TOOL_LIMIT_ENV_KEYS = /** @type {const} */ ({
     maxContentBytes: 'COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES',
@@ -140,6 +152,9 @@ export const BLOCKED_PATTERNS_SECRETS = [
 /**
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
  *
+ * Reusable capabilities are issued only by the canonical WorkspacePathAuthority. Callers never receive or invoke a raw
+ * capability constructor.
+ *
  * @param {string} filePath - Caminho absoluto ou relativo
  * @param {{ mode?: 'read' | 'write'; issueReadCapability?: boolean; issueMutableCapability?: boolean }} [opts] - Modo
  *   de operação; capabilities exigem opt-in explícito.
@@ -147,8 +162,8 @@ export const BLOCKED_PATTERNS_SECRETS = [
  *     ok: boolean;
  *     reason?: string;
  *     resolved: string;
- *     validatedReadPath?: ReturnType<typeof createValidatedReadWorkspacePath>;
- *     validatedWritePath?: ReturnType<typeof createValidatedMutableWorkspacePath>;
+ *     validatedReadPath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath;
+ *     validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath;
  * }>}
  */
 export async function validatePath(filePath, opts) {
@@ -160,38 +175,24 @@ export async function validatePath(filePath, opts) {
     }
 
     const mode = opts?.mode ?? 'write';
-    const normalizedWorkspaceRoot = normalizeWorkspaceRoot(WORKSPACE_ROOT);
-    const policy = await evaluateIoPathPolicyAsync(filePath, {
-        workspaceRoot: normalizedWorkspaceRoot,
-        mode,
-    });
-    if (!policy.ok) {
+    try {
+        if (mode === 'read' && opts?.issueReadCapability === true) {
+            const validatedReadPath = await WORKSPACE_PATH_AUTHORITY.authorizeRead(filePath, 'read');
+            return { ok: true, resolved: validatedReadPath.realPath, validatedReadPath };
+        }
+        if (mode !== 'read' && opts?.issueMutableCapability === true) {
+            const validatedWritePath = await WORKSPACE_PATH_AUTHORITY.authorizeMutation(filePath, 'write');
+            return { ok: true, resolved: validatedWritePath.realPath, validatedWritePath };
+        }
+        return { ok: true, resolved: await WORKSPACE_PATH_AUTHORITY.resolvePath(filePath, mode) };
+    } catch (error) {
+        const policyError = /** @type {Error & { policyReason?: string }} */ (error);
         return {
             ok: false,
-            reason: `Acesso negado: ${policy.reason}`,
+            reason: `Acesso negado: ${policyError.policyReason ?? policyError.message}`,
             resolved: '',
         };
     }
-
-    return {
-        ok: true,
-        resolved: policy.realPath,
-        ...(mode === 'read' && opts?.issueReadCapability === true
-            ? {
-                  validatedReadPath: createValidatedReadWorkspacePath({
-                      realPath: policy.realPath,
-                      workspaceRoot: policy.workspaceRoot,
-                  }),
-              }
-            : mode !== 'read' && opts?.issueMutableCapability === true
-              ? {
-                    validatedWritePath: createValidatedMutableWorkspacePath({
-                        realPath: policy.realPath,
-                        workspaceRoot: policy.workspaceRoot,
-                    }),
-                }
-              : {}),
-    };
 }
 
 // ---------------------------------------------------------------------------

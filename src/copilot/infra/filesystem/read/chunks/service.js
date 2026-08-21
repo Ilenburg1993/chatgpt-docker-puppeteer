@@ -3,7 +3,12 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { readTextLineChunks, readTextLineChunksStream } from './lines.js';
 
 /**
@@ -19,6 +24,7 @@ import { readTextLineChunks, readTextLineChunksStream } from './lines.js';
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
  *     advisoryLimits?: Record<string, unknown>;
+ *     readRuntime?: NonNullable<NonNullable<Parameters<typeof readTextLineChunks>[1]>['readRuntime']>;
  * }} [options]
  */
 export async function readTextChunks(filePath, options = {}) {
@@ -48,6 +54,8 @@ export async function readTextChunks(filePath, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return {
             path: filePath,
@@ -90,6 +98,7 @@ export async function readTextChunks(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -107,6 +116,7 @@ export async function readTextChunks(filePath, options = {}) {
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
  *     advisoryLimits?: Record<string, unknown>;
+ *     readRuntime?: NonNullable<NonNullable<Parameters<typeof readTextLineChunksStream>[1]>['readRuntime']>;
  * }} [options]
  * @returns {ReadableStream<import('./types.js').TextLineChunk>}
  */

@@ -6,9 +6,9 @@ import { scanDirectory } from '#copilot/infra/internal/indexing/scanner';
 import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import pLimit from 'p-limit';
-import { DEFAULT_INDEX_EXTENSIONS } from './content.js';
+import { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';
 import { createIoIndexFileReconciler } from './file-reconciler.js';
-import { flattenScanEntries, normalizeIndexExtensions, normalizeIndexPath, shouldIndexFile } from './paths.js';
+import { flattenScanEntries, normalizeIndexExtensions, normalizeIndexPath, shouldIndexFile } from './path/index.js';
 
 const DEFAULT_INDEX_BUILD_MAX_FILES = readEnvPositiveInt('IO_INDEX_BUILD_MAX_FILES', 10_000);
 

@@ -1,6 +1,6 @@
 // @ts-check
 /** Symbol materialization stage for a selected scope working set. */
-import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser';
+import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser/cache';
 import { isSymbolParseTarget, recordScopeFailure, setScopeSymbols } from './state.js';
 
 /** @typedef {import('./types.js')._InternalScope} _InternalScope */
@@ -9,7 +9,7 @@ import { isSymbolParseTarget, recordScopeFailure, setScopeSymbols } from './stat
  * @param {_InternalScope} scope
  * @param {readonly string[]} resolvedPaths
  * @param {ReadonlyMap<string, import('#copilot/infra/internal/filesystem/read').TextFileSnapshot>} warmSnapshots
- * @param {{ parseSymbols: boolean; silent: boolean; signal: AbortSignal }} options
+ * @param {{ parseSymbols: boolean; silent: boolean; signal: AbortSignal; parserCacheRuntime?: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime> }} options
  */
 export async function materializeScopeSymbols(scope, resolvedPaths, warmSnapshots, options) {
     if (!options.parseSymbols || resolvedPaths.length === 0) return;
@@ -25,6 +25,7 @@ export async function materializeScopeSymbols(scope, resolvedPaths, warmSnapshot
                 const symbols = await parseAndCacheSymbols(filePath, {
                     ...(snapshot ? { snapshot } : {}),
                     signal: options.signal,
+                    ...(options.parserCacheRuntime ? { parserCacheRuntime: options.parserCacheRuntime } : {}),
                 });
                 setScopeSymbols(scope, filePath, symbols);
             } catch (error) {

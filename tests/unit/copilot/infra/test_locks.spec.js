@@ -11,26 +11,17 @@ import {
     acquireFileResourceLock,
     acquireIoResourceLock,
     acquireIoResourceLocks,
-    acquireLock,
     getFileResourceLockProfile,
     getIoLockStats,
     hashFileResourceLockKey,
-    releaseLock,
-    releaseLockAsync,
+    readFileResourceLockPolicy,
     shouldAcquireFileResourceLock,
     withIoResourceLock,
 } from '#copilot/infra/internal/concurrency/locks';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
-const ORIGINAL_FILE_LOCK_PROFILE = process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
-
 afterEach(async () => {
-    if (ORIGINAL_FILE_LOCK_PROFILE === undefined) {
-        delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
-    } else {
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = ORIGINAL_FILE_LOCK_PROFILE;
-    }
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -74,14 +65,19 @@ describe('infra locks', () => {
         expect(acquired).toBe(true);
     });
 
-    it('acquireLock é atomico para concorrência no mesmo lockfile', async () => {
+    it('acquireFileResourceLock é atômico para concorrência no mesmo lockfile', async () => {
         const dir = await createTempDir();
         const lockPath = join(dir, 'agent.lock');
-
-        const results = await Promise.all([acquireLock(lockPath), acquireLock(lockPath)]);
-
-        expect(results.filter(Boolean)).toHaveLength(1);
-        releaseLock(lockPath);
+        const attempts = await Promise.allSettled([
+            acquireFileResourceLock(lockPath, { lockPath, timeoutMs: 0 }),
+            acquireFileResourceLock(lockPath, { lockPath, timeoutMs: 0 }),
+        ]);
+        const acquired = attempts.filter((result) => result.status === 'fulfilled');
+        const rejected = attempts.filter((result) => result.status === 'rejected');
+        expect(acquired).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        if (rejected[0]?.status === 'rejected') expect(rejected[0].reason).toMatchObject({ code: 'ETIMEDOUT' });
+        if (acquired[0]?.status === 'fulfilled') await acquired[0].value.release();
         expect(existsSync(lockPath)).toBe(false);
     });
 
@@ -100,53 +96,73 @@ describe('infra locks', () => {
         expect(locked.value.waitMs).toBe(0);
     });
 
-    it('releaseLock não remove lock de outro processo', async () => {
+    it('lease canônico não toma nem remove lock estrangeiro ativo', async () => {
         const dir = await createTempDir();
         const lockPath = join(dir, 'foreign.lock');
-        writeFileSync(lockPath, JSON.stringify({ pid: 1, createdAt: Date.now() }), 'utf8');
+        writeFileSync(
+            lockPath,
+            JSON.stringify({
+                schemaVersion: 1,
+                token: 'foreign-token',
+                pid: process.pid,
+                hostname: 'foreign-host',
+                resourceKey: lockPath,
+                resourceHash: hashFileResourceLockKey(lockPath),
+                operation: 'foreign',
+                target: lockPath,
+                startedAt: new Date().toISOString(),
+                startedAtMs: Date.now(),
+            }),
+            'utf8',
+        );
 
-        releaseLock(lockPath);
-
+        await expect(
+            acquireFileResourceLock(lockPath, { lockPath, timeoutMs: 0, staleMs: 60_000 }),
+        ).rejects.toMatchObject({
+            code: 'ETIMEDOUT',
+        });
         expect(existsSync(lockPath)).toBe(true);
     });
 
-    it('releaseLockAsync remove lock do processo atual', async () => {
+    it('lease.release remove lock pertencente ao processo atual', async () => {
         const dir = await createTempDir();
         const lockPath = join(dir, 'async.lock');
-
-        const acquired = await acquireLock(lockPath);
-        expect(acquired).toBe(true);
+        const lease = await acquireFileResourceLock(lockPath, { lockPath });
         expect(existsSync(lockPath)).toBe(true);
-
-        await releaseLockAsync(lockPath);
+        await lease.release();
         expect(existsSync(lockPath)).toBe(false);
     });
 
-    it('acquireLock usa metadata do L1 canônico no path legado', async () => {
+    it('acquireFileResourceLock persiste metadata do protocolo canônico', async () => {
         const dir = await createTempDir();
         const lockPath = join(dir, 'canonical.lock');
-
-        expect(await acquireLock(lockPath)).toBe(true);
+        const lease = await acquireFileResourceLock(lockPath, {
+            lockPath,
+            target: lockPath,
+            operation: 'unit-canonical',
+        });
         const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
         expect(metadata).toMatchObject({
             schemaVersion: 1,
             pid: process.pid,
             resourceKey: lockPath,
             target: lockPath,
+            operation: 'unit-canonical',
         });
-        expect(metadata.token).toEqual(expect.any(String));
-
-        await releaseLockAsync(lockPath);
+        expect(metadata.token).toBe(lease.token);
+        await lease.release();
     });
 
-    it('acquireLock recusa lock path simbólico', async () => {
+    it('acquireFileResourceLock recusa lock path simbólico', async () => {
         const dir = await createTempDir();
         const target = join(dir, 'target.lock');
         const lockPath = join(dir, 'symlink.lock');
         await writeFile(target, '{}', 'utf8');
         await symlink(target, lockPath);
 
-        await expect(acquireLock(lockPath)).rejects.toMatchObject({ code: 'ERR_LOCKFILE_SYMLINK' });
+        await expect(acquireFileResourceLock(lockPath, { lockPath })).rejects.toMatchObject({
+            code: 'ERR_LOCKFILE_SYMLINK',
+        });
         expect(existsSync(target)).toBe(true);
     });
 
@@ -303,48 +319,30 @@ describe('infra locks', () => {
         expect(getIoLockStats().fileLocks.aborts).toBe(before.fileLocks.aborts + 1);
     });
 
-    it('resolve perfis L1 por risco preservando booleano legado como all', () => {
-        delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
-        expect(getFileResourceLockProfile()).toBe('off');
-        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' })).toBe(false);
+    it('resolve perfis processuais por risco a partir de snapshots explícitos', () => {
+        const off = readFileResourceLockPolicy({}, '/workspace');
+        expect(off.profile).toBe('off');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' }, off)).toBe(false);
 
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'high-risk';
-        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' })).toBe(false);
-        expect(shouldAcquireFileResourceLock({ riskClass: 'high' })).toBe(true);
-        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' })).toBe(true);
+        const highRisk = readFileResourceLockPolicy({ COPILOT_IO_FILE_LOCKS_ENABLED: 'high-risk' }, '/workspace');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' }, highRisk)).toBe(false);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'high' }, highRisk)).toBe(true);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' }, highRisk)).toBe(true);
 
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'mutations';
-        expect(shouldAcquireFileResourceLock({ riskClass: 'low' })).toBe(false);
-        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' })).toBe(true);
+        const mutations = readFileResourceLockPolicy({ COPILOT_IO_FILE_LOCKS_ENABLED: 'mutations' }, '/workspace');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'low' }, mutations)).toBe(false);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' }, mutations)).toBe(true);
 
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
-        expect(getFileResourceLockProfile()).toBe('all');
-        expect(shouldAcquireFileResourceLock({ riskClass: 'low' })).toBe(true);
-        expect(shouldAcquireFileResourceLock()).toBe(true);
+        const all = readFileResourceLockPolicy({ COPILOT_IO_FILE_LOCKS_ENABLED: '1' }, '/workspace');
+        expect(all.profile).toBe('all');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'low' }, all)).toBe(true);
+        expect(shouldAcquireFileResourceLock({}, all)).toBe(true);
+        expect(Object.isFrozen(all)).toBe(true);
     });
 
-    it('aplica high-risk no lock composto e mantém override explícito', async () => {
+    it('mantém override explícito de file lock independente do default processual', async () => {
         const dir = await createTempDir();
         const lockDir = join(dir, '.profile-locks');
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'high-risk';
-
-        const medium = await acquireIoResourceLock(join(dir, 'medium.txt'), {
-            fileLockDir: lockDir,
-            operation: 'profile-medium',
-            riskClass: 'medium',
-        });
-        expect(medium.fileLockEnabled).toBe(false);
-        await medium.releaseAsync();
-
-        const high = await acquireIoResourceLock(join(dir, 'high.txt'), {
-            fileLockDir: lockDir,
-            operation: 'profile-high',
-            riskClass: 'high',
-        });
-        expect(high.fileLockEnabled).toBe(true);
-        await high.releaseAsync();
-
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'off';
         const forced = await acquireIoResourceLock(join(dir, 'forced.txt'), {
             fileLock: true,
             fileLockDir: lockDir,
@@ -355,15 +353,14 @@ describe('infra locks', () => {
         await forced.releaseAsync();
     });
 
-    it('rejeita perfil L1 desconhecido e mantém health configurável', () => {
-        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'surprise';
-        expect(() => getFileResourceLockProfile()).toThrow(
+    it('rejeita perfil processual desconhecido no resolver puro', () => {
+        expect(() => readFileResourceLockPolicy({ COPILOT_IO_FILE_LOCKS_ENABLED: 'surprise' }, '/workspace')).toThrow(
             expect.objectContaining({ code: 'ERR_IO_FILE_LOCK_PROFILE' }),
         );
         expect(getIoLockStats().fileLocks).toMatchObject({
-            enabledByEnv: false,
-            profile: 'off',
-            configurationValid: false,
+            processDefaultEnabled: getFileResourceLockProfile() !== 'off',
+            profile: getFileResourceLockProfile(),
+            configurationValid: true,
         });
     });
 });

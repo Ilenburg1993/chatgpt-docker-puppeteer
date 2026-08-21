@@ -8,19 +8,15 @@
  * @module copilot/terminal/commands/scope
  */
 
-import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
-import {
-    closeScope,
-    declareScope,
-    findSymbol,
-    getScopeContext,
-    getScopeStats,
-    listScopes,
-    refreshScope,
-} from '#copilot/infra/public/indexing/context';
+import { getApplicationWorkspaceInfra } from '#copilot/boot';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
+
+const TERMINAL_SCOPE_WORKSPACE = getApplicationWorkspaceInfra(process.cwd());
+const TERMINAL_SCOPE_CONTEXT = TERMINAL_SCOPE_WORKSPACE.indexing.context;
+const { closeScope, declareScope, findSymbol, getScopeContext, getScopeStats, listScopes, refreshScope } =
+    TERMINAL_SCOPE_CONTEXT;
 
 /**
  * @typedef {{ println: (text: string) => void; hubSessionId?: string | null }} ScopeCommandContext
@@ -217,7 +213,7 @@ function parseScopeArgs(parts) {
 async function looksLikeExistingPath(value) {
     if (!value) return false;
     try {
-        await statPathTrusted(value, { caller: 'terminal.commands.scope' });
+        await TERMINAL_SCOPE_WORKSPACE.readIo.statPath(value);
         return true;
     } catch {
         return value.includes('/') || value.includes('\\') || value.startsWith('.') || value.startsWith('~');
@@ -259,7 +255,7 @@ async function resolveDeclareTarget(ctx, args) {
 
 /**
  * @param {ScopeCommandContext} ctx
- * @param {import('#copilot/infra/public/indexing/context').ScopeStats | null} stats
+ * @param {import('#copilot/infra/public/composition/workspace/indexing').ScopeStats | null} stats
  * @returns {void}
  */
 function printScopeStats(ctx, stats) {
@@ -294,14 +290,20 @@ function printScopeStats(ctx, stats) {
 async function runDeclare(ctx, parts) {
     const args = parseScopeArgs(parts);
     const target = await resolveDeclareTarget(ctx, args);
-    /** @type {import('#copilot/infra/public/indexing/context').ScopeDeclareOptions} */
+    /** @type {import('#copilot/infra/public/composition/workspace/indexing').ScopeDeclareOptions} */
     const scopeOptions = {
         sessionId: target.sessionId,
         recursive: args.recursive,
         parseSymbols: args.parseSymbols,
     };
-    if (target.paths.length > 0) scopeOptions.paths = target.paths;
-    if (target.directory !== undefined) scopeOptions.directory = target.directory;
+    if (target.paths.length > 0) {
+        scopeOptions.paths = await Promise.all(
+            target.paths.map((filePath) => TERMINAL_SCOPE_WORKSPACE.authority.resolvePath(filePath, 'read')),
+        );
+    }
+    if (target.directory !== undefined) {
+        scopeOptions.directory = await TERMINAL_SCOPE_WORKSPACE.authority.resolvePath(target.directory, 'scan');
+    }
     if (args.extensions.length > 0) scopeOptions.extensions = args.extensions;
     if (args.include.length > 0) scopeOptions.include = args.include;
     if (args.exclude.length > 0) scopeOptions.exclude = args.exclude;
@@ -430,7 +432,12 @@ function runFind(ctx, parts) {
 async function runRefresh(ctx, parts) {
     const args = parseScopeArgs(parts);
     const sessionId = args.sessionId ?? args.rest.shift() ?? ctx.hubSessionId ?? 'terminal-live';
-    const modifiedPaths = args.rest.length > 0 ? args.rest : undefined;
+    const modifiedPaths =
+        args.rest.length > 0
+            ? await Promise.all(
+                  args.rest.map((filePath) => TERMINAL_SCOPE_WORKSPACE.authority.resolvePath(filePath, 'read')),
+              )
+            : undefined;
     const result = await refreshScope(sessionId, modifiedPaths);
     ctx.println('');
     ctx.println(

@@ -5,11 +5,52 @@ import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { buildInfraModuleScorecard, INFRA_MODULE_LAYOUT } from '#copilot/infra/internal/governance';
+import {
+    buildInfraModuleScorecard,
+    buildInfraMutableStateReport,
+    buildInfraPublicApiCostReport,
+    INFRA_MODULE_LAYOUT,
+    INFRA_PUBLIC_API_MANIFEST,
+    listMutableModuleBindings,
+} from '#copilot/infra/internal/governance';
 
 const REPO_ROOT = process.cwd();
 const INFRA_ROOT = resolve(REPO_ROOT, 'src/copilot/infra');
 const PACKAGE_JSON = resolve(REPO_ROOT, 'package.json');
+
+// Ambient environment access is architectural authority. Runtime-owned configuration is captured by composition;
+// only explicit config resolvers/factories and genuinely process-scoped bootstrap capabilities may touch process.env.
+const INFRA_ENV_TOUCHPOINTS = Object.freeze([
+    'cache/l2/config.js',
+    'cache/memory/runtime/service.js',
+    'composition/runtime/service.js',
+    'concurrency/locks/file/policy.js',
+    'filesystem/invalidation/bus/bus-runtime.js',
+    'filesystem/invalidation/cross-process/config.js',
+    'filesystem/invalidation/external-watch/config.js',
+    'filesystem/read/cache/line-offset-runtime.js',
+    'filesystem/read/line-index/policy.js',
+    'filesystem/read/runtime/service.js',
+    'indexing/parser/cache/runtime/service.js',
+    'indexing/parser/foundation/config.js',
+    'indexing/registry/instance/service.js',
+    'platform/env.js',
+    'platform/node/compile-cache.js',
+    'telemetry/advisory-budget.js',
+]);
+
+const INFRA_DIRECT_ENV_BOOTSTRAP_TOUCHPOINTS = Object.freeze([
+    'composition/runtime/service.js',
+    'concurrency/locks/file/policy.js',
+    'filesystem/invalidation/bus/bus-runtime.js',
+    'indexing/parser/foundation/config.js',
+    'platform/node/compile-cache.js',
+]);
+
+/** Remove comments before architecture-text checks so documentation cannot create false ambient-authority positives. */
+function stripJavaScriptComments(source) {
+    return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/.*$/gmu, '$1');
+}
 
 /** @param {string} directory @returns {string[]} */
 function listJavaScriptFiles(directory) {
@@ -168,16 +209,26 @@ describe('infra barrel governance', () => {
         ).toBe(true);
         expect(publicAliases.map(([key]) => key)).toEqual(
             expect.arrayContaining([
-                '#copilot/infra/public/platform',
+                '#copilot/infra/public/platform/buffer',
+                '#copilot/infra/public/platform/http-response',
+                '#copilot/infra/public/platform/process-output',
                 '#copilot/infra/public/concurrency/locks',
+                '#copilot/infra/public/filesystem/invalidation/replay',
                 '#copilot/infra/public/filesystem/read',
                 '#copilot/infra/public/filesystem/write',
-                '#copilot/infra/public/filesystem/workspace',
-                '#copilot/infra/public/filesystem/trusted',
-                '#copilot/infra/public/database',
-                '#copilot/infra/public/cache',
-                '#copilot/infra/public/code-analysis',
-                '#copilot/infra/public/indexing',
+                '#copilot/infra/public/composition/workspace/authority',
+                '#copilot/infra/public/composition/workspace/io',
+                '#copilot/infra/public/composition/workspace/read-io',
+                '#copilot/infra/public/composition/workspace/mutation-io',
+                '#copilot/infra/public/composition/workspace/indexing',
+                '#copilot/infra/public/composition/workspace/instance',
+                '#copilot/infra/public/composition/runtime',
+                '#copilot/infra/public/composition/process',
+                '#copilot/infra/public/cache/keys',
+                '#copilot/infra/public/cache/tiering',
+                '#copilot/infra/public/diagnostic/code-analysis',
+                '#copilot/infra/public/indexing/search',
+                '#copilot/infra/public/indexing/file-context',
                 '#copilot/infra/public/operations',
                 '#copilot/infra/public/observability',
                 '#copilot/infra/public/telemetry',
@@ -185,6 +236,123 @@ describe('infra barrel governance', () => {
                 '#copilot/infra/public/testing',
             ]),
         );
+    });
+
+    it('public API manifest corresponde exatamente aos package imports e ao snapshot nominal de símbolos', async () => {
+        const packageJson = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'));
+        const packagePublic = Object.entries(packageJson.imports ?? {})
+            .filter(([alias]) => alias.startsWith('#copilot/infra/public/'))
+            .sort(([left], [right]) => left.localeCompare(right));
+        const manifestPublic = INFRA_PUBLIC_API_MANIFEST.map((entry) => [entry.alias, entry.target]).sort(
+            ([left], [right]) => String(left).localeCompare(String(right)),
+        );
+
+        expect(packagePublic).toEqual(manifestPublic);
+        expect(new Set(INFRA_PUBLIC_API_MANIFEST.map((entry) => entry.alias)).size).toBe(
+            INFRA_PUBLIC_API_MANIFEST.length,
+        );
+
+        const symbolDrift = [];
+        for (const entry of INFRA_PUBLIC_API_MANIFEST) {
+            const actual = Object.keys(await import(entry.alias)).sort();
+            if (JSON.stringify(actual) !== JSON.stringify([...entry.exports])) {
+                symbolDrift.push({ alias: entry.alias, expected: entry.exports, actual });
+            }
+        }
+        expect(symbolDrift).toEqual([]);
+    });
+
+    it('detector trata instâncias stateful criadas em module scope como estado mesmo quando escapam por getter', () => {
+        expect(
+            listMutableModuleBindings(`
+                const DEFAULT_RUNTIME = createExampleRuntime();
+                export function getRuntime() { return DEFAULT_RUNTIME; }
+                function localFactory() { const local = createExampleRuntime(); return local; }
+            `),
+        ).toEqual(['DEFAULT_RUNTIME']);
+    });
+
+    it('todo estado mutável de módulo declarado é processo-global por necessidade intrínseca', () => {
+        const report = buildInfraMutableStateReport();
+        expect(report.undeclared).toEqual([]);
+        expect(report.stale).toEqual([]);
+        expect(report.invalidScopes).toEqual([]);
+        expect(report.success).toBe(true);
+        expect(report.byScope).toMatchObject({
+            process: expect.any(Number),
+            runtime: expect.any(Number),
+            workspace: expect.any(Number),
+        });
+    });
+
+    it('process.env fica restrito a config resolvers e bootstrap processual explicitamente allowlisted', async () => {
+        const envTouchpoints = [];
+        const directBootstrapTouchpoints = [];
+        for (const file of listJavaScriptFiles(INFRA_ROOT)) {
+            const source = stripJavaScriptComments(await readFile(file, 'utf8'));
+            if (!source.includes('process.env')) continue;
+            const relativeFile = relative(INFRA_ROOT, file).replaceAll('\\', '/');
+            envTouchpoints.push(relativeFile);
+            const directAccess =
+                /process\.env\s*(?:\[|\.)/u.test(source) ||
+                /(?:\.\.\.\s*)?process\.env\b/u.test(source.replace(/=\s*process\.env\b/gu, '')) ||
+                /\?\?\s*process\.env\b/u.test(source);
+            if (directAccess) directBootstrapTouchpoints.push(relativeFile);
+        }
+
+        expect(envTouchpoints.sort()).toEqual([...INFRA_ENV_TOUCHPOINTS].sort());
+        expect(directBootstrapTouchpoints.sort()).toEqual([...INFRA_DIRECT_ENV_BOOTSTRAP_TOUCHPOINTS].sort());
+    });
+
+    it('public API static closures respeitam cost tiers e baseline ratcheted', async () => {
+        const report = await buildInfraPublicApiCostReport();
+        expect(report.violations).toEqual([]);
+        expect(report.success).toBe(true);
+    });
+
+    it('public/** usa somente exports nominais e runtime não expõe minting/raw write primitives', async () => {
+        const publicRoot = join(INFRA_ROOT, 'public');
+        const starViolations = [];
+        for (const file of listJavaScriptFiles(publicRoot)) {
+            const source = await readFile(file, 'utf8');
+            if (/\bexport\s+\*/u.test(source)) starViolations.push(relative(publicRoot, file));
+        }
+        expect(starViolations).toEqual([]);
+
+        const runtimeAuthorityViolations = INFRA_PUBLIC_API_MANIFEST.filter(
+            (entry) => entry.audience === 'runtime',
+        ).flatMap((entry) =>
+            entry.exports
+                .filter(
+                    (name) =>
+                        /^createValidated/u.test(name) ||
+                        /^createWorkspacePathAuthority$/u.test(name) ||
+                        /(?:Unlocked|Portable)$/u.test(name),
+                )
+                .map((name) => `${entry.alias}:${name}`),
+        );
+        expect(runtimeAuthorityViolations).toEqual([]);
+    });
+
+    it('production não pode importar surfaces diagnostic ou test-only', async () => {
+        const forbidden = new Set(
+            INFRA_PUBLIC_API_MANIFEST.filter(
+                (entry) => entry.audience === 'diagnostic' || entry.audience === 'test',
+            ).map((entry) => entry.alias),
+        );
+        const copilotRoot = resolve(REPO_ROOT, 'src/copilot');
+        const violations = [];
+        const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
+        for (const file of listJavaScriptFiles(copilotRoot)) {
+            if (isInsideDirectory(INFRA_ROOT, file)) continue;
+            const source = await readFile(file, 'utf8');
+            for (const match of source.matchAll(moduleSpecifierPattern)) {
+                const specifier = match[1];
+                if (specifier && forbidden.has(specifier))
+                    violations.push(`${relative(copilotRoot, file)} -> ${specifier}`);
+            }
+        }
+        expect(violations).toEqual([]);
     });
 
     it('código externo a infra só consome a membrana public e não atravessa por caminho relativo', async () => {
@@ -432,7 +600,7 @@ describe('infra barrel governance', () => {
     it('observability não reexporta operações pertencentes ao parser', async () => {
         const source = await readFile(join(INFRA_ROOT, 'observability/index.js'), 'utf8');
 
-        expect(source).not.toContain('#copilot/infra/public/indexing/parser');
+        expect(source).not.toContain('#copilot/infra/public/diagnostic/indexing/parser');
         expect(source).not.toContain('parseAndCacheSymbols');
         expect(source).not.toContain('invalidateParserCache');
     });

@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/scheduled-transport-benchmark-runner
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceMutationIo } from '#copilot/infra/public/composition/workspace/mutation-io';
 import { getTransportBenchmarkStateFile, readCloudflaredMetricsSnapshot } from '#copilot/mcp/cloudflare';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
-const workspaceIo = createWorkspaceIo({ workspaceRoot: repoRoot });
+const workspaceIo = createWorkspaceMutationIo({ workspaceRoot: repoRoot });
 const STATE_FILE = getTransportBenchmarkStateFile();
 const CANDIDATES = Object.freeze(['quic', 'auto', 'http2']);
 const RELOAD_PROFILES = Object.freeze({

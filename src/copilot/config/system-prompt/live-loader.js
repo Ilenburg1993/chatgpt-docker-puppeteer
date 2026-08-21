@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/live-loader
  */
 
-import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { fileURLToPath } from 'node:url';
 import { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } from './sections-registry.js';
 
@@ -18,6 +18,19 @@ import { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } fr
 
 /** @type {Map<string, { stamp: string; section: LiveSection }>} */
 const _cache = new Map();
+
+const SECTION_PATHS = Object.values(SYSTEM_PROMPT_SECTION_FILES).map((fileName) =>
+    fileURLToPath(new URL(`./sections/${fileName}`, import.meta.url)),
+);
+const SECTION_METADATA_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'config.system-prompt.live-loader.sections',
+        exactPaths: SECTION_PATHS,
+        operations: ['stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 /**
  * @param {string} sectionId
@@ -37,7 +50,7 @@ export async function loadLiveSystemPromptSection(sectionId) {
     const filePath = fileURLToPath(baseUrl);
 
     try {
-        const info = (await statPathTrusted(filePath, { caller: 'config.system-prompt.live-loader' })).stats;
+        const info = (await SECTION_METADATA_IO.statPath(filePath)).stats;
         const stamp = `${info.mtimeMs}:${info.size}`;
         const cached = _cache.get(sectionId);
         if (cached?.stamp === stamp) {

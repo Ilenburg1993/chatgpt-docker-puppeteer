@@ -13,16 +13,16 @@ const mocks = vi.hoisted(() => ({
     closeScope: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/indexing/context', () => ({
-    closeScope: mocks.closeScope,
-    declareScope: mocks.declareScope,
-    refreshScope: mocks.refreshScope,
-    getScopeContext: mocks.getScopeContext,
-    getScopeStats: mocks.getScopeStats,
-    invalidateScopePath: mocks.invalidateScopePath,
-    findSymbol: mocks.findSymbol,
-    listScopes: mocks.listScopes,
-}));
+vi.mock('../../../../../src/copilot/tools/file/shared.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        WORKSPACE_INDEXING: {
+            ...actual.WORKSPACE_INDEXING,
+            context: mocks,
+        },
+    };
+});
 
 import {
     scopeTools,

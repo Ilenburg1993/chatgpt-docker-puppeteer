@@ -1,6 +1,5 @@
 // @ts-check
 /** Selected-path convergence from a scope working set into the global derived index. */
-import { refreshIoIndexPaths } from '#copilot/infra/internal/indexing/registry';
 import { recordScopeFailure } from './state.js';
 
 /** @typedef {import('./types.js').ScopeDeclareOptions} ScopeDeclareOptions */
@@ -12,11 +11,20 @@ import { recordScopeFailure } from './state.js';
  * @param {ReadonlyMap<string, import('#copilot/infra/internal/filesystem/read').TextFileSnapshot>} warmSnapshots
  * @param {ScopeDeclareOptions} opts
  * @param {AbortSignal} signal
+ * @param {import('./state.js').ScopeRuntimeState} runtime
  */
-export async function convergeScopeIndex(scope, resolvedPaths, warmSnapshots, opts, signal) {
+export async function convergeScopeIndex(scope, resolvedPaths, warmSnapshots, opts, signal, runtime) {
     const indexMode = opts.indexMode ?? 'auto';
-    if (indexMode === 'off' || !scope.workspaceRoot || resolvedPaths.length === 0 || signal.aborted) return;
-    const indexResult = await refreshIoIndexPaths(resolvedPaths, {
+    if (
+        indexMode === 'off' ||
+        !runtime.indexRegistry ||
+        !scope.workspaceRoot ||
+        resolvedPaths.length === 0 ||
+        signal.aborted
+    )
+        return;
+    const refreshPaths = runtime.indexRegistry.refreshPaths;
+    const indexResult = await refreshPaths(resolvedPaths, {
         workspaceRoot: scope.workspaceRoot,
         ...(opts.extensions !== undefined ? { extensions: opts.extensions } : {}),
         snapshots: warmSnapshots,

@@ -15,12 +15,20 @@
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { ToolsConfigSchema } from '#copilot/core/schemas';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const TOOLS_CONFIG_PATH = resolvePersistentConfigFile('tools-config.json');
+const TOOLS_CONFIG_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'sdk.tools.state',
+        exactPaths: [TOOLS_CONFIG_PATH],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+    }),
+);
 
 /**
  * Configuração de ferramentas em runtime (allow/deny lists).
@@ -50,7 +58,7 @@ export function resetToolsConfigForTests() {
  */
 export async function loadToolsConfigAsync() {
     try {
-        const raw = (await readTextFreshTrusted(TOOLS_CONFIG_PATH, { caller: 'sdk.tools.state' })).content;
+        const raw = (await TOOLS_CONFIG_IO.readTextFresh(TOOLS_CONFIG_PATH)).content;
         const jsonResult = safeJsonParse(raw, '[tools-state/loadToolsConfigAsync]');
         if (!jsonResult.ok) {
             log('WARN', '[tools-state] tools-config.json JSON inválido — mantendo defaults.');
@@ -88,7 +96,7 @@ export async function loadToolsConfigAsync() {
 async function _persistToolsConfigAsync() {
     const payload = `${JSON.stringify(getToolsConfig(), null, 2)}\n`;
     const write = _toolsConfigWriteQueue.then(() =>
-        writeFileAtomicTrusted(TOOLS_CONFIG_PATH, payload, { caller: 'sdk.tools.state', mode: 0o600 }),
+        TOOLS_CONFIG_IO.writeFileAtomic(TOOLS_CONFIG_PATH, payload, { mode: 0o600 }),
     );
     _toolsConfigWriteQueue = write.catch((err) => {
         log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${toError(err).message}`);

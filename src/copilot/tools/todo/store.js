@@ -24,7 +24,7 @@ import { SCHEMA_VERSION } from './todo-schema.js';
  * @see module:copilot/db/sqlite
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 
 export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPriority, zStatus } from './todo-schema.js';
 
@@ -40,6 +40,15 @@ export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPrio
 
 /** Arquivo JSON legado (mantido para migração one-shot) */
 const TODOS_FILE = resolveHooksStateFile('todos.json');
+const TODO_MIGRATION_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'tools.todo.store.migration',
+        exactPaths: [TODOS_FILE],
+        operations: ['read'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 // SQLite backend — persistência
 // ---------------------------------------------------------------------------
@@ -64,7 +73,7 @@ async function ensureTodoLegacyMigration() {
             if (count.n !== 0) return;
             let raw;
             try {
-                raw = (await readTextFreshTrusted(TODOS_FILE, { caller: 'tools.todo.store.migration' })).content;
+                raw = (await TODO_MIGRATION_FS.readTextFresh(TODOS_FILE)).content;
             } catch (error) {
                 if (toError(error).code === 'ENOENT') return;
                 throw error;

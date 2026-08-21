@@ -8,25 +8,7 @@
 import { countPhysicalTextLines, iterateTextLines, sha256 } from '#copilot/infra/internal/platform';
 import { extname } from 'node:path';
 
-export const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
-    '.js',
-    '.mjs',
-    '.cjs',
-    '.jsx',
-    '.ts',
-    '.mts',
-    '.cts',
-    '.tsx',
-    '.json',
-    '.jsonc',
-    '.md',
-    '.mdx',
-    '.txt',
-    '.yaml',
-    '.yml',
-    '.css',
-    '.html',
-]);
+export { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';
 
 export const SYMBOL_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
 

@@ -25,7 +25,7 @@ import pLimit from 'p-limit';
 import { mapInBatches, normalizeBatchSize } from './batching.js';
 import { buildFileFingerprint, classifyStats } from './fingerprint.js';
 import { loadGitignoreMatcher } from './gitignore.js';
-import { IO_GLOB_ENGINE, matchesAnyPattern, matchesFilter } from './glob.js';
+import { IO_GLOB_ENGINE, matchesAnyPattern, matchesFilter } from './glob-match/index.js';
 
 const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
 const DEFAULT_SCAN_HARD_MAX_ENTRIES = readEnvPositiveInt('IO_SCAN_HARD_MAX_ENTRIES', 20_000);

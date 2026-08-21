@@ -7,15 +7,15 @@
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { parseFileForContext, windowFileContext } from '#copilot/infra/public/indexing';
-import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
-import { truncateUtf8String } from '#copilot/infra/public/platform';
+import { windowFileContext } from '#copilot/infra/public/indexing/file-context';
+import { truncateUtf8String } from '#copilot/infra/public/platform/buffer';
 import {
+    MCP_TOOL_EXECUTION_LIMITS,
     errorResult,
     estimateStructuredTextResultBytes,
+    getMcpWorkspaceIndexing,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
-    MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     readOnlyAnnotations,
     resolveValidatedReadPath,
@@ -27,13 +27,9 @@ import { z } from 'zod';
 import { readRepoFileChunksWithValidatedResultCache, readRepoFileWithValidatedResultCache } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
-const workspaceRoot = getMcpWorkspaceRoot();
-const { diffTextValidated, readBytesValidated, readTextValidated, statPathValidated } = createWorkspaceIo({
-    workspaceRoot,
-});
-const { scanDirectoryValidated, searchTextValidated, searchWorkspaceSymbolsValidated } = createWorkspaceIndexing({
-    workspaceRoot,
-});
+const { diffTextValidated, readBytesValidated, readTextValidated, statPathValidated } = getMcpWorkspaceIo();
+const { parseFileForContext, scanDirectoryValidated, searchTextValidated, searchWorkspaceSymbolsValidated } =
+    getMcpWorkspaceIndexing();
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
 const {

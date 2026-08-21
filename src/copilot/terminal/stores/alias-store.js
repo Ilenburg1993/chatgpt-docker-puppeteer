@@ -8,7 +8,7 @@
  */
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { log } from '#copilot/observability';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,6 +32,14 @@ const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
 
 /** Arquivo padrão de aliases customizados. */
 const ALIASES_FILE = LLM_B_ALIASES_FILE ?? path.join(os.homedir(), '.copilot-aliases.json');
+const ALIASES_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'terminal.stores.alias-store',
+        exactPaths: [ALIASES_FILE],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+    }),
+);
 
 /** Cache em memória dos aliases (builtin + custom). @type {Record<string, string>} */
 let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
@@ -52,9 +60,7 @@ function _saveCustomAliases() {
     const content = serializeCustomAliases();
     _saveQueue = _saveQueue
         .catch(() => undefined)
-        .then(() =>
-            writeFileAtomicTrusted(ALIASES_FILE, content, { caller: 'terminal.stores.alias-store', mode: 0o600 }),
-        )
+        .then(() => ALIASES_IO.writeFileAtomic(ALIASES_FILE, content, { mode: 0o600 }))
         .catch((e) => {
             logSwallowed(e, 'terminal.aliasStore.write');
             log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
@@ -69,7 +75,7 @@ function _saveCustomAliases() {
 export async function loadAliasesAsync() {
     try {
         await _saveQueue;
-        const raw = (await readTextFreshTrusted(ALIASES_FILE, { caller: 'terminal.stores.alias-store' })).content;
+        const raw = (await ALIASES_IO.readTextFresh(ALIASES_FILE)).content;
         const jsonResult = safeJsonParse(raw, '[alias-store/loadAliasesAsync]');
         if (!jsonResult.ok) {
             _aliases = { ...BUILTIN_ALIASES };

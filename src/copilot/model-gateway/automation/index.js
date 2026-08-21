@@ -5,6 +5,7 @@ export {
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS,
+    createModelGatewayRuntimeAutomationPolicyStore,
     explainModelGatewayRuntimeAutomationPolicySources,
     listModelGatewayRuntimeAutomationPolicyPresets,
     mergeModelGatewayRuntimeAutomationPolicy,

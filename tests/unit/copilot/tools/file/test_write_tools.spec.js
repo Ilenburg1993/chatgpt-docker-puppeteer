@@ -34,12 +34,28 @@ const workspaceIoMocks = vi.hoisted(() => ({
 
 const mockValidatePath = vi.hoisted(() => vi.fn());
 
-vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
+const mutationAuditMock = vi.hoisted(() => ({
+    record: vi.fn(async () => ({ enabled: false, path: null, written: false })),
+}));
+
+const rollbackPolicyMock = vi.hoisted(() => ({
+    enabled: true,
+    directory: '/workspace/src/copilot/.ai/rollback',
+    ttlMs: 24 * 60 * 60 * 1000,
+    maxEntries: 32,
+    maxBytes: 32 * 1024 * 1024,
+}));
+
+vi.mock('#copilot/infra/public/composition/workspace/io', () => ({
     createWorkspaceIo: vi.fn(() => workspaceIoMocks),
 }));
 
 vi.mock('#copilot/tools/file/shared', () => ({
     validatePath: mockValidatePath,
+    WORKSPACE_IO: workspaceIoMocks,
+    WORKSPACE_MUTATION_AUDIT: mutationAuditMock,
+    WORKSPACE_ROLLBACK_POLICY: rollbackPolicyMock,
+    WORKSPACE_PATH_AUTHORITY: Object.freeze({ workspaceRoot: '/workspace' }),
     WORKSPACE_ROOT: '/workspace',
 }));
 
@@ -230,7 +246,7 @@ function pathFail(reason = 'Path traversal blocked') {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
+    rollbackPolicyMock.enabled = true;
     workspaceIoMocks.writeFileAtomic.mockResolvedValue(writeOutcome());
     workspaceIoMocks.writeFileAtomicValidated.mockResolvedValue(writeOutcome());
     workspaceIoMocks.createOrReplaceFileAtomic.mockResolvedValue(createOutcome());
@@ -340,7 +356,7 @@ describe('write_file_content — validated mutation capability', () => {
     });
 
     it('mantém rollback automático desabilitável por política sem impedir a escrita', async () => {
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
+        rollbackPolicyMock.enabled = false;
         pathOk('/workspace/file.txt');
 
         const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });

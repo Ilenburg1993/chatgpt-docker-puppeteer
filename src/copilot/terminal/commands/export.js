@@ -9,7 +9,7 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
@@ -17,6 +17,8 @@ import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
 import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
+
+const TERMINAL_EXPORT_WORKSPACE = getApplicationWorkspaceInfra(WORKSPACE_ROOT);
 
 /**
  * @typedef {object} ExportContext
@@ -102,7 +104,7 @@ export async function cmdExport({ println }, arg) {
     }
 
     try {
-        await writeFileAtomicTrusted(filePath, lines.join('\n'), { caller: 'terminal.commands.export' });
+        await TERMINAL_EXPORT_WORKSPACE.mutationIo.writeFileAtomic(filePath, lines.join('\n'));
         println(terminalThemeRow('Exportado', formatTerminalToolPathForOperator(filePath), { role: 'success' }));
         println(
             terminalThemeRow(

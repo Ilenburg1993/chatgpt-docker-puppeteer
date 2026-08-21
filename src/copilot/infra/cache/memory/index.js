@@ -1,13 +1,5 @@
 // @ts-check
 /** @module copilot/infra/cache/memory */
-
-/** @typedef {import('./cache-types.js').IoCacheEntry} IoCacheEntry */
-
-export {
-    getIoCacheStats,
-    getIoL1Cache,
-    getVerifiedIoL1Entry,
-    invalidateIoCachePath,
-    invalidateIoCacheSubtree,
-} from './cache.js';
-export { makeBytesKey, makeTextKey, normalizeIoCacheKey } from './keys.js';
+/** @typedef {import('./contracts/index.js').IoCacheEntry} IoCacheEntry */
+/** @typedef {import('./contracts/index.js').IoCacheStats} IoCacheStats */
+export { createIoL1CacheRuntime } from './runtime/index.js';

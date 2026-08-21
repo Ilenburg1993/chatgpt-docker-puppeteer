@@ -3,10 +3,15 @@
 
 import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
 import { withIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 
 /**
  * Cria diretório com lock por path, preservando a semântica do SDK SessionFsProvider.mkdir().
@@ -29,8 +34,9 @@ import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/i
  *     lockWaitMs: number;
  *     durability: Awaited<ReturnType<typeof mkdirPathUnlocked>>['durability'];
  * }>}
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function mkdirPathLocked(dirPath, options = {}) {
+export async function mkdirPathLocked(dirPath, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(dirPath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
@@ -52,7 +58,8 @@ export async function mkdirPathLocked(dirPath, options = {}) {
                 dirPath,
                 ...mkdirResult.durability.directorySyncs.map((entry) => entry.target),
             ]);
-            for (const invalidationTarget of invalidationTargets) invalidateIoCoherencePath(invalidationTarget);
+            for (const invalidationTarget of invalidationTargets)
+                invalidateIoCoherencePath(invalidationTarget, {}, invalidationBus);
         }
         const io = publishIoOperationResult(
             buildIoMeta({
@@ -73,6 +80,8 @@ export async function mkdirPathLocked(dirPath, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return withIoMeta(
             {
@@ -97,6 +106,7 @@ export async function mkdirPathLocked(dirPath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

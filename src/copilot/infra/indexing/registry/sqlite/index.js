@@ -21,6 +21,6 @@ export {
     normalizeIndexPath,
     normalizeRelativePath,
     shouldIndexFile,
-} from './paths.js';
-export { normalizeIndexMaxResults, sanitizeFtsQuery } from './query.js';
+} from './path/index.js';
+export { normalizeIndexMaxResults, sanitizeFtsQuery } from './query-api.js';
 export { createIoIndexSqlite, isIoIndex } from './store.js';

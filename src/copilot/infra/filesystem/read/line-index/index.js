@@ -4,16 +4,6 @@
 /** @typedef {import('./types.js').ByteLineIndexEntry} ByteLineIndexEntry */
 /** @typedef {import('./types.js').ByteLineIndexLookup} ByteLineIndexLookup */
 
-export { resolveByteLineSeedStreamHighWaterMark } from './policy.js';
+export { readByteLineIndexConfig, resolveByteLineSeedStreamHighWaterMark } from './policy.js';
+export { createByteLineIndexRuntime } from './runtime.js';
 export { appendPhysicalLineStartsFromBuffer, scanPhysicalLineStartsFromBuffer } from './scanner.js';
-export {
-    discardStaleByteLineIndex,
-    ensureByteLineIndexInvalidationHook,
-    getByteLineIndex,
-    getByteLineIndexStats,
-    invalidateByteLineIndexPath,
-    invalidateByteLineIndexSubtree,
-    recordByteLineIndexCapturedRangeReuse,
-    recordByteLineIndexRangeRead,
-    rememberByteLineIndexStreamSeed,
-} from './state.js';

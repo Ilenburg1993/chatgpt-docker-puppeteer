@@ -73,14 +73,13 @@ const mocks = vi.hoisted(() => {
     };
 });
 
-vi.mock('#copilot/infra/public/indexing/context', () => ({
-    declareScope: mocks.declareScope,
-    getScopeStats: mocks.getScopeStats,
-    getScopeContext: mocks.getScopeContext,
-    findSymbol: mocks.findSymbol,
-    refreshScope: mocks.refreshScope,
-    closeScope: mocks.closeScope,
-}));
+vi.mock('#copilot/mcp/control-plane', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        getMcpWorkspaceIndexing: () => ({ context: mocks }),
+    };
+});
 
 import { repoWorkingSetTool, resetMcpWorkingSetsForTest } from '../../../../src/copilot/mcp/tools/repo-working-set.js';
 

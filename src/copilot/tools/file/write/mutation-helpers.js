@@ -14,11 +14,10 @@ import {
     completeIoOperationEnvelope,
     createIoRollbackToken,
     failIoOperationEnvelope,
-    getIoRollbackPolicy,
-    recordIoMutationAudit,
     serializeIoRollbackToken,
 } from '#copilot/infra/public/operations';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
+import { WORKSPACE_MUTATION_AUDIT, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
 import {
     buildPatchFailureTerminalSummary,
     patchFailureCategory,
@@ -55,7 +54,7 @@ export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
  */
 export async function completeAndAuditMutation(operation, result, auditContext) {
     const completed = completeIoOperationEnvelope(operation, result);
-    const audit = await recordIoMutationAudit(completed, auditContext);
+    const audit = await WORKSPACE_MUTATION_AUDIT.record(completed, auditContext);
     return audit.enabled
         ? {
               ...completed,
@@ -75,7 +74,7 @@ export async function completeAndAuditMutation(operation, result, auditContext) 
  */
 export async function failAndAuditMutation(operation, error, auditContext) {
     const failed = failIoOperationEnvelope(operation, error);
-    const audit = await recordIoMutationAudit(failed, auditContext);
+    const audit = await WORKSPACE_MUTATION_AUDIT.record(failed, auditContext);
     return audit.enabled
         ? {
               ...failed,
@@ -123,7 +122,13 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  * }} input
  */
 export function buildMutationChangeSet(input) {
-    const rollbackPolicy = getIoRollbackPolicy();
+    const rollbackPolicy = WORKSPACE_ROLLBACK_POLICY;
+    const rollbackPolicySummary = Object.freeze({
+        enabled: rollbackPolicy.enabled,
+        ttlMs: rollbackPolicy.ttlMs,
+        maxEntries: rollbackPolicy.maxEntries,
+        maxBytes: rollbackPolicy.maxBytes,
+    });
     /**
      * @type {{
      *     action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
@@ -195,7 +200,7 @@ export function buildMutationChangeSet(input) {
                   token: serializeIoRollbackToken(rollbackToken),
                   stepCount: rollbackToken.stepCount,
                   steps: rollbackToken.steps,
-                  policy: rollbackPolicy,
+                  policy: rollbackPolicySummary,
               }
             : {
                   enabled: false,
@@ -203,7 +208,7 @@ export function buildMutationChangeSet(input) {
                   stepCount: 0,
                   steps: [],
                   reason: 'disabled_by_default',
-                  policy: rollbackPolicy,
+                  policy: rollbackPolicySummary,
               },
     };
 }

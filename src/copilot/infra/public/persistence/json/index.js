@@ -1,4 +1,8 @@
 // @ts-check
 /** @module copilot/infra/public/persistence/json */
 
-export * from '../../../persistence/json/index.js';
+export {
+    fileExists,
+    readJson,
+    writeJson,
+} from '../../../persistence/json/index.js';

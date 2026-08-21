@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/latency-benchmark
  */
 
-import { readBoundedResponseBytes } from '#copilot/infra/public/platform';
+import { readBoundedResponseBytes } from '#copilot/infra/public/platform/http-response';
 import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 import { connect as connectHttp2, constants as http2Constants } from 'node:http2';

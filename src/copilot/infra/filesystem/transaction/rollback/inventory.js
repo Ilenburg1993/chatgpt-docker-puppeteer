@@ -5,7 +5,7 @@ import { positiveIntegerOr } from '#copilot/infra/internal/platform';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { SIDECAR_FILE_PATTERN } from './format.js';
-import { getIoRollbackPolicy, getRollbackSidecarDirectory } from './policy.js';
+import { createDefaultIoRollbackPolicy } from './policy.js';
 import { readVerifiedRollbackSidecar } from './storage.js';
 
 /** @param {unknown} error */
@@ -17,10 +17,11 @@ function isMissingDirectoryError(error) {
 /**
  * Lista apenas metadados derivados de nomes válidos; nunca retorna conteúdo nem path absoluto.
  *
- * @param {{ directory?: string; nowMs?: number; maxEntries?: number; verifyContent?: boolean }} [options]
+ * @param {{ directory?: string; nowMs?: number; maxEntries?: number; verifyContent?: boolean; policy?: import('./policy.js').IoRollbackPolicy }} [options]
  */
 export async function listRollbackSidecars(options = {}) {
-    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const policy = options.policy ?? createDefaultIoRollbackPolicy();
+    const directory = path.resolve(options.directory ?? policy.directory);
     const nowMs = Math.trunc(options.nowMs ?? Date.now());
     const maxEntries = positiveIntegerOr(options.maxEntries, 100);
     const directoryEntries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
@@ -49,6 +50,7 @@ export async function listRollbackSidecars(options = {}) {
         if (options.verifyContent) {
             contentVerified = await readVerifiedRollbackSidecar(descriptor, {
                 directory,
+                policy,
                 nowMs,
                 allowExpired: true,
             })
@@ -68,7 +70,12 @@ export async function listRollbackSidecars(options = {}) {
     return {
         count: sidecars.length,
         limited: candidates.length > entries.length,
-        policy: getIoRollbackPolicy(),
+        policy: Object.freeze({
+            enabled: policy.enabled,
+            ttlMs: policy.ttlMs,
+            maxEntries: policy.maxEntries,
+            maxBytes: policy.maxBytes,
+        }),
         sidecars,
     };
 }

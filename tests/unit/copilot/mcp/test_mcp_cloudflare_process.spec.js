@@ -6,57 +6,67 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import {
-    ensureDetachedProcess,
-    rotateDetachedProcessLogIfOversized,
-} from '../../../../src/copilot/mcp/cloudflare/cli-process.js';
+import { createCloudflareManagedProcessController } from '../../../../src/copilot/mcp/cloudflare/cli-process.js';
 
-describe('MCP Cloudflare detached process supervision', () => {
-    it('rotates an oversized detached-process log before a future restart', async () => {
+/** @param {string} dir */
+function processConfig(dir) {
+    return /** @type {import('../../../../src/copilot/mcp/cloudflare/config.js').CloudflareTunnelConfig} */ (
+        /** @type {unknown} */ ({
+            mcpHttpPidFile: path.join(dir, 'mcp-http.pid'),
+            mcpHttpLogFile: path.join(dir, 'mcp-http.log'),
+            managedTunnelPidFile: path.join(dir, 'cloudflared.pid'),
+            managedTunnelLogFile: path.join(dir, 'cloudflared.log'),
+        })
+    );
+}
+
+describe('MCP Cloudflare bound process supervision', () => {
+    it('rotates an oversized detached-process log through the controller-bound exact paths', async () => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-log-rotation-'));
-        const logFile = path.join(dir, 'test.log');
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
         try {
-            await fs.writeFile(logFile, 'abcdefghij', 'utf8');
-            const result = await rotateDetachedProcessLogIfOversized(logFile, { maxBytes: 5 });
+            await fs.writeFile(config.mcpHttpLogFile, 'abcdefghij', 'utf8');
+            const result = await controller.mcpHttp.rotateLogIfOversized({ maxBytes: 5 });
             assert.equal(result.rotated, true);
             assert.equal(result.previousBytes, 10);
-            assert.equal(result.rotatedPath, `${logFile}.1`);
-            assert.equal(await fs.readFile(`${logFile}.1`, 'utf8'), 'abcdefghij');
-            await assert.rejects(fs.access(logFile), /ENOENT/u);
+            assert.equal(result.rotatedPath, `${config.mcpHttpLogFile}.1`);
+            assert.equal(await fs.readFile(`${config.mcpHttpLogFile}.1`, 'utf8'), 'abcdefghij');
+            await assert.rejects(fs.access(config.mcpHttpLogFile), /ENOENT/u);
         } finally {
             await fs.rm(dir, { recursive: true, force: true });
         }
     });
 
-    it('terminates the detached child when publishing the PID marker fails', async () => {
+    it('publishes durable metadata before PID and terminates the child when the PID publication gate fails', async () => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-detached-rollback-'));
-        const pidFile = path.join(dir, 'test.pid');
-        const metadataFile = `${pidFile}.json`;
-        const logFile = path.join(dir, 'test.log');
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
+        const metadataFile = `${config.mcpHttpPidFile}.json`;
         /** @type {number | null} */
         let spawnedPid = null;
 
         try {
             await assert.rejects(
-                ensureDetachedProcess({
+                controller.mcpHttp.ensure({
                     name: 'rollback-test',
                     command: process.execPath,
                     args: ['-e', 'setInterval(() => {}, 1000)'],
-                    pidFile,
-                    logFile,
-                    stateWriter: async (filePath, content) => {
-                        if (filePath === pidFile) throw new Error('injected-pid-write-failure');
-                        const metadata = JSON.parse(content);
+                    beforePidPublish: async () => {
+                        const metadata = JSON.parse(await fs.readFile(metadataFile, 'utf8'));
                         spawnedPid = Number(metadata.pid);
-                        await fs.writeFile(filePath, content, 'utf8');
+                        assert.equal(metadata.schemaVersion, 2);
+                        assert.equal(metadata.name, 'rollback-test');
+                        await assert.rejects(fs.access(config.mcpHttpPidFile), /ENOENT/u);
+                        throw new Error('injected-pid-publish-failure');
                     },
                 }),
-                /injected-pid-write-failure/u,
+                /injected-pid-publish-failure/u,
             );
 
             assert.ok(Number.isInteger(spawnedPid) && Number(spawnedPid) > 0);
             assert.throws(() => process.kill(Number(spawnedPid), 0));
-            await assert.rejects(fs.access(pidFile), /ENOENT/u);
+            await assert.rejects(fs.access(config.mcpHttpPidFile), /ENOENT/u);
             await assert.rejects(fs.access(metadataFile), /ENOENT/u);
         } finally {
             if (spawnedPid) {
@@ -66,6 +76,18 @@ describe('MCP Cloudflare detached process supervision', () => {
                     // Already terminated by rollback.
                 }
             }
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('reads only the requested tail of a managed log', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-log-tail-'));
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
+        try {
+            await fs.writeFile(config.managedTunnelLogFile, '0123456789', 'utf8');
+            assert.equal(await controller.readCloudflaredLogTail(4), '6789');
+        } finally {
             await fs.rm(dir, { recursive: true, force: true });
         }
     });

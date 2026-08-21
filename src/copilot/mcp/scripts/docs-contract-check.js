@@ -8,12 +8,12 @@
  * @module copilot/mcp/scripts/docs-contract-check
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
-const docsWorkspaceIo = createWorkspaceIo({ workspaceRoot: ROOT });
+const docsWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: ROOT });
 const ACTIVE_DOCS = Object.freeze([
     'src/copilot/README.md',
     'src/copilot/agent/README.md',

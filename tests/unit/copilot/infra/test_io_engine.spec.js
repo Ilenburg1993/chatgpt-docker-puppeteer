@@ -3,16 +3,15 @@
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as ioCacheL2Registry from '#copilot/infra/internal/cache';
-import { getIoL1Cache } from '#copilot/infra/internal/cache';
 import {
     acquireIoResourceLock,
     getFileResourceLockPath,
     getIoLockStats,
     withIoResourceLock,
 } from '#copilot/infra/internal/concurrency/locks';
+import { createIoInvalidationBusRuntime } from '#copilot/infra/internal/filesystem/invalidation/bus';
 import {
     copyFileLocked,
     deleteFileLocked,
@@ -22,28 +21,53 @@ import {
     removePathLocked,
 } from '#copilot/infra/internal/filesystem/mutation';
 import {
-    getIoReadHashStats,
-    readBytes,
     readBytesFresh,
-    readLines,
-    readText,
-    readTextChunks,
+    readBytes as readBytesRaw,
+    readLines as readLinesRaw,
+    readTextChunks as readTextChunksRaw,
     readTextFresh,
+    readText as readTextRaw,
 } from '#copilot/infra/internal/filesystem/read';
 import { createOrReplaceFileAtomic, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/internal/filesystem/write';
 import { scanDirectory } from '#copilot/infra/internal/indexing';
 import { searchText, searchWorkspaceSymbols } from '#copilot/infra/internal/indexing/search';
 import { sha256 } from '#copilot/infra/internal/platform';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 
-import { resetIoL1CacheForTest, resetIoReadHashStatsForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const TEMP_DIRS = [];
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let infraRuntime;
+
+/** @param {string} filePath @param {Parameters<typeof readBytesRaw>[1]} [options] */
+const readBytes = (filePath, options = {}) =>
+    readBytesRaw(filePath, { ...options, cacheRuntime: options.cacheRuntime ?? infraRuntime.coherence });
+/** @param {string} filePath @param {Parameters<typeof readTextRaw>[1]} [options] */
+const readText = (filePath, options = {}) =>
+    readTextRaw(filePath, {
+        ...options,
+        cacheRuntime: options.cacheRuntime ?? infraRuntime.coherence,
+        readRuntime: options.readRuntime ?? infraRuntime.coherence.read,
+    });
+/** @param {string} filePath @param {Parameters<typeof readLinesRaw>[1]} [options] */
+const readLines = (filePath, options = {}) =>
+    readLinesRaw(filePath, {
+        ...options,
+        cacheRuntime: options.cacheRuntime ?? infraRuntime.coherence,
+        readRuntime: options.readRuntime ?? infraRuntime.coherence.read,
+    });
+/** @param {string} filePath @param {Parameters<typeof readTextChunksRaw>[1]} [options] */
+const readTextChunks = (filePath, options = {}) =>
+    readTextChunksRaw(filePath, { ...options, readRuntime: options.readRuntime ?? infraRuntime.coherence.read });
+
+beforeEach(() => {
+    infraRuntime = createInfraRuntime({ runtimeId: `io-engine-test-${Date.now()}-${Math.random()}` });
+});
 
 afterEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
-    resetIoL1CacheForTest();
-    resetIoReadHashStatsForTest();
+    await infraRuntime.dispose();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -372,6 +396,18 @@ describe('infra/io-engine', () => {
         expect(result.io.engine).toBe('io-engine.fs.readFile.text');
     });
 
+    it('raw readText é stateless e não materializa L1 implicitamente', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'raw-stateless.txt');
+        await writeFile(file, 'raw read', 'utf8');
+
+        const result = await readTextRaw(file);
+
+        expect(result.content).toBe('raw read');
+        expect(result.io.cache).toBe('bypass');
+        expect(infraRuntime.coherence.l1.materialized).toBe(false);
+    });
+
     it('readText reutiliza cache completo e ainda respeita ranges posteriores', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'cached-range.txt');
@@ -402,11 +438,11 @@ describe('infra/io-engine', () => {
             writeFile(noneFile, text, 'utf8'),
         ]);
 
-        resetIoReadHashStatsForTest();
+        infraRuntime.coherence.read.hashes.reset();
         const full = await readText(fullFile, { hashMode: 'full' });
         expect(full.contentHash).toBe(sha256(text));
         expect(full.returnedContentHash).toBe(full.contentHash);
-        expect(getIoReadHashStats()).toMatchObject({
+        expect(infraRuntime.coherence.read.hashes.stats()).toMatchObject({
             reads: 1,
             hashComputations: 1,
             fullHashComputations: 1,
@@ -414,11 +450,11 @@ describe('infra/io-engine', () => {
             fullWindowReturnedHashReuses: 1,
         });
 
-        resetIoReadHashStatsForTest();
+        infraRuntime.coherence.read.hashes.reset();
         const returned = await readText(returnedFile, { startLine: 2, endLine: 2, hashMode: 'returned' });
         expect(returned.contentHash).toBeUndefined();
         expect(returned.returnedContentHash).toBe(sha256('two'));
-        expect(getIoReadHashStats()).toMatchObject({
+        expect(infraRuntime.coherence.read.hashes.stats()).toMatchObject({
             reads: 1,
             hashComputations: 1,
             fullHashComputations: 0,
@@ -426,11 +462,11 @@ describe('infra/io-engine', () => {
             fullHashOutputSkips: 1,
         });
 
-        resetIoReadHashStatsForTest();
+        infraRuntime.coherence.read.hashes.reset();
         const none = await readText(noneFile, { startLine: 2, endLine: 2, hashMode: 'none' });
         expect(none.contentHash).toBeUndefined();
         expect(none.returnedContentHash).toBeUndefined();
-        expect(getIoReadHashStats()).toMatchObject({
+        expect(infraRuntime.coherence.read.hashes.stats()).toMatchObject({
             reads: 1,
             hashComputations: 0,
             fullHashComputations: 0,
@@ -447,7 +483,7 @@ describe('infra/io-engine', () => {
 
         const cached = await readText(file);
         expect(cached.content).toBe('{"version":1}\n');
-        expect(getIoL1Cache().stats().size).toBeGreaterThan(0);
+        expect(infraRuntime.coherence.l1.stats().size).toBeGreaterThan(0);
 
         // Simula writer externo que não publica invalidation no processo atual. O cached read pode continuar dentro de sua
         // janela de stale-probe; o fresh read deve refletir o snapshot físico sem consultar L1/L2.
@@ -466,17 +502,20 @@ describe('infra/io-engine', () => {
         const file = join(dir, 'fresh-no-cache.bin');
         const payload = Buffer.from('fresh payload', 'utf8');
         await writeFile(file, payload);
-        const cache = getIoL1Cache();
-        expect(cache.stats().size).toBe(0);
+        const cache = infraRuntime.coherence.l1;
+        expect(cache.materialized).toBe(false);
+        expect(cache.stats()).toBeNull();
 
         const unhashed = await readBytesFresh(file);
         expect(unhashed.content.equals(payload)).toBe(true);
         expect(unhashed.contentHash).toBeUndefined();
-        expect(cache.stats().size).toBe(0);
+        expect(cache.materialized).toBe(false);
+        expect(cache.stats()).toBeNull();
 
         const hashed = await readBytesFresh(file, { includeHash: true });
         expect(hashed.contentHash).toBe(sha256(payload));
-        expect(cache.stats().size).toBe(0);
+        expect(cache.materialized).toBe(false);
+        expect(cache.stats()).toBeNull();
     });
 
     it('readTextFresh rejeita UTF-8 inválido sem contaminar cache', async () => {
@@ -485,7 +524,8 @@ describe('infra/io-engine', () => {
         await writeFile(file, Buffer.from([0xc3, 0x28]));
 
         await expect(readTextFresh(file)).rejects.toThrow(/UTF-8/);
-        expect(getIoL1Cache().stats().size).toBe(0);
+        expect(infraRuntime.coherence.l1.materialized).toBe(false);
+        expect(infraRuntime.coherence.l1.stats()).toBeNull();
     });
 
     it('readText e readLines compartilham semântica física para CRLF e CR isolado', async () => {
@@ -524,16 +564,19 @@ describe('infra/io-engine', () => {
             set: vi.fn(),
             invalidatePath: vi.fn(),
         };
-        vi.spyOn(ioCacheL2Registry, 'getIoL2Cache').mockReturnValue(/** @type {any} */ (l2Mock));
+        const cacheRuntime = {
+            l1: infraRuntime.coherence.l1,
+            l2: { get: () => /** @type {any} */ (l2Mock) },
+        };
 
-        const first = await readBytes(file);
+        const first = await readBytes(file, { cacheRuntime });
         expect(first.content.toString('utf8')).toBe('L2_PAYLOAD');
         expect(first.io.cache).toBe('l2-hit');
         expect(first.contentHash).toBe(sha256(payload));
         expect(first.cacheFingerprintStrategy).toBe('l2-mtime-size');
         expect(l2Mock.get).toHaveBeenCalledTimes(1);
 
-        const second = await readBytes(file);
+        const second = await readBytes(file, { cacheRuntime });
         expect(second.content.toString('utf8')).toBe('L2_PAYLOAD');
         expect(second.io.cache).toBe('l1-hit');
         expect(l2Mock.get).toHaveBeenCalledTimes(1);
@@ -551,9 +594,21 @@ describe('infra/io-engine', () => {
                 throw new Error('l2 invalidate failed');
             }),
         };
-        vi.spyOn(ioCacheL2Registry, 'getIoL2Cache').mockReturnValue(/** @type {any} */ (l2Mock));
+        const invalidationBus = createIoInvalidationBusRuntime({
+            l1: { invalidate: vi.fn() },
+            l2: { get: () => /** @type {any} */ (l2Mock) },
+            crossProcess: {
+                publish: () => false,
+                start: () => () => {},
+                stop: () => {},
+                stats: () => ({}),
+            },
+            runtimeId: 'io-engine-best-effort',
+            debounceMs: 0,
+        });
 
-        const result = await writeFileAtomic(file, 'after');
+        const result = await writeFileAtomic(file, 'after', {}, invalidationBus);
+        invalidationBus.dispose();
         expect(result.bytesWritten).toBe(Buffer.byteLength('after', 'utf8'));
         await expect(readFile(file, 'utf8')).resolves.toBe('after');
         expect(l2Mock.invalidatePath).toHaveBeenCalled();
@@ -595,6 +650,10 @@ describe('infra/io-engine', () => {
 
     it('readTextChunks preserva fallback de stream scan quando byte-line index é desativado', async () => {
         vi.stubEnv('COPILOT_IO_BYTE_LINE_INDEX_DISABLE', 'true');
+        await infraRuntime.dispose();
+        infraRuntime = createInfraRuntime({
+            runtimeId: `io-engine-byte-index-disabled-${Date.now()}-${Math.random()}`,
+        });
         const dir = await createTempDir();
         const file = join(dir, 'chunks-fallback.txt');
         await writeFile(file, 'a\nb\nc\nd', 'utf8');
@@ -636,9 +695,7 @@ describe('infra/io-engine', () => {
         const destination = join(dir, 'copy-destination.txt');
         await writeFile(source, 'source-content', 'utf8');
         await writeFile(destination, 'old-destination', 'utf8');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
-
-        const result = await copyFileLocked(source, destination, { overwrite: true });
+        const result = await copyFileLocked(source, destination, { overwrite: true, captureRollback: true });
 
         expect(result.destinationPreviousHash).toBe(sha256('old-destination'));
         expect(result.destinationPreviousBytes).toBe(Buffer.byteLength('old-destination', 'utf8'));
@@ -920,9 +977,7 @@ describe('infra/io-engine', () => {
         const destination = join(dir, 'move-destination.txt');
         await writeFile(source, 'incoming', 'utf8');
         await writeFile(destination, 'existing-destination', 'utf8');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
-
-        const result = await moveFileLocked(source, destination, { overwrite: true });
+        const result = await moveFileLocked(source, destination, { overwrite: true, captureRollback: true });
 
         expect(result.destinationPreviousHash).toBe(sha256('existing-destination'));
         expect(result.destinationPreviousBytes).toBe(Buffer.byteLength('existing-destination', 'utf8'));
@@ -943,10 +998,9 @@ describe('infra/io-engine', () => {
         const dir = await createTempDir();
         const file = join(dir, 'patch-snapshot.txt');
         await writeFile(file, 'before patch', 'utf8');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
-
         const result = await patchTextLocked(file, {
             oldString: 'before',
+            captureRollback: true,
             newString: 'after',
         });
 
@@ -960,11 +1014,12 @@ describe('infra/io-engine', () => {
         const rollbackDirectory = join(dir, 'rollback-delete');
         const file = join(dir, 'delete-large.bin');
         const payload = Buffer.alloc(300 * 1024, 'd');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
         await writeFile(file, payload);
-
-        const result = await deleteFileLocked(file);
+        const rollbackPolicy = infraRuntime.config.rollback;
+        const result = await deleteFileLocked(file, {
+            captureRollback: true,
+            rollbackPolicy: { ...rollbackPolicy, enabled: true, directory: rollbackDirectory },
+        });
 
         expect(result.previousSnapshotBase64).toBeNull();
         expect(result.previousSnapshotTruncated).toBe(true);
@@ -981,14 +1036,14 @@ describe('infra/io-engine', () => {
         const rollbackDirectory = join(dir, 'rollback-patch');
         const file = join(dir, 'patch-large.txt');
         const content = `${'a'.repeat(300 * 1024)} before`;
-        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
         await writeFile(file, content, 'utf8');
-
+        const rollbackPolicy = { ...infraRuntime.config.rollback, enabled: true, directory: rollbackDirectory };
         const result = await patchTextLocked(file, {
             oldString: 'before',
             newString: 'after',
             computeDiff: false,
+            captureRollback: true,
+            rollbackPolicy,
         });
 
         expect(result.previousSnapshotBase64).toBeNull();

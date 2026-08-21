@@ -21,7 +21,8 @@ import {
     sleepMs,
     toError,
 } from '#copilot/core';
-import { createBoundedProcessOutputCapture, utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/platform/process-output';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';

@@ -17,7 +17,7 @@ import {
     extractBabelFileSymbols,
     formatBabelParserError,
     resolveBabelParserOptions,
-} from '#copilot/infra/public/code-analysis';
+} from '#copilot/infra/public/diagnostic/code-analysis';
 
 const SOURCE_GLOB = '**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}';
 const DEFAULT_IGNORES = Object.freeze([

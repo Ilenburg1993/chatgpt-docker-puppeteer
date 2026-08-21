@@ -1,17 +1,21 @@
 // @ts-check
 /** @module copilot/infra/filesystem/workspace */
 
-/** @typedef {import('./path-boundary.js').WorkspaceIoContext} WorkspaceIoContext */
-/** @typedef {import('./validated-path.js').ValidatedReadWorkspacePath} ValidatedReadWorkspacePath */
-/** @typedef {import('./validated-path.js').ValidatedMutableWorkspacePath} ValidatedMutableWorkspacePath */
+/** @typedef {import('./boundary/index.js').WorkspaceIoContext} WorkspaceIoContext */
+/** @typedef {import('./authority/index.js').ValidatedReadWorkspacePath} ValidatedReadWorkspacePath */
+/** @typedef {import('./authority/index.js').ValidatedMutableWorkspacePath} ValidatedMutableWorkspacePath */
+/** @typedef {import('./authority/index.js').WorkspacePathAuthority} WorkspacePathAuthority */
+/** @typedef {import('./authority/index.js').WorkspacePathAuthorityContext} WorkspacePathAuthorityContext */
 
-export { createWorkspaceIo } from './io.js';
-export { assertWorkspaceIoContext, requireValidatedWorkspaceReadPath, resolveWorkspacePath } from './path-boundary.js';
 export {
-    createValidatedMutableWorkspacePath,
-    createValidatedReadWorkspacePath,
+    createWorkspacePathAuthority,
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
     resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
-} from './validated-path.js';
+    resolveWorkspacePathAuthority,
+} from './authority/index.js';
+export { assertWorkspaceIoContext, requireValidatedWorkspaceReadPath, resolveWorkspacePath } from './boundary/index.js';
+export { createWorkspaceIo } from './io.js';
+export { createWorkspaceMutationIo } from './mutation-io/index.js';
+export { createWorkspaceReadIo } from './read-io/index.js';

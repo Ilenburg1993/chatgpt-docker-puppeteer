@@ -3,19 +3,11 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import {
-    deleteFileTrusted,
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-    readTextFreshTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
-import { resolve } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { basename, resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';
-
-/** @type {Promise<void>} */
-let selectionTracePersistQueue = Promise.resolve();
+const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIRECTORY = resolve(DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
 
 /**
  * @param {unknown} value
@@ -289,78 +281,151 @@ export function buildModelGatewaySelectionDecisionTrace(input) {
     };
 }
 
+/** @param {unknown} value */
+function normalizeTraceFileName(value) {
+    const raw = optionalString(value);
+    if (!raw) throw new TypeError('selection trace file name is required');
+    if (basename(raw) !== raw) throw new TypeError('selection trace file name must not contain path components');
+    const stem = raw.endsWith('.json') ? raw.slice(0, -'.json'.length) : raw;
+    return `${normalizeTraceId(stem)}.json`;
+}
+
 /**
- * @param {Record<string, unknown>} trace
- * @param {{ directory?: string; fileName?: string; writeLatest?: boolean }} [options]
- * @returns {Promise<{
- *     schema: 'model-gateway-selection-decision-trace-persistence';
- *     ok: boolean;
- *     written: boolean;
- *     traceId: string;
- *     filePath: string | null;
- *     latestPath: string | null;
- *     error: string | null;
- * }>}
+ * Build a trace store from a directory capability already granted by the composition root. The store owns its queue;
+ * operational calls may choose trace ids/file basenames, but can never retarget the persistence directory.
+ *
+ * @param {{ directory: string; io: ReturnType<typeof createConfiguredFsIo> }} binding
  */
-export async function persistModelGatewaySelectionDecisionTrace(trace, options = {}) {
-    const traceId = normalizeTraceId(trace['traceId']);
-    const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
-    const fileName = `${normalizeTraceId(options.fileName ?? traceId)}.json`;
-    const filePath = resolve(directory, fileName);
-    const latestPath = options.writeLatest === false ? null : resolve(directory, 'latest.json');
-    const operation = selectionTracePersistQueue
-        .catch(() => undefined)
-        .then(async () => {
-            try {
-                const payload = `${JSON.stringify(trace, null, 2)}\n`;
-                await writeFileAtomicTrusted(filePath, payload, {
-                    caller: 'model-gateway.routing.selection-trace',
-                    mode: 0o600,
+export function createModelGatewaySelectionTraceStore(binding) {
+    const directory = resolve(binding.directory);
+    const io = binding.io;
+    /** @type {Promise<void>} */
+    let persistQueue = Promise.resolve();
+
+    return Object.freeze({
+        directory,
+        async persist(
+            /** @type {Record<string, unknown>} */ trace,
+            /** @type {{fileName?:string;writeLatest?:boolean}} */ options = {},
+        ) {
+            const traceId = normalizeTraceId(trace['traceId']);
+            const fileName = normalizeTraceFileName(options.fileName ?? traceId);
+            const filePath = resolve(directory, fileName);
+            const latestPath = options.writeLatest === false ? null : resolve(directory, 'latest.json');
+            const operation = persistQueue
+                .catch(() => undefined)
+                .then(async () => {
+                    try {
+                        const payload = `${JSON.stringify(trace, null, 2)}\n`;
+                        await io.writeFileAtomic(filePath, payload, { mode: 0o600 });
+                        if (latestPath) await io.writeFileAtomic(latestPath, payload, { mode: 0o600 });
+                        return {
+                            schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                            ok: true,
+                            written: true,
+                            traceId,
+                            filePath,
+                            latestPath,
+                            error: null,
+                        };
+                    } catch (error) {
+                        return {
+                            schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                            ok: false,
+                            written: false,
+                            traceId,
+                            filePath: null,
+                            latestPath: null,
+                            error: error instanceof Error ? error.message : String(error),
+                        };
+                    }
                 });
-                if (latestPath) {
-                    await writeFileAtomicTrusted(latestPath, payload, {
-                        caller: 'model-gateway.routing.selection-trace',
-                        mode: 0o600,
-                    });
+            persistQueue = operation.then(
+                () => undefined,
+                () => undefined,
+            );
+            return operation;
+        },
+        async read(/** @type {string} */ fileName) {
+            const target = resolve(directory, normalizeTraceFileName(fileName));
+            const snapshot = await io.readTextFresh(target);
+            const payload = JSON.parse(snapshot.content);
+            return optionalRecord(payload) ?? {};
+        },
+        async list(/** @type {{limit?:number}} */ options = {}) {
+            const limit = normalizePositiveInteger(options.limit, 50);
+            return (await listSelectionTraceMetadata(directory, io)).slice(0, limit);
+        },
+        async applyRetention(/** @type {{maxFiles?:number;dryRun?:boolean}} */ options = {}) {
+            const maxFiles = normalizePositiveInteger(options.maxFiles, 100);
+            const dryRun = options.dryRun !== false;
+            try {
+                const files = await listSelectionTraceMetadata(directory, io);
+                const retained = files.slice(0, maxFiles);
+                const pruned = files.slice(maxFiles);
+                let deletedCount = 0;
+                if (!dryRun) {
+                    for (const file of pruned) {
+                        const removed = await io.deleteFile(file.filePath, { ignoreMissing: true });
+                        if (removed) deletedCount += 1;
+                    }
                 }
                 return {
-                    schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                    schema: /** @type {const} */ ('model-gateway-selection-trace-retention'),
                     ok: true,
-                    written: true,
-                    traceId,
-                    filePath,
-                    latestPath,
+                    directory,
+                    dryRun,
+                    maxFiles,
+                    candidateCount: files.length,
+                    retainedCount: retained.length,
+                    prunedCount: pruned.length,
+                    deletedCount,
+                    retained,
+                    pruned,
                     error: null,
                 };
             } catch (error) {
                 return {
-                    schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                    schema: /** @type {const} */ ('model-gateway-selection-trace-retention'),
                     ok: false,
-                    written: false,
-                    traceId,
-                    filePath: null,
-                    latestPath: null,
+                    directory,
+                    dryRun,
+                    maxFiles,
+                    candidateCount: 0,
+                    retainedCount: 0,
+                    prunedCount: 0,
+                    deletedCount: 0,
+                    retained: [],
+                    pruned: [],
                     error: error instanceof Error ? error.message : String(error),
                 };
             }
-        });
-    selectionTracePersistQueue = operation.then(
-        () => undefined,
-        () => undefined,
-    );
-    return operation;
+        },
+    });
 }
 
-/**
- * @param {string} filePath
- * @returns {Promise<Record<string, unknown>>}
- */
-export async function readModelGatewaySelectionDecisionTrace(filePath) {
-    const snapshot = await readTextFreshTrusted(resolve(filePath), {
-        caller: 'model-gateway.routing.selection-trace',
-    });
-    const payload = JSON.parse(snapshot.content);
-    return optionalRecord(payload) ?? {};
+const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'model-gateway.routing.selection-trace',
+        roots: [DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIRECTORY],
+        operations: ['delete', 'list', 'read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_STORE = createModelGatewaySelectionTraceStore({
+    directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIRECTORY,
+    io: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_IO,
+});
+
+/** @param {Record<string, unknown>} trace @param {{fileName?:string;writeLatest?:boolean}} [options] */
+export async function persistModelGatewaySelectionDecisionTrace(trace, options = {}) {
+    return DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_STORE.persist(trace, options);
+}
+
+/** @param {string} fileName */
+export async function readModelGatewaySelectionDecisionTrace(fileName) {
+    return DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_STORE.read(fileName);
 }
 
 /** @param {unknown} error */
@@ -376,15 +441,14 @@ function isMissingTracePathError(error) {
  * that property explicitly with lstat instead of accidentally following a symlink through stat.
  *
  * @param {string} directory
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
  * @returns {Promise<{ name: string; filePath: string; mtimeMs: number; size: number }[]>}
  */
-async function listSelectionTraceMetadata(directory) {
+async function listSelectionTraceMetadata(directory, io) {
     /** @type {string[]} */
     let names;
     try {
-        const listing = await listDirectoryNamesFreshTrusted(directory, {
-            caller: 'model-gateway.routing.selection-trace',
-        });
+        const listing = await io.listDirectoryNamesFresh(directory);
         names = listing.entries;
     } catch (error) {
         if (isMissingTracePathError(error)) return [];
@@ -396,9 +460,7 @@ async function listSelectionTraceMetadata(directory) {
         candidates.map(async (name) => {
             const filePath = resolve(directory, name);
             try {
-                const { stats } = await lstatPathTrusted(filePath, {
-                    caller: 'model-gateway.routing.selection-trace',
-                });
+                const { stats } = await io.lstatPath(filePath);
                 if (!stats.isFile() || stats.isSymbolicLink()) return null;
                 return { name, filePath, mtimeMs: stats.mtimeMs, size: stats.size };
             } catch (error) {
@@ -498,78 +560,14 @@ export function compareModelGatewaySelectionDecisionTraces(leftTrace, rightTrace
 }
 
 /**
- * @param {{ directory?: string; limit?: number }} [options]
+ * @param {{ limit?: number }} [options]
  * @returns {Promise<{ name: string; filePath: string; mtimeMs: number; size: number }[]>}
  */
 export async function listModelGatewaySelectionDecisionTraceFiles(options = {}) {
-    const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
-    const limit = normalizePositiveInteger(options.limit, 50);
-    return (await listSelectionTraceMetadata(directory)).slice(0, limit);
+    return DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_STORE.list(options);
 }
 
-/**
- * @param {{ directory?: string; maxFiles?: number; dryRun?: boolean }} [options]
- * @returns {Promise<{
- *     schema: 'model-gateway-selection-trace-retention';
- *     ok: boolean;
- *     directory: string;
- *     dryRun: boolean;
- *     maxFiles: number;
- *     candidateCount: number;
- *     retainedCount: number;
- *     prunedCount: number;
- *     deletedCount: number;
- *     retained: { name: string; filePath: string; mtimeMs: number; size: number }[];
- *     pruned: { name: string; filePath: string; mtimeMs: number; size: number }[];
- *     error: string | null;
- * }>}
- */
+/** @param {{ maxFiles?: number; dryRun?: boolean }} [options] */
 export async function applyModelGatewaySelectionTraceRetention(options = {}) {
-    const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
-    const maxFiles = normalizePositiveInteger(options.maxFiles, 100);
-    const dryRun = options.dryRun !== false;
-    try {
-        const files = await listSelectionTraceMetadata(directory);
-        const retained = files.slice(0, maxFiles);
-        const pruned = files.slice(maxFiles);
-        let deletedCount = 0;
-        if (!dryRun) {
-            for (const file of pruned) {
-                const removed = await deleteFileTrusted(file.filePath, {
-                    caller: 'model-gateway.routing.selection-trace',
-                    ignoreMissing: true,
-                });
-                if (removed) deletedCount += 1;
-            }
-        }
-        return {
-            schema: 'model-gateway-selection-trace-retention',
-            ok: true,
-            directory,
-            dryRun,
-            maxFiles,
-            candidateCount: files.length,
-            retainedCount: retained.length,
-            prunedCount: pruned.length,
-            deletedCount,
-            retained,
-            pruned,
-            error: null,
-        };
-    } catch (error) {
-        return {
-            schema: 'model-gateway-selection-trace-retention',
-            ok: false,
-            directory,
-            dryRun,
-            maxFiles,
-            candidateCount: 0,
-            retainedCount: 0,
-            prunedCount: 0,
-            deletedCount: 0,
-            retained: [],
-            pruned: [],
-            error: error instanceof Error ? error.message : String(error),
-        };
-    }
+    return DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_STORE.applyRetention(options);
 }

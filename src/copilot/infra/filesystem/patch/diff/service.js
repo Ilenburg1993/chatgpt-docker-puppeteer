@@ -8,7 +8,12 @@
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { readText } from '#copilot/infra/internal/filesystem/read';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { buildSimpleTextDiff } from './algorithm.js';
 
 /**
@@ -55,6 +60,8 @@ export async function diffTextWithReader(readTextLike, pathA, pathB, options = {
                 advisoryLimits: { contextLines },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { pathA, pathB, diff, identical: diff.trim() === '', io };
     } catch (error) {
@@ -70,6 +77,7 @@ export async function diffTextWithReader(readTextLike, pathA, pathB, options = {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

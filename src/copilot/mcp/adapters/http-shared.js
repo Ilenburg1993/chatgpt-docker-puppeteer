@@ -17,11 +17,9 @@
  * @module copilot/mcp/adapters/http-shared
  */
 
-import { startIoExternalWatch } from '#copilot/infra/public/filesystem/invalidation';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
-import { resolve } from 'node:path';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
 import { readMcpAuthJwksWarmupState, scheduleMcpAuthJwksWarmup } from '../control-plane/auth-jwks-warmup.js';
@@ -37,7 +35,7 @@ import {
     runWithMcpHttpToolTimingContext,
 } from '../control-plane/metrics.js';
 import { scheduleOpenAiEndpointLatencyMonitor } from '../control-plane/openai-endpoint-monitor.js';
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
+import { startMcpWorkspaceExternalWatch } from '../control-plane/paths.js';
 import { scheduleMcpRoundTripAnalyticsMonitor } from '../control-plane/round-trip-analytics-monitor.js';
 import { recordMcpToolsListObserved } from '../control-plane/schema-convergence.js';
 import {
@@ -51,7 +49,7 @@ import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-b
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
 import { handleStatefulMcpHttpRequest } from './http-stateful-router.js';
 
-export const MCP_HTTP_SHARED_IMPLEMENTATION_VERSION = '1.5.0';
+export const MCP_HTTP_SHARED_IMPLEMENTATION_VERSION = '1.6.0';
 export const MCP_PATH = '/mcp';
 
 const DEFAULT_ALLOWED_ORIGINS = /** @type {const} */ ([
@@ -604,10 +602,40 @@ export function createMcpHttpRequestHandler(options) {
 }
 
 /**
- * @returns {void}
+ * Bind process-scoped application infra before the MCP origin starts accepting traffic. Failure remains degradable: the
+ * origin can serve non-SQLite surfaces while health/index status reports the missing provider explicitly.
+ *
+ * @returns {Promise<Readonly<{ configured: boolean; revision: number }> | null>}
  */
-export function notifyMcpHttpStarted() {
-    startIoExternalWatch(resolve(getMcpWorkspaceRoot(), 'src/copilot'));
+export async function prepareMcpHttpRuntime() {
+    try {
+        const { bootstrapApplicationInfraSqliteProvider } = await import('#copilot/boot/application-infra');
+        return await bootstrapApplicationInfraSqliteProvider();
+    } catch (error) {
+        logMcp('WARN', 'MCP application infra SQLite bootstrap failed; continuing in degraded mode.', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+    }
+}
+
+/**
+ * Start runtime-owned services only after application infra bootstrap and socket listen have completed. The external
+ * watcher is awaited because it registers a lifecycle-owned resource; fire-and-forget registration could race an
+ * immediate server shutdown/runtime dispose and resurrect work against an already-disposed WorkspaceInfra.
+ *
+ * Optional monitors remain scheduled after the owned watcher reaches a settled state.
+ *
+ * @returns {Promise<void>}
+ */
+export async function notifyMcpHttpStarted() {
+    try {
+        await startMcpWorkspaceExternalWatch();
+    } catch (error) {
+        logMcp('WARN', 'Workspace external watcher could not be started.', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
     startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
     scheduleMcpAuthJwksWarmup();
     scheduleMcpStartupMaintenance();

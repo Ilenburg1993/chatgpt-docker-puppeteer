@@ -120,6 +120,39 @@ describe('core/io-policy evaluateIoPathPolicyAsync', () => {
         expect(result.realPath).toBe(path.join(workspaceRoot, 'target.txt'));
     });
 
+    it('preserves the final symlink for lstat policy without allowing ancestor escape', async () => {
+        const workspaceRoot = await createTempDir();
+        const outsideRoot = await createTempDir();
+        const insideTarget = path.join(workspaceRoot, 'target.txt');
+        const insideLink = path.join(workspaceRoot, 'inside-link.txt');
+        const outsideTarget = path.join(outsideRoot, 'outside.txt');
+        const outsideLink = path.join(workspaceRoot, 'outside-link.txt');
+        await Promise.all([writeFile(insideTarget, 'inside', 'utf8'), writeFile(outsideTarget, 'outside', 'utf8')]);
+        await Promise.all([symlink(insideTarget, insideLink), symlink(outsideTarget, outsideLink)]);
+
+        const inside = await evaluateIoPathPolicyAsync(insideLink, {
+            workspaceRoot,
+            mode: 'stat',
+            preserveFinalSymlink: true,
+        });
+        const outsideFinal = await evaluateIoPathPolicyAsync(outsideLink, {
+            workspaceRoot,
+            mode: 'stat',
+            preserveFinalSymlink: true,
+        });
+        await symlink(outsideRoot, path.join(workspaceRoot, 'escape-parent'));
+        const escapedAncestor = await evaluateIoPathPolicyAsync('escape-parent/file.txt', {
+            workspaceRoot,
+            mode: 'stat',
+            preserveFinalSymlink: true,
+        });
+
+        expect(inside.ok && inside.realPath).toBe(insideLink);
+        expect(outsideFinal.ok && outsideFinal.realPath).toBe(outsideLink);
+        expect(escapedAncestor.ok).toBe(false);
+        if (!escapedAncestor.ok) expect(escapedAncestor.code).toBe('PATH_SYMLINK_OUTSIDE');
+    });
+
     it('reuses read-only realpath decisions inside a fixed window and invalidates them explicitly', async () => {
         process.env['IO_PATH_POLICY_CACHE_TTL_MS'] = '1000';
         resetIoPathPolicyCacheForTest();

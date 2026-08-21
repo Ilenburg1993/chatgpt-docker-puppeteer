@@ -8,6 +8,8 @@ const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
 
 /**
  * @param {string} filePath
+ * @param {boolean} [captureRollback]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>} [rollbackPolicy]
  * @returns {Promise<{
  *     contentHash: string;
  *     bytesRead: number;
@@ -16,10 +18,10 @@ const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
  *     rollbackSidecar: import('#copilot/infra/internal/filesystem/transaction').IoRollbackSidecar | null;
  * }>}
  */
-export async function readMutationSnapshot(filePath, captureRollback = false) {
+export async function readMutationSnapshot(filePath, captureRollback = false, rollbackPolicy = undefined) {
     const snapshot = await readBinaryMutationSnapshot(filePath, {
         snapshotMaxBytes: captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
-        rollbackSidecar: captureRollback,
+        rollbackSidecar: captureRollback ? { ...(rollbackPolicy ? { policy: rollbackPolicy } : {}) } : false,
     });
     return captureRollback
         ? snapshot
@@ -33,6 +35,8 @@ export async function readMutationSnapshot(filePath, captureRollback = false) {
 
 /**
  * @param {string} filePath
+ * @param {boolean} [captureRollback]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>} [rollbackPolicy]
  * @returns {Promise<{
  *     contentHash: string;
  *     bytesRead: number;
@@ -41,9 +45,9 @@ export async function readMutationSnapshot(filePath, captureRollback = false) {
  *     rollbackSidecar: import('#copilot/infra/internal/filesystem/transaction').IoRollbackSidecar | null;
  * } | null>}
  */
-export async function readOptionalMutationSnapshot(filePath, captureRollback = false) {
+export async function readOptionalMutationSnapshot(filePath, captureRollback = false, rollbackPolicy = undefined) {
     try {
-        return await readMutationSnapshot(filePath, captureRollback);
+        return await readMutationSnapshot(filePath, captureRollback, rollbackPolicy);
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code === 'ENOENT' || code === 'ENOTDIR') return null;
@@ -72,7 +76,7 @@ export async function assertDestinationWritable(destination, overwrite) {
 
 /**
  * @param {Buffer} content
- * @param {{ persistLarge?: boolean; contentHash?: string }} [options]
+ * @param {{ persistLarge?: boolean; contentHash?: string; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy> }} [options]
  * @returns {Promise<{
  *     snapshotBase64: string | null;
  *     snapshotTruncated: boolean;
@@ -86,6 +90,7 @@ export async function buildRollbackSnapshot(content, options = {}) {
     const rollbackSidecar = options.persistLarge
         ? await persistRollbackSidecar(content, {
               ...(options.contentHash === undefined ? {} : { contentHash: options.contentHash }),
+              ...(options.rollbackPolicy ? { policy: options.rollbackPolicy } : {}),
           })
         : null;
     return { snapshotBase64: null, snapshotTruncated: true, rollbackSidecar };

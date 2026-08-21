@@ -5,13 +5,11 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import {
+    createCloudflareStateStore,
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
     readCloudflareTunnelConfig,
-    readConnectorSmokeState,
-    readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
     validateConfiguredPublicUrl,
@@ -29,32 +27,10 @@ import {
 } from '#copilot/mcp/control-plane';
 import https from 'node:https';
 import { z } from 'zod';
+import { createCloudflareManagedProcessController } from '../cloudflare/cli-process.js';
 import { runCanonicalConnectorSmoke } from '../cloudflare/connector-smoke.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
-const CLOUDFLARED_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
-
-/**
- * @param {string} pidFile
- * @returns {Promise<{ pidFile: string; pid: number | null; alive: boolean; error: string | null }>}
- */
-async function readPidFileStatus(pidFile) {
-    try {
-        const raw = (await readTextFreshTrusted(pidFile, { caller: 'mcp.tools.tunnel-status' })).content.trim();
-        const pid = Number(raw);
-        if (!Number.isInteger(pid) || pid <= 0) {
-            return { pidFile, pid: null, alive: false, error: 'PID file does not contain a positive integer.' };
-        }
-        try {
-            process.kill(pid, 0);
-            return { pidFile, pid, alive: true, error: null };
-        } catch (error) {
-            return { pidFile, pid, alive: false, error: error instanceof Error ? error.message : String(error) };
-        }
-    } catch (error) {
-        return { pidFile, pid: null, alive: false, error: error instanceof Error ? error.message : String(error) };
-    }
-}
 
 /**
  * @param {string} url
@@ -96,16 +72,14 @@ function probeLocalInsecureHttpsHealth(url) {
     });
 }
 
-/** @returns {Promise<Record<string, unknown>>} */
-async function readCloudflaredOriginDiagnostics() {
+/** @param {ReturnType<typeof createCloudflareManagedProcessController>} processes */
+async function readCloudflaredOriginDiagnostics(processes) {
     let text;
     try {
-        text = (await readTextFreshTrusted(CLOUDFLARED_LOG_FILE, { caller: 'mcp.tools.tunnel-status' })).content.slice(
-            -64_000,
-        );
+        text = await processes.readCloudflaredLogTail(64_000);
     } catch {
         return {
-            logFile: CLOUDFLARED_LOG_FILE,
+            logFile: processes.logs.cloudflared,
             originUsesLocalhost: false,
             originUsesLoopbackIp: false,
             recentOriginErrors: [],
@@ -124,7 +98,7 @@ async function readCloudflaredOriginDiagnostics() {
     const originUsesLocalhost = /http:\/\/localhost:3333|\[::1\]:3333/iu.test(text);
     const originUsesLoopbackIp = /http:\/\/127\.0\.0\.1:3333/iu.test(text);
     return {
-        logFile: CLOUDFLARED_LOG_FILE,
+        logFile: processes.logs.cloudflared,
         originUsesLocalhost,
         originUsesLoopbackIp,
         recentOriginErrors,
@@ -363,9 +337,10 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
     const config = readCloudflareTunnelConfig();
     const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
     const connectorSmoke = summarizeConnectorSmokeState(
-        await readConnectorSmokeState(config.smokeStateFile),
+        await createCloudflareStateStore(config).readConnectorSmokeState(),
         config.publicMcpUrl ?? null,
     );
+    const processes = createCloudflareManagedProcessController(config);
     const reload = summarizeMcpReloadState(await readMcpReloadState(), connectorSmoke.checkedAt);
     const connectorSmokeAgeFresh =
         connectorSmoke.ok === true &&
@@ -374,14 +349,15 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
     const connectorSmokeFresh = connectorSmokeAgeFresh && reload.reconciledWithConnectorSmoke === true;
     const publicHealthUrl = config.publicMcpUrl ? new URL('/health', config.publicMcpUrl).toString() : null;
     const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
-        readPidFileStatus(config.mcpHttpPidFile),
-        readPidFileStatus(config.managedTunnelPidFile),
+        processes.mcpHttp.status(),
+        processes.cloudflared.status(),
         probeHealth(config.healthUrl),
         publicHealthUrl
             ? probeHealth(publicHealthUrl)
             : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
     ]);
-    const originDiagnostics = options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics();
+    const originDiagnostics =
+        options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics(processes);
     const statefulPolicy = {
         ...readMcpHttpStatefulSessionPolicy(),
         postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
@@ -526,17 +502,19 @@ export const mcpTunnelStatusTool = {
     annotations: readOnlyAnnotations(),
     handler: async () => {
         const config = readCloudflareTunnelConfig();
-        const state = await readQuickTunnelState(config.stateFile);
+        const stateStore = createCloudflareStateStore(config);
+        const processes = createCloudflareManagedProcessController(config);
+        const [state, connectorSmokeState] = await Promise.all([
+            stateStore.readQuickTunnelState(),
+            stateStore.readConnectorSmokeState(),
+        ]);
         const auth = readMcpAuthConfig();
         const quickTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
         const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
         const permanentReady =
             config.mode === 'named-permanent' && publicUrlValidation?.ok === true && Boolean(config.publicMcpUrl);
-        const connectorSmoke = summarizeConnectorSmokeState(
-            await readConnectorSmokeState(config.smokeStateFile),
-            config.publicMcpUrl ?? null,
-        );
-        const originDiagnostics = await readCloudflaredOriginDiagnostics();
+        const connectorSmoke = summarizeConnectorSmokeState(connectorSmokeState, config.publicMcpUrl ?? null);
+        const originDiagnostics = await readCloudflaredOriginDiagnostics(processes);
         const connectorSmokeFresh =
             connectorSmoke.ok === true &&
             typeof connectorSmoke.ageMinutes === 'number' &&

@@ -3,15 +3,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    readTextFreshTrusted: vi.fn(),
-    writeFileAtomicTrusted: vi.fn(),
+    readTextFreshConfigured: vi.fn(),
+    writeFileAtomicConfigured: vi.fn(),
     log: vi.fn(),
     logSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
-    readTextFreshTrusted: mocks.readTextFreshTrusted,
-    writeFileAtomicTrusted: mocks.writeFileAtomicTrusted,
+vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
+    createConfiguredFsGrant: vi.fn((declaration) => declaration),
+    createConfiguredFsIo: vi.fn(() => ({
+        readTextFresh: mocks.readTextFreshConfigured,
+        writeFileAtomic: mocks.writeFileAtomicConfigured,
+    })),
 }));
 
 vi.mock('../../../../src/copilot/core/error-handlers.js', () => ({
@@ -41,10 +44,10 @@ vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
 
 describe('sdk/tools/state', () => {
     beforeEach(() => {
-        mocks.readTextFreshTrusted.mockReset();
-        mocks.readTextFreshTrusted.mockResolvedValue({ content: '{}' });
-        mocks.writeFileAtomicTrusted.mockReset();
-        mocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
+        mocks.readTextFreshConfigured.mockReset();
+        mocks.readTextFreshConfigured.mockResolvedValue({ content: '{}' });
+        mocks.writeFileAtomicConfigured.mockReset();
+        mocks.writeFileAtomicConfigured.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -52,7 +55,7 @@ describe('sdk/tools/state', () => {
     });
 
     it('loadToolsConfigAsync trata ENOENT como opcional', async () => {
-        mocks.readTextFreshTrusted.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        mocks.readTextFreshConfigured.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
         const mod = await import('../../../../src/copilot/sdk/tools/state.js');
 
         await mod.loadToolsConfigAsync();
@@ -66,7 +69,7 @@ describe('sdk/tools/state', () => {
         mod.resetToolsConfigForTests();
         /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
         let releaseFirst;
-        mocks.writeFileAtomicTrusted
+        mocks.writeFileAtomicConfigured
             .mockImplementationOnce(
                 () =>
                     new Promise((resolve) => {
@@ -80,15 +83,15 @@ describe('sdk/tools/state', () => {
         const second = mod.patchToolsConfig({ denylist: ['shell'] });
         await Promise.resolve();
 
-        expect(mocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(1);
+        expect(mocks.writeFileAtomicConfigured).toHaveBeenCalledTimes(1);
         releaseFirst?.();
         await Promise.all([first, second]);
 
-        expect(mocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
-        const firstPayload = JSON.parse(String(mocks.writeFileAtomicTrusted.mock.calls[0]?.[1]));
-        const secondPayload = JSON.parse(String(mocks.writeFileAtomicTrusted.mock.calls[1]?.[1]));
+        expect(mocks.writeFileAtomicConfigured).toHaveBeenCalledTimes(2);
+        const firstPayload = JSON.parse(String(mocks.writeFileAtomicConfigured.mock.calls[0]?.[1]));
+        const secondPayload = JSON.parse(String(mocks.writeFileAtomicConfigured.mock.calls[1]?.[1]));
         expect(firstPayload).toEqual({ allowlist: ['read_file'], denylist: [] });
         expect(secondPayload).toEqual({ allowlist: ['read_file'], denylist: ['shell'] });
-        expect(mocks.writeFileAtomicTrusted.mock.calls[1]?.[2]).toEqual({ caller: 'sdk.tools.state', mode: 0o600 });
+        expect(mocks.writeFileAtomicConfigured.mock.calls[1]?.[2]).toEqual({ mode: 0o600 });
     });
 });

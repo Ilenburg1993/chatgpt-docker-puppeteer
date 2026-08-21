@@ -24,7 +24,7 @@ import {
     BABEL_PARSER_POLICY_VERSION,
     formatBabelParserError,
     resolveBabelParserOptions,
-} from '#copilot/infra/public/code-analysis';
+} from '#copilot/infra/public/diagnostic/code-analysis';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

@@ -127,17 +127,27 @@ const readTerminalTimelineProjection = /** @type {import('vitest').Mock<
     )
 );
 
-const writeFileAtomicTrusted = /** @type {import('vitest').Mock<
-    typeof import('#copilot/infra/public/filesystem/trusted').writeFileAtomicTrusted
->} */ (vi.fn(async () => undefined));
+const writeFileAtomic = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
 }));
 
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
-    writeFileAtomicTrusted,
-}));
+vi.mock('#copilot/boot/application-infra', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/boot/application-infra')} */ (await importOriginal());
+    return {
+        ...actual,
+        getApplicationWorkspaceInfra: vi.fn((workspaceRoot) => {
+            const workspace = actual.getApplicationWorkspaceInfra(workspaceRoot);
+            return new Proxy(workspace, {
+                get(target, property, receiver) {
+                    if (property === 'mutationIo') return { ...target.mutationIo, writeFileAtomic };
+                    return Reflect.get(target, property, receiver);
+                },
+            });
+        }),
+    };
+});
 
 const { cmdExport } = await import('../../../../src/copilot/terminal/commands/export.js');
 
@@ -148,10 +158,9 @@ function mockCtx() {
     return { println, output: () => lines.join('\n') };
 }
 
-/** @returns {Parameters<typeof import('#copilot/infra/public/filesystem/trusted').writeFileAtomicTrusted>} */
 function requireWriteCall() {
-    const call = writeFileAtomicTrusted.mock.calls[0];
-    if (!call) throw new Error('[fixture] writeFileAtomicTrusted was not called');
+    const call = writeFileAtomic.mock.calls[0];
+    if (!call) throw new Error('[fixture] workspace mutationIo.writeFileAtomic was not called');
     return call;
 }
 
@@ -163,10 +172,10 @@ describe('terminal/commands/export', () => {
     it('exporta usando a seam canônica do frontend runtime', async () => {
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         expect(readTerminalTimelineProjection).toHaveBeenCalled();
-        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        expect(writeFileAtomic).toHaveBeenCalledOnce();
         const [, content] = requireWriteCall();
         expect(String(content)).toContain('envelope=sdk/assistant.message');
         expect(String(content)).toContain('trace=trace-export-1');
@@ -202,7 +211,7 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         const [, content] = requireWriteCall();
         const markdown = String(content);
@@ -240,7 +249,7 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         const [, content] = requireWriteCall();
         const markdown = String(content);
@@ -258,7 +267,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, 'artifacts/terminal-live/conversa.md');
 
-        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        expect(writeFileAtomic).toHaveBeenCalledOnce();
         const [filePath] = requireWriteCall();
         expect(String(filePath)).toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
         expect(ctx.output()).toContain('Exportado');
@@ -307,7 +316,7 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         const [, content] = requireWriteCall();
         expect(String(content)).toContain('envelope=terminal.dialog.engine');
@@ -380,7 +389,7 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         const [, content] = requireWriteCall();
         const markdown = String(content);
@@ -440,7 +449,7 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
         const [, content] = requireWriteCall();
         const markdown = String(content);
@@ -468,9 +477,9 @@ describe('terminal/commands/export', () => {
         );
         const ctx = mockCtx();
 
-        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-test/conversa.md');
 
-        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        expect(writeFileAtomic).toHaveBeenCalledOnce();
         const [, content] = requireWriteCall();
         expect(String(content)).toContain('0 mensagens');
         expect(String(content)).toContain('diagnóstico mínimo');

@@ -7,10 +7,9 @@ import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
-import { configureInfraSqliteProvider } from '#copilot/infra/public/database';
+import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot';
 import { cmdIndex } from '../../../../src/copilot/terminal/commands/workspace-index.js';
 
-import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
 /** @type {string | null} */
@@ -30,11 +29,10 @@ function mockCtx() {
 }
 
 beforeEach(async () => {
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+    getApplicationInfraRuntime().database.reset();
     testDb = new Database(':memory:');
     ensureIoIndexSchema(testDb);
-    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    configureApplicationInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-index-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
     await mkdir(join(tmpDir, 'nested'), { recursive: true });
@@ -43,8 +41,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+    getApplicationInfraRuntime().database.reset();
     if (testDb?.open) testDb.close();
     testDb = null;
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });

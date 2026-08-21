@@ -12,12 +12,7 @@
 
 import { resolveBootWorkspaceRoot } from '#copilot/boot';
 import { toError } from '#copilot/core/error-handlers';
-import {
-    deleteFileTrusted,
-    readTextFreshTrusted,
-    statPathTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
@@ -42,36 +37,26 @@ const CACHE_FILE_NAME = 'modellist-cache.json';
 const CACHE_DEFAULT_RELATIVE_PATH = `data/copilot/sdk/models/${CACHE_FILE_NAME}`;
 const CACHE_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24h
 
-/** @type {Promise<void>} */
-let _persistentModelCacheMutationQueue = Promise.resolve();
-
 /**
- * @param {() => Promise<void>} mutation
- * @returns {Promise<void>}
+ * Resolve an immutable persistence binding from bootstrap configuration. Production calls this once; alternate stores
+ * must carry their own already-authorized IO instead of changing process env between operations.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {string} [workspaceRoot]
  */
-function enqueuePersistentModelCacheMutation(mutation) {
-    const queued = _persistentModelCacheMutationQueue.then(mutation);
-    _persistentModelCacheMutationQueue = queued.catch(() => undefined);
-    return queued;
-}
-
-/**
- * @returns {string}
- */
-function resolvePersistentModelCacheFile() {
-    const override = String(process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] ?? '').trim();
-    const workspaceRoot = resolveBootWorkspaceRoot();
-    if (override) return isAbsolute(override) ? override : resolve(workspaceRoot, override);
-    return resolve(workspaceRoot, CACHE_DEFAULT_RELATIVE_PATH);
-}
-
-/**
- * @returns {string[]}
- */
-function resolvePersistentModelCacheReadPaths() {
-    const primary = resolvePersistentModelCacheFile();
-    const legacy = resolvePersistentConfigFile(CACHE_FILE_NAME);
-    return primary === legacy ? [primary] : [primary, legacy];
+export function resolvePersistentModelCacheBinding(env = process.env, workspaceRoot = resolveBootWorkspaceRoot()) {
+    const override = String(env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] ?? '').trim();
+    const primaryPath = override
+        ? isAbsolute(override)
+            ? override
+            : resolve(workspaceRoot, override)
+        : resolve(workspaceRoot, CACHE_DEFAULT_RELATIVE_PATH);
+    const legacyPath = resolvePersistentConfigFile(CACHE_FILE_NAME);
+    return Object.freeze({
+        primaryPath,
+        legacyPath,
+        readPaths: Object.freeze(primaryPath === legacyPath ? [primaryPath] : [primaryPath, legacyPath]),
+    });
 }
 
 /**
@@ -110,11 +95,12 @@ function parsePersistentModelCachePayload(data) {
 
 /**
  * @param {string} cachePath
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
  * @returns {Promise<PersistentModelListCache | null | undefined>} `undefined` means cache miss.
  */
-async function readPersistentModelCachePath(cachePath) {
+async function readPersistentModelCachePath(cachePath, io) {
     try {
-        const content = (await readTextFreshTrusted(cachePath, { caller: 'sdk.models.persistent-cache' })).content;
+        const content = (await io.readTextFresh(cachePath)).content;
         let data;
         try {
             data = JSON.parse(content);
@@ -136,6 +122,123 @@ async function readPersistentModelCachePath(cachePath) {
 }
 
 /**
+ * @param {{
+ *     primaryPath: string;
+ *     legacyPath: string;
+ *     primaryIo: ReturnType<typeof createConfiguredFsIo>;
+ *     legacyIo: ReturnType<typeof createConfiguredFsIo>;
+ * }} binding
+ */
+export function createPersistentModelCacheStore(binding) {
+    const primaryPath = resolve(binding.primaryPath);
+    const legacyPath = resolve(binding.legacyPath);
+    const readTargets =
+        primaryPath === legacyPath
+            ? [{ path: primaryPath, io: binding.primaryIo }]
+            : [
+                  { path: primaryPath, io: binding.primaryIo },
+                  { path: legacyPath, io: binding.legacyIo },
+              ];
+    /** @type {Promise<void>} */
+    let mutationQueue = Promise.resolve();
+
+    /** @param {() => Promise<void>} mutation */
+    function enqueueMutation(mutation) {
+        const queued = mutationQueue.then(mutation);
+        mutationQueue = queued.catch(() => undefined);
+        return queued;
+    }
+
+    return Object.freeze({
+        primaryPath,
+        legacyPath,
+        async read() {
+            for (const target of readTargets) {
+                const result = await readPersistentModelCachePath(target.path, target.io);
+                if (result !== undefined) return result;
+            }
+            return null;
+        },
+        /** @param {ModelInfo[]} models */
+        writeAsync(models) {
+            if (!Array.isArray(models)) {
+                log('WARN', '[model-cache] writePersistentModelCacheAsync: models não é array');
+                return;
+            }
+            const modelsSnapshot = [...models];
+            const writePromise = enqueueMutation(async () => {
+                try {
+                    const data = /** @type {PersistentModelListCache} */ ({
+                        schema: 'ModelInfo[]',
+                        version: CACHE_SCHEMA_VERSION,
+                        fetchedAt: Date.now(),
+                        models: modelsSnapshot,
+                    });
+                    await binding.primaryIo.writeFileAtomic(primaryPath, JSON.stringify(data, null, 2), {
+                        mode: 0o600,
+                    });
+                    log('DEBUG', `[model-cache] Cache persistido: ${modelsSnapshot.length} modelos`);
+                } catch (error) {
+                    const err = toError(error);
+                    log('WARN', `[model-cache] Persistência falhou: ${err.message}`);
+                }
+            });
+            void writePromise;
+        },
+        async clear() {
+            await enqueueMutation(async () => {
+                for (const target of readTargets) {
+                    try {
+                        const removed = await target.io.deleteFile(target.path, { ignoreMissing: true });
+                        if (removed) log('DEBUG', '[model-cache] Cache persistido deletado');
+                    } catch (error) {
+                        const err = /** @type {NodeJS.ErrnoException} */ (error);
+                        if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
+                            const errMsg = toError(error);
+                            log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
+                        }
+                    }
+                }
+            });
+        },
+        async diagnostics() {
+            try {
+                const stat = (await binding.primaryIo.statPath(primaryPath)).stats;
+                const ageHours = Math.floor((Date.now() - stat.mtime.getTime()) / (60 * 60 * 1000));
+                return { exists: true, size: stat.size, age: `${ageHours}h` };
+            } catch {
+                return { exists: false };
+            }
+        },
+    });
+}
+
+const DEFAULT_PERSISTENT_MODEL_CACHE_BINDING = resolvePersistentModelCacheBinding();
+const DEFAULT_PERSISTENT_MODEL_CACHE_PRIMARY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'sdk.models.persistent-cache.primary',
+        exactPaths: [DEFAULT_PERSISTENT_MODEL_CACHE_BINDING.primaryPath],
+        operations: ['delete', 'read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_PERSISTENT_MODEL_CACHE_LEGACY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'sdk.models.persistent-cache.legacy',
+        exactPaths: [DEFAULT_PERSISTENT_MODEL_CACHE_BINDING.legacyPath],
+        operations: ['delete', 'read'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_PERSISTENT_MODEL_CACHE_STORE = createPersistentModelCacheStore({
+    ...DEFAULT_PERSISTENT_MODEL_CACHE_BINDING,
+    primaryIo: DEFAULT_PERSISTENT_MODEL_CACHE_PRIMARY_IO,
+    legacyIo: DEFAULT_PERSISTENT_MODEL_CACHE_LEGACY_IO,
+});
+
+/**
  * Ler cache persistente do disk de forma segura.
  *
  * Nunca re-lança erros — qualquer falha retorna null (cache miss). Valida schema, version, e estrutura de dados antes
@@ -150,11 +253,7 @@ async function readPersistentModelCachePath(cachePath) {
  * @returns {Promise<PersistentModelListCache | null>}
  */
 export async function readPersistentModelCache() {
-    for (const cachePath of resolvePersistentModelCacheReadPaths()) {
-        const result = await readPersistentModelCachePath(cachePath);
-        if (result !== undefined) return result;
-    }
-    return null;
+    return DEFAULT_PERSISTENT_MODEL_CACHE_STORE.read();
 }
 
 /**
@@ -171,34 +270,7 @@ export async function readPersistentModelCache() {
  * @returns {void}
  */
 export function writePersistentModelCacheAsync(models) {
-    if (!Array.isArray(models)) {
-        log('WARN', '[model-cache] writePersistentModelCacheAsync: models não é array');
-        return;
-    }
-
-    const modelsSnapshot = [...models];
-    const writePromise = enqueuePersistentModelCacheMutation(async () => {
-        try {
-            const cachePath = resolvePersistentModelCacheFile();
-            const now = Date.now();
-
-            const data = /** @type {PersistentModelListCache} */ ({
-                schema: 'ModelInfo[]',
-                version: CACHE_SCHEMA_VERSION,
-                fetchedAt: now,
-                models: modelsSnapshot,
-            });
-
-            const json = JSON.stringify(data, null, 2);
-            await writeFileAtomicTrusted(cachePath, json, { caller: 'sdk.models.persistent-cache', mode: 0o600 });
-            log('DEBUG', `[model-cache] Cache persistido: ${modelsSnapshot.length} modelos`);
-        } catch (error) {
-            // Não re-lançar — graceful degrade para L1-only cache
-            const err = toError(error);
-            log('WARN', `[model-cache] Persistência falhou: ${err.message}`);
-        }
-    });
-    void writePromise;
+    DEFAULT_PERSISTENT_MODEL_CACHE_STORE.writeAsync(models);
 }
 
 /**
@@ -212,23 +284,7 @@ export function writePersistentModelCacheAsync(models) {
  * @returns {Promise<void>}
  */
 export async function clearPersistentModelCache() {
-    await enqueuePersistentModelCacheMutation(async () => {
-        for (const cachePath of resolvePersistentModelCacheReadPaths()) {
-            try {
-                const removed = await deleteFileTrusted(cachePath, {
-                    caller: 'sdk.models.persistent-cache',
-                    ignoreMissing: true,
-                });
-                if (removed) log('DEBUG', '[model-cache] Cache persistido deletado');
-            } catch (error) {
-                const err = /** @type {NodeJS.ErrnoException} */ (error);
-                if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
-                    const errMsg = toError(error);
-                    log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
-                }
-            }
-        }
-    });
+    await DEFAULT_PERSISTENT_MODEL_CACHE_STORE.clear();
 }
 
 /**
@@ -255,18 +311,5 @@ export function evaluatePersistentCache(cache) {
  * @returns {Promise<{ exists: boolean; size?: number; age?: string }>}
  */
 export async function getPersistentCacheDiagnostics() {
-    try {
-        const cachePath = resolvePersistentModelCacheFile();
-        const stat = (await statPathTrusted(cachePath, { caller: 'sdk.models.persistent-cache' })).stats;
-        const ageMs = Date.now() - stat.mtime.getTime();
-        const ageHours = Math.floor(ageMs / (60 * 60 * 1000));
-
-        return {
-            exists: true,
-            size: stat.size,
-            age: `${ageHours}h`,
-        };
-    } catch {
-        return { exists: false };
-    }
+    return DEFAULT_PERSISTENT_MODEL_CACHE_STORE.diagnostics();
 }

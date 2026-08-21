@@ -5,11 +5,7 @@
  * @module copilot/mcp/tools/devcontainer-network-posture
  */
 
-import {
-    readBytesRangeFreshTrusted,
-    readTextFreshTrusted,
-    statPathTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { boundedWriteAnnotations, errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execFile } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
@@ -29,6 +25,35 @@ const CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT = resolve(
 const execFileAsync = promisify(execFile);
 const NETWORK_CONTROL_PLANE_REFRESH_TIMEOUT_MS = 10_000;
 const NETWORK_CONTROL_PLANE_REFRESH_MAX_BUFFER = 64 * 1024;
+const NETWORK_POSTURE_FIXED_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.tools.devcontainer-network-posture.fixed',
+        exactPaths: [
+            LOCAL_DNS_SUMMARY,
+            LOCAL_DNS_ACTION_SUMMARY,
+            LOCAL_DNS_STATUS,
+            NETWORK_CONTROL_PLANE_SUMMARY,
+            NETWORK_CONTROL_PLANE_EVENTS,
+            CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT,
+        ],
+        operations: ['read', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+
+/** @param {string} configuredScript */
+function createNetworkScriptIo(configuredScript) {
+    return createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.tools.devcontainer-network-posture.configured-script',
+            exactPaths: [...new Set([configuredScript, CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT])],
+            operations: ['read', 'stat'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+}
 
 const DNS_KEYS = [
     'status',
@@ -81,7 +106,7 @@ export const mcpDevcontainerNetworkControlPlaneRefreshTool = {
 
 /** @returns {Promise<ReturnType<typeof okResult> | ReturnType<typeof errorResult>>} */
 export async function refreshDevcontainerNetworkControlPlaneState() {
-    const script = await inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT);
+    const script = await inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, NETWORK_POSTURE_FIXED_IO);
     if (!script.readable || !script.isFile) {
         return errorResult('Canonical DevContainer network control-plane script is unavailable.', {
             code: 'ERR_DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_UNAVAILABLE',
@@ -278,11 +303,12 @@ async function inspectNetworkControlPlaneRuntime() {
             ? expanded
             : resolve(REPO_ROOT, expanded)
         : CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT;
+    const scriptIo = createNetworkScriptIo(configuredScript);
     const [configured, canonical, configuredVersion, canonicalVersion] = await Promise.all([
-        inspectFile(configuredScript),
-        inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT),
-        readScriptDeclaredVersion(configuredScript),
-        readScriptDeclaredVersion(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT),
+        inspectFile(configuredScript, scriptIo),
+        inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, scriptIo),
+        readScriptDeclaredVersion(configuredScript, scriptIo),
+        readScriptDeclaredVersion(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, scriptIo),
     ]);
     const configuredMatchesCanonical = configuredScript === CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT;
     const fallbackActive =
@@ -324,11 +350,10 @@ function normalizeVersion(value) {
         .replace(/^v/u, '');
 }
 
-/** @param {string} path */
-async function readScriptDeclaredVersion(path) {
+/** @param {string} path @param {ReturnType<typeof createConfiguredFsIo>} io */
+async function readScriptDeclaredVersion(path, io) {
     try {
-        const snapshot = await readBytesRangeFreshTrusted(path, {
-            caller: 'mcp.tools.devcontainer-network-posture',
+        const snapshot = await io.readBytesRangeFresh(path, {
             start: 0,
             maxBytes: 8 * 1024,
             rejectSymlink: true,
@@ -343,10 +368,10 @@ async function readScriptDeclaredVersion(path) {
     }
 }
 
-/** @param {string} path */
-async function inspectFile(path) {
+/** @param {string} path @param {ReturnType<typeof createConfiguredFsIo>} io */
+async function inspectFile(path, io) {
     try {
-        const info = (await statPathTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' })).stats;
+        const info = (await io.statPath(path)).stats;
         return { readable: true, isFile: info.isFile(), error: null };
     } catch (error) {
         return { readable: false, isFile: false, error: error instanceof Error ? error.message : String(error) };
@@ -359,8 +384,7 @@ async function inspectFile(path) {
  */
 async function readSingleLine(path) {
     try {
-        const content = (await readTextFreshTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' }))
-            .content;
+        const content = (await NETWORK_POSTURE_FIXED_IO.readTextFresh(path)).content;
         return { path, readable: true, line: content.split(/\r?\n/u)[0] ?? '', error: null };
     } catch (error) {
         return { path, readable: false, line: null, error: error instanceof Error ? error.message : String(error) };
@@ -376,8 +400,7 @@ async function readSingleLine(path) {
  */
 async function readKvFile(path) {
     try {
-        const content = (await readTextFreshTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' }))
-            .content;
+        const content = (await NETWORK_POSTURE_FIXED_IO.readTextFresh(path)).content;
         const values = Object.fromEntries(
             content
                 .split(/\r?\n/u)
@@ -404,8 +427,7 @@ async function readKvFile(path) {
  */
 async function readTailLines(path, limit) {
     try {
-        const snapshot = await readBytesRangeFreshTrusted(path, {
-            caller: 'mcp.tools.devcontainer-network-posture',
+        const snapshot = await NETWORK_POSTURE_FIXED_IO.readBytesRangeFresh(path, {
             maxBytes: 256 * 1024,
             fromEnd: true,
             rejectSymlink: true,

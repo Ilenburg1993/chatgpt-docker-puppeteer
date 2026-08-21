@@ -16,15 +16,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
-const { mockLog, mockBuildTool, mockLogSwallowed, mockReadTextFreshTrusted, mockWriteFileAtomicTrusted } = vi.hoisted(
-    () => ({
+const { mockLog, mockBuildTool, mockLogSwallowed, mockReadTextFreshConfigured, mockWriteFileAtomicConfigured } =
+    vi.hoisted(() => ({
         mockLog: vi.fn(),
         mockBuildTool: vi.fn((opts) => ({ name: opts.name, handler: opts.handler, _handler: opts.handler })),
         mockLogSwallowed: vi.fn(),
-        mockReadTextFreshTrusted: vi.fn(() => Promise.resolve({ content: '[]' })),
-        mockWriteFileAtomicTrusted: vi.fn(() => Promise.resolve()),
-    }),
-);
+        mockReadTextFreshConfigured: vi.fn(() => Promise.resolve({ content: '[]' })),
+        mockWriteFileAtomicConfigured: vi.fn(() => Promise.resolve()),
+    }));
 
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
@@ -43,9 +42,12 @@ vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: mockLogSwallowed,
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
-    readTextFreshTrusted: mockReadTextFreshTrusted,
-    writeFileAtomicTrusted: mockWriteFileAtomicTrusted,
+vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
+    createConfiguredFsGrant: vi.fn((declaration) => declaration),
+    createConfiguredFsIo: vi.fn(() => ({
+        readTextFresh: mockReadTextFreshConfigured,
+        writeFileAtomic: mockWriteFileAtomicConfigured,
+    })),
 }));
 vi.mock('#copilot/core/safe-json', () => ({
     safeJsonParse: vi.fn((raw) => {
@@ -90,8 +92,8 @@ const {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockReadTextFreshTrusted.mockReset();
-    mockReadTextFreshTrusted.mockResolvedValue({ content: '[]' });
+    mockReadTextFreshConfigured.mockReset();
+    mockReadTextFreshConfigured.mockResolvedValue({ content: '[]' });
     _resetRegistry();
     setCustomToolsBuilder(mockBuildTool);
 });
@@ -244,7 +246,7 @@ describe('F39 — registerCustomTool', () => {
 
     it('serializa snapshots concorrentes e persiste o estado mais novo por último', async () => {
         let releaseFirst = () => {};
-        mockWriteFileAtomicTrusted.mockImplementationOnce(
+        mockWriteFileAtomicConfigured.mockImplementationOnce(
             () =>
                 new Promise((resolve) => {
                     releaseFirst = resolve;
@@ -253,19 +255,18 @@ describe('F39 — registerCustomTool', () => {
 
         const first = registerCustomTool({ name: 'first_tool', description: 'first', handlerId: 'echo' });
         const second = registerCustomTool({ name: 'second_tool', description: 'second', handlerId: 'echo' });
-        await vi.waitFor(() => expect(mockWriteFileAtomicTrusted).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(mockWriteFileAtomicConfigured).toHaveBeenCalledTimes(1));
         releaseFirst();
         await Promise.all([first, second]);
 
-        expect(mockWriteFileAtomicTrusted).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicTrusted.mock.calls[0] ?? [])[1]);
-        const secondSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicTrusted.mock.calls[1] ?? [])[1]);
+        expect(mockWriteFileAtomicConfigured).toHaveBeenCalledTimes(2);
+        const firstSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicConfigured.mock.calls[0] ?? [])[1]);
+        const secondSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicConfigured.mock.calls[1] ?? [])[1]);
         expect(firstSnapshot).toContain('first_tool');
         expect(firstSnapshot).not.toContain('second_tool');
         expect(secondSnapshot).toContain('first_tool');
         expect(secondSnapshot).toContain('second_tool');
-        expect(mockWriteFileAtomicTrusted).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
-            caller: 'sdk.tools.custom',
+        expect(mockWriteFileAtomicConfigured).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
             mode: 0o600,
         });
     });
@@ -338,8 +339,8 @@ describe('F39 — buildCustomTools', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F39 — loadCustomToolsAsync', () => {
-    it('carrega tools do disco pela capability trusted fresh', async () => {
-        mockReadTextFreshTrusted.mockResolvedValue({
+    it('carrega tools do disco pela capability configured bound', async () => {
+        mockReadTextFreshConfigured.mockResolvedValue({
             content: JSON.stringify([{ name: 'disk_tool', description: 'From disk', handlerId: 'echo' }]),
         });
 
@@ -348,11 +349,11 @@ describe('F39 — loadCustomToolsAsync', () => {
         const defs = getCustomToolDefinitions();
         expect(defs).toHaveLength(1);
         expect(defs[0]?.name).toBe('disk_tool');
-        expect(mockReadTextFreshTrusted).toHaveBeenCalledWith(expect.any(String), { caller: 'sdk.tools.custom' });
+        expect(mockReadTextFreshConfigured).toHaveBeenCalledWith(expect.any(String));
     });
 
     it('ignora arquivo json inválido', async () => {
-        mockReadTextFreshTrusted.mockResolvedValue({ content: 'not-json{{{' });
+        mockReadTextFreshConfigured.mockResolvedValue({ content: 'not-json{{{' });
 
         await loadCustomToolsAsync();
 
@@ -360,7 +361,7 @@ describe('F39 — loadCustomToolsAsync', () => {
     });
 
     it('trata file-not-found como registry opcional vazio', async () => {
-        mockReadTextFreshTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        mockReadTextFreshConfigured.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
 
         await loadCustomToolsAsync();
 

@@ -5,10 +5,10 @@
  * @module copilot/mcp/tools/repo-plan
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
     errorResult,
+    getMcpWorkspaceIndexRegistry,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
@@ -21,7 +21,10 @@ import {
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 
-const { readTextValidated, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const readIoIndexStatus = INDEX_REGISTRY.status;
+
+const { readTextValidated, statPath } = getMcpWorkspaceIo();
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 160;
@@ -330,7 +333,7 @@ export const repoPlanTools = [
                 plannedTool: 'repo_index_build',
                 path: resolved.relative,
                 workspaceRoot: getMcpWorkspaceRoot(),
-                currentStats: getIoIndexStats(),
+                currentStats: readIoIndexStatus(),
                 plannedOptions: {
                     workspaceRoot: WORKSPACE_ROOT,
                     recursive: true,

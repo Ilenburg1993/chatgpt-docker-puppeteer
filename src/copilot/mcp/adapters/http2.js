@@ -11,7 +11,7 @@
  * @module copilot/mcp/adapters/http2
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { logMcp } from '#copilot/mcp/control-plane';
 import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
 import { createSecureServer, constants as http2Constants } from 'node:http2';
@@ -22,6 +22,7 @@ import {
     createMcpHttpRequestHandler,
     MCP_PATH,
     notifyMcpHttpStarted,
+    prepareMcpHttpRuntime,
     readMcpHttpSessionRuntimeState,
 } from './http-shared.js';
 
@@ -223,8 +224,17 @@ export async function startHttp2McpServer(opts = {}) {
     const port = normalizeListenPort(opts.port ?? Number(process.env['COPILOT_MCP_PORT'] ?? DEFAULT_HTTP2_PORT));
     const policy = readMcpHttp2ServerPolicy();
     assertLoopbackBindAllowed(host, policy);
+    const tlsIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.adapters.http2.tls-material',
+            exactPaths: [policy.certFile, policy.keyFile],
+            operations: ['read'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
 
-    const { cert, key, certStats, keyStats } = await readTlsMaterial(policy);
+    const { cert, key, certStats, keyStats } = await readTlsMaterial(policy, tlsIo);
     const tlsReport = validateTlsMaterial(cert, key, policy);
 
     const protocolState = createMcpHttpProtocolState(policy.allowHTTP1 ? 'h2-compat' : 'h2');
@@ -238,6 +248,7 @@ export async function startHttp2McpServer(opts = {}) {
 
     const runtime = installHttp2RuntimeGuards(http2Server, policy);
     const timingPolicy = configureHttp2ServerTiming(http2Server);
+    await prepareMcpHttpRuntime();
     await listenHttp2Server(http2Server, host, port);
     logMcp('INFO', 'MCP HTTP/2 server listening.', {
         adapter: { name: MCP_HTTP2_ADAPTER_NAME, version: MCP_HTTP2_ADAPTER_VERSION },
@@ -252,7 +263,7 @@ export async function startHttp2McpServer(opts = {}) {
         },
         runtime: summarizeHttp2Runtime(runtime),
     });
-    notifyMcpHttpStarted();
+    await notifyMcpHttpStarted();
     return http2Server;
 }
 
@@ -508,6 +519,7 @@ function listenHttp2Server(server, host, port) {
 
 /**
  * @param {McpHttp2ServerPolicy} policy
+ * @param {ReturnType<typeof createConfiguredFsIo>} tlsIo
  * @returns {Promise<{
  *     cert: string;
  *     key: string;
@@ -515,11 +527,11 @@ function listenHttp2Server(server, host, port) {
  *     keyStats: { size: number; mode: number };
  * }>}
  */
-async function readTlsMaterial(policy) {
+async function readTlsMaterial(policy, tlsIo) {
     try {
         const [certSnapshot, keySnapshot] = await Promise.all([
-            readTextFreshTrusted(policy.certFile, { caller: 'mcp.adapters.http2' }),
-            readTextFreshTrusted(policy.keyFile, { caller: 'mcp.adapters.http2' }),
+            tlsIo.readTextFresh(policy.certFile),
+            tlsIo.readTextFresh(policy.keyFile),
         ]);
         if (!certSnapshot.isFile || certSnapshot.sizeBytes <= 0 || certSnapshot.sizeBytes > MAX_TLS_FILE_BYTES) {
             throw new Error(`certificate file must be a non-empty regular file <= ${MAX_TLS_FILE_BYTES} bytes`);

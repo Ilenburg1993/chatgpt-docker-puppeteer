@@ -10,7 +10,8 @@
  * @see module:copilot/tools/web-tools
  */
 
-import { createBoundedProcessOutputCapture, utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/platform/process-output';
 import http from 'node:http';
 import https from 'node:https';
 

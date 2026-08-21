@@ -79,6 +79,31 @@ describe('system-prompt-modular › user config', () => {
         expect(cfg.reloadStrategy).toBe('sdk-transform');
     });
 
+    it('não transforma objeto de config forjado em authority para append files', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-system-prompt-unbound-'));
+        const file = join(dir, 'unbound.md');
+        await writeFile(file, 'UNBOUND SECRET CONTENT', 'utf8');
+        const { readUserAppendContent } = await import('../../../../src/copilot/config/system-prompt/index.js');
+        const forged = /** @type {any} */ ({
+            configPath: join(dir, 'forged.json'),
+            mode: 'append',
+            appendFiles: [file],
+            appendText: 'INLINE SAFE CONTENT',
+            autoReload: true,
+            reloadStrategy: 'sdk-transform',
+            objective: '',
+            personality: '',
+            collaborationContract: '',
+            northStar: '',
+            engineeringDoctrine: '',
+            evolutionLoop: '',
+            focusPaths: [],
+        });
+        const content = await readUserAppendContent(forged);
+        expect(content).toContain('INLINE SAFE CONTENT');
+        expect(content).not.toContain('UNBOUND SECRET CONTENT');
+    });
+
     it('lê append files e append text do env', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-system-prompt-'));
         const file = join(dir, 'user-prompt.md');

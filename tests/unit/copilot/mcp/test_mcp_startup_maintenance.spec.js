@@ -1,6 +1,6 @@
 // @ts-check
 
-import { cleanupStaleQuickTunnelState } from '#copilot/mcp/cloudflare';
+import { createCloudflareStateStore } from '#copilot/mcp/cloudflare';
 import {
     readMcpStartupMaintenanceState,
     resetMcpStartupMaintenanceForTests,
@@ -113,7 +113,10 @@ describe('MCP startup maintenance', () => {
         };
         await writeFile(stateFile, JSON.stringify(state), 'utf8');
 
-        const result = await cleanupStaleQuickTunnelState(stateFile, { nowMs: 10_000, staleAfterMs: 1_000 });
+        const result = await createCloudflareStateStore({
+            stateFile,
+            smokeStateFile: path.join(tempDir, 'connector-smoke.json'),
+        }).cleanupStaleQuickTunnelState({ nowMs: 10_000, staleAfterMs: 1_000 });
         assert.equal(result.removed, true);
         await assert.rejects(readFile(stateFile, 'utf8'), /ENOENT/u);
     });

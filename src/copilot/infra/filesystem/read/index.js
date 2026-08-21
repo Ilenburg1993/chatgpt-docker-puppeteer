@@ -3,7 +3,7 @@
 
 /** @typedef {import('./snapshot/index.js').TextFileSnapshot} TextFileSnapshot */
 
-export { getIoReadHashStats, getLineOffsetCacheStats, readBytes, readLines, readText } from './cache/index.js';
+export { readBytes, readLines, readText } from './cache/index.js';
 export { readTextChunks, readTextChunksStream, readTextLineChunks, readTextLineChunksStream } from './chunks/index.js';
 export {
     listDirectoryNamesFresh,
@@ -13,11 +13,6 @@ export {
     readTextFresh,
     statPath,
 } from './fresh/index.js';
-export {
-    getByteLineIndexStats,
-    invalidateByteLineIndexPath,
-    invalidateByteLineIndexSubtree,
-} from './line-index/index.js';
 export {
     createStaleSnapshotError,
     lstatPathSnapshot,

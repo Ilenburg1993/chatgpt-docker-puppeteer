@@ -9,14 +9,10 @@
  * @module copilot/mcp/tools/repo-read-cache
  */
 
-import { registerIoInvalidationHook } from '#copilot/infra/public/filesystem/invalidation';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
+import { getMcpWorkspaceIo, registerMcpWorkspaceInvalidationHook } from '#copilot/mcp/control-plane';
 import path from 'node:path';
 
-const { readTextValidated, readTextChunksValidated, statPathValidated } = createWorkspaceIo({
-    workspaceRoot: getMcpWorkspaceRoot(),
-});
+const { readTextValidated, readTextChunksValidated, statPathValidated } = getMcpWorkspaceIo();
 
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
 const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
@@ -138,7 +134,7 @@ export function clearRepoReadFileResultCacheForResolvedSubtree(resolvedPath) {
 /**
  * Read a UTF-8 file/window and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} resolved
  * @param {number | undefined} startLine
  * @param {number | undefined} endLine
  * @param {'full' | 'returned' | 'none'} [hashMode]
@@ -209,7 +205,7 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
 /**
  * Read line chunks and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} resolved
  * @param {number} effectiveStartLine
  * @param {number | undefined} endLine
  * @param {number} chunkLines
@@ -349,7 +345,7 @@ export function resetRepoReadResponseCacheForTest() {
  */
 export function ensureRepoReadCacheInvalidationHook() {
     if (repoReadCacheInvalidationUnregister) return;
-    repoReadCacheInvalidationUnregister = registerIoInvalidationHook((filePath, event) => {
+    repoReadCacheInvalidationUnregister = registerMcpWorkspaceInvalidationHook((filePath, event) => {
         const removed = event.recursive
             ? clearRepoReadFileResultCacheForResolvedSubtree(filePath)
             : clearRepoReadFileResultCacheForResolvedPath(filePath);
@@ -382,7 +378,7 @@ function clearRepoReadCacheEntriesByPrefix(prefix) {
 /**
  * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {string} key
- * @param {import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath} validatedReadPath
+ * @param {import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath} validatedReadPath
  * @param {{
  *     hitStat: 'hits' | 'chunkHits';
  *     trustWindowHitStat: 'trustWindowHits' | 'chunkTrustWindowHits';

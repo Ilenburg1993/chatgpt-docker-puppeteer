@@ -3,9 +3,14 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { chmodFileUnlocked } from './unlocked.js';
 
 /**
@@ -23,8 +28,9 @@ import { chmodFileUnlocked } from './unlocked.js';
  *     advisoryLimits?: Record<string, unknown>;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function chmodFileLocked(filePath, mode, options = {}) {
+export async function chmodFileLocked(filePath, mode, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
@@ -44,7 +50,7 @@ export async function chmodFileLocked(filePath, mode, options = {}) {
                     ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                 }),
             );
-            if (value.changed) invalidateIoCoherencePath(filePath);
+            if (value.changed) invalidateIoCoherencePath(filePath, {}, invalidationBus);
             const io = publishIoOperationResult(
                 buildIoMeta({
                     operation: 'metadata',
@@ -67,6 +73,8 @@ export async function chmodFileLocked(filePath, mode, options = {}) {
                     },
                 }),
                 true,
+                undefined,
+                getIoTelemetryRuntimeOption(options),
             );
             return { ...value, lockWaitMs: lease.waitMs, io };
         } finally {
@@ -85,6 +93,7 @@ export async function chmodFileLocked(filePath, mode, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

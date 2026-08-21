@@ -160,7 +160,6 @@ Principais famílias externas:
 #copilot/infra/public/filesystem/mutation
 #copilot/infra/public/filesystem/invalidation
 #copilot/infra/public/filesystem/workspace
-#copilot/infra/public/filesystem/trusted
 #copilot/infra/public/filesystem/skills
 #copilot/infra/public/persistence/json
 #copilot/infra/public/persistence/jsonl
@@ -299,13 +298,14 @@ Composition root de I/O workspace-bound:
 É intencionalmente um composition module relativamente grande; o critério é manter uma única
 autoridade de containment/policy.
 
-### 4.10 `filesystem/trusted/` e `skills/`
+### 4.10 filesystem configurado e `skills/`
 
-`trusted` é uma capability privilegiada para paths explicitamente configurados fora do containment
-comum. Seu uso externo é auditado por manifesto/CI.
+A antiga capability genérica `filesystem/trusted` foi eliminada. Estado externo ao workspace deve
+ser vinculado previamente por um owner com `ConfiguredFsGrant`; paths escolhidos pelo operador
+passam por `WorkspacePathAuthority`; recursos de sistema operacional que não são arquivos de
+workspace exigem primitives de domínio estreitas, sem aceitar paths arbitrários.
 
-`skills` fornece uma capability estreita de catálogo; consumers de skills não recebem generic
-trusted filesystem.
+`skills` fornece uma capability estreita de catálogo e não recebe authority genérica de filesystem.
 
 ### 4.11 `database/`
 
@@ -491,7 +491,7 @@ Além disso:
 - rollback snapshots/sidecars são bounded;
 - applied-but-unconfirmed não deve provocar reexecução que duplique mutation;
 - fingerprints ricos são safety net contra invalidação perdida;
-- trusted IO permanece explicitamente auditado;
+- generic trusted IO não existe; sua reintrodução é bloqueada por invariant negativo de CI;
 - leituras/writers low-level fora do owner esperado são inventariados por CI.
 
 ---
@@ -505,7 +505,7 @@ npm run -s tsc7 -- --checkers 2 -p config/typing/strict/tsconfig.strict.src.copi
 npx vitest run tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js
 npm run -s check:copilot:fs-read-boundaries:strict
 npm run -s check:copilot:fs-mutation-boundaries
-npm run -s check:copilot:trusted-io-boundaries
+npm run -s check:copilot:no-trusted-io
 npm run -s lint:copilot
 npm run -s test:copilot:unit
 ```

@@ -11,6 +11,7 @@
  * @property {boolean} [cacheBytes=true] Quando captureTextSnapshots=true, também prima a entrada bytes. Default: true.
  *   Default is `true`
  * @property {AbortSignal} [signal]
+ * @property {{l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>}} [cacheRuntime]
  */
 
 /**
@@ -22,6 +23,7 @@
  * @property {number} durationMs
  * @property {number} pathCount
  * @property {boolean} active
+ * @property {'opening' | 'ready' | 'degraded' | 'closing' | 'closed'} state
  */
 
 /**
@@ -34,6 +36,7 @@
  * @property {number} startedAt
  * @property {number | null} endedAt
  * @property {boolean} active
+ * @property {'opening' | 'ready' | 'degraded' | 'closing' | 'closed'} state
  */
 
 export {};

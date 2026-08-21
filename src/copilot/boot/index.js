@@ -7,6 +7,7 @@
  * @module copilot/boot
  */
 
+export * from './application-infra.js';
 export * from './config.js';
 export * from './contract.js';
 export * from './lifecycle-runner.js';

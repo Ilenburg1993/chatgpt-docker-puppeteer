@@ -5,25 +5,28 @@
 
 import { invalidateIoCoherenceSubtree } from '#copilot/infra/internal/filesystem/invalidation';
 import { writeFileAtomic } from '#copilot/infra/internal/filesystem/write';
-import {
-    closeScope,
-    declareScope,
-    findSymbol,
-    getScopeContext,
-    getScopeStats,
-    invalidateScopePath,
-    listScopes,
-    refreshScope,
-} from '#copilot/infra/internal/indexing/context';
+import { createWorkspaceScopeRuntime } from '#copilot/infra/internal/indexing/context';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/internal/observability';
-import { resetIoL1CacheForTest } from '#copilot/infra/public/testing';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it } from 'vitest';
 
 let tmpDir = '';
+/** @type {ReturnType<typeof createWorkspaceScopeRuntime>} */
+let scopeRuntime;
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let infraRuntime;
+const closeScope = (sessionId) => scopeRuntime.closeScope(sessionId);
+const declareScope = (options) => scopeRuntime.declareScope(options);
+const findSymbol = (sessionId, name, options = {}) => scopeRuntime.findSymbol(sessionId, name, options);
+const getScopeContext = (sessionId, options = {}) => scopeRuntime.getScopeContext(sessionId, options);
+const getScopeStats = (sessionId) => scopeRuntime.getScopeStats(sessionId);
+const invalidateScopePath = (sessionId, filePath) => scopeRuntime.invalidateScopePath(sessionId, filePath);
+const listScopes = () => scopeRuntime.listScopes();
+const refreshScope = (sessionId, paths) => scopeRuntime.refreshScope(sessionId, paths);
 const JS_A = `
 // Módulo A
 export function helperA() { return 'a'; }
@@ -39,12 +42,27 @@ export class ServiceB {
 export function utilB(x) { return x * 2; }
 `;
 
+beforeEach(() => {
+    infraRuntime = createInfraRuntime({ runtimeId: `session-infra-${Date.now()}-${Math.random()}` });
+    scopeRuntime = createWorkspaceScopeRuntime({
+        runtimeId: `session-scope-test-${Date.now()}-${Math.random()}`,
+        workspaceRoot: tmpDir || undefined,
+        cacheRuntime: infraRuntime.coherence,
+        invalidationBus: infraRuntime.coherence.invalidation,
+        parserCacheRuntime: infraRuntime.parserCache,
+    });
+});
+
+afterEach(async () => {
+    await scopeRuntime.dispose();
+    await infraRuntime.dispose();
+});
+
 beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'io-session-scope-test-'));
     await fs.writeFile(path.join(tmpDir, 'a.js'), JS_A);
     await fs.writeFile(path.join(tmpDir, 'b.js'), JS_B);
     await fs.writeFile(path.join(tmpDir, 'c.json'), '{"env":"test","port":3000}');
-    resetIoL1CacheForTest();
 });
 
 afterAll(async () => {
@@ -130,7 +148,7 @@ describe('declareScope + getScopeStats', () => {
         assert.strictEqual(stats.lastError?.phase, 'warm');
         assert.ok(!JSON.stringify(stats.lastError).includes(missingPath));
         assert.ok(
-            readIoRuntimeHealthSnapshot().alerts.some((alert) => alert.code === 'IO_SCOPE_DEGRADED'),
+            readIoRuntimeHealthSnapshot(infraRuntime).alerts.some((alert) => alert.code === 'IO_SCOPE_DEGRADED'),
             'health deve projetar escopo degradado',
         );
 
@@ -289,7 +307,12 @@ describe('refreshScope', () => {
         await handle.awaitReady();
         assert.ok(findSymbol(sessionId, 'beforeWrite', { exactMatch: true }).length >= 1);
 
-        await writeFileAtomic(watchedPath, "export function afterWrite() { return 'after'; }\n", { encoding: 'utf8' });
+        await writeFileAtomic(
+            watchedPath,
+            "export function afterWrite() { return 'after'; }\n",
+            { encoding: 'utf8' },
+            infraRuntime.coherence.invalidation,
+        );
 
         const invalidatedStats = getScopeStats(sessionId);
         assert.ok(invalidatedStats !== null);
@@ -366,7 +389,7 @@ describe('refreshScope', () => {
         await handle.awaitReady();
         assert.ok(findSymbol(sessionId, 'nestedChild', { exactMatch: true }).length >= 1);
 
-        invalidateIoCoherenceSubtree(nestedDir);
+        invalidateIoCoherenceSubtree(nestedDir, {}, infraRuntime.coherence.invalidation);
 
         const stats = getScopeStats(sessionId);
         assert.ok(stats !== null);

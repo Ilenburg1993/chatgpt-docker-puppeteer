@@ -5,14 +5,8 @@
  * @module copilot/mcp/control-plane/index-auto-build
  */
 
-import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/filesystem/invalidation';
-import {
-    buildIoIndexForDirectory,
-    filterIoIndexRefreshDomainPaths,
-    getIoIndexStats,
-    reconcileIoIndexAutoRefreshDomain,
-    refreshIoIndexPaths,
-} from '#copilot/infra/public/indexing';
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
+import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/filesystem/invalidation/replay';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { isAbsolute, relative, resolve } from 'node:path';
 import {
@@ -23,7 +17,7 @@ import {
     readIndexStartupCheckpoint,
     writeIndexStartupCheckpoint,
 } from './index-auto-build-checkpoint.js';
-import { resolveReadPath } from './paths.js';
+import { getMcpWorkspaceIndexRegistry, resolveReadPath } from './paths.js';
 
 /**
  * @typedef {object} McpIndexAutoBuildConfig
@@ -48,6 +42,13 @@ import { resolveReadPath } from './paths.js';
  * @property {McpIndexAutoBuildConfig} config
  * @property {Record<string, unknown>} stats
  */
+
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
+const filterIoIndexRefreshDomainPaths = INDEX_REGISTRY.filterRefreshDomainPaths;
+const reconcileIoIndexAutoRefreshDomain = INDEX_REGISTRY.reconcileAutoRefreshDomain;
+const refreshIoIndexPaths = INDEX_REGISTRY.refreshPaths;
+const readIoIndexStatus = INDEX_REGISTRY.status;
 
 const DEFAULT_AUTO_BUILD_PATH = 'src/copilot';
 const DEFAULT_AUTO_BUILD_MAX_FILES = 5000;
@@ -156,7 +157,7 @@ function makeState(input) {
         result: input.result ?? null,
         error: input.error ?? null,
         config: input.config ?? readMcpIndexAutoBuildConfig(),
-        stats: /** @type {Record<string, unknown>} */ (getIoIndexStats()),
+        stats: /** @type {Record<string, unknown>} */ (readIoIndexStatus()),
     };
 }
 
@@ -168,7 +169,7 @@ export function readMcpIndexAutoBuildState() {
         return {
             ...autoBuildState,
             config: { ...autoBuildState.config },
-            stats: /** @type {Record<string, unknown>} */ (getIoIndexStats()),
+            stats: /** @type {Record<string, unknown>} */ (readIoIndexStatus()),
             result: autoBuildState.result ? { ...autoBuildState.result } : null,
             error: autoBuildState.error ? { ...autoBuildState.error } : null,
         };
@@ -232,13 +233,14 @@ async function runIndexAutoBuild(config) {
             });
         }
         const startupStartedAt = Date.now();
-        const indexStats = /** @type {Record<string, unknown>} */ (getIoIndexStats());
+        const indexStats = /** @type {Record<string, unknown>} */ (readIoIndexStatus());
         const schemaVersion = Number(indexStats['schemaVersion'] ?? 0);
         const indexFiles = Number(indexStats['files'] ?? 0);
         const checkpoint = readIndexStartupCheckpoint(config.path);
         const journalReplay = readCrossProcessInvalidationReplay({
             afterSequence: checkpoint?.journalSequence ?? 0,
             maxRows: config.journalReplayMaxRows,
+            db: getApplicationInfraRuntime().database.get(),
         });
         const journalScope = classifyIndexJournalReplayRows(journalReplay.rows, resolved.resolved);
         const journalDomain = await filterIoIndexRefreshDomainPaths(journalScope.paths, {

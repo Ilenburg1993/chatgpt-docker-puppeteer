@@ -185,9 +185,9 @@ describe('repo_apply_patch_batch V2', () => {
             causalFailureCount: 1,
             abortedOperationCount: 2,
             causalByCode: { ERR_PATCH_NOT_FOUND: 1 },
-            failureClassCounts: { 'stale-context': 1 },
-            retryabilityCounts: { 'caller-refresh': 1 },
-            recoveryRequiredTargetCount: 1,
+            failureClassCounts: { 'virtual-batch-context': 1 },
+            retryabilityCounts: { 'manual-decision': 1 },
+            recoveryRequiredTargetCount: 0,
             convergenceCandidateCount: 0,
         });
         const causal = failures[0];
@@ -196,7 +196,10 @@ describe('repo_apply_patch_batch V2', () => {
         assert.deepEqual(causal?.['affectedOperationIndices'], [0, 1, 2]);
         assert.equal(causal?.['affectedOperationCount'], 3);
         assert.equal(causal?.['abortedOperationCount'], 2);
-        assert.match(String(causal?.['nextAction']), /failed target|target/i);
+        assert.equal(causal?.['failureClass'], 'virtual-batch-context');
+        assert.equal(causal?.['retryability'], 'manual-decision');
+        assert.equal(causal?.['recoveryRequired'], false);
+        assert.match(String(causal?.['nextAction']), /virtual|anchor|ordering/iu);
         assert.equal(await readFile(absolutePath, 'utf8'), initial);
     });
 

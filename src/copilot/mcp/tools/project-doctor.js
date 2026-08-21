@@ -5,13 +5,12 @@
  * @module copilot/mcp/tools/project-doctor
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { getMcpWorkspaceIo, getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execGit } from '#copilot/mcp/tools/shared';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-const projectDoctorWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const projectDoctorWorkspaceIo = getMcpWorkspaceIo();
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

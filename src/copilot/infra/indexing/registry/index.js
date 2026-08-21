@@ -1,20 +1,10 @@
 // @ts-check
 /** @module copilot/infra/indexing/registry */
-
-export { buildIoIndexForDirectory } from './build.js';
 export {
-    findIoIndexImports,
-    findIoIndexImportsByPath,
-    findIoIndexSymbol,
-    invalidateIoIndexPath,
-    searchIoIndex,
-    searchIoIndexLiteral,
-} from './query.js';
-export {
+    createIndexAutoRefreshDomain,
+    executeIoIndexPathRefresh,
     filterIoIndexRefreshDomainPaths,
-    flushIoIndexAutoRefresh,
-    getIoIndexAutoRefreshStats,
-    readIoIndexAutoRefreshConfig,
-    reconcileIoIndexAutoRefreshDomain,
-} from './refresh/index.js';
-export { getIoIndex, getIoIndexStats, refreshIoIndexPaths } from './runtime/index.js';
+    isIndexRefreshDomainCandidate,
+} from './core/index.js';
+export { DEFAULT_INDEX_EXTENSIONS } from './extensions/index.js';
+export { createIoIndexRegistryRuntime, readIoIndexRuntimeConfig } from './instance/index.js';

@@ -1,11 +1,4 @@
 // @ts-check
 /** @module copilot/infra/filesystem/invalidation/bus */
-
+export { createIoInvalidationBusRuntime } from './bus-runtime.js';
 export { normalizeIoInvalidationEvent } from './events.js';
-export {
-    flushIoInvalidationQueue,
-    getIoInvalidationBusStats,
-    getRecentIoInvalidation,
-    publishIoInvalidation,
-    registerIoInvalidationHook,
-} from './runtime.js';

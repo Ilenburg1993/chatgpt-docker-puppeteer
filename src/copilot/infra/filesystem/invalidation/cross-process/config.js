@@ -2,9 +2,6 @@
 /** Cross-process invalidation runtime configuration. */
 import { booleanValueOr, boundedIntegerOr } from '#copilot/infra/internal/platform';
 
-const isTestRuntime =
-    process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test' || process.env['NODE_ENV'] === 'testing';
-const DEFAULT_ENABLED = !isTestRuntime;
 export const DEFAULT_CROSS_PROCESS_POLL_MS = 125;
 const DEFAULT_BATCH_MAX = 256;
 const DEFAULT_MAX_ROWS = 10_000;
@@ -13,8 +10,9 @@ const DEFAULT_CLEANUP_INTERVAL_MS = 60 * 1000;
 
 /** @param {NodeJS.ProcessEnv} [env] @returns {import('./types.js').CrossProcessInvalidationConfig} */
 export function readCrossProcessInvalidationConfig(env = process.env) {
-    return {
-        enabled: booleanValueOr(env['IO_CROSS_PROCESS_INVALIDATION_ENABLED'], DEFAULT_ENABLED),
+    const isTestRuntime = env['VITEST'] === 'true' || env['NODE_ENV'] === 'test' || env['NODE_ENV'] === 'testing';
+    return Object.freeze({
+        enabled: booleanValueOr(env['IO_CROSS_PROCESS_INVALIDATION_ENABLED'], !isTestRuntime),
         pollMs: boundedIntegerOr(
             env['IO_CROSS_PROCESS_INVALIDATION_POLL_MS'],
             DEFAULT_CROSS_PROCESS_POLL_MS,
@@ -35,5 +33,5 @@ export function readCrossProcessInvalidationConfig(env = process.env) {
             1_000,
             60 * 60 * 1000,
         ),
-    };
+    });
 }

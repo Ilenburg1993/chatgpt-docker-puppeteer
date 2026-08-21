@@ -7,4 +7,4 @@
 export { warmCacheForPaths, warmRecentPaths, warmTextSnapshotsForPaths } from './cache-warm.js';
 export { warmFromDirectory } from './directory.js';
 export { warmReadThroughContext } from './read-through.js';
-export { endSessionScope, getSessionScopeStats, listSessionScopes, startSessionScope } from './session.js';
+export { createPrefetchSessionRegistry } from './registry.js';

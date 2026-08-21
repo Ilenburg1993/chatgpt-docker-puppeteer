@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync, redactSecretText, toError } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withSessionRuntimeMeta } from './session-route-helpers.js';

@@ -10,7 +10,7 @@ import {
     summarizeProbeEnvelope,
     summarizeToolsListProbe,
 } from './cli-probe.js';
-import { writeConnectorSmokeState } from './state.js';
+import { createCloudflareStateStore } from './state.js';
 
 const DEFAULT_MCP_PROTOCOL_VERSION = '2025-11-25';
 const DEFAULT_SMOKE_ATTEMPTS = 3;
@@ -107,7 +107,7 @@ export async function runCloudflareSmoke({
     };
     if (persistState) {
         try {
-            await writeConnectorSmokeState(config.smokeStateFile, {
+            await createCloudflareStateStore(config).writeConnectorSmokeState({
                 connectorUrl,
                 checkedAt: new Date().toISOString(),
                 health: report.health,

@@ -7,18 +7,22 @@
 import { resolveHooksStateDir } from '#copilot/boot';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
 import { safeJsonParse, SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
-import {
-    deleteFileTrusted,
-    listDirectoryNamesFreshTrusted,
-    readTextFreshTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';
 import { startSpan } from '../../ports/tracing-port.js';
 
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
+const SNAPSHOT_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'agent.session.state.snapshot-store',
+        roots: [SNAPSHOT_DIR],
+        operations: ['delete', 'list', 'read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 /**
  * @param {unknown} snapshotId
@@ -68,10 +72,7 @@ export async function saveSnapshotFileAsync(snapshot) {
             const filename = `${snapshotId}.json`;
             const filepath = join(SNAPSHOT_DIR, filename);
 
-            await writeFileAtomicTrusted(filepath, JSON.stringify(snapshot, null, 4), {
-                caller: 'agent.session.state.snapshot-store',
-                mode: 0o600,
-            });
+            await SNAPSHOT_FS.writeFileAtomic(filepath, JSON.stringify(snapshot, null, 4), { mode: 0o600 });
             log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
 
             await pruneSnapshotFilesAsync();
@@ -87,8 +88,7 @@ export async function saveSnapshotFileAsync(snapshot) {
 export async function listSnapshotFilesAsync() {
     let entries;
     try {
-        entries = (await listDirectoryNamesFreshTrusted(SNAPSHOT_DIR, { caller: 'agent.session.state.snapshot-store' }))
-            .entries;
+        entries = (await SNAPSHOT_FS.listDirectoryNamesFresh(SNAPSHOT_DIR)).entries;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code === 'ENOENT' || code === 'ENOTDIR') return [];
@@ -103,8 +103,7 @@ export async function listSnapshotFilesAsync() {
         if (!fileSnapshotId) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
-            const text = (await readTextFreshTrusted(filepath, { caller: 'agent.session.state.snapshot-store' }))
-                .content;
+            const text = (await SNAPSHOT_FS.readTextFresh(filepath)).content;
             const jsonResult = safeJsonParse(text, `[SessionSnapshot/listAsync/${f}]`);
             if (!jsonResult.ok) continue;
             const parsed = SnapshotListItemSchema.safeParse(jsonResult.data);
@@ -144,8 +143,7 @@ export async function loadSnapshotFileAsync(snapshotId) {
         const filepath = join(SNAPSHOT_DIR, `${normalizedSnapshotId}.json`);
 
         try {
-            const text = (await readTextFreshTrusted(filepath, { caller: 'agent.session.state.snapshot-store' }))
-                .content;
+            const text = (await SNAPSHOT_FS.readTextFresh(filepath)).content;
             const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
             if (!jsonResult.ok) return null;
             const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
@@ -180,10 +178,7 @@ export async function pruneSnapshotFilesAsync(keep = MAX_SNAPSHOTS) {
     for (const snap of toRemove) {
         try {
             if (snap?.filepath) {
-                const deletion = await deleteFileTrusted(snap.filepath, {
-                    caller: 'agent.session.state.snapshot-store',
-                    ignoreMissing: true,
-                });
+                const deletion = await SNAPSHOT_FS.deleteFile(snap.filepath, { ignoreMissing: true });
                 if (deletion) removed++;
             }
         } catch (e) {

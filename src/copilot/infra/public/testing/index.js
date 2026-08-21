@@ -1,4 +1,11 @@
 // @ts-check
 /** @module copilot/infra/public/testing */
 
-export * from '../../testing/index.js';
+export {
+    getValidatedMutableWorkspacePathStats,
+    getValidatedReadWorkspacePathStats,
+    resetCopilotNodeCompileCacheHealthForTest,    resetIoCapacityPreflightCacheForTest,    resetSearchSubprocessCacheForTest,
+    resetSiblingTempCleanupForTest,
+    resetValidatedMutableWorkspacePathStatsForTest,
+    resetValidatedReadWorkspacePathStatsForTest,
+} from '../../testing/index.js';

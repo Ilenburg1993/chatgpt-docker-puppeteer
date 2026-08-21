@@ -9,9 +9,9 @@
  * @module copilot/mcp/tools/company-knowledge
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     errorResult,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
@@ -47,7 +47,7 @@ const DEFAULT_CORPUS_ROOTS = Object.freeze([
     'src/copilot/model-gateway/README.md',
 ]);
 
-const companyKnowledgeWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const companyKnowledgeWorkspaceIo = getMcpWorkspaceIo();
 
 const DOCUMENT_EXTENSIONS = new Set(['.md', '.mdx', '.txt', '.json', '.jsonc', '.yaml', '.yml']);
 const SKIPPED_DIRECTORY_NAMES = new Set([

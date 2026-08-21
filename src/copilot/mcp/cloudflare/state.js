@@ -5,11 +5,8 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import {
-    deleteFileTrusted,
-    readTextFreshTrusted,
-    writeFileAtomicTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { resolve } from 'node:path';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -60,95 +57,103 @@ import {
  */
 
 /**
- * @param {string} stateFile
- * @returns {Promise<QuickTunnelState | { error: string } | undefined>}
- */
-export async function readQuickTunnelState(stateFile) {
-    try {
-        const parsed = JSON.parse((await readTextFreshTrusted(stateFile, { caller: 'mcp.cloudflare.state' })).content);
-        return isQuickTunnelState(parsed) ? parsed : { error: 'Invalid Cloudflare quick tunnel state file.' };
-    } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
-        return { error: error instanceof Error ? error.message : String(error) };
-    }
-}
-
-/**
- * @param {string} stateFile
- * @param {QuickTunnelState} state
- * @returns {Promise<void>}
- */
-export async function saveQuickTunnelState(stateFile, state) {
-    await writeFileAtomicTrusted(stateFile, `${JSON.stringify(state, null, 2)}\n`, {
-        caller: 'mcp.cloudflare.state',
-        mode: 0o600,
-    });
-}
-
-/**
- * @param {string} stateFile
- * @param {QuickTunnelState | { error: string } | undefined} state
- * @param {QuickTunnelSmokeState} lastSmoke
- * @returns {Promise<boolean>}
- */
-export async function updateQuickTunnelLastSmoke(stateFile, state, lastSmoke) {
-    if (!isQuickTunnelState(state)) return false;
-    await saveQuickTunnelState(stateFile, { ...state, lastSmoke });
-    return true;
-}
-
-/**
- * Remove only a valid quick-tunnel state whose process is dead and whose age exceeds the configured stale window. Live,
- * recent and malformed state is preserved for operator inspection.
+ * Bind Cloudflare persistence to the two configured state files once. Callers never receive generic filesystem
+ * authority and state operations never accept a caller-provided path after store creation.
  *
- * @param {string} stateFile
- * @param {{ nowMs?: number; staleAfterMs?: number }} [options]
- * @returns {Promise<{ removed: boolean; reason: string; summary: ReturnType<typeof summarizeQuickTunnelState> }>}
+ * Relative config paths are resolved eagerly so later cwd changes cannot retarget the capability.
+ *
+ * @param {{ stateFile: string; smokeStateFile: string }} config
  */
-export async function cleanupStaleQuickTunnelState(stateFile, options = {}) {
-    const state = await readQuickTunnelState(stateFile);
-    const summary = summarizeQuickTunnelState(
-        state,
-        options.nowMs ?? Date.now(),
-        options.staleAfterMs ?? 6 * 60 * 60 * 1000,
+export function createCloudflareStateStore(config) {
+    const stateFile = resolveConfiguredStatePath(config?.stateFile, 'stateFile');
+    const smokeStateFile = resolveConfiguredStatePath(config?.smokeStateFile, 'smokeStateFile');
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.cloudflare.state',
+            exactPaths: [stateFile, smokeStateFile],
+            operations: ['read', 'write', 'delete'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
     );
-    if (!summary.configured) return { removed: false, reason: 'missing', summary };
-    if (!summary.stateValid) return { removed: false, reason: 'invalid', summary };
-    if (summary.processAlive) return { removed: false, reason: 'process-alive', summary };
-    if (!summary.stale) return { removed: false, reason: 'not-stale', summary };
-    const removed = await deleteFileTrusted(stateFile, {
-        caller: 'mcp.cloudflare.state',
-        ignoreMissing: true,
-    });
-    return { removed: removed !== null, reason: removed ? 'stale-dead-state' : 'already-missing', summary };
-}
 
-/**
- * @param {string} smokeFile
- * @returns {Promise<ConnectorSmokeState | { error: string } | undefined>}
- */
-export async function readConnectorSmokeState(smokeFile) {
-    try {
-        const parsed = JSON.parse((await readTextFreshTrusted(smokeFile, { caller: 'mcp.cloudflare.state' })).content);
-        return normalizeLastSmoke(parsed)
-            ? /** @type {ConnectorSmokeState} */ (parsed)
-            : { error: 'Invalid connector smoke state file.' };
-    } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
-        return { error: error instanceof Error ? error.message : String(error) };
+    async function readQuickTunnelState() {
+        try {
+            const parsed = JSON.parse((await io.readTextFresh(stateFile)).content);
+            return isQuickTunnelState(parsed) ? parsed : { error: 'Invalid Cloudflare quick tunnel state file.' };
+        } catch (error) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
+            return { error: error instanceof Error ? error.message : String(error) };
+        }
     }
+
+    /** @param {QuickTunnelState} state */
+    async function saveQuickTunnelState(state) {
+        await io.writeFileAtomic(stateFile, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    }
+
+    /** @param {QuickTunnelState | { error: string } | undefined} state @param {QuickTunnelSmokeState} lastSmoke */
+    async function updateQuickTunnelLastSmoke(state, lastSmoke) {
+        if (!isQuickTunnelState(state)) return false;
+        await saveQuickTunnelState({ ...state, lastSmoke });
+        return true;
+    }
+
+    /**
+     * Remove only a valid quick-tunnel state whose process is dead and whose age exceeds the configured stale window.
+     * Live, recent and malformed state is preserved for operator inspection.
+     *
+     * @param {{ nowMs?: number; staleAfterMs?: number }} [options]
+     */
+    async function cleanupStaleQuickTunnelState(options = {}) {
+        const state = await readQuickTunnelState();
+        const summary = summarizeQuickTunnelState(
+            state,
+            options.nowMs ?? Date.now(),
+            options.staleAfterMs ?? 6 * 60 * 60 * 1000,
+        );
+        if (!summary.configured) return { removed: false, reason: 'missing', summary };
+        if (!summary.stateValid) return { removed: false, reason: 'invalid', summary };
+        if (summary.processAlive) return { removed: false, reason: 'process-alive', summary };
+        if (!summary.stale) return { removed: false, reason: 'not-stale', summary };
+        const removed = await io.deleteFile(stateFile, { ignoreMissing: true });
+        return { removed: removed !== null, reason: removed ? 'stale-dead-state' : 'already-missing', summary };
+    }
+
+    async function readConnectorSmokeState() {
+        try {
+            const parsed = JSON.parse((await io.readTextFresh(smokeStateFile)).content);
+            return normalizeLastSmoke(parsed)
+                ? /** @type {ConnectorSmokeState} */ (parsed)
+                : { error: 'Invalid connector smoke state file.' };
+        } catch (error) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
+            return { error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    /** @param {ConnectorSmokeState} lastSmoke */
+    async function writeConnectorSmokeState(lastSmoke) {
+        await io.writeFileAtomic(smokeStateFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, { mode: 0o600 });
+    }
+
+    return Object.freeze({
+        readQuickTunnelState,
+        saveQuickTunnelState,
+        updateQuickTunnelLastSmoke,
+        cleanupStaleQuickTunnelState,
+        readConnectorSmokeState,
+        writeConnectorSmokeState,
+    });
 }
 
-/**
- * @param {string} smokeFile
- * @param {ConnectorSmokeState} lastSmoke
- * @returns {Promise<void>}
- */
-export async function writeConnectorSmokeState(smokeFile, lastSmoke) {
-    await writeFileAtomicTrusted(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, {
-        caller: 'mcp.cloudflare.state',
-        mode: 0o600,
-    });
+/** @param {unknown} value @param {string} label */
+function resolveConfiguredStatePath(value, label) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw || /[\r\n\0]/u.test(raw)) {
+        throw new TypeError(`Cloudflare ${label} must be a non-empty single-line path.`);
+    }
+    return resolve(raw);
 }
 
 /**

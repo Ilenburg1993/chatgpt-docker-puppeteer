@@ -18,9 +18,10 @@ import { searchTextViaSubprocess } from './process.js';
  *
  * @param {string} targetPath
  * @param {TextSearchOptions} options
+ * @param {{ indexRegistry?: ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime> }} [context]
  * @returns {Promise<TextSearchResult>}
  */
-export async function searchText(targetPath, options) {
+export async function searchText(targetPath, options, context = {}) {
     assertValidTargetPath(targetPath);
     if (typeof options.pattern !== 'string' || options.pattern.trim().length === 0) {
         const error = /** @type {TypeError & { code?: string }} */ (new TypeError('pattern inválido para searchText'));
@@ -70,7 +71,14 @@ export async function searchText(targetPath, options) {
 
     try {
         const ripgrepAvailable = await isRipgrepAvailable();
-        const indexAttempt = trySearchTextViaIndex(targetPath, options, searchWindow, ripgrepAvailable, buildSearchIo);
+        const indexAttempt = trySearchTextViaIndex(
+            targetPath,
+            options,
+            searchWindow,
+            ripgrepAvailable,
+            buildSearchIo,
+            context.indexRegistry ?? null,
+        );
         if (indexAttempt.result) return indexAttempt.result;
         return await searchTextViaSubprocess(
             targetPath,

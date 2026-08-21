@@ -5,12 +5,12 @@
  * @module copilot/mcp/tools/maintenance
  */
 
-import { buildIoIndexForDirectory, getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
     boundedWriteAnnotations,
     buildAiArtifactsReport,
     cleanupAiArtifacts,
     destructiveAnnotations,
+    getMcpWorkspaceIndexRegistry,
     inspectRootDependencyUpdates,
     okResult,
     openWorldBoundedWriteAnnotations,
@@ -24,6 +24,10 @@ import { z } from 'zod';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
+
+const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
+const readIoIndexStatus = INDEX_REGISTRY.status;
+const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
 
 const maintenanceFixSchema = z.enum([
     'ai-artifacts-report',
@@ -39,7 +43,7 @@ const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-repo
  * @returns {Promise<Record<string, unknown>[]>}
  */
 async function buildMaintenancePlanItems() {
-    const indexStats = getIoIndexStats();
+    const indexStats = readIoIndexStatus();
     const metrics = readMcpMetricsSnapshot();
     const aiArtifactsReport = await buildAiArtifactsReport();
     return [
@@ -294,7 +298,7 @@ export const maintenanceTools = [
                                 maxFiles: 25_000,
                                 pruneMissing: true,
                             },
-                            currentStats: getIoIndexStats(),
+                            currentStats: readIoIndexStatus(),
                         });
                     } else {
                         const result = await buildIoIndexForDirectory('src/copilot', {
@@ -311,7 +315,7 @@ export const maintenanceTools = [
                             dryRun: false,
                             success: result.available !== false,
                             result,
-                            stats: getIoIndexStats(),
+                            stats: readIoIndexStatus(),
                         });
                     }
                 }

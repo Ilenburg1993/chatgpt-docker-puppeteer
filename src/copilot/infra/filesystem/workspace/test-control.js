@@ -1,6 +1,8 @@
 // @ts-check
 /** Private reset composition for filesystem/workspace. */
 export {
+    getValidatedMutableWorkspacePathStats,
+    getValidatedReadWorkspacePathStats,
     resetValidatedMutableWorkspacePathStatsForTest,
     resetValidatedReadWorkspacePathStatsForTest,
-} from './validated-path.js';
+} from './authority/service.js';

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { mkdirPathUnlocked } from '../directory/index.js';
 import { SIDECAR_FILE_PATTERN } from './format.js';
 import { cleanupExpiredRollbackSidecars, cleanupRollbackSidecars } from './maintenance.js';
-import { getRollbackSidecarDirectory, getRollbackSidecarTtlMs, isIoRollbackEnabled } from './policy.js';
+import { createDefaultIoRollbackPolicy } from './policy.js';
 
 /** @typedef {import('./types.js').IoRollbackSidecar} IoRollbackSidecar */
 
@@ -41,12 +41,14 @@ async function writeAll(handle, chunk) {
  *     ttlMs?: number;
  *     nowMs?: number;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     policy?: import('./policy.js').IoRollbackPolicy;
  * }} [options]
  */
 export async function createRollbackSidecarWriter(options = {}) {
-    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const policy = options.policy ?? createDefaultIoRollbackPolicy();
+    const directory = path.resolve(options.directory ?? policy.directory);
     const createdAtMs = Math.trunc(options.nowMs ?? Date.now());
-    const ttlMs = positiveIntegerOr(options.ttlMs, getRollbackSidecarTtlMs());
+    const ttlMs = positiveIntegerOr(options.ttlMs, policy.ttlMs);
     const expiresAtMs = createdAtMs + ttlMs;
     const tempPath = path.join(directory, `.pending-${expiresAtMs}-${process.pid}-${randomUUID()}`);
     await mkdirPathUnlocked(directory, {
@@ -110,15 +112,16 @@ export async function createRollbackSidecarWriter(options = {}) {
                 createdAtMs,
                 expiresAtMs,
             };
-            if (isIoRollbackEnabled()) {
+            if (policy.enabled) {
                 await cleanupRollbackSidecars({
+                    policy,
                     directory,
                     nowMs: createdAtMs,
                     preservePath: finalPath,
                     enforceBudget: true,
                 }).catch(() => undefined);
             } else {
-                await cleanupExpiredRollbackSidecars({ directory, nowMs: createdAtMs }).catch(() => undefined);
+                await cleanupExpiredRollbackSidecars({ policy, directory, nowMs: createdAtMs }).catch(() => undefined);
             }
             return descriptor;
         },
@@ -160,6 +163,7 @@ export async function createRollbackSidecarWriter(options = {}) {
  *     ttlMs?: number;
  *     nowMs?: number;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     policy?: import('./policy.js').IoRollbackPolicy;
  * }} [options]
  * @returns {Promise<IoRollbackSidecar>}
  */
@@ -190,11 +194,12 @@ export async function persistRollbackSidecar(content, options = {}) {
  * Lê e valida um sidecar sem seguir symlinks nem aceitar paths fora do diretório configurado.
  *
  * @param {IoRollbackSidecar} descriptor
- * @param {{ directory?: string; nowMs?: number; allowExpired?: boolean }} [options]
+ * @param {{ directory?: string; nowMs?: number; allowExpired?: boolean; policy?: import('./policy.js').IoRollbackPolicy }} [options]
  * @returns {Promise<Buffer>}
  */
 export async function readVerifiedRollbackSidecar(descriptor, options = {}) {
-    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const policy = options.policy ?? createDefaultIoRollbackPolicy();
+    const directory = path.resolve(options.directory ?? policy.directory);
     const candidate = path.resolve(String(descriptor?.path ?? ''));
     if (path.dirname(candidate) !== directory) {
         const error = new Error('Sidecar de rollback fora do diretório permitido.');

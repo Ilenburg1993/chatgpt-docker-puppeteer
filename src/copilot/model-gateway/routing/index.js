@@ -69,6 +69,7 @@ export {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionDecisionTraces,
+    createModelGatewaySelectionTraceStore,
     listModelGatewaySelectionDecisionTraceFiles,
     persistModelGatewaySelectionDecisionTrace,
     readModelGatewaySelectionDecisionTrace,

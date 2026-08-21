@@ -15,11 +15,11 @@
  */
 
 import { readBootSkillConfig, resolveHooksStateFile, resolveWorkspacePath } from '#copilot/boot';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
 import { container, logSwallowed, safeJsonParse, toError } from '#copilot/core';
 import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/platform';
+import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { z } from 'zod';
 import { log } from '../../ports/logging/index.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
@@ -29,7 +29,7 @@ import { readAgentTodoStore } from '../../ports/tool-port.js';
 
 export const BRIEFING_FILE = resolveHooksStateFile('session-briefing.md');
 export const SESSION_JSON_FILE = resolveHooksStateFile('session.json');
-const hookContextWorkspaceIo = createWorkspaceIo({ workspaceRoot: resolveWorkspacePath() });
+const hookContextWorkspaceIo = getApplicationWorkspaceInfra(resolveWorkspacePath()).readIo;
 
 /**
  * Envelope defensivo para conteudo local controlavel por ferramentas.

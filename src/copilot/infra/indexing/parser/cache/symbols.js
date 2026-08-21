@@ -7,9 +7,8 @@ import {
     statPathSnapshot,
 } from '#copilot/infra/internal/filesystem/read';
 import { richFingerprintMatches } from '#copilot/infra/internal/platform';
-import { normalizeParserPath, parserRuntimeStats } from '../foundation/index.js';
+import { normalizeParserPath } from '../foundation/index.js';
 import { parseFileSymbols } from '../parse/index.js';
-import { ensureParserInvalidationHook, symbolCache } from './state.js';
 
 /** @typedef {import('../foundation/index.js').FileSymbols} FileSymbols */
 /** @typedef {import('../foundation/index.js').ParserFingerprint} ParserFingerprint */
@@ -45,12 +44,46 @@ function fingerprintMatches(left, right) {
 }
 
 /**
+ * Parse with snapshot consistency guarantees but without retaining parser cache state.
  * @param {string} filePath
- * @param {{ snapshot?: import('#copilot/infra/internal/filesystem/read').TextFileSnapshot; maxRetries?: number; signal?: AbortSignal }} [options]
+ * @param {{ snapshot?: import('#copilot/infra/internal/filesystem/read').TextFileSnapshot; maxRetries?: number; signal?: AbortSignal }} options
+ */
+async function parseSymbolsStateless(filePath, options) {
+    const maxRetries =
+        Number.isInteger(options.maxRetries) && Number(options.maxRetries) >= 0
+            ? Math.min(10, Number(options.maxRetries))
+            : 2;
+    let suppliedSnapshot = options.snapshot ?? null;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+        options.signal?.throwIfAborted();
+        const snapshot =
+            suppliedSnapshot ??
+            (await readTextFileSnapshot(filePath, options.signal ? { signal: options.signal } : {}));
+        suppliedSnapshot = null;
+        const symbols = await parseFileSymbols(
+            filePath,
+            snapshot.content,
+            options.signal ? { signal: options.signal } : {},
+        );
+        const current = await statPathSnapshot(filePath);
+        options.signal?.throwIfAborted();
+        if (fingerprintMatches(snapshot, current)) return symbols;
+        if (attempt > maxRetries) throw createStaleSnapshotError(filePath, attempt);
+    }
+    throw createStaleSnapshotError(filePath, maxRetries + 1);
+}
+
+/**
+ * @param {string} filePath
+ * @param {{ snapshot?: import('#copilot/infra/internal/filesystem/read').TextFileSnapshot; maxRetries?: number; signal?: AbortSignal; parserCacheRuntime?: ReturnType<typeof import('./runtime/index.js').createParserCacheRuntime> }} [options]
  * @returns {Promise<FileSymbols>}
  */
 export async function parseAndCacheSymbols(filePath, options = {}) {
-    ensureParserInvalidationHook();
+    const parserCacheRuntime = options.parserCacheRuntime ?? null;
+    if (!parserCacheRuntime) return parseSymbolsStateless(filePath, options);
+    parserCacheRuntime.ensureInvalidationHook();
+    const symbolCache = parserCacheRuntime.symbolCache;
+    const symbolStats = parserCacheRuntime.symbolStats;
     options.signal?.throwIfAborted();
     const cacheKey = normalizeParserPath(filePath);
     const maxRetries =
@@ -65,52 +98,51 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
         let snapshot = suppliedSnapshot;
         suppliedSnapshot = null;
         if (snapshot) {
-            parserRuntimeStats.symbolSuppliedSnapshots += 1;
+            symbolStats.symbolSuppliedSnapshots += 1;
             if (cached && fingerprintMatches(cached.fingerprint, snapshot)) {
-                parserRuntimeStats.symbolFreshnessChecks += 1;
+                symbolStats.symbolFreshnessChecks += 1;
                 const current = await statPathSnapshot(filePath);
                 options.signal?.throwIfAborted();
                 if (!fingerprintMatches(snapshot, current)) {
-                    parserRuntimeStats.symbolSnapshotConflicts += 1;
+                    symbolStats.symbolSnapshotConflicts += 1;
                     if (attempt <= maxRetries) continue;
                     throw createStaleSnapshotError(filePath, attempt);
                 }
-                parserRuntimeStats.symbolCacheHits += 1;
+                symbolStats.symbolCacheHits += 1;
                 return cached.symbols;
             }
-            parserRuntimeStats.symbolSnapshotPrechecksAvoided += 1;
+            symbolStats.symbolSnapshotPrechecksAvoided += 1;
             if (cached) {
-                parserRuntimeStats.symbolCacheStale += 1;
+                symbolStats.symbolCacheStale += 1;
                 symbolCache.delete(cacheKey);
             }
         } else if (cached) {
-            parserRuntimeStats.symbolFreshnessChecks += 1;
+            symbolStats.symbolFreshnessChecks += 1;
             const current = await statPathSnapshot(filePath);
             options.signal?.throwIfAborted();
             if (fingerprintMatches(cached.fingerprint, current)) {
-                parserRuntimeStats.symbolCacheHits += 1;
+                symbolStats.symbolCacheHits += 1;
                 return cached.symbols;
             }
-            parserRuntimeStats.symbolCacheStale += 1;
+            symbolStats.symbolCacheStale += 1;
             symbolCache.delete(cacheKey);
         }
 
         if (!snapshot) {
-            parserRuntimeStats.symbolSnapshotReads += 1;
+            symbolStats.symbolSnapshotReads += 1;
             snapshot = await readTextFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
         }
-        parserRuntimeStats.symbolCacheMisses += 1;
-        const symbols = await parseFileSymbols(
-            filePath,
-            snapshot.content,
-            options.signal ? { signal: options.signal } : {},
-        );
+        symbolStats.symbolCacheMisses += 1;
+        const symbols = await parseFileSymbols(filePath, snapshot.content, {
+            ...(options.signal ? { signal: options.signal } : {}),
+            ...(parserCacheRuntime.workerRuntime ? { workerRuntime: parserCacheRuntime.workerRuntime } : {}),
+        });
         options.signal?.throwIfAborted();
-        parserRuntimeStats.symbolFreshnessChecks += 1;
+        symbolStats.symbolFreshnessChecks += 1;
         const current = await statPathSnapshot(filePath);
         options.signal?.throwIfAborted();
         if (!fingerprintMatches(snapshot, current)) {
-            parserRuntimeStats.symbolSnapshotConflicts += 1;
+            symbolStats.symbolSnapshotConflicts += 1;
             if (attempt <= maxRetries) continue;
             throw createStaleSnapshotError(filePath, attempt);
         }

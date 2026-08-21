@@ -7,7 +7,7 @@ import { assertSuccessfulSync, syncParentDirectoryBestEffort } from '#copilot/in
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { PENDING_FILE_PATTERN, SIDECAR_FILE_PATTERN } from './format.js';
-import { getRollbackSidecarDirectory, getRollbackSidecarMaxBytes, getRollbackSidecarMaxEntries } from './policy.js';
+import { createDefaultIoRollbackPolicy } from './policy.js';
 
 const DEFAULT_CLEANUP_MAX_ENTRIES = 512;
 /** @param {unknown} error */
@@ -43,6 +43,7 @@ function emptyRollbackCleanupResult() {
  *     purgeAll?: boolean;
  *     enforceBudget?: boolean;
  *     preservePath?: string;
+ *     policy?: import('./policy.js').IoRollbackPolicy;
  * }} [options]
  * @returns {Promise<{
  *     scanned: number;
@@ -58,11 +59,12 @@ function emptyRollbackCleanupResult() {
  * }>}
  */
 export async function cleanupRollbackSidecars(options = {}) {
-    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const policy = options.policy ?? createDefaultIoRollbackPolicy();
+    const directory = path.resolve(options.directory ?? policy.directory);
     const nowMs = Math.trunc(options.nowMs ?? Date.now());
     const scanLimit = positiveIntegerOr(options.scanLimit, DEFAULT_CLEANUP_MAX_ENTRIES);
-    const maxEntries = positiveIntegerOr(options.maxEntries, getRollbackSidecarMaxEntries());
-    const maxBytes = positiveIntegerOr(options.maxBytes, getRollbackSidecarMaxBytes());
+    const maxEntries = positiveIntegerOr(options.maxEntries, policy.maxEntries);
+    const maxBytes = positiveIntegerOr(options.maxBytes, policy.maxBytes);
     const purgeAll = options.purgeAll === true;
     const enforceBudget = options.enforceBudget !== false;
     const preservePath = options.preservePath ? path.resolve(options.preservePath) : null;
@@ -186,12 +188,13 @@ export async function cleanupRollbackSidecars(options = {}) {
 /**
  * Compatibilidade: cleanup estritamente por expiração, sem aplicar budgets aos sidecars ativos.
  *
- * @param {{ directory?: string; nowMs?: number; maxEntries?: number }} [options]
+ * @param {{ directory?: string; nowMs?: number; maxEntries?: number; policy?: import('./policy.js').IoRollbackPolicy }} [options]
  */
 export async function cleanupExpiredRollbackSidecars(options = {}) {
     return cleanupRollbackSidecars({
         ...(options.directory === undefined ? {} : { directory: options.directory }),
         ...(options.nowMs === undefined ? {} : { nowMs: options.nowMs }),
+        ...(options.policy === undefined ? {} : { policy: options.policy }),
         scanLimit: positiveIntegerOr(options.maxEntries, DEFAULT_CLEANUP_MAX_ENTRIES),
         enforceBudget: false,
     });

@@ -1,5 +1,6 @@
 // @ts-check
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -52,7 +53,16 @@ describe('config/PinnedFilesLoader', () => {
         const file = join(nested, 'context.md');
         await mkdir(nested, { recursive: true });
 
-        const loader = new PinnedFilesLoader([root]);
+        const io = createConfiguredFsIo(
+            createConfiguredFsGrant({
+                id: 'test.config.pinned-files',
+                roots: [root],
+                operations: ['list', 'read', 'stat', 'watch'],
+                symlinkPolicy: 'deny',
+                durability: ['file-and-directory'],
+            }),
+        );
+        const loader = new PinnedFilesLoader({ dirs: [root], io });
         await loader.start();
         try {
             const added = waitForChange(loader, file, 'added');

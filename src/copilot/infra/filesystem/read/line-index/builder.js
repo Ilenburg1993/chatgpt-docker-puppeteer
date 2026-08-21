@@ -11,7 +11,7 @@ import {
     fingerprintFromStats,
     sameFileSnapshot,
 } from '../snapshot/index.js';
-import { readByteLineIndexMaxLines, resolveByteLineIndexHighWaterMark } from './policy.js';
+import { readByteLineIndexConfig, resolveByteLineIndexHighWaterMark } from './policy.js';
 import { scanPhysicalLineStartsFromBuffer } from './scanner.js';
 
 /** @typedef {import('./types.js').ByteLineIndexEntry} ByteLineIndexEntry */
@@ -25,6 +25,7 @@ import { scanPhysicalLineStartsFromBuffer } from './scanner.js';
  *     requiredLineStarts?: number;
  *     captureStartLine?: number;
  *     existing?: ByteLineIndexEntry;
+ *     maxLines?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
  * @returns {Promise<{
@@ -37,7 +38,10 @@ import { scanPhysicalLineStartsFromBuffer } from './scanner.js';
  */
 export async function buildByteLineIndex(filePath, options = {}) {
     options.signal?.throwIfAborted();
-    const maxLines = readByteLineIndexMaxLines();
+    const maxLines =
+        Number.isFinite(options.maxLines) && Number(options.maxLines) > 0
+            ? Math.floor(Number(options.maxLines))
+            : readByteLineIndexConfig({}).maxLines;
     const requiredLineStarts =
         Number.isFinite(options.requiredLineStarts) && Number(options.requiredLineStarts) > 0
             ? Math.floor(Number(options.requiredLineStarts))

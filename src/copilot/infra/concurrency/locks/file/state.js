@@ -78,7 +78,7 @@ export function getFileResourceLockStats() {
         configurationValid = false;
     }
     return {
-        enabledByEnv: configurationValid && profile !== 'off',
+        processDefaultEnabled: configurationValid && profile !== 'off',
         profile,
         configurationValid,
         activeLeases: activeFileLocks.size,

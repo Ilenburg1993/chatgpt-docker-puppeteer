@@ -23,25 +23,33 @@ let statfsFunctionIds = new WeakMap();
 let nextStatfsFunctionId = 1;
 
 /**
- * @param {string} key
- * @param {number} fallback
+ * Project an explicit environment snapshot into an immutable capacity policy.
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
  */
-function readNonNegativeIntegerEnv(key, fallback) {
-    const raw = String(process.env[key] ?? '').trim();
-    if (!raw) return fallback;
-    const value = Number(raw);
-    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
-}
-
-export function getIoCapacityPreflightConfiguration() {
-    const minBytes = readNonNegativeIntegerEnv('IO_CAPACITY_PREFLIGHT_MIN_BYTES', DEFAULT_MIN_BYTES);
-    return {
+export function readIoCapacityPreflightConfig(env) {
+    const source = env ?? {};
+    /** @param {string} key @param {number} fallback */
+    const readNonNegativeInteger = (key, fallback) => {
+        const raw = String(source[key] ?? '').trim();
+        if (!raw) return fallback;
+        const value = Number(raw);
+        return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+    };
+    const minBytes = readNonNegativeInteger('IO_CAPACITY_PREFLIGHT_MIN_BYTES', DEFAULT_MIN_BYTES);
+    return Object.freeze({
         enabled: minBytes > 0,
         minBytes,
-        reserveBytes: readNonNegativeIntegerEnv('IO_CAPACITY_PREFLIGHT_RESERVE_BYTES', DEFAULT_RESERVE_BYTES),
-        cacheTtlMs: readNonNegativeIntegerEnv('IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS', DEFAULT_CACHE_TTL_MS),
-    };
+        reserveBytes: readNonNegativeInteger('IO_CAPACITY_PREFLIGHT_RESERVE_BYTES', DEFAULT_RESERVE_BYTES),
+        cacheTtlMs: readNonNegativeInteger('IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS', DEFAULT_CACHE_TTL_MS),
+    });
 }
+
+const DEFAULT_CAPACITY_PREFLIGHT_CONFIG = Object.freeze({
+    enabled: true,
+    minBytes: DEFAULT_MIN_BYTES,
+    reserveBytes: DEFAULT_RESERVE_BYTES,
+    cacheTtlMs: DEFAULT_CACHE_TTL_MS,
+});
 
 /**
  * @param {typeof fs.statfs} statfs
@@ -130,7 +138,7 @@ function toNonNegativeBigInt(value) {
  * @returns {Promise<IoCapacityPreflightResult>}
  */
 export async function preflightIoCapacity(targetPath, requiredBytes, options = {}) {
-    const configuration = getIoCapacityPreflightConfiguration();
+    const configuration = DEFAULT_CAPACITY_PREFLIGHT_CONFIG;
     const minBytes = Math.max(0, Math.floor(options.minBytes ?? configuration.minBytes));
     const reserveBytes = Math.max(0, Math.floor(options.reserveBytes ?? configuration.reserveBytes));
     const cacheTtlMs = Math.max(0, Math.floor(options.cacheTtlMs ?? configuration.cacheTtlMs));

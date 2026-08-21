@@ -1,28 +1,33 @@
 // @ts-check
 
-import {
-    getIoDurabilityStats,
-    getIoLatencyStats,
-    publishIoOperation,
-    recordIoLatency,
-} from '#copilot/infra/internal/telemetry';
-import { describe, expect, it } from 'vitest';
+import { publishIoOperation } from '#copilot/infra/internal/telemetry';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/observability/health.js';
+
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let runtime;
+beforeEach(() => {
+    runtime = createInfraRuntime({ runtimeId: `observability-test-${Date.now()}-${Math.random()}` });
+});
+afterEach(async () => {
+    await runtime.dispose();
+});
 
 describe('infra/io-observability bounds', () => {
     it('limits diagnostic histogram cardinality for dynamic operation names', () => {
         for (let i = 0; i < 80; i++) {
-            recordIoLatency(`dynamic-operation-${i}`, i + 1);
+            runtime.telemetry.latency.record(`dynamic-operation-${i}`, i + 1);
         }
 
-        const stats = getIoLatencyStats();
+        const stats = runtime.telemetry.latency.stats();
         expect(Object.keys(stats).length).toBeLessThanOrEqual(64);
         expect(stats['dynamic-operation-0']).toBeUndefined();
         expect(stats['dynamic-operation-79']?.count).toBe(1);
     });
 
     it('agrega metadata de durabilidade com cardinalidade fixa e projeta alerta de falha', () => {
-        const before = getIoDurabilityStats();
+        const before = runtime.telemetry.durability.stats();
         publishIoOperation(
             /** @type {import('../../../../src/copilot/core/io-contracts.js').IoMeta} */ ({
                 operation: 'copy',
@@ -38,22 +43,23 @@ describe('infra/io-observability bounds', () => {
                 },
             }),
             { success: false, error: new Error('sync failed') },
+            runtime.telemetry,
         );
 
-        const after = getIoDurabilityStats();
+        const after = runtime.telemetry.durability.stats();
         expect(after.operationsObserved).toBe(before.operationsObserved + 1);
         expect(after.operationsWithMetadata).toBe(before.operationsWithMetadata + 1);
         expect(after.fileSync.confirmed).toBe(before.fileSync.confirmed + 1);
         expect(after.directorySync.failed).toBe(before.directorySync.failed + 1);
         expect(after.directorySync.skipped).toBe(before.directorySync.skipped + 1);
         expect(after.lastFailure).toMatchObject({ kind: 'directory', operation: 'copy', errorCode: 'EIO' });
-        expect(readIoRuntimeHealthSnapshot().alerts).toContainEqual(
+        expect(readIoRuntimeHealthSnapshot(runtime).alerts).toContainEqual(
             expect.objectContaining({ code: 'IO_DURABILITY_SYNC_FAILED', severity: 'high' }),
         );
     });
 
     it('projeta locks bounded no health sem recursos em claro', () => {
-        const health = readIoRuntimeHealthSnapshot();
+        const health = readIoRuntimeHealthSnapshot(runtime);
         expect(health.locks.wait.maxOperationCardinality).toBe(32);
         expect(health.locks.wait.operationCardinality).toBeLessThanOrEqual(32);
         expect(health.locks.activeLeaseSample).toHaveLength(0);

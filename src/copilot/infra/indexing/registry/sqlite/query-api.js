@@ -8,8 +8,24 @@
  * @module copilot/infra/indexing/registry/sqlite/query-api
  */
 
-import { buildIndexPathTreeRange, normalizeIndexPath } from './paths.js';
-import { normalizeIndexMaxResults, sanitizeFtsQuery } from './query.js';
+import { buildIndexPathTreeRange, normalizeIndexPath } from './path/index.js';
+
+const DEFAULT_QUERY_LIMIT_POLICY = Object.freeze({ defaultMaxResults: 50, hardMaxResults: 500 });
+
+/** @param {number | undefined} value @param {{defaultMaxResults:number;hardMaxResults:number}} [policy] */
+export function normalizeIndexMaxResults(value, policy = DEFAULT_QUERY_LIMIT_POLICY) {
+    const normalized = Number.isFinite(value) && Number(value) > 0 ? Math.floor(Number(value)) : null;
+    return Math.min(normalized ?? policy.defaultMaxResults, policy.hardMaxResults);
+}
+
+/** @param {string} query */
+export function sanitizeFtsQuery(query) {
+    const tokens = query
+        .split(/\s+/u)
+        .map((part) => part.replace(/[^\p{L}\p{N}_./:-]+/gu, '').trim())
+        .filter((token) => token.length >= 1);
+    return tokens.length > 0 ? tokens.map((token) => `"${token.replace(/"/gu, '""')}"`).join(' ') : '""';
+}
 
 /** @typedef {ReturnType<typeof import('./statements.js').createIoIndexStatements>} IoIndexStatements */
 /**
@@ -47,9 +63,10 @@ import { normalizeIndexMaxResults, sanitizeFtsQuery } from './query.js';
  *     db: { prepare: Function };
  *     statements: IoIndexStatements;
  *     stats: { searches: number };
+ *     queryPolicy?: {defaultMaxResults:number;hardMaxResults:number};
  * }} context
  */
-export function createIoIndexQueryApi({ db, statements, stats }) {
+export function createIoIndexQueryApi({ db, statements, stats, queryPolicy = DEFAULT_QUERY_LIMIT_POLICY }) {
     const {
         stmtImportSearch,
         stmtImportSearchByPath,
@@ -66,7 +83,7 @@ export function createIoIndexQueryApi({ db, statements, stats }) {
         search(query, options = {}) {
             stats.searches += 1;
             const safe = sanitizeFtsQuery(query);
-            const maxResults = normalizeIndexMaxResults(options.maxResults);
+            const maxResults = normalizeIndexMaxResults(options.maxResults, queryPolicy);
             if (!options.pathPrefix) return /** @type {IoIndexSearchResult[]} */ (stmtSearch.all(safe, maxResults));
             const range = buildIndexPathTreeRange(normalizeIndexPath(options.pathPrefix));
             return /** @type {IoIndexSearchResult[]} */ (
@@ -79,7 +96,7 @@ export function createIoIndexQueryApi({ db, statements, stats }) {
             stats.searches += 1;
             const literal = String(query ?? '');
             if (!literal) return /** @type {IoIndexSearchResult[]} */ ([]);
-            const maxResults = normalizeIndexMaxResults(options.maxResults);
+            const maxResults = normalizeIndexMaxResults(options.maxResults, queryPolicy);
             const caseSensitive = options.caseSensitive === true;
             if (!options.pathPrefix) {
                 const statement = caseSensitive ? stmtLiteralSearch : stmtLiteralSearchInsensitive;
@@ -123,7 +140,7 @@ export function createIoIndexQueryApi({ db, statements, stats }) {
                 where.push('(s.file_path = ? OR (s.file_path >= ? AND s.file_path < ?))');
                 params.push(range.exact, range.descendantStart, range.descendantEnd);
             }
-            params.push(normalizeIndexMaxResults(options.maxResults));
+            params.push(normalizeIndexMaxResults(options.maxResults, queryPolicy));
             const sql = `
                 SELECT
                     s.file_path as filePath,
@@ -148,7 +165,7 @@ export function createIoIndexQueryApi({ db, statements, stats }) {
             const safe = String(source ?? '').trim();
             if (!safe) return /** @type {IoIndexImportResult[]} */ ([]);
             const rows = /** @type {IoIndexImportResult[]} */ (
-                stmtImportSearch.all(safe, `%${safe}%`, normalizeIndexMaxResults(options.maxResults))
+                stmtImportSearch.all(safe, `%${safe}%`, normalizeIndexMaxResults(options.maxResults, queryPolicy))
             );
             return options.exactSource ? rows.filter((row) => row.source === source) : rows;
         },

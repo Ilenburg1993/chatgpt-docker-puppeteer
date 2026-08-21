@@ -6,8 +6,8 @@
  * Mede e compara:
  *
  * 1. fs.readFile vs stream (ReadStream) para arquivos de tamanhos variados
- * 2. Cache L1 hit vs miss (io-cache)
- * 3. io-engine vs fs.readFile direto
+ * 2. Cache L1 hit vs miss (runtime-owned L1)
+ * 3. runtime-owned readBytes vs fs.readFile direto
  *
  * Saída: resultados versionáveis em JSON + tabela legível
  *
@@ -21,13 +21,9 @@ import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Bench } from 'tinybench';
 // note: Readable imported for future stream-reads-to-buffer use
-import {
-    getIoL1Cache,
-    makeBytesKey,
-    normalizeIoCacheKey,
-    resetIoL1CacheForTest,
-} from '../src/copilot/infra/io-cache.js';
-import { readBytes } from '../src/copilot/infra/io-engine.js';
+import { makeBytesKey, normalizeIoCacheKey } from '#copilot/infra/public/cache/keys';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { readBytes as readBytesRaw } from '#copilot/infra/public/filesystem/read';
 
 // --- CLI args ---
 const args = process.argv.slice(2);
@@ -71,6 +67,8 @@ const sizesToRun = sizeArg === 'all' ? Object.keys(SIZES) : [sizeArg];
 
 /** @param {string} label @param {string} filePath */
 async function runSuitForSize(label, filePath) {
+    const runtime = createInfraRuntime({ runtimeId: `io-read-benchmark-${label}` });
+    const readBytes = (target) => readBytesRaw(target, { cacheRuntime: runtime.coherence });
     const bench = new Bench({ time: 500, warmupTime: 100 });
 
     // --- readFile direto ---
@@ -90,21 +88,21 @@ async function runSuitForSize(label, filePath) {
     });
 
     // --- io-engine readBytes (cache miss — cold) ---
-    bench.add(`io-engine.readBytes miss [${label}]`, async () => {
-        resetIoL1CacheForTest();
+    bench.add(`runtime.readBytes miss [${label}]`, async () => {
+        runtime.coherence.l1.reset();
         await readBytes(filePath);
     });
 
     // --- io-engine readBytes (cache hit — warm) ---
     // Pre-warm cache fora do benchmark
-    resetIoL1CacheForTest();
+    runtime.coherence.l1.reset();
     await readBytes(filePath); // popula o cache
-    bench.add(`io-engine.readBytes hit [${label}]`, async () => {
+    bench.add(`runtime.readBytes hit [${label}]`, async () => {
         await readBytes(filePath);
     });
 
     // --- L1 cache direto (get já aquecido) ---
-    const cache = getIoL1Cache();
+    const cache = runtime.coherence.l1;
     const normalized = normalizeIoCacheKey(filePath);
     const key = makeBytesKey(normalized);
     // garante entry presente
@@ -116,9 +114,9 @@ async function runSuitForSize(label, filePath) {
     await bench.run();
 
     // Re-popular cache após o bench (o bench de miss pode ter limpo o singleton)
-    resetIoL1CacheForTest();
+    runtime.coherence.l1.reset();
     await readBytes(filePath);
-    const cacheAfterBench = getIoL1Cache();
+    const cacheAfterBench = runtime.coherence.l1;
     const normalizedAfter = normalizeIoCacheKey(filePath);
     const keyAfter = makeBytesKey(normalizedAfter);
 
@@ -181,9 +179,11 @@ async function runSuitForSize(label, filePath) {
         };
     }
 
-    return lruSyntheticTask
+    const tasks = lruSyntheticTask
         ? [...bench.tasks, l1SyntheticTask, mapSyntheticTask, lruSyntheticTask]
         : [...bench.tasks, l1SyntheticTask, mapSyntheticTask];
+    await runtime.dispose();
+    return tasks;
 }
 
 // --- Executar ---
@@ -244,11 +244,9 @@ if (!jsonOutput) {
         const fs_task = allResults.find((r) => r.name.startsWith('fs.readFile') && r.size_label === sizeKey);
         const l1_task = allResults.find((r) => r.name.startsWith('l1-cache.get') && r.size_label === sizeKey);
         const miss_task = allResults.find(
-            (r) => r.name.startsWith('io-engine.readBytes miss') && r.size_label === sizeKey,
+            (r) => r.name.startsWith('runtime.readBytes miss') && r.size_label === sizeKey,
         );
-        const hit_task = allResults.find(
-            (r) => r.name.startsWith('io-engine.readBytes hit') && r.size_label === sizeKey,
-        );
+        const hit_task = allResults.find((r) => r.name.startsWith('runtime.readBytes hit') && r.size_label === sizeKey);
 
         if (fs_task && l1_task) {
             const speedup = l1_task.hz / fs_task.hz;
@@ -259,7 +257,7 @@ if (!jsonOutput) {
         }
         if (miss_task && hit_task) {
             const hitSpeedup = hit_task.hz / miss_task.hz;
-            console.log(`[${sizeKey}] io-engine hit/miss ratio: ${hitSpeedup.toFixed(1)}x`);
+            console.log(`[${sizeKey}] runtime read hit/miss ratio: ${hitSpeedup.toFixed(1)}x`);
         }
     }
     console.log();

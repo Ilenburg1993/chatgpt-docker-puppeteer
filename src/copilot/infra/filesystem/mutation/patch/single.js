@@ -3,13 +3,17 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { buildSimpleTextDiffAroundLineRange, computeTextPatch } from '#copilot/infra/internal/filesystem/patch';
-import { shouldCaptureIoRollback } from '#copilot/infra/internal/filesystem/transaction';
 import { writeAtomicFileUnlocked } from '#copilot/infra/internal/filesystem/write';
 import { decodeUtf8Buffer, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
 import { assertExpectedSha256, assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import * as fs from 'node:fs/promises';
 import { buildRollbackSnapshot, discardRollbackSidecar, isUnpublishedSnapshotConflict } from '../rollback/index.js';
 import { annotatePatchRecoveryState } from './errors.js';
@@ -37,17 +41,20 @@ const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
  *     maxDiffBytes?: number;
  *     computeDiff?: boolean;
  *     captureRollback?: boolean;
+ *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
+ *     capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function patchTextLocked(filePath, options) {
+export async function patchTextLocked(filePath, options, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     const riskClass = options.dryRun ? 'low' : 'high';
-    const captureRollback = shouldCaptureIoRollback(options.captureRollback !== false) && !options.dryRun;
+    const captureRollback = (options.captureRollback ?? options.rollbackPolicy?.enabled ?? false) && !options.dryRun;
     try {
         const lease = await acquireIoResourceLock(filePath, {
             operation: 'patch',
@@ -68,7 +75,11 @@ export async function patchTextLocked(filePath, options) {
                     try {
                         patch = computeTextPatch(content, options);
                     } catch (error) {
-                        throw annotatePatchRecoveryState(error, previousHash, rawBuffer.byteLength);
+                        throw annotatePatchRecoveryState(error, previousHash, rawBuffer.byteLength, {
+                            currentStateKind: 'locked-file',
+                            diskBaselineHash: previousHash,
+                            diskBaselineBytes: rawBuffer.byteLength,
+                        });
                     }
                     const patchMs = elapsedIoMs(patchStartedAt);
                     void readMs;
@@ -81,6 +92,7 @@ export async function patchTextLocked(filePath, options) {
                             : await buildRollbackSnapshot(rawBuffer, {
                                   persistLarge: true,
                                   contentHash: previousHash,
+                                  ...(options.rollbackPolicy ? { rollbackPolicy: options.rollbackPolicy } : {}),
                               });
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                     const { firstMatchLine, lastMatchLine, lineDelta } = patch;
@@ -107,6 +119,9 @@ export async function patchTextLocked(filePath, options) {
                                 expectedHash: previousHash,
                                 ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                                 ...(options.durability === undefined ? {} : { durability: options.durability }),
+                                ...(options.capacityPreflight === undefined
+                                    ? {}
+                                    : { capacityPreflight: options.capacityPreflight }),
                             });
                         } catch (error) {
                             if (isUnpublishedSnapshotConflict(error)) {
@@ -152,7 +167,7 @@ export async function patchTextLocked(filePath, options) {
             }
         })();
         const waitMs = lease.waitMs;
-        if (!options.dryRun && !value.noop) invalidateIoCoherencePath(filePath);
+        if (!options.dryRun && !value.noop) invalidateIoCoherencePath(filePath, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'patch',
@@ -190,6 +205,8 @@ export async function patchTextLocked(filePath, options) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { path: filePath, ...value, lockWaitMs: waitMs, io };
     } catch (error) {
@@ -205,6 +222,7 @@ export async function patchTextLocked(filePath, options) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

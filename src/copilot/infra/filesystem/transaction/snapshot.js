@@ -27,7 +27,7 @@ const DEFAULT_SNAPSHOT_RETRIES = 2;
  *     snapshotMaxBytes?: number;
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
- *     rollbackSidecar?: boolean | { directory?: string; ttlMs?: number; nowMs?: number };
+ *     rollbackSidecar?: boolean | { directory?: string; ttlMs?: number; nowMs?: number; policy?: import('./rollback/policy.js').IoRollbackPolicy };
  *     maxRetries?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]

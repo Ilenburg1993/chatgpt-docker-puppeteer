@@ -15,9 +15,8 @@ const mocks = vi.hoisted(() => ({
     readText: vi.fn(),
     parseFileForContext: vi.fn(),
     // outros símbolos de indexing.js necessários para o módulo carregar
-    getIoIndexStats: vi.fn(() => ({ available: false })),
+    readIoIndexStatus: vi.fn(() => ({ available: false })),
     buildIoIndex: vi.fn(),
-    getIoIndexStatus: vi.fn(),
     searchIoIndex: vi.fn(() => []),
     findIoIndexSymbol: vi.fn(() => []),
     invalidateIoIndexPath: vi.fn(),
@@ -38,32 +37,31 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../../src/copilot/tools/file/shared.js', () => ({
     validatePath: mocks.validatePath,
     WORKSPACE_ROOT: '/workspaces/chatgpt-docker-puppeteer',
+    WORKSPACE_IO: { readText: mocks.readText },
+    WORKSPACE_INDEXING: {
+        parseFileForContext: mocks.parseFileForContext,
+        registry: {
+            buildDirectory: mocks.buildIoIndex,
+            status: mocks.readIoIndexStatus,
+            search: mocks.searchIoIndex,
+            findSymbol: mocks.findIoIndexSymbol,
+            findImports: mocks.findIoIndexImports,
+            invalidatePath: mocks.invalidateIoIndexPath,
+        },
+    },
 }));
 
-vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
-    createWorkspaceIo: () => ({ readText: mocks.readText }),
-}));
-
-vi.mock('#copilot/infra/public/indexing', async (importOriginal) => {
+vi.mock('#copilot/infra/public/indexing/search', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
-        getIoIndexStats: mocks.getIoIndexStats,
-        buildIoIndex: mocks.buildIoIndex,
-        getIoIndexStatus: mocks.getIoIndexStatus,
-        searchIoIndex: mocks.searchIoIndex,
-        findIoIndexSymbol: mocks.findIoIndexSymbol,
-        invalidateIoIndexPath: mocks.invalidateIoIndexPath,
-        findIoIndexImports: mocks.findIoIndexImports,
-        parseFileForContext: mocks.parseFileForContext,
+        formatIndexImportRows: mocks.formatIndexImportRows,
+        formatIndexSymbolRows: mocks.formatIndexSymbolRows,
+        formatIndexSearchRows: mocks.formatIndexSearchRows,
+        paginateSearchItems: mocks.paginateSearchItems,
+        normalizeSearchWindow: mocks.normalizeSearchWindow,
     };
 });
-
-vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-    LOG_DIR: '/tmp/test-logs',
-    getRecentLogs: vi.fn(() => []),
-}));
 
 import { workspaceParseFileTool } from '../../../../../src/copilot/tools/file/index-tools.js';
 

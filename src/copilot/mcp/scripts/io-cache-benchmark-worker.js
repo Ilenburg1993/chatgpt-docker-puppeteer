@@ -6,8 +6,7 @@
  */
 
 import { getIoPathPolicyCacheStats } from '#copilot/core';
-import { getIoReadHashStats } from '#copilot/infra/public/filesystem/read';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
@@ -15,7 +14,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
-const workspaceIo = createWorkspaceIo({ workspaceRoot: repoRoot });
+const benchmarkRuntime = createInfraRuntime({ runtimeId: `mcp-io-cache-benchmark:${process.pid}` });
+const workspaceIo = benchmarkRuntime.workspace(repoRoot).io;
 const REQUEST_ID_RE = /^mcp-io-cache-benchmark-[a-z0-9-]{8,80}$/u;
 const MODES = Object.freeze(['cold', 'l1', 'l2-prime', 'l2']);
 const WORKLOAD = Object.freeze([
@@ -73,7 +73,7 @@ async function runPass(io) {
     const files = [];
     let totalBytes = 0;
     const pathPolicyBefore = getIoPathPolicyCacheStats();
-    const readHashesBefore = getIoReadHashStats();
+    const readHashesBefore = benchmarkRuntime.coherence.read.hashes.stats();
     const startedAt = performance.now();
     for (const relativePath of WORKLOAD) {
         // Deliberately exercise the public workspace facade: benchmark includes canonical path policy/realpath overhead.
@@ -92,7 +92,7 @@ async function runPass(io) {
             return counts;
         }, /** @type {Record<string, number>} */ ({})),
         pathPolicy: counterDelta(getIoPathPolicyCacheStats(), pathPolicyBefore, PATH_POLICY_COUNTERS),
-        readHashes: counterDelta(getIoReadHashStats(), readHashesBefore, READ_HASH_COUNTERS),
+        readHashes: counterDelta(benchmarkRuntime.coherence.read.hashes.stats(), readHashesBefore, READ_HASH_COUNTERS),
     };
 }
 
@@ -112,29 +112,24 @@ async function main() {
     }
     process.env['COPILOT_DB_PATH'] = path.join(benchmarkDir, 'copilot.sqlite');
     process.env['IO_L2_CACHE_PROFILE'] = mode === 'l2' || mode === 'l2-prime' ? 'experimental' : 'off';
-    delete process.env['IO_L2_CACHE_ENABLED'];
 
-    const [{ getIoL2Cache }, { closeCopilotDb, ensureCopilotDbDir, getCopilotDb }, { configureInfraSqliteProvider }] =
-        await Promise.all([
-            import('#copilot/infra/public/cache'),
-            import('../../db/index.js'),
-            import('#copilot/infra/public/database'),
-        ]);
+    const { closeCopilotDb, ensureCopilotDbDir, getCopilotDb } = await import('../../db/index.js');
     await ensureCopilotDbDir();
-    configureInfraSqliteProvider(getCopilotDb);
+    benchmarkRuntime.database.configure(getCopilotDb);
 
     try {
         if (mode === 'l1') await runPass(workspaceIo);
         const result = await runPass(workspaceIo);
-        const l2 = getIoL2Cache();
-        if (l2) l2.flushPending?.();
+        const l2 = benchmarkRuntime.coherence.l2.get();
+        l2?.flushPending?.();
         process.stdout.write(`${JSON.stringify({ success: true, requestId, mode, workload: WORKLOAD, ...result })}\n`);
     } finally {
         try {
-            getIoL2Cache()?.flushPending?.();
+            benchmarkRuntime.coherence.l2.get()?.flushPending?.();
         } catch {
             // Best effort: worker DB is isolated and will be removed by the parent runner.
         }
+        await benchmarkRuntime.dispose();
         closeCopilotDb();
     }
 }

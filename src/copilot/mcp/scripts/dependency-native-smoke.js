@@ -8,12 +8,12 @@
  * @module copilot/mcp/scripts/dependency-native-smoke
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const requireFromHere = createRequire(import.meta.url);
-const dependencySmokeWorkspaceIo = createWorkspaceIo({ workspaceRoot: process.cwd() });
+const dependencySmokeWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: process.cwd() });
 const DEFAULT_PTY_TIMEOUT_MS = 5_000;
 
 /** @returns {Promise<Set<string>>} */

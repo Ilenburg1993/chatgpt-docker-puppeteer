@@ -8,13 +8,12 @@
  * @module copilot/mcp/tools/git-write
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
     destructiveAnnotations,
     errorResult,
-    getMcpWorkspaceRoot,
+    getMcpWorkspaceIo,
     okResult,
     readOnlyAnnotations,
     resolveWritePath,
@@ -23,7 +22,7 @@ import {
 import { execGit } from '#copilot/mcp/tools/shared';
 import { z } from 'zod';
 
-const gitWriteWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const gitWriteWorkspaceIo = getMcpWorkspaceIo();
 
 const MAX_STAGE_PATHS = 200;
 const MAX_STAGE_FILES = 500;

@@ -8,14 +8,20 @@
  */
 
 import { sanitizeIoTextOutput, toError, withIoMeta } from '#copilot/core';
-import { getIoCacheStats } from '#copilot/infra/public/cache';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { z } from 'zod';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
-import { FILE_TOOLS_OUTPUT_POLICY, truncateBuffer, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../shared.js';
+import {
+    FILE_TOOLS_OUTPUT_POLICY,
+    truncateBuffer,
+    truncateUtf8Text,
+    validatePath,
+    WORKSPACE_INDEXING,
+    WORKSPACE_INFRA,
+    WORKSPACE_IO,
+    WORKSPACE_ROOT,
+} from '../shared.js';
 import { createReadFileFailure } from './feedback.js';
 import { buildReadFileMetadata } from './metadata.js';
 import {
@@ -29,10 +35,8 @@ import {
 } from './read-through-policy.js';
 import { nextLineCursor, normalizeNonNegativeInteger, normalizePositiveInteger, parseReadCursor } from './window.js';
 
-const { readBytesValidated, readTextChunksValidated, readTextValidated, statPathValidated } = createWorkspaceIo({
-    workspaceRoot: WORKSPACE_ROOT,
-});
-const { warmReadThroughContext } = createWorkspaceIndexing({ workspaceRoot: WORKSPACE_ROOT });
+const { readBytesValidated, readTextChunksValidated, readTextValidated, statPathValidated } = WORKSPACE_IO;
+const { warmReadThroughContext } = WORKSPACE_INDEXING;
 
 /**
  * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.
@@ -366,7 +370,7 @@ export const readFileContentTool = buildTool({
                     rawReturnedBytes: limitedBuffer.byteLength,
                     truncated,
                     cacheFingerprintStrategy: raw.cacheFingerprintStrategy,
-                    ...(includeCacheStats ? { cacheStats: getIoCacheStats() } : {}),
+                    ...(includeCacheStats ? { cacheStats: WORKSPACE_INFRA.coherenceStats?.() ?? null } : {}),
                     ...(includeHash ? { contentHash: raw.contentHash } : {}),
                 });
                 const terminalSummary = buildReadTerminalSummary({
@@ -492,7 +496,7 @@ export const readFileContentTool = buildTool({
                 ...(resolvedReadStrategy === 'stream' && streamHighWaterMark !== undefined
                     ? { streamHighWaterMark }
                     : {}),
-                ...(includeCacheStats ? { cacheStats: getIoCacheStats() } : {}),
+                ...(includeCacheStats ? { cacheStats: WORKSPACE_INFRA.coherenceStats?.() ?? null } : {}),
                 ...(resolvedMaxLines !== undefined ? { maxLines: resolvedMaxLines } : {}),
                 ...(includeHash && 'contentHash' in text && typeof text.contentHash === 'string'
                     ? { contentHash: text.contentHash }

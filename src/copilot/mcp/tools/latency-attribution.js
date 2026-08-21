@@ -9,7 +9,7 @@
  * @module copilot/mcp/tools/latency-attribution
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/platform';
+import { readBoundedResponseText } from '#copilot/infra/public/platform/http-response';
 import {
     readCloudflaredMetricsSnapshot,
     readCloudflareHttpLatencyAnalytics,

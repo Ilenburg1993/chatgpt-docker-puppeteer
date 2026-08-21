@@ -1,11 +1,16 @@
 // @ts-check
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { acquireIoResourceLocks } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
-import { mkdirPathUnlocked, shouldCaptureIoRollback } from '#copilot/infra/internal/filesystem/transaction';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
+import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';
 import { moveFileUnlocked } from '#copilot/infra/internal/filesystem/write';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { dirname } from 'node:path';
 import { assertDestinationWritable, readMutationSnapshot, readOptionalMutationSnapshot } from '../rollback/index.js';
 
@@ -14,14 +19,16 @@ import { assertDestinationWritable, readMutationSnapshot, readOptionalMutationSn
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>; capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity }} [options]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function moveFileLocked(source, destination, options = {}) {
+export async function moveFileLocked(source, destination, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(source);
     assertValidIoFilePath(destination);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
-    const captureRollback = shouldCaptureIoRollback(options.overwrite === true && options.captureRollback !== false);
+    const captureRollback =
+        options.overwrite === true && (options.captureRollback ?? options.rollbackPolicy?.enabled ?? false);
     try {
         const lease = await acquireIoResourceLocks([source, destination], {
             operation: 'move',
@@ -42,7 +49,11 @@ export async function moveFileLocked(source, destination, options = {}) {
                      */
                     let destinationSnapshot = null;
                     if (options.overwrite) {
-                        destinationSnapshot = await readOptionalMutationSnapshot(destination, captureRollback);
+                        destinationSnapshot = await readOptionalMutationSnapshot(
+                            destination,
+                            captureRollback,
+                            options.rollbackPolicy,
+                        );
                     } else {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
@@ -53,6 +64,9 @@ export async function moveFileLocked(source, destination, options = {}) {
                         overwrite: Boolean(options.overwrite),
                         expectedSourceHash: sourceSnapshot.contentHash,
                         expectedSourceBytes: sourceSnapshot.bytesRead,
+                        ...(options.capacityPreflight === undefined
+                            ? {}
+                            : { capacityPreflight: options.capacityPreflight }),
                     });
                     return {
                         ...sourceSnapshot,
@@ -77,8 +91,8 @@ export async function moveFileLocked(source, destination, options = {}) {
             }
         })();
         const waitMs = lease.waitMs;
-        invalidateIoCoherencePath(source);
-        invalidateIoCoherencePath(destination);
+        invalidateIoCoherencePath(source, {}, invalidationBus);
+        invalidateIoCoherencePath(destination, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'move',
@@ -114,6 +128,8 @@ export async function moveFileLocked(source, destination, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return {
             source,
@@ -151,6 +167,7 @@ export async function moveFileLocked(source, destination, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

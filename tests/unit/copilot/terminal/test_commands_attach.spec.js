@@ -2,9 +2,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fsMocks = vi.hoisted(() => ({
-    access: vi.fn(async () => undefined),
-    stat: vi.fn(async () => ({ size: 1024 })),
+const workspaceMocks = vi.hoisted(() => ({
+    statPath: vi.fn(async () => ({ stats: { size: 1024 } })),
 }));
 
 const stateMocks = vi.hoisted(() => ({
@@ -25,7 +24,21 @@ const stateMocks = vi.hoisted(() => ({
     setShowUsage: vi.fn(),
 }));
 
-vi.mock('node:fs/promises', () => fsMocks);
+vi.mock('#copilot/boot/application-infra', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/boot/application-infra')} */ (await importOriginal());
+    return {
+        ...actual,
+        getApplicationWorkspaceInfra: vi.fn((workspaceRoot) => {
+            const workspace = actual.getApplicationWorkspaceInfra(workspaceRoot);
+            return new Proxy(workspace, {
+                get(target, property, receiver) {
+                    if (property === 'readIo') return { ...target.readIo, statPath: workspaceMocks.statPath };
+                    return Reflect.get(target, property, receiver);
+                },
+            });
+        }),
+    };
+});
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => stateMocks);
 
 import { cmdAttach } from '../../../../src/copilot/terminal/commands/attach.js';
@@ -68,12 +81,36 @@ describe('terminal/commands/attach', () => {
                 displayName: 'memo.txt',
             }),
         );
-        expect(fsMocks.access).not.toHaveBeenCalled();
+        expect(workspaceMocks.statPath).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('Adicionado');
         expect(ctx.output()).toContain('memo.txt');
         expect(ctx.output()).toContain('text/plain');
         expect(ctx.output()).toContain('1 item na fila · será embutido no próximo turno');
         expect(ctx.output()).not.toContain('Fila:');
+    });
+
+    it('/attach arquivo usa workspace read authority e adiciona apenas após stat autorizado', async () => {
+        stateMocks.getAttachmentQueue.mockReturnValue(
+            /** @type {(string | Record<string, unknown>)[]} */ (['src/copilot/index.js']),
+        );
+        const ctx = mockCtx();
+
+        await cmdAttach({ println: ctx.println }, 'src/copilot/index.js');
+
+        expect(workspaceMocks.statPath).toHaveBeenCalledWith('src/copilot/index.js');
+        expect(stateMocks.addAttachment).toHaveBeenCalledWith('src/copilot/index.js');
+        expect(ctx.output()).toContain('Adicionado');
+        expect(ctx.output()).toContain('1.0 KB');
+    });
+
+    it('/attach não adiciona path negado pela workspace authority', async () => {
+        workspaceMocks.statPath.mockRejectedValueOnce(new Error('outside workspace'));
+        const ctx = mockCtx();
+
+        await cmdAttach({ println: ctx.println }, '/tmp/outside.txt');
+
+        expect(stateMocks.addAttachment).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('arquivo não encontrado ou sem permissão');
     });
 
     it('/attach lista fila com entries tipadas', async () => {

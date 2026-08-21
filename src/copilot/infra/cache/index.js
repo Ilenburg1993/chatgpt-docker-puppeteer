@@ -1,25 +1,8 @@
 // @ts-check
 /** @module copilot/infra/cache */
-
-/** @typedef {import('./memory/cache-types.js').IoCacheEntry} IoCacheEntry */
-/** @typedef {import('./memory/cache-types.js').IoCacheStats} IoCacheStats */
-
-export {
-    createIoL2SqliteCache,
-    getIoL2Cache,
-    getIoL2CacheConfiguration,
-    getIoL2CacheHealth,
-    getIoL2CacheStats,
-    isIoL2Cache,
-} from './l2/index.js';
-export {
-    getIoCacheStats,
-    getIoL1Cache,
-    getVerifiedIoL1Entry,
-    invalidateIoCachePath,
-    invalidateIoCacheSubtree,
-    makeBytesKey,
-    makeTextKey,
-    normalizeIoCacheKey,
-} from './memory/index.js';
-export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './tiering.js';
+/** @typedef {import('./memory/contracts/index.js').IoCacheEntry} IoCacheEntry */
+/** @typedef {import('./memory/contracts/index.js').IoCacheStats} IoCacheStats */
+export { makeBytesKey, makeTextKey, normalizeIoCacheKey } from './keys/index.js';
+export { createIoL2CacheRuntime, createIoL2SqliteCache, getIoL2CacheConfiguration, isIoL2Cache } from './l2/index.js';
+export { createIoL1CacheRuntime } from './memory/index.js';
+export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './tiering/index.js';

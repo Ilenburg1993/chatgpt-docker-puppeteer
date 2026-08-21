@@ -9,7 +9,7 @@
 
 import { getInjectInterventionPolicy } from '#copilot/config';
 import { container, sleepMs, toError } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../dialog-timeout-policy.js';
 import { readRuntimeIdFromParams } from '../../routing/index.js';

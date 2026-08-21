@@ -8,14 +8,12 @@
  * @module copilot/mcp/control-plane/openai-endpoint-latency
  */
 
-import { withIoResourceLock } from '#copilot/infra/public/concurrency/locks';
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
-import { readJsonlTailTrusted } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import https from 'node:https';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
+import { createBoundConfiguredJsonlStore } from './persistence/index.js';
 
 export const OPENAI_ENDPOINT_LATENCY_TARGETS = Object.freeze([
     Object.freeze({ id: 'chatgpt-web', hostname: 'chatgpt.com', path: '/', method: 'HEAD' }),
@@ -33,6 +31,24 @@ const DEFAULT_MAX_HISTORY_SNAPSHOTS = 1_000;
 const MAX_HISTORY_SNAPSHOTS = 10_000;
 const MAX_HISTORY_READ_BYTES = 4 * 1024 * 1024;
 const DEFAULT_BASELINE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const OPENAI_ENDPOINT_LATENCY_HISTORY_PATH = path.resolve(
+    getMcpWorkspaceRoot(),
+    DEFAULT_OPENAI_ENDPOINT_LATENCY_HISTORY_RELATIVE_PATH,
+);
+const OPENAI_ENDPOINT_LATENCY_HISTORY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.openai-endpoint-latency',
+        exactPaths: [OPENAI_ENDPOINT_LATENCY_HISTORY_PATH],
+        operations: ['append', 'read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const OPENAI_ENDPOINT_LATENCY_HISTORY_STORE = createBoundConfiguredJsonlStore({
+    filePath: OPENAI_ENDPOINT_LATENCY_HISTORY_PATH,
+    io: OPENAI_ENDPOINT_LATENCY_HISTORY_IO,
+    maxReadBytes: MAX_HISTORY_READ_BYTES,
+});
 
 /**
  * @typedef {{
@@ -296,45 +312,31 @@ function summarizeTargetSamples(target, allSamples) {
  * Persist one compact endpoint snapshot and trim history by snapshot count.
  *
  * @param {OpenAiEndpointLatencySnapshot} snapshot
- * @param {{ maxSnapshots?: number; filePath?: string }} [options]
+ * @param {{ maxSnapshots?: number }} [options]
  */
 export async function appendOpenAiEndpointLatencySnapshot(snapshot, options = {}) {
-    const filePath = resolveHistoryPath(options.filePath);
     const maxSnapshots = boundedInteger(options.maxSnapshots, DEFAULT_MAX_HISTORY_SNAPSHOTS, 1, MAX_HISTORY_SNAPSHOTS);
-    const entry = `${JSON.stringify(snapshot)}\n`;
     try {
-        const { value: retainedSnapshots } = await withIoResourceLock(
-            filePath,
-            async () => {
-                await mkdirPathLocked(path.dirname(filePath), {
-                    recursive: true,
-                    advisoryLimits: { domain: 'openai-endpoint-latency-parent' },
-                });
-                await appendTextLocked(filePath, entry, {
-                    encoding: 'utf8',
-                    advisoryLimits: { domain: 'openai-endpoint-latency-history' },
-                });
-                return trimHistory(filePath, maxSnapshots);
-            },
-            { operation: 'openai-endpoint-latency-history', target: filePath, riskClass: 'low' },
-        );
+        const { retainedEntries } = await OPENAI_ENDPOINT_LATENCY_HISTORY_STORE.appendRecord(snapshot, {
+            maxEntries: maxSnapshots,
+        });
         return {
             persisted: true,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(OPENAI_ENDPOINT_LATENCY_HISTORY_PATH),
             maxSnapshots,
-            retainedSnapshots,
+            retainedSnapshots: retainedEntries,
         };
     } catch (error) {
         return {
             persisted: false,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(OPENAI_ENDPOINT_LATENCY_HISTORY_PATH),
             error: sanitizeError(error),
         };
     }
 }
 
 /**
- * @param {{ limit?: number; filePath?: string }} [options]
+ * @param {{ limit?: number }} [options]
  * @returns {Promise<{
  *     ok: boolean;
  *     path: string;
@@ -344,11 +346,9 @@ export async function appendOpenAiEndpointLatencySnapshot(snapshot, options = {}
  * }>}
  */
 export async function readOpenAiEndpointLatencyHistory(options = {}) {
-    const filePath = resolveHistoryPath(options.filePath);
     const limit = boundedInteger(options.limit, 200, 1, 2_000);
     try {
-        const tail = await readJsonlTailTrusted(filePath, {
-            caller: 'mcp.control-plane.openai-endpoint-latency',
+        const tail = await OPENAI_ENDPOINT_LATENCY_HISTORY_STORE.readTail({
             maxLines: Math.min(10_000, Math.max(limit, limit * 5)),
             maxBytes: MAX_HISTORY_READ_BYTES,
         });
@@ -358,17 +358,22 @@ export async function readOpenAiEndpointLatencyHistory(options = {}) {
             .slice(-limit);
         return {
             ok: true,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(OPENAI_ENDPOINT_LATENCY_HISTORY_PATH),
             entries: /** @type {OpenAiEndpointLatencySnapshot[]} */ (entries),
             truncatedByBytes: tail.truncatedByByteLimit,
         };
     } catch (error) {
         if (isNotFoundError(error)) {
-            return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [], truncatedByBytes: false };
+            return {
+                ok: true,
+                path: toWorkspaceRelativePath(OPENAI_ENDPOINT_LATENCY_HISTORY_PATH),
+                entries: [],
+                truncatedByBytes: false,
+            };
         }
         return {
             ok: false,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(OPENAI_ENDPOINT_LATENCY_HISTORY_PATH),
             entries: [],
             truncatedByBytes: false,
             error: sanitizeError(error),
@@ -493,26 +498,6 @@ function percentile(sorted, quantile) {
 function pushFinite(target, value) {
     const parsed = Number(value);
     if (Number.isFinite(parsed)) target.push(parsed);
-}
-
-/** @param {string | undefined} overridePath */
-function resolveHistoryPath(overridePath) {
-    return overridePath ?? path.join(getMcpWorkspaceRoot(), DEFAULT_OPENAI_ENDPOINT_LATENCY_HISTORY_RELATIVE_PATH);
-}
-
-/** @param {string} filePath @param {number} maxSnapshots */
-async function trimHistory(filePath, maxSnapshots) {
-    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.openai-endpoint-latency' })).content;
-    const lines = raw.split('\n').filter((line) => line.trim());
-    if (lines.length <= maxSnapshots) return lines.length;
-    const retained = lines.slice(-maxSnapshots);
-    await writeFileAtomic(filePath, `${retained.join('\n')}\n`, {
-        encoding: 'utf8',
-        mode: 0o600,
-        riskClass: 'low',
-        advisoryLimits: { domain: 'openai-endpoint-latency-history-trim', maxSnapshots },
-    });
-    return retained.length;
 }
 
 /** @param {unknown} value @returns {OpenAiEndpointLatencySnapshot | null} */

@@ -3,9 +3,14 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { normalizeWritePayload } from '../payload/index.js';
 import { openDetachedAppendSinkUnlocked } from './sink.js';
 import { appendFileUnlocked } from './unlocked.js';
@@ -32,8 +37,9 @@ import { appendFileUnlocked } from './unlocked.js';
  *     durability: Awaited<ReturnType<typeof appendFileUnlocked>>;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function appendTextLocked(filePath, content, options = {}) {
+export async function appendTextLocked(filePath, content, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
@@ -59,7 +65,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
             await lease.releaseAsync();
         }
         const waitMs = lease.waitMs;
-        invalidateIoCoherencePath(filePath);
+        invalidateIoCoherencePath(filePath, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'append',
@@ -77,6 +83,8 @@ export async function appendTextLocked(filePath, content, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { path: filePath, bytesWritten: bytes, lockWaitMs: waitMs, durability, io };
     } catch (error) {
@@ -92,6 +100,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }
@@ -109,8 +118,9 @@ export async function appendTextLocked(filePath, content, options = {}) {
  *     traceId?: string;
  *     advisoryLimits?: Record<string, unknown>;
  * }} [options]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function openDetachedAppendSinkLocked(filePath, options = {}) {
+export async function openDetachedAppendSinkLocked(filePath, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
@@ -128,7 +138,7 @@ export async function openDetachedAppendSinkLocked(filePath, options = {}) {
                     ...(options.durability === undefined ? {} : { durability: options.durability }),
                 }),
             );
-            if (value.created) invalidateIoCoherencePath(filePath);
+            if (value.created) invalidateIoCoherencePath(filePath, {}, invalidationBus);
             const io = publishIoOperationResult(
                 buildIoMeta({
                     operation: 'append',
@@ -150,6 +160,8 @@ export async function openDetachedAppendSinkLocked(filePath, options = {}) {
                     },
                 }),
                 true,
+                undefined,
+                getIoTelemetryRuntimeOption(options),
             );
             return { ...value, lockWaitMs: lease.waitMs, io };
         } finally {
@@ -168,6 +180,7 @@ export async function openDetachedAppendSinkLocked(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

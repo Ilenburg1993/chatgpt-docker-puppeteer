@@ -7,29 +7,47 @@ import { BABEL_PARSER_POLICY_VERSION, resolveBabelParserOptions } from '#copilot
 import { readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
 import {
     buildOutline,
+    createParserWorkerRuntime,
     extractJsonSchema,
     extractMarkdownOutline,
     extractTopComments,
-    getParserCacheStats,
-    invalidateParserCache,
-    parseAndCacheSymbols,
-    parseFileForContext,
+    getParserCacheStats as getParserCacheStatsRaw,
+    parseAndCacheSymbols as parseAndCacheSymbolsRaw,
+    parseFileForContext as parseFileForContextRaw,
     parseFileSymbols,
     resolveParserWorkerPoolPolicy,
     resolveParserWorkerQueuePolicy,
     windowFileContext,
 } from '#copilot/infra/internal/indexing/parser';
+import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';
 import { sha256 } from '#copilot/infra/internal/platform';
-import { resetParserCacheForTest } from '#copilot/infra/public/testing';
 import * as assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it } from 'vitest';
 
 let tmpDir = '';
+/** @type {ReturnType<typeof createParserWorkerRuntime>} */
+let parserWorkerRuntime;
+/** @type {ReturnType<typeof createParserCacheRuntime>} */
+let parserCacheRuntime;
+const INVALIDATION_BUS = Object.freeze({
+    registerHook() {
+        return () => {};
+    },
+});
+/** @param {string} filePath @param {Parameters<typeof parseAndCacheSymbolsRaw>[1]} [options] */
+const parseAndCacheSymbols = (filePath, options = {}) =>
+    parseAndCacheSymbolsRaw(filePath, { ...options, parserCacheRuntime });
+/** @param {string} filePath @param {string} content @param {Parameters<typeof parseFileForContextRaw>[2]} [options] */
+const parseFileForContext = (filePath, content, options = {}) =>
+    parseFileForContextRaw(filePath, content, { ...options, parserCacheRuntime });
+const getParserCacheStats = () => getParserCacheStatsRaw(parserCacheRuntime);
+const invalidateParserCache = (filePath) => parserCacheRuntime.invalidate(filePath);
+
 const execFileAsync = promisify(execFile);
 const JS_CONTENT = `
 // Module principal de teste
@@ -66,9 +84,20 @@ export async function handleRequest(cfg: Config): Promise<void> {
 
 const JSON_CONTENT = JSON.stringify({ name: 'test', version: '1.0.0', keywords: ['a', 'b'] });
 
+beforeEach(() => {
+    const runtimeId = `parser-test-${Date.now()}-${Math.random()}`;
+    parserWorkerRuntime = createParserWorkerRuntime({ runtimeId: `${runtimeId}:workers` });
+    parserCacheRuntime = createParserCacheRuntime({
+        invalidationBus: INVALIDATION_BUS,
+        runtimeId,
+        workerRuntime: parserWorkerRuntime,
+    });
+});
+
 afterEach(async () => {
     process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '1';
-    await resetParserCacheForTest();
+    parserCacheRuntime.dispose();
+    await parserWorkerRuntime.dispose();
 });
 
 const MD_CONTENT = `# Título
@@ -91,7 +120,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await resetParserCacheForTest({ teardownWorkers: true });
     await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -167,9 +195,8 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('aplica line guard também a arquivos com CR isolado', async () => {
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
             const result = await parseFileSymbols('/tmp/cr-only.js', 'a\\rb\\rc\\rd');
-            await resetParserCacheForTest({ teardownWorkers: true });
             console.log(JSON.stringify({ lines: result.lines, parseError: result.parseError }));
         `;
         const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
@@ -190,10 +217,9 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('trunca o source pelo orçamento UTF-8 real', async () => {
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
             const content = "export const before = 1;\\n// 🚀🚀🚀🚀🚀🚀🚀🚀\\nexport const afterBudget = 1;";
             const result = await parseFileSymbols('/tmp/byte-budget.js', content);
-            await resetParserCacheForTest({ teardownWorkers: true });
             console.log(JSON.stringify({
                 truncated: result.truncated,
                 bytes: result.bytes,
@@ -367,12 +393,12 @@ describe('Babel parser policy', () => {
     it('mantém paridade entre worker e fallback síncrono', async () => {
         const filePath = '/tmp/parser-parity.cts';
         const content = 'import dep = require("./dep.cjs");\nexport = dep;';
-        const workerResult = await parseFileSymbols(filePath, content);
+        const workerStatsBefore = getParserCacheStats();
+        const workerResult = await parseFileSymbols(filePath, content, { workerRuntime: parserWorkerRuntime });
         const workerStats = getParserCacheStats();
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
             const result = await parseFileSymbols(${JSON.stringify(filePath)}, ${JSON.stringify(content)});
-            await resetParserCacheForTest({ teardownWorkers: true });
             console.log(JSON.stringify(result));
         `;
         const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
@@ -387,9 +413,9 @@ describe('Babel parser policy', () => {
         assert.deepEqual(fallbackResult.imports, workerResult.imports);
         assert.deepEqual(fallbackResult.exports, workerResult.exports);
         assert.equal(fallbackResult.parseError, workerResult.parseError);
-        assert.equal(workerStats.workerRequests, 1);
-        assert.equal(workerStats.workerFailures, 0);
-        assert.equal(workerStats.workerFallbacks, 0);
+        assert.equal(workerStats.workerRequests, workerStatsBefore.workerRequests + 1);
+        assert.equal(workerStats.workerFailures, workerStatsBefore.workerFailures);
+        assert.equal(workerStats.workerFallbacks, workerStatsBefore.workerFallbacks);
     });
 });
 
@@ -505,7 +531,7 @@ describe('parseAndCacheSymbols', () => {
     it('aceita snapshot consistente fornecido sem reler o arquivo', async () => {
         const filePath = path.join(tmpDir, 'module.js');
         const snapshot = await readTextFileSnapshot(filePath);
-        await resetParserCacheForTest();
+        parserCacheRuntime.reset();
 
         const result = await parseAndCacheSymbols(filePath, { snapshot });
         const stats = getParserCacheStats();
@@ -572,19 +598,20 @@ describe('parseAndCacheSymbols', () => {
 
     it('remove tarefa abortada da fila de workers', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
             const slowContent = Array.from({ length: 20_000 }, (_, index) => 'export function f' + index + '() { return ' + index + '; }').join('\\n');
-            const first = parseFileSymbols('/tmp/abort-holder.js', slowContent);
+            const first = parseFileSymbols('/tmp/abort-holder.js', slowContent, { workerRuntime });
             const controller = new AbortController();
-            const queued = parseFileSymbols('/tmp/abort-queued.js', slowContent, { signal: controller.signal });
+            const queued = parseFileSymbols('/tmp/abort-queued.js', slowContent, { signal: controller.signal, workerRuntime });
             controller.abort(new DOMException('queued parse cancelled', 'AbortError'));
             const queuedResult = await queued.then(
                 () => ({ status: 'resolved' }),
                 (error) => ({ status: 'rejected', name: error?.name, message: error?.message }),
             );
             await first;
-            const stats = getParserCacheStats();
-            await resetParserCacheForTest({ teardownWorkers: true });
+            const stats = getParserCacheStats(parserCacheRuntime);
+            parserCacheRuntime.dispose();
+            await workerRuntime.dispose();
             console.log(JSON.stringify({ queuedResult, workerQueueLength: stats.workerQueueLength }));
             process.exit(0);
         `;
@@ -612,13 +639,14 @@ describe('parseAndCacheSymbols', () => {
 
     it('rejeita backlog quando a fila de workers atinge o limite configurado', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
-                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/queued-' + index + '.js', content)),
+                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/queued-' + index + '.js', content, { workerRuntime })),
             );
-            const stats = getParserCacheStats();
-            await resetParserCacheForTest({ teardownWorkers: true });
+            const stats = getParserCacheStats(parserCacheRuntime);
+            parserCacheRuntime.dispose();
+            await workerRuntime.dispose();
             console.log(JSON.stringify({
                 parseErrors: results.map((result) => result.parseError),
                 workerQueueRejected: stats.workerQueueRejected,
@@ -650,13 +678,14 @@ describe('parseAndCacheSymbols', () => {
 
     it('faz fallback síncrono limitado para arquivos pequenos sob overload', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
-                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/fallback-' + index + '.js', content)),
+                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/fallback-' + index + '.js', content, { workerRuntime })),
             );
-            const stats = getParserCacheStats();
-            await resetParserCacheForTest({ teardownWorkers: true });
+            const stats = getParserCacheStats(parserCacheRuntime);
+            parserCacheRuntime.dispose();
+            await workerRuntime.dispose();
             console.log(JSON.stringify({
                 parseErrors: results.map((result) => result.parseError),
                 symbolCounts: results.map((result) => result.symbols.length),
@@ -757,7 +786,7 @@ describe('parseFileForContext', () => {
 
     it('cacheia FileContext por path e conteúdo', async () => {
         const filePath = path.join(tmpDir, 'module.js');
-        await resetParserCacheForTest();
+        parserCacheRuntime.reset();
 
         const first = await parseFileForContext(filePath, JS_CONTENT);
         const afterFirst = getParserCacheStats();
@@ -775,7 +804,7 @@ describe('parseFileForContext', () => {
 
     it('reutiliza contentHash canônico no FileContext sem recalcular SHA-256', async () => {
         const filePath = path.join(tmpDir, 'module.js');
-        await resetParserCacheForTest();
+        parserCacheRuntime.reset();
         const snapshot = await readTextFileSnapshot(filePath);
         const contentHash = sha256(snapshot.content);
 
@@ -790,7 +819,7 @@ describe('parseFileForContext', () => {
 
     it('invalida FileContext quando invalidateParserCache é chamado', async () => {
         const filePath = path.join(tmpDir, 'module.js');
-        await resetParserCacheForTest();
+        parserCacheRuntime.reset();
 
         await parseFileForContext(filePath, JS_CONTENT);
         assert.equal(getParserCacheStats().fileContext.size, 1);
@@ -802,8 +831,13 @@ describe('parseFileForContext', () => {
 
     it('suporta kill-switch do FileContext cache', async () => {
         const filePath = path.join(tmpDir, 'module.js');
+        const enabledRuntime = parserCacheRuntime;
         process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '0';
-        await resetParserCacheForTest();
+        enabledRuntime.dispose();
+        parserCacheRuntime = createParserCacheRuntime({
+            invalidationBus: INVALIDATION_BUS,
+            runtimeId: `parser-disabled-${Date.now()}-${Math.random()}`,
+        });
 
         const first = await parseFileForContext(filePath, JS_CONTENT);
         const second = await parseFileForContext(filePath, JS_CONTENT);
@@ -817,10 +851,10 @@ describe('parseFileForContext', () => {
 
     it('recusa retenção de FileContext maior que o orçamento configurado', async () => {
         const script = `
-            import { getParserCacheStats, parseFileForContext } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
-            await parseFileForContext('/tmp/oversized-context.js', 'export const oversizedContext = 1;');
-            const stats = getParserCacheStats();
-            await resetParserCacheForTest({ teardownWorkers: true });
+            import { getParserCacheStats, parseFileForContext } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child-context' });
+            await parseFileForContext('/tmp/oversized-context.js', 'export const oversizedContext = 1;', { parserCacheRuntime });
+            const stats = getParserCacheStats(parserCacheRuntime);
+            parserCacheRuntime.dispose();
             console.log(JSON.stringify(stats));
         `;
         const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {

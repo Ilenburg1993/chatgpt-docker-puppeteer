@@ -2,16 +2,15 @@
 /** Cached L1/L2 byte read service. */
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
-import {
-    getIoL1Cache,
-    getIoL2Cache,
-    getVerifiedIoL1Entry,
-    makeBytesKey,
-    normalizeIoCacheKey,
-} from '#copilot/infra/internal/cache';
+import { makeBytesKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import { isBufferValue, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import { readBytesFileSnapshot, statPathSnapshot } from '../snapshot/index.js';
 import {
     hasRichCacheFingerprint,
@@ -25,17 +24,18 @@ import {
  * Lê bytes completos de um arquivo.
  *
  * @param {string} filePath
- * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown>; signal?: AbortSignal }} [options]
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown>; signal?: AbortSignal; cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2CacheRuntime>} }} [options]
  */
 export async function readBytes(filePath, options = {}) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const _l1 = getIoL1Cache();
+        const _l1 = options.cacheRuntime?.l1 ?? null;
+        const _l2Runtime = options.cacheRuntime?.l2 ?? null;
         const _normalizedPath = normalizeIoCacheKey(filePath);
         const _cacheKey = makeBytesKey(_normalizedPath);
-        const _cached = await getVerifiedIoL1Entry(_cacheKey, filePath);
+        const _cached = _l1 ? await _l1.getVerified(_cacheKey, filePath) : null;
         if (_cached) {
             const content = /** @type {Buffer} */ (
                 isBufferValue(_cached.content) ? _cached.content : toOwnedBuffer(String(_cached.content))
@@ -55,6 +55,8 @@ export async function readBytes(filePath, options = {}) {
                     ...(options.advisoryLimits !== undefined ? { advisoryLimits: options.advisoryLimits } : {}),
                 }),
                 true,
+                undefined,
+                getIoTelemetryRuntimeOption(options),
             );
             return {
                 path: filePath,
@@ -67,7 +69,7 @@ export async function readBytes(filePath, options = {}) {
                 io,
             };
         }
-        const l2Cache = getIoL2Cache();
+        const l2Cache = _l2Runtime?.get() ?? null;
         if (l2Cache) {
             const l2Entry = l2Cache.get(_cacheKey);
             if (l2Entry?.kind === 'bytes' && isBufferValue(l2Entry.payload)) {
@@ -80,7 +82,7 @@ export async function readBytes(filePath, options = {}) {
                         ? 'l2-mtime-size-ctime-dev-ino'
                         : 'l2-mtime-size';
                     const _now = Date.now();
-                    _l1.set(_cacheKey, {
+                    _l1?.set(_cacheKey, {
                         content: l2Entry.payload,
                         bytes: l2Entry.payload.byteLength,
                         cachedAt: _now,
@@ -108,6 +110,8 @@ export async function readBytes(filePath, options = {}) {
                             ...(options.advisoryLimits !== undefined ? { advisoryLimits: options.advisoryLimits } : {}),
                         }),
                         true,
+                        undefined,
+                        getIoTelemetryRuntimeOption(options),
                     );
                     return {
                         path: filePath,
@@ -128,7 +132,7 @@ export async function readBytes(filePath, options = {}) {
         const content = snapshot.content;
         const contentHash = sha256(content);
         const _now = Date.now();
-        /** @type {import('#copilot/infra/internal/cache').IoCacheEntry} */
+        /** @type {import('#copilot/infra/internal/cache/memory').IoCacheEntry} */
         const _entry = {
             content,
             bytes: content.byteLength,
@@ -143,7 +147,7 @@ export async function readBytes(filePath, options = {}) {
             contentHash,
             fingerprintStrategy: 'fs-read',
         };
-        _l1.set(_cacheKey, _entry);
+        _l1?.set(_cacheKey, _entry);
         if (l2Cache) {
             l2Cache.set({
                 key: _cacheKey,
@@ -170,10 +174,12 @@ export async function readBytes(filePath, options = {}) {
                 engine: 'io-engine.fs.readFile.bytes',
                 riskClass: 'low',
                 traceId,
-                cache: 'l1-miss',
+                cache: _l1 ? 'l1-miss' : 'bypass',
                 ...(options.advisoryLimits !== undefined ? { advisoryLimits: options.advisoryLimits } : {}),
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return {
             path: filePath,
@@ -198,6 +204,7 @@ export async function readBytes(filePath, options = {}) {
             }),
             false,
             error,
+            getIoTelemetryRuntimeOption(options),
         );
         throw error;
     }

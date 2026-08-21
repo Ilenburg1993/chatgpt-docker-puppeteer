@@ -1,7 +1,7 @@
 // @ts-check
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
+import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,23 +66,41 @@ vi.mock('../../../../src/copilot/infra/indexing/registry/sqlite/index.js', async
 
 /** @type {import('better-sqlite3').Database | null} */
 let testDb = null;
+/** @type {ReturnType<typeof createInfraSqliteProviderBinding> | null} */
+let databaseBinding = null;
+/** @type {ReturnType<typeof createIoIndexRegistryRuntime> | null} */
+let indexRuntime = null;
 
-import {
-    buildIoIndexForDirectory,
-    filterIoIndexRefreshDomainPaths,
-    flushIoIndexAutoRefresh,
-    getIoIndexStats,
-    reconcileIoIndexAutoRefreshDomain,
-    refreshIoIndexPaths,
-} from '#copilot/infra/internal/indexing/registry';
+import { createIoIndexRegistryRuntime } from '#copilot/infra/internal/indexing/registry';
 
-import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
+function requireIndexRuntime() {
+    if (!indexRuntime) throw new Error('test index runtime is not initialized');
+    return indexRuntime;
+}
+
+async function recreateIndexRuntime() {
+    await indexRuntime?.dispose();
+    if (!databaseBinding) throw new Error('test database binding is not initialized');
+    indexRuntime = createIoIndexRegistryRuntime({
+        database: databaseBinding,
+        invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
+        runtimeId: `test-index-${Date.now()}-${Math.random()}`,
+    });
+    mocks.registerIoInvalidationHook.mockClear();
+    return indexRuntime;
+}
+
 beforeEach(() => {
     mocks.registerIoInvalidationHook.mockImplementation(() => mocks.unregisterIoInvalidationHook);
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+    vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');
+    vi.stubEnv('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', '10000');
     testDb = new Database(':memory:');
-    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    databaseBinding = createInfraSqliteProviderBinding(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    indexRuntime = createIoIndexRegistryRuntime({
+        database: databaseBinding,
+        invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
+        runtimeId: `test-index-${Date.now()}-${Math.random()}`,
+    });
     mocks.registerIoInvalidationHook.mockClear();
     mocks.indexDirectory.mockReset();
     mocks.invalidatePath.mockReset().mockReturnValue(true);
@@ -109,16 +127,31 @@ beforeEach(() => {
         ignores: (/** @type {string} */ value) => String(value).includes('ignored'),
     });
     mocks.unregisterIoInvalidationHook.mockReset();
-    vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');
-    vi.stubEnv('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', '10000');
 });
 
-afterEach(() => {
-    resetIoIndexForTest();
-    resetInfraSqliteProviderForTest();
+afterEach(async () => {
+    await indexRuntime?.dispose();
+    indexRuntime = null;
+    databaseBinding = null;
     if (testDb?.open) testDb.close();
     testDb = null;
     vi.unstubAllEnvs();
+});
+
+describe('io-index-registry status isolation', () => {
+    it('reads status without materializing the index or registering invalidation hooks', () => {
+        const status = requireIndexRuntime().status();
+
+        expect(status).toMatchObject({
+            enabled: true,
+            available: false,
+            schemaPrepared: false,
+            reason: 'schema-unprepared',
+            lifecycle: { materialized: false, materializations: 0 },
+        });
+        expect(mocks.registerIoInvalidationHook).not.toHaveBeenCalled();
+        expect(mocks.indexDirectory).not.toHaveBeenCalled();
+    });
 });
 
 describe('io-index-registry build coalescing', () => {
@@ -135,8 +168,8 @@ describe('io-index-registry build coalescing', () => {
         });
 
         const [a, b] = await Promise.all([
-            buildIoIndexForDirectory('/tmp/ws-a', { recursive: true, extensions: ['.js', '.ts'] }),
-            buildIoIndexForDirectory('/tmp/ws-a', { recursive: true, extensions: ['.ts', '.js'] }),
+            requireIndexRuntime().buildDirectory('/tmp/ws-a', { recursive: true, extensions: ['.js', '.ts'] }),
+            requireIndexRuntime().buildDirectory('/tmp/ws-a', { recursive: true, extensions: ['.ts', '.js'] }),
         ]);
 
         expect(mocks.indexDirectory).toHaveBeenCalledTimes(1);
@@ -153,14 +186,14 @@ describe('io-index-registry build coalescing', () => {
         });
 
         await Promise.all([
-            buildIoIndexForDirectory('/tmp/ws-b', { recursive: true, maxFiles: 100 }),
-            buildIoIndexForDirectory('/tmp/ws-b', { recursive: true, maxFiles: 200 }),
+            requireIndexRuntime().buildDirectory('/tmp/ws-b', { recursive: true, maxFiles: 100 }),
+            requireIndexRuntime().buildDirectory('/tmp/ws-b', { recursive: true, maxFiles: 200 }),
         ]);
 
         expect(mocks.indexDirectory).toHaveBeenCalledTimes(2);
     });
 
-    it('desmonta e recria o hook de invalidação ao resetar', async () => {
+    it('desmonta o hook no dispose e registra um novo hook em outra instância', async () => {
         mocks.indexDirectory.mockResolvedValue({
             available: true,
             indexed: 0,
@@ -169,13 +202,19 @@ describe('io-index-registry build coalescing', () => {
             durationMs: 0,
         });
 
-        await buildIoIndexForDirectory('/tmp/ws-hook');
+        await requireIndexRuntime().buildDirectory('/tmp/ws-hook');
         expect(mocks.registerIoInvalidationHook).toHaveBeenCalledTimes(1);
 
-        resetIoIndexForTest();
+        await requireIndexRuntime().dispose();
         expect(mocks.unregisterIoInvalidationHook).toHaveBeenCalledTimes(1);
+        if (!databaseBinding) throw new Error('test database binding is not initialized');
+        indexRuntime = createIoIndexRegistryRuntime({
+            database: databaseBinding,
+            invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
+            runtimeId: `test-index-recreated-${Date.now()}-${Math.random()}`,
+        });
 
-        await buildIoIndexForDirectory('/tmp/ws-hook');
+        await requireIndexRuntime().buildDirectory('/tmp/ws-hook');
         expect(mocks.registerIoInvalidationHook).toHaveBeenCalledTimes(2);
     });
 
@@ -183,7 +222,7 @@ describe('io-index-registry build coalescing', () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-auto-refresh';
         const filePath = `${workspaceRoot}/changed.js`;
-        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
         const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
@@ -191,13 +230,13 @@ describe('io-index-registry build coalescing', () => {
         hook(filePath, { recursive: false, source: 'test-write' });
 
         expect(mocks.invalidatePath).toHaveBeenCalledTimes(2);
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1, queued: 1, coalesced: 1 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 1, queued: 1, coalesced: 1 });
 
-        const refreshed = await flushIoIndexAutoRefresh();
+        const refreshed = await requireIndexRuntime().flushAutoRefresh();
 
         expect(refreshed).toMatchObject({ requested: 1, indexed: 1, failed: 0 });
         expect(mocks.indexTextFile).toHaveBeenCalledTimes(1);
-        expect(getIoIndexStats().autoRefresh).toMatchObject({
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({
             pending: 0,
             batches: 1,
             requested: 1,
@@ -206,18 +245,93 @@ describe('io-index-registry build coalescing', () => {
         });
     });
 
+    it('mantém falha transitória pending e converge no retry seguinte', async () => {
+        vi.stubEnv('IO_INDEX_AUTO_REFRESH_RETRY_BASE_MS', '10000');
+        vi.stubEnv('IO_INDEX_AUTO_REFRESH_RETRY_MAX_ATTEMPTS', '3');
+        await recreateIndexRuntime();
+        const workspaceRoot = '/tmp/ws-auto-refresh-retry';
+        const filePath = `${workspaceRoot}/retry.js`;
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        mocks.indexTextFile.mockRejectedValueOnce(new Error('transient sqlite contention')).mockResolvedValueOnce({});
+
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+        hook(filePath, { recursive: false, source: 'retry-test' });
+
+        const first = await requireIndexRuntime().flushAutoRefresh();
+        expect(first).toMatchObject({ failed: 1, retryPending: 1, exhausted: 0 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({
+            pending: 1,
+            attempted: 1,
+            transientFailed: 1,
+            retried: 1,
+            exhausted: 0,
+            succeeded: 0,
+            explicitConvergences: 0,
+        });
+
+        const second = await requireIndexRuntime().flushAutoRefresh();
+        expect(second).toMatchObject({ indexed: 1, failed: 0, retryPending: 0, exhausted: 0 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({
+            pending: 0,
+            attempted: 2,
+            transientFailed: 1,
+            retried: 1,
+            exhausted: 0,
+            succeeded: 1,
+            explicitConvergences: 0,
+        });
+        expect(mocks.indexTextFile).toHaveBeenCalledTimes(2);
+    });
+
+    it('encerra retry persistente no limite e expõe exhaustion sem loop infinito', async () => {
+        vi.stubEnv('IO_INDEX_AUTO_REFRESH_RETRY_BASE_MS', '10000');
+        vi.stubEnv('IO_INDEX_AUTO_REFRESH_RETRY_MAX_ATTEMPTS', '2');
+        await recreateIndexRuntime();
+        const workspaceRoot = '/tmp/ws-auto-refresh-exhausted';
+        const filePath = `${workspaceRoot}/never-converges.js`;
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        mocks.indexTextFile.mockRejectedValue(new Error('persistent failure'));
+
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+        hook(filePath, { recursive: false, source: 'exhaustion-test' });
+
+        expect(await requireIndexRuntime().flushAutoRefresh()).toMatchObject({
+            failed: 1,
+            retryPending: 1,
+            exhausted: 0,
+        });
+        expect(await requireIndexRuntime().flushAutoRefresh()).toMatchObject({
+            failed: 1,
+            retryPending: 0,
+            exhausted: 1,
+        });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({
+            pending: 0,
+            attempted: 2,
+            transientFailed: 2,
+            retried: 1,
+            exhausted: 1,
+            succeeded: 0,
+        });
+        expect(await requireIndexRuntime().flushAutoRefresh()).toBeNull();
+    });
+
     it('não promove invalidation recursiva a scan implícito', async () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-recursive-refresh';
-        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
         const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(workspaceRoot, { recursive: true, source: 'test-rm-r' });
 
         expect(mocks.invalidatePath).toHaveBeenCalledTimes(1);
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, recursiveSkipped: 1 });
-        expect(await flushIoIndexAutoRefresh()).toBeNull();
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 0, recursiveSkipped: 1 });
+        expect(await requireIndexRuntime().flushAutoRefresh()).toBeNull();
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
     });
 
@@ -225,7 +339,7 @@ describe('io-index-registry build coalescing', () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-domain';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        await buildIoIndexForDirectory(scopeRoot, {
+        await requireIndexRuntime().buildDirectory(scopeRoot, {
             workspaceRoot,
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
@@ -235,15 +349,15 @@ describe('io-index-registry build coalescing', () => {
 
         hook(`${scopeRoot}/.ai/jobs/job.json`, { recursive: false, source: 'validator-artifact' });
 
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, domainSkipped: 1 });
-        expect(await flushIoIndexAutoRefresh()).toBeNull();
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 0, domainSkipped: 1 });
+        expect(await requireIndexRuntime().flushAutoRefresh()).toBeNull();
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
     });
 
     it('pré-filtra replay paths com o mesmo domínio de hidden/extensão/gitignore sem mutar scheduler', async () => {
         const workspaceRoot = '/tmp/ws-domain-preflight';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        const result = await filterIoIndexRefreshDomainPaths(
+        const result = await requireIndexRuntime().filterRefreshDomainPaths(
             [
                 `${scopeRoot}/kept.js`,
                 `${scopeRoot}/kept.js`,
@@ -261,14 +375,14 @@ describe('io-index-registry build coalescing', () => {
             domainSkipped: 3,
             gitignoredSkipped: 1,
         });
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, queued: 0, domainSkipped: 0 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 0, queued: 0, domainSkipped: 0 });
     });
 
     it('filtra gitignored path antes do derived-state refresh', async () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-gitignore';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        await buildIoIndexForDirectory(scopeRoot, {
+        await requireIndexRuntime().buildDirectory(scopeRoot, {
             workspaceRoot,
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
@@ -277,12 +391,16 @@ describe('io-index-registry build coalescing', () => {
         assert.equal(typeof hook, 'function');
 
         hook(`${scopeRoot}/ignored.js`, { recursive: false, source: 'ignored-write' });
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 1 });
 
-        const result = await flushIoIndexAutoRefresh();
+        const result = await requireIndexRuntime().flushAutoRefresh();
 
         expect(result).toMatchObject({ requested: 0, indexed: 0, failed: 0 });
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, gitignoredSkipped: 1, requested: 0 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({
+            pending: 0,
+            gitignoredSkipped: 1,
+            requested: 0,
+        });
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
     });
 
@@ -299,7 +417,7 @@ describe('io-index-registry build coalescing', () => {
             return { isFile: () => true, size: 12, mtimeMs: 10, ctimeMs: 11, dev: 1, ino: 2 };
         });
 
-        const result = await refreshIoIndexPaths(paths, { workspaceRoot, concurrency: 2 });
+        const result = await requireIndexRuntime().refreshPaths(paths, { workspaceRoot, concurrency: 2 });
 
         expect(result).toMatchObject({ requested: 6, indexed: 6, failed: 0, concurrency: 2 });
         expect(highWater).toBe(2);
@@ -310,18 +428,18 @@ describe('io-index-registry build coalescing', () => {
         const workspaceRoot = '/tmp/ws-explicit-convergence';
         const filePath = `${workspaceRoot}/src/changed.js`;
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
-        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
         const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(filePath, { recursive: false, source: 'canonical-write' });
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 1 });
 
-        const result = await refreshIoIndexPaths([filePath], { workspaceRoot });
+        const result = await requireIndexRuntime().refreshPaths([filePath], { workspaceRoot });
 
         expect(result).toMatchObject({ requested: 1, indexed: 1, failed: 0 });
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, explicitConvergences: 1 });
-        expect(await flushIoIndexAutoRefresh()).toBeNull();
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 0, explicitConvergences: 1 });
+        expect(await requireIndexRuntime().flushAutoRefresh()).toBeNull();
         expect(mocks.indexTextFile).toHaveBeenCalledTimes(1);
     });
 
@@ -349,10 +467,15 @@ describe('io-index-registry build coalescing', () => {
             parseError: null,
         };
 
-        const result = await refreshIoIndexPaths([filePath], {
+        const result = await requireIndexRuntime().refreshPaths([filePath], {
             workspaceRoot,
             snapshots: new Map([[filePath, snapshot]]),
-            parsedSymbols: new Map([[filePath, /** @type {any} */ (parsedSymbols)]]),
+            parsedSymbols: new Map([
+                [
+                    filePath,
+                    /** @type {import('#copilot/infra/internal/indexing/parser').FileSymbols} */ (parsedSymbols),
+                ],
+            ]),
         });
 
         expect(result).toMatchObject({
@@ -373,7 +496,7 @@ describe('io-index-registry build coalescing', () => {
     it('aplica o mesmo domínio no refresh incremental de startup', async () => {
         const workspaceRoot = '/tmp/ws-incremental-domain';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        const result = await refreshIoIndexPaths([`${scopeRoot}/.hidden.js`], {
+        const result = await requireIndexRuntime().refreshPaths([`${scopeRoot}/.hidden.js`], {
             workspaceRoot,
             scopeRoot,
             respectGitignore: true,
@@ -387,26 +510,26 @@ describe('io-index-registry build coalescing', () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-canonical-domain';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        await buildIoIndexForDirectory(scopeRoot, {
+        await requireIndexRuntime().buildDirectory(scopeRoot, {
             workspaceRoot,
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
         });
-        await buildIoIndexForDirectory('/tmp/manual-index-slice', { workspaceRoot: '/tmp' });
+        await requireIndexRuntime().buildDirectory('/tmp/manual-index-slice', { workspaceRoot: '/tmp' });
         const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(`${scopeRoot}/kept.js`, { recursive: false, source: 'canonical-write' });
         hook('/tmp/manual-index-slice/manual.js', { recursive: false, source: 'manual-slice-write' });
 
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1, queued: 1, domainSkipped: 1 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 1, queued: 1, domainSkipped: 1 });
     });
 
     it('reconcilia apenas rows explicit-path contaminadas e preserva build manual legítimo', async () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-domain-reconcile';
         const scopeRoot = `${workspaceRoot}/src/copilot`;
-        await buildIoIndexForDirectory(scopeRoot, {
+        await requireIndexRuntime().buildDirectory(scopeRoot, {
             workspaceRoot,
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
@@ -440,7 +563,7 @@ describe('io-index-registry build coalescing', () => {
             },
         ]);
 
-        const result = await reconcileIoIndexAutoRefreshDomain();
+        const result = await requireIndexRuntime().reconcileAutoRefreshDomain();
 
         expect(result).toEqual({
             available: true,
@@ -454,6 +577,6 @@ describe('io-index-registry build coalescing', () => {
         expect(mocks.invalidatePath).toHaveBeenCalledWith(`${scopeRoot}/ignored.js`);
         expect(mocks.invalidatePath).toHaveBeenCalledWith(`${workspaceRoot}/tests/outside.js`);
         expect(mocks.invalidatePath).not.toHaveBeenCalledWith('/tmp/manual-index-slice/manual.js');
-        expect(getIoIndexStats().autoRefresh).toMatchObject({ domainReconciliations: 1, domainPruned: 3 });
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ domainReconciliations: 1, domainPruned: 3 });
     });
 });

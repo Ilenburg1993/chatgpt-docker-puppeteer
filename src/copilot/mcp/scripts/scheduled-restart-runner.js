@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/scheduled-restart-runner
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -17,6 +17,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
 const STATE_FILE = resolve(repoRoot, 'src/copilot/.ai/mcp/mcp-reload-state.json');
+const RELOAD_STATE_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.scripts.scheduled-restart-runner',
+        exactPaths: [STATE_FILE],
+        operations: ['write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 const RUNNER_PROFILE_TARGETS = Object.freeze({
     quic: 'copilot:mcp:quic:restart',
     h2: 'copilot:mcp:h2:restart',
@@ -31,10 +40,7 @@ function sleep(ms) {
 
 /** @param {Record<string, unknown>} state */
 async function writeState(state) {
-    await writeFileAtomicTrusted(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, {
-        caller: 'mcp.scripts.scheduled-restart-runner',
-        mode: 0o600,
-    });
+    await RELOAD_STATE_FS.writeFileAtomic(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
 }
 
 /** @param {string} profile */

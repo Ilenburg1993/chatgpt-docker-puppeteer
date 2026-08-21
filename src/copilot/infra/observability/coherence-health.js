@@ -1,39 +1,25 @@
 // @ts-check
-/** Read-side coherence/invalidation health projection with bounded fail-closed fallback. */
-import { getIoExternalWatchStats, getIoInvalidationBusStats } from '#copilot/infra/internal/filesystem/invalidation';
-import { healthErrorMessage, safeHealthCall } from './safe-call.js';
+/** Side-effect-free runtime-owned coherence/invalidation health projection. */
+import { healthErrorMessage } from './safe-call.js';
 
-export function readCoherenceHealthStats() {
-    const externalWatch = safeHealthCall(getIoExternalWatchStats, {
-        starts: 0,
-        reuses: 0,
-        stops: 0,
-        events: 0,
-        queued: 0,
-        coalesced: 0,
-        canonicalSuppressed: 0,
-        filtered: 0,
-        nullFilename: 0,
-        dropped: 0,
-        invalidated: 0,
-        errors: 1,
-        flushes: 0,
-        highWater: 0,
-        lastEventAtMs: null,
-        lastFlushAtMs: null,
-        lastError: 'external-watch-health-unavailable',
-        enabled: false,
-        watching: false,
-        rootKnown: false,
-        pending: 0,
-        debounceMs: 0,
-        maxBatch: 0,
-        maxPending: 0,
-    });
+/** @param {ReturnType<typeof import('../composition/runtime/index.js').createInfraRuntime>} runtime */
+export function readCoherenceHealthStats(runtime) {
     try {
-        return { ...getIoInvalidationBusStats(), externalWatch };
+        const invalidation = runtime.coherence.invalidation.snapshot();
+        const externalWatchers = runtime.listWorkspaces().flatMap((workspace) => workspace.externalWatchStats());
+        const active = externalWatchers.filter((entry) => entry.watching === true);
+        return Object.freeze({
+            ...invalidation,
+            externalWatch: Object.freeze({
+                enabled: externalWatchers.some((entry) => entry.enabled === true),
+                watching: active.length > 0,
+                activeWatchers: active.length,
+                watchedRoots: new Set(active.map((entry) => entry.root)).size,
+                watchers: Object.freeze(externalWatchers),
+            }),
+        });
     } catch (error) {
-        return {
+        return Object.freeze({
             error: healthErrorMessage(error),
             hooks: 0,
             pending: 0,
@@ -44,15 +30,21 @@ export function readCoherenceHealthStats() {
             replicationCoalesced: 0,
             replicationFlushes: 0,
             replicationPublished: 0,
-            externalWatch,
-            crossProcess: {
+            externalWatch: Object.freeze({
+                enabled: false,
+                watching: false,
+                activeWatchers: 0,
+                watchedRoots: 0,
+                watchers: Object.freeze([]),
+            }),
+            crossProcess: Object.freeze({
                 enabled: false,
                 initialized: false,
                 initializationErrors: 1,
                 writeErrors: 0,
                 readErrors: 0,
                 gapDetections: 0,
-            },
-        };
+            }),
+        });
     }
 }

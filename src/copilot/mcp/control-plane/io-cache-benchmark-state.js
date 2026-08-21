@@ -5,12 +5,20 @@
  * @module copilot/mcp/control-plane/io-cache-benchmark-state
  */
 
-import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { fileURLToPath } from 'node:url';
 
 export const IO_CACHE_BENCHMARK_STATE_PATH = 'src/copilot/.ai/mcp/io-cache-benchmark-state.json';
 const IO_CACHE_BENCHMARK_STATE_FILE = fileURLToPath(
     new URL('../../.ai/mcp/io-cache-benchmark-state.json', import.meta.url),
+);
+const IO_CACHE_BENCHMARK_STATE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.io-cache-benchmark-state',
+        exactPaths: [IO_CACHE_BENCHMARK_STATE_FILE],
+        operations: ['read', 'stat'],
+        symlinkPolicy: 'deny',
+    }),
 );
 const MAX_STATE_BYTES = 512 * 1024;
 
@@ -21,11 +29,7 @@ export function getIoCacheBenchmarkStateFile() {
 /** @returns {Promise<Record<string, unknown> | null>} */
 export async function readIoCacheBenchmarkState() {
     try {
-        const stats = (
-            await lstatPathTrusted(IO_CACHE_BENCHMARK_STATE_FILE, {
-                caller: 'mcp.control-plane.io-cache-benchmark-state',
-            })
-        ).stats;
+        const stats = (await IO_CACHE_BENCHMARK_STATE_IO.lstatPath(IO_CACHE_BENCHMARK_STATE_FILE)).stats;
         if (stats.isSymbolicLink() || !stats.isFile()) {
             return { schemaVersion: 1, status: 'unreadable', error: 'IO cache benchmark state is not a regular file.' };
         }
@@ -37,11 +41,7 @@ export async function readIoCacheBenchmarkState() {
             };
         }
         const parsed = JSON.parse(
-            (
-                await readTextFreshTrusted(IO_CACHE_BENCHMARK_STATE_FILE, {
-                    caller: 'mcp.control-plane.io-cache-benchmark-state',
-                })
-            ).content,
+            (await IO_CACHE_BENCHMARK_STATE_IO.readTextFresh(IO_CACHE_BENCHMARK_STATE_FILE)).content,
         );
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             return { schemaVersion: 1, status: 'unreadable', error: 'IO cache benchmark state JSON is not an object.' };

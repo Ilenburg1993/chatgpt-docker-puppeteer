@@ -1,9 +1,16 @@
 // @ts-check
 /** @module copilot/infra/telemetry */
 
-export { beginIoAdvisoryBudget, getIoAdvisoryBudgetStats } from './advisory-budget.js';
+export { createIoAdvisoryBudgetRuntime, readIoAdvisoryBudgetConfig } from './advisory-budget.js';
 export { elapsedIoMs, nowIoMs } from './clock.js';
-export { getIoDurabilityStats } from './durability.js';
-export { getIoLatencyStats, recordIoLatency } from './latency.js';
-export { getIoMutationStateStats } from './mutation-state.js';
-export { publishIoLifecycleEvent, publishIoOperation, publishIoOperationResult } from './publisher.js';
+export { createIoDurabilityRuntime } from './durability.js';
+export { createIoLatencyRuntime } from './latency.js';
+export { createIoMutationStateRuntime } from './mutation-state.js';
+export {
+    getIoTelemetryRuntimeOption,
+    publishIoLifecycleEvent,
+    publishIoOperation,
+    publishIoOperationResult,
+    withIoTelemetryRuntimeOption,
+} from './publisher.js';
+export { createIoTelemetryRuntime } from './runtime.js';

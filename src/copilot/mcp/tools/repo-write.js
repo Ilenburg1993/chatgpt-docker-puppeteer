@@ -7,22 +7,15 @@
 
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import {
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-    readBytesFreshTrusted,
-    readBytesRangeFreshTrusted,
-    statPathTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import {
+    MCP_TOOL_EXECUTION_LIMITS,
     appendMcpAuditEvent,
     boundedWriteAnnotations,
     canRunCopilotValidatorInline,
     destructiveAnnotations,
     errorResult,
     estimateStructuredTextResultBytes,
+    getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
-    MCP_TOOL_EXECUTION_LIMITS,
     normalizeFocusedUnitTestFiles,
     okResult,
     readOnlyAnnotations,
@@ -49,11 +42,16 @@ const {
     patchTextBatchLockedValidated,
     patchTextLocked,
     patchTextLockedValidated,
+    listDirectoryNamesFresh,
+    lstatPath,
+    readBytesFresh,
+    readBytesRangeFresh,
     readText,
+    statPath,
     withIoResourceLock,
     writeFileAtomic,
     writeFileAtomicValidated,
-} = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+} = getMcpWorkspaceIo();
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
@@ -72,7 +70,7 @@ const {
  * Use the opaque validated mutable capability when the upstream path adapter supplied one; keep the canonical string
  * method as a compatibility fallback for internal mocks/legacy callers.
  *
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof patchTextLocked>[1]} options
  */
 function patchResolvedTarget(resolved, options) {
@@ -82,7 +80,7 @@ function patchResolvedTarget(resolved, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof patchTextBatchLocked>[1]} options
  */
 function patchResolvedTargetBatch(resolved, options) {
@@ -92,7 +90,7 @@ function patchResolvedTargetBatch(resolved, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content
  * @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options
  */
@@ -103,7 +101,7 @@ function createResolvedTarget(resolved, content, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof writeFileAtomic>[1]} content
  * @param {Parameters<typeof writeFileAtomic>[2]} options
  */
@@ -117,8 +115,8 @@ function writeResolvedTarget(resolved, content, options) {
  * Move through the pair-capability path only when both sides were independently authorized by canonical write policy.
  * Legacy/mocked callers without capabilities keep the string facade and therefore retain full policy validation.
  *
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} source
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} destination
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} source
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} destination
  * @param {Parameters<typeof moveFileLocked>[2]} options
  */
 function moveResolvedTargets(source, destination, options) {
@@ -484,22 +482,21 @@ function optionalInteger(value) {
     return Number.isInteger(value) ? /** @type {number} */ (value) : undefined;
 }
 
-const REPO_WRITE_IO_CALLER = 'mcp.tools.repo-write';
 const MAX_QUARANTINE_METADATA_BYTES = 128 * 1024;
 
 /** @param {string} filePath */
 async function repoWriteStat(filePath) {
-    return (await statPathTrusted(filePath, { caller: REPO_WRITE_IO_CALLER })).stats;
+    return (await statPath(filePath)).stats;
 }
 
 /** @param {string} filePath */
 async function repoWriteLstat(filePath) {
-    return (await lstatPathTrusted(filePath, { caller: REPO_WRITE_IO_CALLER })).stats;
+    return (await lstatPath(filePath)).stats;
 }
 
 /** @param {string} dirPath */
 async function repoWriteListDirectoryNames(dirPath) {
-    return (await listDirectoryNamesFreshTrusted(dirPath, { caller: REPO_WRITE_IO_CALLER })).entries;
+    return (await listDirectoryNamesFresh(dirPath)).entries;
 }
 
 /**
@@ -677,8 +674,7 @@ function createQuarantineRollbackError(primaryError, rollbackError, operation) {
  */
 async function readQuarantineMetadataFile(metadataPath) {
     try {
-        const snapshot = await readBytesRangeFreshTrusted(metadataPath, {
-            caller: REPO_WRITE_IO_CALLER,
+        const snapshot = await readBytesRangeFresh(metadataPath, {
             maxBytes: MAX_QUARANTINE_METADATA_BYTES,
             rejectSymlink: true,
         });
@@ -781,7 +777,7 @@ async function listQuarantineMetadata() {
  * @returns {Promise<string>}
  */
 async function sha256File(filePath) {
-    const snapshot = await readBytesFreshTrusted(filePath, { caller: REPO_WRITE_IO_CALLER, includeHash: true });
+    const snapshot = await readBytesFresh(filePath, { includeHash: true });
     return snapshot.contentHash ?? createHash('sha256').update(snapshot.content).digest('hex');
 }
 
@@ -1375,18 +1371,22 @@ function patchFailureSemantics(code, details = {}, failureScope = 'target') {
     let recoveryRequired = true;
 
     if (normalizedCode === 'ERR_PATCH_NOT_FOUND') {
+        const virtualBatchState = details['currentStateKind'] === 'virtual-batch';
         const exactContextMismatch =
             Number(details['quoteEscapeNormalizedOccurrenceCount'] ?? 0) > 0 ||
             Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0 ||
             Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0;
         failureClass = convergenceCandidate
             ? 'already-converged-candidate'
-            : exactContextMismatch
-              ? 'exact-context-mismatch'
-              : 'stale-context';
-        retryability = convergenceCandidate || exactContextMismatch ? 'manual-decision' : 'caller-refresh';
+            : virtualBatchState
+              ? 'virtual-batch-context'
+              : exactContextMismatch
+                ? 'exact-context-mismatch'
+                : 'stale-context';
+        retryability =
+            convergenceCandidate || exactContextMismatch || virtualBatchState ? 'manual-decision' : 'caller-refresh';
         mutationState = convergenceCandidate ? 'already-converged-candidate' : 'none';
-        recoveryRequired = !convergenceCandidate;
+        recoveryRequired = !convergenceCandidate && !virtualBatchState;
     } else if (
         normalizedCode === 'ERR_PATCH_AMBIGUOUS_MATCH' ||
         normalizedCode === 'ERR_PATCH_EXPECTED_OCCURRENCES' ||
@@ -1445,6 +1445,9 @@ function patchBatchNextAction(code, details = {}) {
     if (code === 'ERR_PATH_DENIED')
         return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
     if (code === 'ERR_PATCH_NOT_FOUND') {
+        if (details['currentStateKind'] === 'virtual-batch') {
+            return 'The anchor is missing from the in-memory virtual state produced by earlier same-file batch operations. diskBaselineHash/diskBaselineBytes identify the unchanged locked file baseline; refine batch ordering/anchors instead of assuming external modification or rereading solely for staleness.';
+        }
         if (details['convergenceCandidate'] === true) {
             return 'Do not repeat the unchanged patch: new_string is already present exactly once. Treat this as a convergence candidate, or review intent using currentHash without rereading solely for diagnosis.';
         }

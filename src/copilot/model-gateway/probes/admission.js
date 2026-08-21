@@ -5,7 +5,7 @@
  * @module copilot/model-gateway/probes/admission
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 
 export const MODEL_GATEWAY_PROBE_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 export const MODEL_GATEWAY_PROBE_RESPONSE_RESERVE_TOKENS = 1_024;

@@ -43,7 +43,7 @@ A direção inversa é proibida.
 
 - `platform/`: primitives estáveis de plataforma;
 - `concurrency/`: bulk/locks;
-- `filesystem/`: read/write/mutation/invalidation/workspace/trusted/skills;
+- `filesystem/`: read/write/mutation/invalidation/workspace/skills; configured external state is exposed only through owner-bound composition;
 - `persistence/`: JSON/JSONL;
 - `database/`: composition port SQLite;
 - `cache/`: cache tiers;

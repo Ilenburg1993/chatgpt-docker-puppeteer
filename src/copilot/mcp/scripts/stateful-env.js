@@ -1,15 +1,15 @@
 // @ts-check
 /** @module copilot/mcp/scripts/stateful-env */
 
-import { chmodFileTrusted, mkdirPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
+const STATEFUL_ENV_ROOT = resolve(repoRoot, 'src/copilot/.ai/mcp');
 
 export const DEFAULT_STATEFUL_ENV_FILE = 'src/copilot/.ai/mcp/stateful-session.env';
 export const DEFAULT_SESSION_TTL_MS = '600000';
@@ -32,55 +32,112 @@ const RUN_TARGETS = new Set([
 /** @typedef {{ envFile: string; created: boolean; secretPreview: string; mode: number | null; warnings: string[] }} EnsureResult */
 
 /**
+ * Resolve one stateful-env file inside the single control-plane state root and bind exact filesystem authority to it.
+ * The public/env-facing path remains repo-relative for shell sourcing; filesystem operations never accept that string
+ * again after this boundary.
+ *
+ * @param {string | undefined} requestedPath
+ */
+function createStatefulEnvStore(requestedPath) {
+    const configuredPath = String(
+        requestedPath ?? process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] ?? DEFAULT_STATEFUL_ENV_FILE,
+    ).trim();
+    if (!configuredPath || configuredPath.includes('\0') || /[\r\n]/u.test(configuredPath)) {
+        throw new Error('Stateful MCP env path must be a non-empty single-line repo-relative path.');
+    }
+    if (isAbsolute(configuredPath)) {
+        throw new Error('Stateful MCP env path must be repo-relative; absolute paths are not allowed.');
+    }
+    const absolutePath = resolve(repoRoot, configuredPath);
+    const relativeToRoot = relative(STATEFUL_ENV_ROOT, absolutePath);
+    if (
+        relativeToRoot === '..' ||
+        relativeToRoot.startsWith(`..${sep}`) ||
+        isAbsolute(relativeToRoot) ||
+        relativeToRoot === ''
+    ) {
+        throw new Error('Stateful MCP env path must resolve to a file inside src/copilot/.ai/mcp/.');
+    }
+    const parentDir = dirname(absolutePath);
+    const normalizedRepoRelativePath = relative(repoRoot, absolutePath).split(sep).join('/');
+    const parentIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.scripts.stateful-env.parent',
+            exactPaths: [parentDir],
+            operations: ['mkdir'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    const fileIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.scripts.stateful-env.file',
+            exactPaths: [absolutePath],
+            operations: ['chmod', 'read', 'stat', 'write'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    return Object.freeze({
+        envFile: normalizedRepoRelativePath,
+        absolutePath,
+        parentDir,
+        parentIo,
+        fileIo,
+    });
+}
+
+/** @param {unknown} error */
+function isMissingPathError(error) {
+    const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+    return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
+/**
  * @param {string} [relativePath]
  * @returns {Promise<EnsureResult>}
  */
-export async function ensureStatefulEnvFile(
-    relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE,
-) {
-    const envFile = resolve(repoRoot, relativePath);
-    await mkdirPathTrusted(dirname(envFile), {
-        caller: 'mcp.scripts.stateful-env',
-        recursive: true,
-        mode: 0o700,
-    });
+export async function ensureStatefulEnvFile(relativePath = undefined) {
+    const store = createStatefulEnvStore(relativePath);
+    await store.parentIo.mkdirPath(store.parentDir, { recursive: true, mode: 0o700 });
     const warnings = [];
     let created = false;
-
-    if (!existsSync(envFile)) {
+    let fileStat;
+    try {
+        fileStat = (await store.fileIo.lstatPath(store.absolutePath)).stats;
+    } catch (error) {
+        if (!isMissingPathError(error)) throw error;
         const secret = normalizeSecret(process.env[secretKey]) || generateSessionSecret();
-        await writeFileAtomicTrusted(envFile, buildEnvFileContent(secret), {
-            caller: 'mcp.scripts.stateful-env',
-            mode: 0o600,
-        });
+        await store.fileIo.writeFileAtomic(store.absolutePath, buildEnvFileContent(secret), { mode: 0o600 });
         created = true;
+        fileStat = (await store.fileIo.lstatPath(store.absolutePath)).stats;
+    }
+    if (!fileStat.isFile() || fileStat.isSymbolicLink()) {
+        throw new Error(`Stateful MCP env path is not a regular file: ${store.envFile}`);
     }
 
-    const fileStat = statSync(envFile);
     const mode = fileStat.mode & 0o777;
     if ((mode & 0o077) !== 0) {
-        await chmodFileTrusted(envFile, 0o600, { caller: 'mcp.scripts.stateful-env' });
+        await store.fileIo.chmodFile(store.absolutePath, 0o600);
         warnings.push('env-file-permissions-tightened-to-0600');
     }
 
-    const envText = readFileSync(envFile, 'utf8');
+    const envText = (await store.fileIo.readTextFresh(store.absolutePath)).content;
     const env = parseEnvFile(envText);
     const secret = normalizeSecret(env[secretKey]);
-    if (!secret) throw new Error(`${secretKey} is missing or too short in ${relativePath}`);
+    if (!secret) throw new Error(`${secretKey} is missing or too short in ${store.envFile}`);
     const upgradedText = upgradeStatefulEnvFileContent(envText, env);
     if (upgradedText !== envText) {
-        await writeFileAtomicTrusted(envFile, upgradedText, {
-            caller: 'mcp.scripts.stateful-env',
-            mode: 0o600,
-        });
+        await store.fileIo.writeFileAtomic(store.absolutePath, upgradedText, { mode: 0o600 });
         warnings.push('env-file-upgraded');
     }
 
+    const finalMode = (await store.fileIo.lstatPath(store.absolutePath)).stats.mode & 0o777 || null;
     return {
-        envFile: relativePath,
+        envFile: store.envFile,
         created,
         secretPreview: previewSecret(secret),
-        mode: statSync(envFile).mode & 0o777,
+        mode: finalMode,
         warnings,
     };
 }
@@ -92,22 +149,20 @@ export async function ensureStatefulEnvFile(
 export async function runWithStatefulEnv(scriptName) {
     if (!RUN_TARGETS.has(scriptName)) throw new Error(`Unsupported stateful run target: ${scriptName}`);
     const ensured = await ensureStatefulEnvFile();
-    const env = buildStatefulProcessEnv(ensured.envFile);
+    const env = await buildStatefulProcessEnv(ensured.envFile);
     console.error(`[mcp-stateful-env] env=${ensured.envFile} secret=${ensured.secretPreview} target=${scriptName}`);
     return spawnNpmRun(scriptName, env);
 }
 
 /**
- * @param {string} relativePath
- * @returns {NodeJS.ProcessEnv}
+ * @param {string} [relativePath]
+ * @returns {Promise<NodeJS.ProcessEnv>}
  */
-export function buildStatefulProcessEnv(
-    relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE,
-) {
-    const envFile = resolve(repoRoot, relativePath);
-    const fileEnv = parseEnvFile(readFileSync(envFile, 'utf8'));
+export async function buildStatefulProcessEnv(relativePath = undefined) {
+    const store = createStatefulEnvStore(relativePath);
+    const fileEnv = parseEnvFile((await store.fileIo.readTextFresh(store.absolutePath)).content);
     const secret = normalizeSecret(fileEnv[secretKey]);
-    if (!secret) throw new Error(`${secretKey} is missing or too short in ${relativePath}`);
+    if (!secret) throw new Error(`${secretKey} is missing or too short in ${store.envFile}`);
     return {
         ...process.env,
         ...fileEnv,

@@ -3,9 +3,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { closeScope } from '#copilot/infra/public/indexing/context';
 import { cmdScope } from '../../../../src/copilot/terminal/commands/scope.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
@@ -26,6 +25,7 @@ function mockCtx() {
 }
 
 beforeEach(async () => {
+    vi.stubEnv('NO_COLOR', '1');
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-scope-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
     await mkdir(join(tmpDir, 'nested'), { recursive: true });
@@ -38,12 +38,14 @@ beforeEach(async () => {
     await writeFile(join(tmpDir, 'notes.md'), '# Notes\n\nText\n', 'utf8');
 });
 
-afterEach(() => {
-    closeScope('scope-terminal-test');
-    closeScope('scope-terminal-filtered');
+afterEach(async () => {
+    const cleanupContext = mockCtx();
+    await cmdScope(cleanupContext, 'close scope-terminal-test');
+    await cmdScope(cleanupContext, 'close scope-terminal-filtered');
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = null;
     tmpRel = null;
+    vi.unstubAllEnvs();
 });
 
 describe('terminal/commands/scope', () => {

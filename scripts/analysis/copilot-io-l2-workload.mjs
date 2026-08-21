@@ -116,7 +116,7 @@ function summarizePayloads(files) {
 }
 
 /**
- * @param {import('#copilot/infra/public/indexing/scanner').IoScanEntry[]} entries
+ * @param {import('#copilot/infra/public/diagnostic/indexing/scanner').IoScanEntry[]} entries
  * @param {WorkloadFile[]} output
  */
 function collectFiles(entries, output) {
@@ -168,7 +168,6 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
         IO_L1_CACHE_MAX_ENTRIES: '5000',
         IO_L1_CACHE_MAX_BYTES: String(256 * 1024 * 1024),
     };
-    delete env['IO_L2_CACHE_ENABLED'];
     delete env['IO_L2_CACHE_TTL_MS'];
     delete env['IO_L2_CACHE_MAX_ENTRIES'];
     delete env['IO_L2_CACHE_PRUNE_MS'];
@@ -208,23 +207,22 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
  */
 async function executePhase(phase, manifestPath, concurrency) {
     const files = /** @type {WorkloadFile[]} */ (JSON.parse(await readFile(manifestPath, 'utf8')));
-    const [{ readBytes }, cache, db, sqlitePort, testing] = await Promise.all([
+    const [{ readBytes }, { createInfraRuntime }, db] = await Promise.all([
         import('#copilot/infra/public/filesystem/read'),
-        import('#copilot/infra/public/cache'),
+        import('#copilot/infra/public/composition/runtime'),
         import('../../src/copilot/db/sqlite.js'),
-        import('#copilot/infra/public/database'),
-        import('#copilot/infra/public/testing'),
     ]);
     await db.ensureCopilotDbDir();
-    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
-    const l2Cache = cache.getIoL2Cache();
+    const runtime = createInfraRuntime({
+        runtimeId: `l2-workload-${phase}`,
+        sqliteProvider: db.getCopilotDb,
+    });
+    const l2Cache = runtime.coherence.l2.get();
     if (phase === 'seed') {
         assert.ok(l2Cache, 'seed phase requires the experimental L2 cache');
         l2Cache.clearAll();
     }
-    if (phase === 'baseline') {
-        assert.equal(l2Cache, null, 'baseline phase must keep L2 off');
-    }
+    if (phase === 'baseline') assert.equal(l2Cache, null, 'baseline phase must keep L2 off');
 
     let cursor = 0;
     let bytes = 0;
@@ -245,7 +243,7 @@ async function executePhase(phase, manifestPath, concurrency) {
             if (!file) return;
             const readStartedAt = performance.now();
             try {
-                const result = await readBytes(file.path);
+                const result = await readBytes(file.path, { cacheRuntime: runtime.coherence });
                 bytes += result.bytesRead;
                 const cache = String(result.io.cache ?? 'none');
                 cacheCounts[cache] = (cacheCounts[cache] ?? 0) + 1;
@@ -262,15 +260,14 @@ async function executePhase(phase, manifestPath, concurrency) {
 
     try {
         await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, () => worker()));
-        l2Cache?.flushPending?.();
+        l2Cache?.flushPending();
         const wallMs = performance.now() - startedAt;
-        if (errors > 0) {
+        if (errors > 0)
             throw new Error(`workload phase ${phase} had ${errors} read errors: ${errorSamples.join(', ')}`);
-        }
         const throughputMiBPerSecond = wallMs > 0 ? bytes / (1024 * 1024) / (wallMs / 1000) : 0;
         const result = {
             phase,
-            profile: cache.getIoL2CacheConfiguration().profile,
+            profile: runtime.coherence.l2.snapshot().profile,
             files: files.length,
             bytes,
             errors,
@@ -278,14 +275,12 @@ async function executePhase(phase, manifestPath, concurrency) {
             wallMs: rounded(wallMs),
             throughputMiBPerSecond: rounded(throughputMiBPerSecond),
             latencyMs: summarizeLatency(latencies),
-            l1Stats: /** @type {Record<string, unknown> | null} */ (cache.getIoCacheStats()),
-            l2Stats: /** @type {Record<string, unknown>} */ (cache.getIoL2CacheStats()),
+            l1Stats: /** @type {Record<string, unknown> | null} */ (runtime.coherence.l1.stats()),
+            l2Stats: /** @type {Record<string, unknown>} */ (runtime.coherence.l2.stats()),
         };
         process.stdout.write(`${JSON.stringify(result)}\n`);
     } finally {
-        testing.resetIoL1CacheForTest();
-        testing.resetIoL2CacheForTest();
-        testing.resetInfraSqliteProviderForTest();
+        await runtime.dispose();
         db.closeCopilotDb();
     }
 }
@@ -296,7 +291,7 @@ async function executePhase(phase, manifestPath, concurrency) {
  * @param {number} maxFiles
  */
 async function discoverFiles(rootPath, include, maxFiles) {
-    const { scanDirectory } = await import('#copilot/infra/public/indexing/scanner');
+    const { scanDirectory } = await import('#copilot/infra/public/diagnostic/indexing/scanner');
     const workspaceRoot = process.cwd();
     const scan = await scanDirectory(rootPath, {
         workspaceRoot,

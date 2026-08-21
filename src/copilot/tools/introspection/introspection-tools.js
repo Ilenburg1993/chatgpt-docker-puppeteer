@@ -1,4 +1,5 @@
 // @ts-check
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
 import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { createRequire } from 'node:module';
@@ -707,7 +708,7 @@ const getAgentInfoTool = buildTool({
             _agentInfoProvider?.getModelSnapshot() ??
             null;
 
-        const ioHealth = readIoRuntimeHealthSnapshot();
+        const ioHealth = readIoRuntimeHealthSnapshot(getApplicationInfraRuntime());
 
         return {
             sdkVersion,

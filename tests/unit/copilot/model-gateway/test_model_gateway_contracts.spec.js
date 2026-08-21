@@ -3,6 +3,7 @@
  * Unit tests for the canonical model gateway foundation.
  */
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
@@ -49,7 +50,6 @@ import {
     anthropicAdapter,
     applyModelGatewayCatalogRetention,
     applyModelGatewayEligibilityToSnapshot,
-    applyModelGatewaySelectionTraceRetention,
     auditCatalogImporterSet,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
@@ -116,6 +116,8 @@ import {
     createModelEligibilityRun,
     createModelGatewayCatalogSnapshotId,
     createModelGatewayRouteDecisionCapture,
+    createModelGatewayRuntimeAutomationPolicyStore,
+    createModelGatewaySelectionTraceStore,
     createModelMetadataEvidence,
     createModelRecord,
     createModelRouteOption,
@@ -169,7 +171,6 @@ import {
     listModelGatewayProviderQuotaCapabilities,
     listModelGatewayRouteDecisions,
     listModelGatewayRuntimeAutomationPolicyPresets,
-    listModelGatewaySelectionDecisionTraceFiles,
     listModelGatewayTaskProfiles,
     listProviderEndpointInventory,
     listProviderEndpointSourceRecords,
@@ -208,7 +209,6 @@ import {
     parseOpenAiDocsRows,
     parseOpenRouterKeyRows,
     persistEnvByokModelGatewaySnapshot,
-    persistModelGatewaySelectionDecisionTrace,
     planCostBoundedCatalogProbes,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
@@ -224,8 +224,6 @@ import {
     readGatewayModelHealthFromRecords,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
-    readModelGatewayRuntimeAutomationPolicyFile,
-    readModelGatewaySelectionDecisionTrace,
     recommendCatalogDiffProbes,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
@@ -284,7 +282,6 @@ import {
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     validateModelGatewayRuntimeAutomationPolicy,
-    writeModelGatewayRuntimeAutomationPolicyFile,
 } from '../../../../src/copilot/model-gateway/index.js';
 import {
     createByokProbeState,
@@ -1710,15 +1707,24 @@ describe('model-gateway foundation', () => {
 
         const policyDir = await mkdtemp(join(tmpdir(), 'model-gateway-auto-policy-'));
         const policyPath = join(policyDir, 'policy.json');
-        await writeModelGatewayRuntimeAutomationPolicyFile(
-            {
-                enabled: true,
-                profiles: ['tool_agent'],
-                allowLiveSetModel: true,
-            },
-            { filePath: policyPath },
-        );
-        const filePolicy = await readModelGatewayRuntimeAutomationPolicyFile({ filePath: policyPath });
+        const policyStore = createModelGatewayRuntimeAutomationPolicyStore({
+            filePath: policyPath,
+            io: createConfiguredFsIo(
+                createConfiguredFsGrant({
+                    id: 'test.model-gateway.automation-policy',
+                    exactPaths: [policyPath],
+                    operations: ['read', 'write'],
+                    symlinkPolicy: 'deny',
+                    durability: ['file-and-directory'],
+                }),
+            ),
+        });
+        await policyStore.write({
+            enabled: true,
+            profiles: ['tool_agent'],
+            allowLiveSetModel: true,
+        });
+        const filePolicy = await policyStore.read();
         assert.deepEqual(filePolicy, {
             enabled: true,
             preset: 'operator_manual',
@@ -1731,7 +1737,7 @@ describe('model-gateway foundation', () => {
             accountWideFailureKinds: [],
         });
         const effectivePolicy = await readModelGatewayRuntimeAutomationEffectivePolicy({
-            filePath: policyPath,
+            store: policyStore,
             env: {
                 COPILOT_BYOK_GATEWAY_AUTO_PRESET: 'auto_same_boundary',
                 COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent',
@@ -3367,7 +3373,19 @@ describe('model-gateway foundation', () => {
 
         const traceDir = await mkdtemp(join(tmpdir(), 'model-gateway-selection-trace-'));
         try {
-            const persistedTrace = await persistModelGatewaySelectionDecisionTrace(trace, { directory: traceDir });
+            const traceStore = createModelGatewaySelectionTraceStore({
+                directory: traceDir,
+                io: createConfiguredFsIo(
+                    createConfiguredFsGrant({
+                        id: 'test.model-gateway.selection-trace',
+                        roots: [traceDir],
+                        operations: ['delete', 'list', 'read', 'stat', 'write'],
+                        symlinkPolicy: 'deny',
+                        durability: ['file-and-directory'],
+                    }),
+                ),
+            });
+            const persistedTrace = await traceStore.persist(trace);
             assert.equal(DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, 'data/copilot/model-gateway/selection-traces');
             assert.equal(persistedTrace.ok, true);
             assert.equal(persistedTrace.written, true);
@@ -3393,16 +3411,12 @@ describe('model-gateway foundation', () => {
                     },
                 ],
             };
-            const secondPersistedTrace = await persistModelGatewaySelectionDecisionTrace(secondTrace, {
-                directory: traceDir,
-            });
-            await persistModelGatewaySelectionDecisionTrace(
-                { ...trace, traceId: 'unit-selection-trace-c' },
-                { directory: traceDir },
-            );
-            const readBackTrace = await readModelGatewaySelectionDecisionTrace(String(secondPersistedTrace.filePath));
+            const secondPersistedTrace = await traceStore.persist(secondTrace);
+            await traceStore.persist({ ...trace, traceId: 'unit-selection-trace-c' });
+            assert.equal(secondPersistedTrace.filePath, join(traceDir, 'unit-selection-trace-b.json'));
+            const readBackTrace = await traceStore.read('unit-selection-trace-b.json');
             assert.equal(readBackTrace['traceId'], 'unit-selection-trace-b');
-            const traceFiles = await listModelGatewaySelectionDecisionTraceFiles({ directory: traceDir, limit: 2 });
+            const traceFiles = await traceStore.list({ limit: 2 });
             assert.equal(traceFiles.length, 2);
             const traceDiff = compareModelGatewaySelectionDecisionTraces(trace, secondTrace);
             assert.equal(traceDiff.schema, 'model-gateway-selection-trace-diff');
@@ -3412,19 +3426,12 @@ describe('model-gateway foundation', () => {
             assert.equal(traceDiff.summary.changedProfileCount, 1);
             assert.equal(traceDiff.summary.removedProfileCount, 1);
             assert.equal(traceDiff.summary.selectedRouteChangedCount, 2);
-            const retentionPreview = await applyModelGatewaySelectionTraceRetention({
-                directory: traceDir,
-                maxFiles: 1,
-            });
+            const retentionPreview = await traceStore.applyRetention({ maxFiles: 1 });
             assert.equal(retentionPreview.ok, true);
             assert.equal(retentionPreview.dryRun, true);
             assert.equal(retentionPreview.prunedCount, 2);
             assert.equal(retentionPreview.deletedCount, 0);
-            const retentionApply = await applyModelGatewaySelectionTraceRetention({
-                directory: traceDir,
-                maxFiles: 1,
-                dryRun: false,
-            });
+            const retentionApply = await traceStore.applyRetention({ maxFiles: 1, dryRun: false });
             assert.equal(retentionApply.ok, true);
             assert.equal(retentionApply.prunedCount, 2);
             assert.equal(retentionApply.deletedCount, 2);

@@ -43,8 +43,8 @@ const ioMock = {
     mkdirPathLocked: vi.fn(),
     createOrReplaceFileAtomic: vi.fn(),
 };
-vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
-    createWorkspaceIo: () => ioMock,
+vi.mock('#copilot/boot/application-infra', () => ({
+    getApplicationWorkspaceInfra: () => ({ io: ioMock }),
 }));
 
 const readConfiguredSkillCatalog = vi.fn();

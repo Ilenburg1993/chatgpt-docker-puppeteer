@@ -8,7 +8,7 @@
  * @module copilot/mcp/cloudflare/tunnel-origin-plan
  */
 
-import { readBoundedResponseJson } from '#copilot/infra/public/platform';
+import { readBoundedResponseJson } from '#copilot/infra/public/platform/http-response';
 import { buildRecommendedOriginRequestPatch } from './origin-request-profile.js';
 import { readCloudflareRemoteApiConfig, resolveCloudflareRemoteTunnelReference } from './remote-api.js';
 

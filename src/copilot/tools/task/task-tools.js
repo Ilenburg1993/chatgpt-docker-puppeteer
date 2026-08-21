@@ -1,7 +1,7 @@
 // @ts-check
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { SERVER_PORT } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { httpRequest } from '#copilot/sdk';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +20,7 @@ import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
  */
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
-const { readText } = createWorkspaceIo({ workspaceRoot: ROOT });
+const { readText } = getApplicationWorkspaceInfra(ROOT).readIo;
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.

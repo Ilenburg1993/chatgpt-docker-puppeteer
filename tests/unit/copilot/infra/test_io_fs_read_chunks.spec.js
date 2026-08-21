@@ -4,33 +4,41 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
 import {
-    getByteLineIndexStats,
     readBytesFileRangeSnapshot,
     readBytesFileSnapshot,
-    readTextLineChunks,
-    readTextLineChunksStream,
+    readTextLineChunks as readTextLineChunksRaw,
+    readTextLineChunksStream as readTextLineChunksStreamRaw,
     readTextLinesSnapshot,
 } from '#copilot/infra/internal/filesystem/read';
 import {
     cleanupExpiredRollbackSidecars,
     cleanupRollbackSidecars,
-    getIoRollbackPolicy,
     persistRollbackSidecar,
     readBinaryMutationSnapshot,
+    readIoRollbackPolicy,
 } from '#copilot/infra/internal/filesystem/transaction';
 import { sha256 } from '#copilot/infra/internal/platform';
-import { resetByteLineIndexCacheForTest } from '#copilot/infra/public/testing';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
+/** @type {ReturnType<typeof createInfraRuntime>} */
+let runtime;
+const getByteLineIndexStats = () => runtime.coherence.read.byteLineIndex.stats();
+const resetByteLineIndex = () => runtime.coherence.read.byteLineIndex.reset();
+const invalidatePath = (filePath) => runtime.coherence.invalidation.invalidatePath(filePath, { source: 'test' });
+/** @param {string} filePath @param {Parameters<typeof readTextLineChunksRaw>[1]} [options] */
+const readTextLineChunks = (filePath, options = {}) =>
+    readTextLineChunksRaw(filePath, { ...options, readRuntime: runtime.coherence.read });
+/** @param {string} filePath @param {Parameters<typeof readTextLineChunksStreamRaw>[1]} [options] */
+const readTextLineChunksStream = (filePath, options = {}) =>
+    readTextLineChunksStreamRaw(filePath, { ...options, readRuntime: runtime.coherence.read });
 
 const REPLACE_FILE_CHILD = `
 import { rename, writeFile } from 'node:fs/promises';
-import { resetByteLineIndexCacheForTest } from '#copilot/infra/public/testing';
 process.on('message', async (message) => {
     try {
         const tempPath = message.filePath + '.external-replacement';
@@ -48,8 +56,13 @@ process.on('message', async (message) => {
 });
 `;
 
+beforeEach(() => {
+    runtime = createInfraRuntime({ runtimeId: `fs-read-chunks-test-${Date.now()}-${Math.random()}` });
+});
+
 afterEach(async () => {
     vi.unstubAllEnvs();
+    await runtime.dispose();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -206,7 +219,7 @@ describe('infra/io/fs read line ports', () => {
         const file = join(dir, 'stream-bytes.txt');
         const content = 'ação\r\nbeta\ngamma\nomega';
         await writeFile(file, content, 'utf8');
-        resetByteLineIndexCacheForTest();
+        resetByteLineIndex();
 
         const result = await readTextLineChunks(file, {
             chunkLines: 1,
@@ -235,7 +248,7 @@ describe('infra/io/fs read line ports', () => {
         const file = join(dir, 'first-page-seed.txt');
         const lines = Array.from({ length: 10_000 }, (_, index) => `linha-${String(index + 1).padStart(5, '0')}`);
         await writeFile(file, lines.join('\n'), 'utf8');
-        resetByteLineIndexCacheForTest();
+        resetByteLineIndex();
 
         const first = await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
         const afterFirst = getByteLineIndexStats();
@@ -259,10 +272,12 @@ describe('infra/io/fs read line ports', () => {
 
     it('byte-line index respeita orçamento agregado de memória e não retém entrada oversized', async () => {
         vi.stubEnv('COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES', '4096');
+        await runtime.dispose();
+        runtime = createInfraRuntime({ runtimeId: `fs-read-budget-${Date.now()}-${Math.random()}` });
         const dir = await createTempDir();
         const file = join(dir, 'byte-index-memory-budget.txt');
         await writeFile(file, 'x\n'.repeat(20_000), 'utf8');
-        resetByteLineIndexCacheForTest();
+        resetByteLineIndex();
 
         await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
         const stats = getByteLineIndexStats();
@@ -279,7 +294,7 @@ describe('infra/io/fs read line ports', () => {
         const file = join(dir, 'progressive-byte-index.txt');
         const lines = Array.from({ length: 1000 }, (_, index) => `linha-${String(index + 1).padStart(4, '0')}`);
         await writeFile(file, lines.join('\n'), 'utf8');
-        resetByteLineIndexCacheForTest();
+        resetByteLineIndex();
 
         const first = await readTextLineChunks(file, {
             startLine: 101,
@@ -323,7 +338,7 @@ describe('infra/io/fs read line ports', () => {
         expect(stats.hits).toBe(1);
         expect(stats.capturedRangeReuses).toBe(2);
 
-        invalidateIoCoherencePath(file);
+        invalidatePath(file);
         const invalidated = getByteLineIndexStats();
         expect(invalidated.busInvalidations).toBe(1);
         expect(invalidated.clears).toBe(1);
@@ -420,7 +435,7 @@ describe('infra/io/fs read line ports', () => {
         const oldLines = Array.from({ length: 200 }, (_, index) => `old-${String(index + 1).padStart(3, '0')}`);
         const newLines = Array.from({ length: 200 }, (_, index) => `new-${String(index + 1).padStart(3, '0')}`);
         await writeFile(file, oldLines.join('\n'), 'utf8');
-        resetByteLineIndexCacheForTest();
+        resetByteLineIndex();
 
         await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
         await replaceTextFileFromChild(file, newLines.join('\n'));
@@ -646,15 +661,22 @@ describe('infra/io/fs read line ports', () => {
         expect(await readdir(sidecarDirectory)).toContain('unknown.rollback');
     });
 
-    it('mantém rollback automático opt-in e expõe budgets configuráveis', () => {
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', '');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_TTL_MS', '1234');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_MAX_ENTRIES', '7');
-        vi.stubEnv('COPILOT_IO_ROLLBACK_MAX_BYTES', '4096');
-        expect(getIoRollbackPolicy()).toEqual({ enabled: false, ttlMs: 1234, maxEntries: 7, maxBytes: 4096 });
+    it('projeta rollback opt-in e budgets a partir de um snapshot ambiental explícito', () => {
+        const disabled = readIoRollbackPolicy(
+            {
+                COPILOT_IO_ROLLBACK_ENABLED: '',
+                COPILOT_IO_ROLLBACK_TTL_MS: '1234',
+                COPILOT_IO_ROLLBACK_MAX_ENTRIES: '7',
+                COPILOT_IO_ROLLBACK_MAX_BYTES: '4096',
+            },
+            '/workspace',
+        );
+        expect(disabled).toMatchObject({ enabled: false, ttlMs: 1234, maxEntries: 7, maxBytes: 4096 });
+        expect(Object.isFrozen(disabled)).toBe(true);
 
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
-        expect(getIoRollbackPolicy().enabled).toBe(true);
+        const enabled = readIoRollbackPolicy({ COPILOT_IO_ROLLBACK_ENABLED: 'true' }, '/workspace');
+        expect(enabled.enabled).toBe(true);
+        expect(enabled.directory).toBe('/workspace/src/copilot/.ai/rollback');
     });
 
     it('aplica budget de quantidade preservando explicitamente um sidecar sem ultrapassar o limite', async () => {

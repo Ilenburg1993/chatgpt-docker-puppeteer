@@ -1,5 +1,5 @@
 // @ts-check
-import { resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
+import { resolveBabelParserOptions } from '#copilot/infra/public/diagnostic/code-analysis';
 import { parse as babelParse } from '@babel/parser';
 import fs from 'node:fs';
 import path from 'node:path';

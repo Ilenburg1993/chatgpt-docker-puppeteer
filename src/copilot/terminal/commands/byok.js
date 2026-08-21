@@ -8,10 +8,21 @@
  * @module copilot/terminal/commands/byok
  */
 
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { join, resolve } from 'node:path';
 import { executeModelGatewayProbe } from '../../model-gateway/control-plane/probe-execution.js';
+
+const BYOK_ENV_LOCAL_PATH = resolve('.env.local');
+const BYOK_ENV_LOCAL_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'terminal.commands.byok.env-local',
+        exactPaths: [BYOK_ENV_LOCAL_PATH],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 import {
     activateModelGatewayByokProfileEnv,
@@ -39,7 +50,6 @@ import {
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
-    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     didConfiguredByokProbeAttemptProvider,
     evaluateModelGatewayCatalogEligibility,
@@ -161,7 +171,7 @@ import {
     terminalThemeWrappedRow,
 } from '../state/theme/index.js';
 
-const terminalByokWorkspaceIo = createWorkspaceIo({ workspaceRoot: process.cwd() });
+const terminalByokWorkspaceIo = getApplicationWorkspaceInfra(process.cwd()).readIo;
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -4367,22 +4377,23 @@ async function renderByokGatewayCatalogIntegrity(println) {
  *     effective: boolean;
  *     requireRuntimeProof: boolean;
  *     writeTrace: boolean;
- *     traceDir: string;
  *     traceId: string;
  *     selectionPolicy: string;
  *     profiles: string[];
  * }}
  */
 function parseByokGatewaySelectionAuditArgs(rest) {
+    if (rest.some((item) => /^--?trace-dir[:=]/iu.test(item))) {
+        throw new TypeError(
+            'trace-dir is not supported: model-gateway selection traces use the configured state store',
+        );
+    }
     const requireRuntimeProof = rest.some((item) =>
         /^(runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(item),
     );
     const writeTrace = rest.some((item) =>
         /^(trace|write-trace|persist-trace|decision-trace|--write-trace|--persist-trace)$/iu.test(item),
     );
-    const traceDir =
-        rest.map((item) => item.match(/^--?trace-dir[:=](.+)$/iu)?.[1] ?? null).find((item) => item !== null) ??
-        DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR;
     const traceId =
         rest
             .map(
@@ -4407,7 +4418,6 @@ function parseByokGatewaySelectionAuditArgs(rest) {
             if (
                 /^--?selection-policy[:=]/iu.test(item) ||
                 /^policy[:=]/iu.test(item) ||
-                /^--?trace-dir[:=]/iu.test(item) ||
                 /^--?trace-id[:=]/iu.test(item) ||
                 /^trace-id[:=]/iu.test(item)
             ) {
@@ -4425,7 +4435,7 @@ function parseByokGatewaySelectionAuditArgs(rest) {
         })
         .map((item) => item.trim())
         .filter(Boolean);
-    return { strict, effective, requireRuntimeProof, writeTrace, traceDir, traceId, selectionPolicy, profiles };
+    return { strict, effective, requireRuntimeProof, writeTrace, traceId, selectionPolicy, profiles };
 }
 
 /**
@@ -4527,7 +4537,6 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                       ...(args.traceId ? { traceId: args.traceId } : {}),
                       source: 'terminal-byok-selection-audit',
                   }),
-                  { directory: args.traceDir },
               )
             : null;
     const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'não';
@@ -7475,16 +7484,15 @@ function mutateEnvLocal(mutate) {
     const operation = envLocalMutationQueue
         .catch(() => undefined)
         .then(async () => {
-            const path = '.env.local';
             let text = '';
             try {
-                text = (await readTextFreshTrusted(path, { caller: 'terminal.commands.byok' })).content;
+                text = (await BYOK_ENV_LOCAL_IO.readTextFresh(BYOK_ENV_LOCAL_PATH)).content;
             } catch (error) {
                 if (/** @type {{ code?: string }} */ (error).code !== 'ENOENT') throw error;
             }
             const next = mutate(text);
             const normalized = next.endsWith('\n') ? next : `${next}\n`;
-            await writeFileAtomicTrusted(path, normalized, { caller: 'terminal.commands.byok', mode: 0o600 });
+            await BYOK_ENV_LOCAL_IO.writeFileAtomic(BYOK_ENV_LOCAL_PATH, normalized, { mode: 0o600 });
         });
     envLocalMutationQueue = operation.then(
         () => undefined,

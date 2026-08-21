@@ -40,7 +40,6 @@ const {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
-    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     discoverConfiguredByokModelsFromEnv,
     evaluateModelGatewayCatalogEligibility,
@@ -87,11 +86,11 @@ const {
     readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokProfilesFromEnv,
     readFile,
-    readTextFreshTrusted,
+    envLocalReadTextFresh,
     readdir,
     mkdir,
     rm,
-    writeFileAtomicTrusted,
+    envLocalWriteFileAtomic,
     workspaceIoListDirectoryNamesFresh,
     workspaceIoReadTextFresh,
     workspaceIoStatPath,
@@ -1113,7 +1112,6 @@ const {
             error: null,
         }),
     ),
-    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR: 'data/copilot/model-gateway/selection-traces',
     planModelGatewayProbeBackoff: vi.fn(() => ({
         ready: [
             {
@@ -1709,11 +1707,11 @@ const {
 >} */ (vi.fn(() => null)),
     readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
     readFile: vi.fn(),
-    readTextFreshTrusted: vi.fn((/** @type {string} */ path) =>
+    envLocalReadTextFresh: vi.fn((/** @type {string} */ path) =>
         Promise.resolve(readFile(path, 'utf8')).then((content) => ({ content: String(content) })),
     ),
     readdir: vi.fn(),
-    writeFileAtomicTrusted: vi.fn(
+    envLocalWriteFileAtomic: vi.fn(
         (
             /** @type {string} */ path,
             /** @type {string | Uint8Array} */ content,
@@ -1956,30 +1954,48 @@ vi.mock('node:fs/promises', () => ({
     stat,
 }));
 
-vi.mock('#copilot/infra/public/filesystem/workspace', async (importOriginal) => {
-    const actual = /** @type {typeof import('#copilot/infra/public/filesystem/workspace')} */ (await importOriginal());
+vi.mock('#copilot/boot/application-infra', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/boot/application-infra')} */ (await importOriginal());
     return {
         ...actual,
-        createWorkspaceIo: vi.fn(
-            (
-                /** @type {Parameters<typeof import('#copilot/infra/public/filesystem/workspace').createWorkspaceIo>[0]} */ options,
-            ) => ({
-                ...actual.createWorkspaceIo(options),
-                listDirectoryNamesFresh: workspaceIoListDirectoryNamesFresh,
-                readTextFresh: workspaceIoReadTextFresh,
-                statPath: workspaceIoStatPath,
-            }),
-        ),
+        getApplicationWorkspaceInfra: vi.fn((workspaceRoot) => {
+            const infra = actual.getApplicationWorkspaceInfra(workspaceRoot);
+            return {
+                ...infra,
+                readIo: {
+                    ...infra.readIo,
+                    listDirectoryNamesFresh: workspaceIoListDirectoryNamesFresh,
+                    readTextFresh: workspaceIoReadTextFresh,
+                    statPath: workspaceIoStatPath,
+                },
+            };
+        }),
     };
 });
 
-vi.mock('#copilot/infra/public/filesystem/trusted', async (importOriginal) => {
-    const actual = /** @type {typeof import('#copilot/infra/public/filesystem/trusted')} */ (await importOriginal());
+vi.mock('#copilot/infra/public/composition/filesystem/configured', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/infra/public/composition/filesystem/configured')} */ (
+        await importOriginal()
+    );
     return {
         ...actual,
-        listDirectoryNamesFreshTrusted: vi.fn(() => Promise.resolve({ entries: [] })),
-        readTextFreshTrusted,
-        writeFileAtomicTrusted,
+        createConfiguredFsIo: vi.fn((grant) => {
+            const grantId = String(/** @type {{id?:unknown}} */ (grant).id ?? '');
+            if (grantId === 'terminal.commands.byok.env-local') {
+                return {
+                    readTextFresh: envLocalReadTextFresh,
+                    writeFileAtomic: envLocalWriteFileAtomic,
+                };
+            }
+            if (grantId === 'observability.logger.retention') {
+                return {
+                    listDirectoryNamesFresh: vi.fn(() => Promise.resolve({ entries: [] })),
+                    lstatPath: vi.fn(),
+                    deleteFile: vi.fn(),
+                };
+            }
+            return actual.createConfiguredFsIo(grant);
+        }),
     };
 });
 
@@ -2070,7 +2086,6 @@ vi.mock('#copilot/model-gateway', async (importOriginal) => ({
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
-    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
@@ -3197,10 +3212,10 @@ describe('terminal /byok command', () => {
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
-        readTextFreshTrusted.mockClear();
+        envLocalReadTextFresh.mockClear();
         readdir.mockReset();
         stat.mockReset();
-        writeFileAtomicTrusted.mockClear();
+        envLocalWriteFileAtomic.mockClear();
         workspaceIoListDirectoryNamesFresh.mockClear();
         workspaceIoReadTextFresh.mockClear();
         workspaceIoStatPath.mockClear();
@@ -5702,7 +5717,6 @@ describe('terminal /byok command', () => {
                 schema: 'model-gateway-selection-decision-trace',
                 traceId: 'terminal-trace',
             }),
-            { directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR },
         );
         expect(ctx.output()).toContain('Trace');
         expect(ctx.output()).toContain('persistido sim');
@@ -5711,6 +5725,20 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).toContain('persistido sim');
         expect(ctx.output()).toContain('/tmp/model-gateway-selection-trace.json');
+    });
+
+    it('recusa retarget de selection trace por trace-dir escolhido pelo operador', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await expect(
+            cmdByok(
+                { println: ctx.println },
+                'gateway selection audit effective write-trace --trace-dir=/tmp/forbidden repo_agent',
+            ),
+        ).rejects.toThrow('trace-dir is not supported');
+
+        expect(persistModelGatewaySelectionDecisionTrace).not.toHaveBeenCalled();
     });
 
     it('executa refresh do catálogo model-gateway com saída OpenAI-compatible resumida', async () => {
@@ -8294,16 +8322,16 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBe('kilo');
-        expect(readTextFreshTrusted).toHaveBeenCalledWith('.env.local', { caller: 'terminal.commands.byok' });
-        expect(writeFileAtomicTrusted).toHaveBeenCalledWith(
-            '.env.local',
+        expect(envLocalReadTextFresh).toHaveBeenCalledWith(expect.stringMatching(/\.env\.local$/u));
+        expect(envLocalWriteFileAtomic).toHaveBeenCalledWith(
+            expect.stringMatching(/\.env\.local$/u),
             expect.stringContaining('COPILOT_BYOK_PROFILE=kilo'),
-            expect.objectContaining({ caller: 'terminal.commands.byok', mode: 0o600 }),
+            expect.objectContaining({ mode: 0o600 }),
         );
         const writeCall = requireFixtureIndex(
-            writeFileAtomicTrusted.mock.calls,
+            envLocalWriteFileAtomic.mock.calls,
             0,
-            'persist profile writeFileAtomicTrusted call',
+            'persist profile envLocalWriteFileAtomic call',
         );
         const written = String(requireFixtureIndex(writeCall, 1, 'persist profile writeFile payload'));
         expect(written).toContain('COPILOT_BYOK_ENABLED=true');
@@ -8330,11 +8358,11 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'persist sdk');
 
-        expect(readTextFreshTrusted).toHaveBeenCalledWith('.env.local', { caller: 'terminal.commands.byok' });
+        expect(envLocalReadTextFresh).toHaveBeenCalledWith(expect.stringMatching(/\.env\.local$/u));
         const writeCall = requireFixtureIndex(
-            writeFileAtomicTrusted.mock.calls,
+            envLocalWriteFileAtomic.mock.calls,
             0,
-            'persist sdk writeFileAtomicTrusted call',
+            'persist sdk envLocalWriteFileAtomic call',
         );
         const written = String(requireFixtureIndex(writeCall, 1, 'persist sdk writeFile payload'));
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('false');

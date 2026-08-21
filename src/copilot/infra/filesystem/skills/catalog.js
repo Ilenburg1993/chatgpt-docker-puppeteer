@@ -9,14 +9,8 @@
  * @module copilot/infra/filesystem/skills/catalog
  */
 
-import {
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-    readTextFreshTrusted,
-} from '#copilot/infra/internal/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/internal/filesystem/configured';
 import { join } from 'node:path';
-
-const SKILL_IO_CALLER = 'infra.filesystem.skills';
 
 /**
  * @typedef {{ name: string; directory: string; skillPath: string }} ConfiguredSkillRecord
@@ -42,6 +36,16 @@ const SKILL_IO_CALLER = 'infra.filesystem.skills';
  * @returns {Promise<ConfiguredSkillCatalog>}
  */
 export async function readConfiguredSkillCatalog(input) {
+    const skillDirectories = [...new Set(input.skillDirectories)];
+    if (skillDirectories.length === 0) return { readableDirectoryCount: 0, names: [], selected: null };
+    const skillIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'infra.filesystem.skills',
+            roots: skillDirectories,
+            operations: ['list', 'stat', 'read'],
+            symlinkPolicy: 'deny',
+        }),
+    );
     const disabled = new Set(input.disabledSkills ?? []);
     /** @type {Map<string, ConfiguredSkillRecord>} */
     const discovered = new Map();
@@ -50,11 +54,7 @@ export async function readConfiguredSkillCatalog(input) {
     for (const skillsDir of input.skillDirectories) {
         let entries;
         try {
-            entries = (
-                await listDirectoryNamesFreshTrusted(skillsDir, {
-                    caller: SKILL_IO_CALLER,
-                })
-            ).entries;
+            entries = (await skillIo.listDirectoryNamesFresh(skillsDir)).entries;
             readableDirectoryCount += 1;
         } catch {
             continue;
@@ -64,7 +64,7 @@ export async function readConfiguredSkillCatalog(input) {
             if (disabled.has(entryName) || discovered.has(entryName)) continue;
             const childPath = join(skillsDir, entryName);
             try {
-                const { stats } = await lstatPathTrusted(childPath, { caller: SKILL_IO_CALLER });
+                const { stats } = await skillIo.lstatPath(childPath);
                 if (!stats.isDirectory() || stats.isSymbolicLink()) continue;
                 discovered.set(entryName, {
                     name: entryName,
@@ -84,7 +84,7 @@ export async function readConfiguredSkillCatalog(input) {
     const selected = discovered.get(requestedName);
     if (!selected) return { readableDirectoryCount, names, selected: null };
     try {
-        const content = (await readTextFreshTrusted(selected.skillPath, { caller: SKILL_IO_CALLER })).content;
+        const content = (await skillIo.readTextFresh(selected.skillPath)).content;
         return { readableDirectoryCount, names, selected: { ...selected, content } };
     } catch {
         return { readableDirectoryCount, names, selected: null };

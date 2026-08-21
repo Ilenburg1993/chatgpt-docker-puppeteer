@@ -5,15 +5,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
-import {
-    getValidatedMutableWorkspacePathStats,
-    getValidatedReadWorkspacePathStats,
-} from '#copilot/infra/public/filesystem/workspace';
 import { readFilesBatchTool } from '../../../../../src/copilot/tools/file/read/index.js';
 import { patchFilesBatchTool } from '../../../../../src/copilot/tools/file/write/index.js';
 import { isToolExecutionFailureResponse } from '../../../../../src/copilot/tools/infra/tool-feedback.js';
 
 import {
+    getValidatedMutableWorkspacePathStats,
+    getValidatedReadWorkspacePathStats,
     resetValidatedMutableWorkspacePathStatsForTest,
     resetValidatedReadWorkspacePathStatsForTest,
 } from '#copilot/infra/public/testing';

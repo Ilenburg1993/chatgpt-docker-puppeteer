@@ -21,14 +21,15 @@ import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import {
     classifyParserExtension,
+    incrementParserRuntimeCounter,
     MAX_PARSE_BYTES,
     MAX_PARSE_DURATION_MS,
     MAX_PARSE_LINE_GUARD,
     PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
     PARSER_WORKER_ENABLED,
-    parserRuntimeStats,
+    recordParserRuntimeDuration,
 } from '../foundation/index.js';
-import { getParserWorkerRuntimeErrorCode, parseSymbolsInWorker } from '../worker/index.js';
+import { getParserWorkerRuntimeErrorCode } from '../worker/index.js';
 
 /** @typedef {import('../foundation/index.js').FileSymbols} FileSymbols */
 
@@ -64,7 +65,7 @@ function tryBabelParse(code, parserOptions) {
  *
  * @param {string} filePath
  * @param {string} content
- * @param {{ signal?: AbortSignal }} [options]
+ * @param {{ signal?: AbortSignal; workerRuntime?: ReturnType<typeof import('../worker/index.js').createParserWorkerRuntime> }} [options]
  * @returns {Promise<FileSymbols>}
  */
 export async function parseFileSymbols(filePath, content, options = {}) {
@@ -98,14 +99,14 @@ export async function parseFileSymbols(filePath, content, options = {}) {
     if (lang === 'js' || lang === 'ts') {
         if (!parserOptions) throw new Error(`Babel parser options unavailable for ${lang}: ${filePath}`);
         if (lines > MAX_PARSE_LINE_GUARD) {
-            parserRuntimeStats.skippedByLineGuard += 1;
+            incrementParserRuntimeCounter('skippedByLineGuard');
             base.parseError = `parser skipped: line guard exceeded (${lines} > ${MAX_PARSE_LINE_GUARD})`;
             return base;
         }
 
-        if (PARSER_WORKER_ENABLED) {
+        if (PARSER_WORKER_ENABLED && options.workerRuntime) {
             try {
-                const workerResult = await parseSymbolsInWorker(
+                const workerResult = await options.workerRuntime.parseSymbols(
                     {
                         source,
                         parserOptions,
@@ -115,12 +116,12 @@ export async function parseFileSymbols(filePath, content, options = {}) {
                 );
                 options.signal?.throwIfAborted();
                 base.parseDurationMs = Number(workerResult.parseDurationMs ?? 0);
-                parserRuntimeStats.lastParseDurationMs = base.parseDurationMs;
+                recordParserRuntimeDuration(base.parseDurationMs);
                 if (
                     typeof workerResult.parseError === 'string' &&
                     workerResult.parseError.includes('budget exceeded')
                 ) {
-                    parserRuntimeStats.budgetExceeded += 1;
+                    incrementParserRuntimeCounter('budgetExceeded');
                 }
                 base.parseError = workerResult.parseError;
                 base.symbols = workerResult.symbols;
@@ -140,7 +141,7 @@ export async function parseFileSymbols(filePath, content, options = {}) {
                         return base;
                     }
                 }
-                parserRuntimeStats.workerFallbacks += 1;
+                incrementParserRuntimeCounter('workerFallbacks');
             }
         }
 
@@ -151,13 +152,13 @@ export async function parseFileSymbols(filePath, content, options = {}) {
         options.signal?.throwIfAborted();
         const parseDurationMs = Math.max(0, Math.round(performance.now() - parseStart));
         base.parseDurationMs = parseDurationMs;
-        parserRuntimeStats.lastParseDurationMs = parseDurationMs;
+        recordParserRuntimeDuration(parseDurationMs);
         if (!parsed.ast) {
             base.parseError = parsed.parseError ?? 'babel parse returned null';
             return base;
         }
         if (parseDurationMs > MAX_PARSE_DURATION_MS) {
-            parserRuntimeStats.budgetExceeded += 1;
+            incrementParserRuntimeCounter('budgetExceeded');
             base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${MAX_PARSE_DURATION_MS}ms)`;
         }
         if (parsed.ast.errors?.length) {

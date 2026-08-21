@@ -15,7 +15,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
-import { validatePath } from '../shared.js';
+import { validatePath, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
 import { completeAndAuditMutation, failAndAuditMutation } from './mutation-helpers.js';
 
 const MAX_ROLLBACK_TOKEN_CHARS = 32 * 1024 * 1024;
@@ -98,7 +98,11 @@ export const rollbackFileChangesTool = buildTool({
             evidence: { tool: 'rollback_file_changes', tokenId: token.tokenId, dryRun },
         });
         try {
-            const result = await executeIoRollbackToken(token, { dryRun, allowedPaths });
+            const result = await executeIoRollbackToken(token, {
+                dryRun,
+                allowedPaths,
+                sidecarDirectory: WORKSPACE_ROLLBACK_POLICY.directory,
+            });
             if (!result.success) {
                 const error = Object.assign(new Error(result.error ?? 'Rollback bloqueado.'), {
                     code: result.code,
@@ -154,6 +158,7 @@ export const rollbackSidecarsStatusTool = buildTool({
     }),
     handler: async ({ maxEntries, verifyContent }) =>
         listRollbackSidecars({
+            policy: WORKSPACE_ROLLBACK_POLICY,
             maxEntries,
             verifyContent,
         }),

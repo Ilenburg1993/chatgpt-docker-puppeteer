@@ -25,7 +25,7 @@
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, container, toError, withRetry } from '#copilot/core';
-import { readBoundedResponseJson } from '#copilot/infra/public/platform';
+import { readBoundedResponseJson } from '#copilot/infra/public/platform/http-response';
 import * as observability from '#copilot/observability';
 import { convertMcpCallToolResult } from '#copilot/sdk';
 import { buildTool } from '#copilot/tools';

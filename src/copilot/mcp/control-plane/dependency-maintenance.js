@@ -17,9 +17,8 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { writeFileAtomic } from '#copilot/infra/public/filesystem/write';
-import { getMcpWorkspaceRoot } from './paths.js';
+import { getMcpWorkspaceIo, getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_DEPENDENCY_MAINTENANCE_VERSION = 2;
 
@@ -43,7 +42,7 @@ export const MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES = Object.freeze([
     'vue-demi',
 ]);
 const TRUSTED_INSTALL_SCRIPT_PACKAGE_SET = new Set(MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES);
-const { readTextFresh: readWorkspaceTextFresh } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const { readTextFresh: readWorkspaceTextFresh } = getMcpWorkspaceIo();
 
 /**
  * @typedef {{

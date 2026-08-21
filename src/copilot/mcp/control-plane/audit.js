@@ -5,8 +5,8 @@
  * @module copilot/mcp/control-plane/audit
  */
 
-import { readBytesRangeFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createJsonlBatchQueue } from '#copilot/infra/public/persistence/jsonl/queue';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,15 +19,25 @@ const MAX_AUDIT_HISTORY_EVENTS = 100_000;
 
 let auditBeforeExitHookInstalled = false;
 
-/**
- * @returns {string}
- */
-function getMcpAuditFile() {
-    return process.env['COPILOT_MCP_AUDIT_FILE'] ?? path.join(MCP_AUDIT_DIR, 'mcp-tool-calls.jsonl');
-}
+// Audit-file identity is a bootstrap decision. Reads and writes must never retarget themselves because process.env was
+// mutated after the audit subsystem was initialized.
+const MCP_AUDIT_FILE = path.resolve(
+    process.env['COPILOT_MCP_AUDIT_FILE'] ?? path.join(MCP_AUDIT_DIR, 'mcp-tool-calls.jsonl'),
+);
+const MCP_AUDIT_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.audit',
+        exactPaths: [MCP_AUDIT_FILE],
+        operations: ['append', 'read'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory', 'none'],
+    }),
+);
 
-const mcpAuditWriter = createJsonlFileWriter({
-    filePath: getMcpAuditFile,
+const mcpAuditWriter = createJsonlBatchQueue({
+    persistBatch: async (data) => {
+        await MCP_AUDIT_FS.appendText(MCP_AUDIT_FILE, data, { mode: 0o600, durability: 'none' });
+    },
     maxQueueLines: MAX_AUDIT_QUEUE_LINES,
     softQueueLines: MAX_AUDIT_QUEUE_LINES - 1,
     onError: (error) => {
@@ -98,11 +108,10 @@ export async function readMcpAuditEventTail(options = {}) {
         MAX_AUDIT_HISTORY_TAIL_BYTES,
     );
     const maxEvents = boundedInteger(options.maxEvents, DEFAULT_AUDIT_HISTORY_EVENTS, 100, MAX_AUDIT_HISTORY_EVENTS);
-    const auditFile = getMcpAuditFile();
+    const auditFile = MCP_AUDIT_FILE;
     try {
         await mcpAuditWriter.flush();
-        const snapshot = await readBytesRangeFreshTrusted(auditFile, {
-            caller: 'mcp.control-plane.audit',
+        const snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
             maxBytes: tailBytes,
             fromEnd: true,
             rejectSymlink: true,
@@ -190,19 +199,17 @@ export async function readMcpAuditEventSlice(options = {}) {
     const requestedOffset = Math.max(0, Math.floor(Number(options.offset ?? 0) || 0));
     const maxBytes = boundedInteger(options.maxBytes, 4 * 1024 * 1024, 64 * 1024, 16 * 1024 * 1024);
     const maxEvents = boundedInteger(options.maxEvents, 50_000, 100, 200_000);
-    const auditFile = getMcpAuditFile();
+    const auditFile = MCP_AUDIT_FILE;
     try {
         await mcpAuditWriter.flush();
-        let snapshot = await readBytesRangeFreshTrusted(auditFile, {
-            caller: 'mcp.control-plane.audit',
+        let snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
             start: requestedOffset,
             maxBytes,
             rejectSymlink: true,
         });
         const resetRequired = requestedOffset > snapshot.sizeBytes;
         if (resetRequired) {
-            snapshot = await readBytesRangeFreshTrusted(auditFile, {
-                caller: 'mcp.control-plane.audit',
+            snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
                 start: 0,
                 maxBytes,
                 rejectSymlink: true,

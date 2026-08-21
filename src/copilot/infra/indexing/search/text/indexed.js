@@ -1,16 +1,15 @@
 // @ts-check
 /** Derived-index acceleration/fallback decision for completeness-oriented text search. */
 
-import { getIoIndexStats, searchIoIndex, searchIoIndexLiteral } from '#copilot/infra/internal/indexing/registry';
 import { utf8ByteLength } from '#copilot/infra/internal/platform';
 import { publishIoOperationResult } from '#copilot/infra/internal/telemetry';
-import { countSearchOutputLines, paginateSearchText, sanitizeSearchOutput } from '../shared/index.js';
 import {
     canUseIndexSearch,
     filterIndexRowsByGlob,
     formatIndexSearchRows,
     formatLiteralIndexSearchRows,
-} from './indexed-format.js';
+} from '../projection/index.js';
+import { countSearchOutputLines, paginateSearchText, sanitizeSearchOutput } from '../shared/index.js';
 
 /** @typedef {import('./types.js').TextSearchOptions} TextSearchOptions */
 /** @typedef {import('./types.js').TextSearchResult} TextSearchResult */
@@ -44,9 +43,21 @@ function isAsciiLiteral(value) {
  * @param {ReturnType<typeof import('../shared/index.js').normalizeSearchWindow>} searchWindow
  * @param {boolean} ripgrepAvailable
  * @param {BuildSearchIo} buildSearchIo
+ * @param {ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime> | null} [indexRegistry]
  * @returns {{ result: TextSearchResult | null; indexFallback: boolean; indexFallbackReason: string | null }}
  */
-export function trySearchTextViaIndex(targetPath, options, searchWindow, ripgrepAvailable, buildSearchIo) {
+export function trySearchTextViaIndex(
+    targetPath,
+    options,
+    searchWindow,
+    ripgrepAvailable,
+    buildSearchIo,
+    indexRegistry = null,
+) {
+    if (!indexRegistry) return { result: null, indexFallback: false, indexFallbackReason: null };
+    const readIndexStats = indexRegistry.stats;
+    const searchIndex = indexRegistry.search;
+    const searchIndexLiteral = indexRegistry.searchLiteral;
     /** @type {boolean} */
     let indexFallback = false;
     /** @type {string | null} */
@@ -56,8 +67,8 @@ export function trySearchTextViaIndex(targetPath, options, searchWindow, ripgrep
         // Avoid the five aggregate SQLite queries in getIoIndexStats() on the normal rg path. The stats snapshot is
         // needed only when we actually have to use the index because rg is unavailable.
         const indexStats = ripgrepAvailable
-            ? /** @type {ReturnType<typeof getIoIndexStats>} */ ({})
-            : getIoIndexStats();
+            ? /** @type {Partial<ReturnType<typeof indexRegistry.stats>>} */ ({})
+            : readIndexStats();
         const indexSearchOptions = {
             pattern: options.pattern,
             ...(options.isRegex !== undefined ? { isRegex: options.isRegex } : {}),
@@ -75,7 +86,7 @@ export function trySearchTextViaIndex(targetPath, options, searchWindow, ripgrep
             freshFiles > 0 &&
             (options.caseSensitive === true || isAsciiLiteral(options.pattern));
         if (literalIndexEligible) {
-            const literalRows = searchIoIndexLiteral(options.pattern, {
+            const literalRows = searchIndexLiteral(options.pattern, {
                 pathPrefix: targetPath,
                 ...(searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount }),
                 caseSensitive: options.caseSensitive === true,
@@ -138,7 +149,7 @@ export function trySearchTextViaIndex(targetPath, options, searchWindow, ripgrep
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const indexRows =
                 Boolean(indexStats?.available) && freshFiles > 0
-                    ? searchIoIndex(options.pattern, {
+                    ? searchIndex(options.pattern, {
                           pathPrefix: targetPath,
                           ...(searchWindow.commandMaxCount === null
                               ? {}
@@ -202,7 +213,7 @@ export function trySearchTextViaIndex(targetPath, options, searchWindow, ripgrep
             const perTermRows =
                 terms && Boolean(indexStats?.available) && freshFiles > 0
                     ? terms.map((term) =>
-                          searchIoIndex(term, {
+                          searchIndex(term, {
                               pathPrefix: targetPath,
                               ...(searchWindow.commandMaxCount === null
                                   ? {}

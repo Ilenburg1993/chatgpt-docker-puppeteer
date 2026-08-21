@@ -2,10 +2,10 @@
 /** Workspace symbol search via registry index with ripgrep fallback. */
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
-import { findIoIndexSymbol } from '#copilot/infra/internal/indexing/registry';
 import { utf8ByteLength } from '#copilot/infra/internal/platform';
 import { hasNullByte } from '#copilot/infra/internal/policy';
 import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from '../projection/index.js';
 import {
     assertValidTargetPath,
     countSearchOutputLines,
@@ -16,7 +16,6 @@ import {
     sanitizeSearchOutput,
 } from '../shared/index.js';
 import { isRipgrepAvailable, streamSearchFile } from '../subprocess/index.js';
-import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './pattern.js';
 
 /** @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind */
 
@@ -35,6 +34,7 @@ import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './patter
  *     cursor?: string | number | null;
  *     traceId?: string;
  * }} options
+ * @param {{ indexRegistry?: ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime> }} [context]
  * @returns {Promise<{
  *     targetPath: string;
  *     symbol: string;
@@ -55,7 +55,7 @@ import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './patter
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
-export async function searchWorkspaceSymbols(targetPath, options) {
+export async function searchWorkspaceSymbols(targetPath, options, context = {}) {
     assertValidTargetPath(targetPath);
     if (typeof options.symbolName !== 'string' || options.symbolName.trim().length === 0) {
         const error = /** @type {TypeError & { code?: string }} */ (
@@ -105,13 +105,14 @@ export async function searchWorkspaceSymbols(targetPath, options) {
 
     try {
         if (!options.includePattern) {
-            const rows = findIoIndexSymbol(options.symbolName, {
-                pathPrefix: targetPath,
-                kind: resolvedKind,
-                exactMatch: options.exactMatch === true,
-                caseSensitive: options.caseSensitive === true,
-                ...(searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount }),
-            });
+            const rows =
+                context.indexRegistry?.findSymbol(options.symbolName, {
+                    pathPrefix: targetPath,
+                    kind: resolvedKind,
+                    exactMatch: options.exactMatch === true,
+                    caseSensitive: options.caseSensitive === true,
+                    ...(searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount }),
+                }) ?? [];
             if (rows.length > 0) {
                 const sanitized = sanitizeSearchOutput(formatIndexSymbolRows(rows));
                 const windowedOutput = paginateSearchText(sanitized.text, searchWindow);

@@ -8,46 +8,57 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ioMocks = vi.hoisted(() => ({
-    deleteFileTrusted: vi.fn(),
-    readTextFreshTrusted: vi.fn(),
-    statPathTrusted: vi.fn(),
-    writeFileAtomicTrusted: vi.fn(),
+    deleteFile: vi.fn(),
+    readTextFresh: vi.fn(),
+    statPath: vi.fn(),
+    writeFileAtomic: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
-    deleteFileTrusted: ioMocks.deleteFileTrusted,
-    readTextFreshTrusted: ioMocks.readTextFreshTrusted,
-    statPathTrusted: ioMocks.statPathTrusted,
-    writeFileAtomicTrusted: ioMocks.writeFileAtomicTrusted,
-}));
+vi.mock('#copilot/infra/public/composition/filesystem/configured', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/infra/public/composition/filesystem/configured')} */ (
+        await importOriginal()
+    );
+    return {
+        ...actual,
+        createConfiguredFsIo: vi.fn(() =>
+            Object.freeze({
+                deleteFile: ioMocks.deleteFile,
+                readTextFresh: ioMocks.readTextFresh,
+                statPath: ioMocks.statPath,
+                writeFileAtomic: ioMocks.writeFileAtomic,
+            }),
+        ),
+    };
+});
 
 import {
     clearPersistentModelCache,
     evaluatePersistentCache,
     getPersistentCacheDiagnostics,
     readPersistentModelCache,
+    resolvePersistentModelCacheBinding,
     writePersistentModelCacheAsync,
 } from '../../../../src/copilot/sdk/models/persistent-cache.js';
 
 describe('persistent-model-cache', () => {
-    /** @type {string | undefined} */
-    let originalPersistentCacheFile;
+    it('resolve override em snapshot explícito sem depender de mutação posterior de env', () => {
+        const env = { COPILOT_MODEL_PERSISTENT_CACHE_FILE: 'cache/custom-models.json' };
+        const binding = resolvePersistentModelCacheBinding(env, '/workspace');
+        expect(binding.primaryPath).toBe('/workspace/cache/custom-models.json');
+        env.COPILOT_MODEL_PERSISTENT_CACHE_FILE = 'cache/other.json';
+        expect(binding.primaryPath).toBe('/workspace/cache/custom-models.json');
+    });
 
     beforeEach(async () => {
         vi.restoreAllMocks();
-        ioMocks.deleteFileTrusted.mockReset();
-        ioMocks.deleteFileTrusted.mockResolvedValue(null);
-        ioMocks.readTextFreshTrusted.mockReset();
-        ioMocks.readTextFreshTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
-        ioMocks.statPathTrusted.mockReset();
-        ioMocks.statPathTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
-        ioMocks.writeFileAtomicTrusted.mockReset();
-        ioMocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
-        originalPersistentCacheFile = process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
-        process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] =
-            `data/copilot/test/persistent-model-cache-${process.pid}-${Date.now()}-${Math.random()
-                .toString(16)
-                .slice(2)}.json`;
+        ioMocks.deleteFile.mockReset();
+        ioMocks.deleteFile.mockResolvedValue(null);
+        ioMocks.readTextFresh.mockReset();
+        ioMocks.readTextFresh.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        ioMocks.statPath.mockReset();
+        ioMocks.statPath.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        ioMocks.writeFileAtomic.mockReset();
+        ioMocks.writeFileAtomic.mockResolvedValue(undefined);
         await clearPersistentModelCache();
         vi.clearAllMocks();
     });
@@ -59,11 +70,6 @@ describe('persistent-model-cache', () => {
         } catch {
             // Ignore cleanup errors
         }
-        if (originalPersistentCacheFile === undefined) {
-            delete process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
-        } else {
-            process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] = originalPersistentCacheFile;
-        }
     });
 
     describe('readPersistentModelCache', () => {
@@ -73,7 +79,7 @@ describe('persistent-model-cache', () => {
         });
 
         it('retorna null para JSON invalido', async () => {
-            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: '{ invalid json }' });
+            ioMocks.readTextFresh.mockResolvedValueOnce({ content: '{ invalid json }' });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -86,7 +92,7 @@ describe('persistent-model-cache', () => {
                 fetchedAt: Date.now(),
                 models: [],
             };
-            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
+            ioMocks.readTextFresh.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -99,7 +105,7 @@ describe('persistent-model-cache', () => {
                 fetchedAt: Date.now(),
                 models: 'not-an-array',
             };
-            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
+            ioMocks.readTextFresh.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -120,7 +126,7 @@ describe('persistent-model-cache', () => {
                     },
                 ],
             };
-            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(validCache) });
+            ioMocks.readTextFresh.mockResolvedValueOnce({ content: JSON.stringify(validCache) });
 
             const result = await readPersistentModelCache();
             expect(result).not.toBeNull();
@@ -133,7 +139,7 @@ describe('persistent-model-cache', () => {
         it('ignora modelos não-array', async () => {
             writePersistentModelCacheAsync(/** @type {any} */ ('not-an-array'));
             await clearPersistentModelCache();
-            expect(ioMocks.writeFileAtomicTrusted).not.toHaveBeenCalled();
+            expect(ioMocks.writeFileAtomic).not.toHaveBeenCalled();
         });
 
         it('escreve models válidos de forma async', async () => {
@@ -148,23 +154,23 @@ describe('persistent-model-cache', () => {
             writePersistentModelCacheAsync(models);
             await clearPersistentModelCache();
 
-            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalled();
-            const call = ioMocks.writeFileAtomicTrusted.mock.calls[0];
+            expect(ioMocks.writeFileAtomic).toHaveBeenCalled();
+            const call = ioMocks.writeFileAtomic.mock.calls[0];
             if (!call) {
-                throw new Error('writeFileAtomicTrusted deveria ter sido chamado ao persistir models válidos');
+                throw new Error('writeFileAtomic deveria ter sido chamado ao persistir models válidos');
             }
-            expect(String(call[0])).toContain('data/copilot/test/persistent-model-cache-');
+            expect(String(call[0])).toMatch(/data\/copilot\/sdk\/models\/modellist-cache\.json$/u);
             const payload = call[1];
             const written = JSON.parse(/** @type {string} */ (payload));
             expect(written.version).toBe(2);
             expect(written.models).toHaveLength(1);
-            expect(call[2]).toEqual({ caller: 'sdk.models.persistent-cache', mode: 0o600 });
+            expect(call[2]).toEqual({ mode: 0o600 });
         });
 
         it('serializa writes concorrentes na ordem de chamada', async () => {
             /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
             let releaseFirst;
-            ioMocks.writeFileAtomicTrusted
+            ioMocks.writeFileAtomic
                 .mockImplementationOnce(
                     () =>
                         new Promise((resolve) => {
@@ -177,19 +183,19 @@ describe('persistent-model-cache', () => {
             writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'second' })]);
             await Promise.resolve();
 
-            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(1);
+            expect(ioMocks.writeFileAtomic).toHaveBeenCalledTimes(1);
             releaseFirst?.();
             await clearPersistentModelCache();
 
-            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
-            const secondPayload = JSON.parse(String(ioMocks.writeFileAtomicTrusted.mock.calls[1]?.[1]));
+            expect(ioMocks.writeFileAtomic).toHaveBeenCalledTimes(2);
+            const secondPayload = JSON.parse(String(ioMocks.writeFileAtomic.mock.calls[1]?.[1]));
             expect(secondPayload.models[0].modelId).toBe('second');
         });
 
         it('ordena clear depois de todos os writes já enfileirados', async () => {
             /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
             let releaseWrite;
-            ioMocks.writeFileAtomicTrusted.mockImplementationOnce(
+            ioMocks.writeFileAtomic.mockImplementationOnce(
                 () =>
                     new Promise((resolve) => {
                         releaseWrite = resolve;
@@ -198,28 +204,28 @@ describe('persistent-model-cache', () => {
             writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'pending' })]);
             const clear = clearPersistentModelCache();
             await Promise.resolve();
-            expect(ioMocks.deleteFileTrusted).not.toHaveBeenCalled();
+            expect(ioMocks.deleteFile).not.toHaveBeenCalled();
 
             releaseWrite?.();
             await clear;
-            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
+            expect(ioMocks.deleteFile).toHaveBeenCalled();
         });
     });
 
     describe('clearPersistentModelCache', () => {
         it('não re-lança erro se arquivo não existe', async () => {
-            ioMocks.deleteFileTrusted.mockResolvedValue(null);
+            ioMocks.deleteFile.mockResolvedValue(null);
 
             await expect(clearPersistentModelCache()).resolves.toBeUndefined();
-            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
+            expect(ioMocks.deleteFile).toHaveBeenCalled();
         });
 
         it('deleta arquivo se existe', async () => {
-            ioMocks.deleteFileTrusted.mockResolvedValue({ removed: true });
+            ioMocks.deleteFile.mockResolvedValue({ removed: true });
 
             await clearPersistentModelCache();
 
-            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
+            expect(ioMocks.deleteFile).toHaveBeenCalled();
         });
     });
 
@@ -270,7 +276,7 @@ describe('persistent-model-cache', () => {
                 size: 5000,
                 mtime: new Date(Date.now() - 60 * 60 * 1000), // 1h ago
             };
-            ioMocks.statPathTrusted.mockResolvedValue({ stats: mockStat });
+            ioMocks.statPath.mockResolvedValue({ stats: mockStat });
 
             const result = await getPersistentCacheDiagnostics();
 

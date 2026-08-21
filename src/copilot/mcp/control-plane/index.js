@@ -18,12 +18,20 @@ export * from './http-client.js';
 export * from './index-auto-build.js';
 export * from './io-cache-benchmark-state.js';
 export * from './jobs.js';
-export * from './latency-history.js';
+/** @typedef {import('./latency-history.js').McpLatencyDashboardSnapshot} McpLatencyDashboardSnapshot */
+
+export {
+    DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH,
+    appendMcpLatencyDashboardSnapshot,
+    compareMcpLatencyDashboardSnapshots,
+    readMcpLatencyDashboardHistory,
+} from './latency-history.js';
 export * from './metrics.js';
 export * from './oauth-replay-store.js';
 export * from './openai-endpoint-latency.js';
 export * from './openai-endpoint-monitor.js';
 export * from './paths.js';
+export * from './process-introspection.js';
 export * from './reload-state.js';
 export * from './result.js';
 export * from './round-trip-analytics-monitor.js';

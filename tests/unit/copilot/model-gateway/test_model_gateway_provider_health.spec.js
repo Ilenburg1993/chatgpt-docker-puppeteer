@@ -4,13 +4,17 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
     comparableModelGatewayRuntimeHealthRecord,
+    configureByokProviderHealthPersistenceStoreForTests,
+    createByokProviderHealthPersistenceStore,
     diffModelGatewayRuntimeHealthSnapshots,
     flushByokProviderHealth,
     hydrateByokProviderHealthFromDisk,
+    readByokProviderHealthPersistenceFingerprint,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -19,6 +23,7 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
+    restoreByokProviderHealthPersistenceStoreForTests,
     summarizeModelGatewayRuntimeHealthRecords,
 } from '../../../../src/copilot/model-gateway/health/index.js';
 
@@ -28,18 +33,45 @@ const cleanupDirs = [];
 async function useTempHealthPath() {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-byok-health-'));
     cleanupDirs.push(dir);
-    process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'] = join(dir, 'health.json');
+    const filePath = join(dir, 'health.json');
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'test.model-gateway.provider-health',
+            exactPaths: [filePath],
+            operations: ['read', 'stat', 'write'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    configureByokProviderHealthPersistenceStoreForTests(
+        createByokProviderHealthPersistenceStore({ binding: { enabled: true, path: filePath }, io }),
+    );
+    return filePath;
 }
 
 describe('BYOK provider chat health state', () => {
     afterEach(async () => {
         resetByokProviderHealthForTests();
-        delete process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
-        delete process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PERSIST_DISABLED'];
+        restoreByokProviderHealthPersistenceStoreForTests();
         while (cleanupDirs.length > 0) {
             const dir = cleanupDirs.pop();
             if (dir) await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('projeta fingerprint físico pelo persistence owner sem expor nova authority de path', async () => {
+        await useTempHealthPath();
+        expect(await readByokProviderHealthPersistenceFingerprint()).toBe('missing');
+
+        recordByokProviderModelCallSuccess({
+            routeProfile: 'fingerprint',
+            providerId: 'fixture',
+            providerModel: 'model',
+            timestamp: 1_700_000_000_000,
+        });
+        await flushByokProviderHealth();
+
+        expect(await readByokProviderHealthPersistenceFingerprint()).toMatch(/^\d+:\d+$/u);
     });
 
     it('persiste falha redigida e reidrata entre instâncias do processo', async () => {
@@ -160,9 +192,7 @@ describe('BYOK provider chat health state', () => {
     });
 
     it('migra registros schema v1 profile/provider/model para identidade gateway canônica', async () => {
-        await useTempHealthPath();
-        const filePath = process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
-        expect(filePath).toBeTruthy();
+        const filePath = await useTempHealthPath();
         await writeFile(
             /** @type {string} */ (filePath),
             `${JSON.stringify({

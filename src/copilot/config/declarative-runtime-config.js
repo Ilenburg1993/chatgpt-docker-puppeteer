@@ -8,7 +8,7 @@
  */
 
 import { resolvePersistentConfigFile } from '#copilot/boot';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { safeJsonParse } from '../core/safe-json.js';
 import {
     BUILTIN_HANDLER_MAP,
@@ -20,6 +20,15 @@ import {
 } from './sdk-config-port.js';
 
 const SKILLS_PATH = resolvePersistentConfigFile('skills.json');
+const SKILLS_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'config.declarative-runtime-config',
+        exactPaths: [SKILLS_PATH],
+        operations: ['read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 /**
  * @typedef {{ paths: string[] }} SkillsConfig
@@ -52,7 +61,7 @@ function readStringArray(value) {
  */
 export async function readSkillsConfig() {
     try {
-        const raw = (await readTextFreshTrusted(SKILLS_PATH, { caller: 'config.declarative-runtime-config' })).content;
+        const raw = (await SKILLS_FS.readTextFresh(SKILLS_PATH)).content;
         const result = safeJsonParse(raw, '[config/declarative-runtime-config.readSkillsConfig]');
         return result.ok ? /** @type {SkillsConfig} */ (result.data) : { paths: [] };
     } catch {
@@ -67,10 +76,7 @@ export async function readSkillsConfig() {
  * @returns {Promise<void>}
  */
 export async function writeSkillsConfig(config) {
-    await writeFileAtomicTrusted(SKILLS_PATH, `${JSON.stringify(config, null, 2)}\n`, {
-        caller: 'config.declarative-runtime-config',
-        mode: 0o600,
-    });
+    await SKILLS_FS.writeFileAtomic(SKILLS_PATH, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**

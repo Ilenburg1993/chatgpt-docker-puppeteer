@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/user-config
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { isAbsolute, resolve } from 'node:path';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -68,6 +68,12 @@ export const SYSTEM_PROMPT_CONFIG_PATH = resolvePersistentConfigFile('system-pro
 const systemPromptConfigSnapshots = new Map();
 /** Last successfully observed append-file text, keyed by configured absolute path. */
 const systemPromptAppendTextSnapshots = new Map();
+/**
+ * Unforgeable authority associated only with asynchronously resolved config snapshots. A caller-crafted plain object
+ * cannot become filesystem authority merely by naming append paths.
+ * @type {WeakMap<ResolvedSystemPromptUserConfig, ReturnType<typeof createConfiguredFsIo> | null>}
+ */
+const systemPromptAppendIoByConfig = new WeakMap();
 
 /**
  * @param {string | undefined} value
@@ -164,8 +170,17 @@ function readConfigFileSnapshot(filePath) {
  * @returns {Promise<SystemPromptUserConfig>}
  */
 async function readConfigFileAsync(filePath) {
+    const configIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'config.system-prompt.user-config.source',
+            exactPaths: [filePath],
+            operations: ['read'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
     try {
-        const raw = (await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.user-config' })).content;
+        const raw = (await configIo.readTextFresh(filePath)).content;
         const parsed = JSON.parse(raw);
         const snapshot = parsed && typeof parsed === 'object' ? /** @type {SystemPromptUserConfig} */ (parsed) : {};
         systemPromptConfigSnapshots.set(filePath, snapshot);
@@ -292,7 +307,21 @@ export async function readResolvedSystemPromptUserConfig(opts = {}) {
     const env = opts.env ?? process.env;
     const cwd = opts.cwd ?? process.cwd();
     const configPath = getSystemPromptConfigFilePath(env);
-    return resolveSystemPromptUserConfigSnapshot(env, cwd, configPath, await readConfigFileAsync(configPath));
+    const resolved = resolveSystemPromptUserConfigSnapshot(env, cwd, configPath, await readConfigFileAsync(configPath));
+    const appendIo =
+        resolved.appendFiles.length === 0
+            ? null
+            : createConfiguredFsIo(
+                  createConfiguredFsGrant({
+                      id: 'config.system-prompt.user-config.append-files',
+                      exactPaths: resolved.appendFiles,
+                      operations: ['read', 'stat'],
+                      symlinkPolicy: 'deny',
+                      durability: ['file-and-directory'],
+                  }),
+              );
+    systemPromptAppendIoByConfig.set(resolved, appendIo);
+    return resolved;
 }
 
 /**
@@ -317,14 +346,14 @@ export function readUserAppendContentSync(resolved = readResolvedSystemPromptUse
  */
 export async function readUserAppendContent(resolved) {
     const effective = resolved ?? (await readResolvedSystemPromptUserConfig());
+    const appendIo = systemPromptAppendIoByConfig.get(effective) ?? null;
     /** @type {string[]} */
     const parts = [];
 
     for (const filePath of effective.appendFiles) {
         try {
-            const content = (
-                await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.user-config' })
-            ).content.trim();
+            if (!appendIo) continue;
+            const content = (await appendIo.readTextFresh(filePath)).content.trim();
             systemPromptAppendTextSnapshots.set(filePath, content);
             if (!content) continue;
             parts.push(`<!-- user-system-prompt:${filePath} -->\n${content}\n<!-- /user-system-prompt:${filePath} -->`);
@@ -339,6 +368,31 @@ export async function readUserAppendContent(resolved) {
     }
 
     return parts.join('\n\n');
+}
+
+/**
+ * Return physical metadata for append files using only authority bound to a resolver-produced config snapshot.
+ * Caller-crafted config objects receive no filesystem authority.
+ *
+ * @param {ResolvedSystemPromptUserConfig} resolved
+ * @returns {Promise<Array<{path:string;exists:boolean;bytes:number|null;mtimeMs:number|null}>>}
+ */
+export async function readBoundSystemPromptAppendFileStatuses(resolved) {
+    const appendIo = systemPromptAppendIoByConfig.get(resolved) ?? null;
+    const statuses = [];
+    for (const filePath of resolved.appendFiles) {
+        if (!appendIo) {
+            statuses.push({ path: filePath, exists: false, bytes: null, mtimeMs: null });
+            continue;
+        }
+        try {
+            const info = (await appendIo.statPath(filePath)).stats;
+            statuses.push({ path: filePath, exists: true, bytes: info.size, mtimeMs: info.mtimeMs });
+        } catch {
+            statuses.push({ path: filePath, exists: false, bytes: null, mtimeMs: null });
+        }
+    }
+    return statuses;
 }
 
 /**

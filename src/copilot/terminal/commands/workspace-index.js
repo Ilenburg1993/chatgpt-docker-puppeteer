@@ -9,13 +9,7 @@
  * @module copilot/terminal/commands/workspace-index
  */
 
-import {
-    buildIoIndexForDirectory,
-    findIoIndexSymbol,
-    getIoIndex,
-    getIoIndexStats,
-    searchIoIndex,
-} from '#copilot/infra/public/indexing/registry';
+import { getApplicationWorkspaceInfra } from '#copilot/boot';
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
@@ -43,6 +37,14 @@ import {
  *     rest: string[];
  * }} ParsedIndexArgs
  */
+
+const INDEX_REGISTRY = getApplicationWorkspaceInfra(process.cwd()).indexing.registry;
+if (!INDEX_REGISTRY) throw new Error('Terminal workspace is not attached to an InfraRuntime index registry.');
+const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
+const clearIoIndex = INDEX_REGISTRY.clear;
+const findIoIndexSymbol = INDEX_REGISTRY.findSymbol;
+const searchIoIndex = INDEX_REGISTRY.search;
+const readIoIndexStatus = INDEX_REGISTRY.status;
 
 const ioIndexChannel = channel('copilot.io.index');
 const ioScanChannel = channel('copilot.io.scan');
@@ -349,7 +351,7 @@ function parseIndexArgs(parts) {
  * @param {IndexCommandContext} ctx
  */
 function printStats(ctx) {
-    const stats = /** @type {Record<string, unknown>} */ (getIoIndexStats());
+    const stats = /** @type {Record<string, unknown>} */ (readIoIndexStatus());
     if (stats['enabled'] === false) {
         ctx.println('');
         ctx.println(terminalThemeRow('Índice L2', `indisponível · ${stringLabel(stats['reason'])}`, { role: 'warn' }));
@@ -540,7 +542,7 @@ function runSymbol(ctx, parts) {
  * @param {IndexCommandContext} ctx
  */
 function runClear(ctx) {
-    getIoIndex()?.clearAll();
+    clearIoIndex();
     ctx.println(terminalThemeRow('Índice L2', 'limpo', { role: 'success' }));
 }
 

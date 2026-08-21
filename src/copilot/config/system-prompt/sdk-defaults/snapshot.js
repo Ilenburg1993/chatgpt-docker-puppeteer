@@ -11,7 +11,7 @@
  * @module copilot/config/system-prompt/sdk-defaults/snapshot
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT_SECTIONS } from '../../sdk-config-port.js';
@@ -49,10 +49,16 @@ function generateSnapshot() {
 const snapshot = generateSnapshot();
 const date = new Date().toISOString().slice(0, 10);
 const outPath = join(__dirname, `captured-${date}.json`);
+const SNAPSHOT_FS = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'config.system-prompt.sdk-defaults.snapshot',
+        exactPaths: [outPath],
+        operations: ['write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
-await writeFileAtomicTrusted(outPath, `${JSON.stringify(snapshot, null, 2)}\n`, {
-    caller: 'config.system-prompt.sdk-defaults.snapshot',
-    mode: 0o600,
-});
+await SNAPSHOT_FS.writeFileAtomic(outPath, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
 console.log(`[sdk-defaults/snapshot] Salvo em: ${outPath}`);
 console.log(`[sdk-defaults/snapshot] ${Object.keys(snapshot.sections).length} seções capturadas.`);

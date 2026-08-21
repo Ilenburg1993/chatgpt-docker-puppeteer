@@ -60,7 +60,7 @@ export function resolveBabelParserOptions(filePath, lang, options = {}) {
     }
 
     // TypeScript moderno usa decorators padrão quando `experimentalDecorators` não está habilitado. O par de plugins
-    // abaixo cobre decorators atuais e auto-accessors sem instalar transform plugins nem reintroduzir semantics legacy.
+    // abaixo cobre decorators atuais e auto-accessors sem instalar transform plugins nem reintroduzir semântica obsoleta.
     plugins.push('decorators', 'decoratorAutoAccessors');
 
     return {

@@ -9,15 +9,14 @@
  */
 
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
-import { validatePath, WORKSPACE_ROOT } from '../shared.js';
+import { validatePath, WORKSPACE_IO } from '../shared.js';
 
-const { patchTextBatchLocked, patchTextBatchLockedValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { patchTextBatchLocked, patchTextBatchLockedValidated } = WORKSPACE_IO;
 
 /**
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} target
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} target
  * @param {Parameters<typeof patchTextBatchLocked>[1]} options
  */
 function patchBatchValidatedOrString(target, options) {

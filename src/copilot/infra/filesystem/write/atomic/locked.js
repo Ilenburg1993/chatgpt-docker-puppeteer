@@ -3,11 +3,16 @@
 
 import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
-import { readBinaryMutationSnapshot, shouldCaptureIoRollback } from '#copilot/infra/internal/filesystem/transaction';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
+import { readBinaryMutationSnapshot } from '#copilot/infra/internal/filesystem/transaction';
 import { sha256 } from '#copilot/infra/internal/platform';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
-import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
+import {
+    elapsedIoMs,
+    getIoTelemetryRuntimeOption,
+    nowIoMs,
+    publishIoOperationResult,
+} from '#copilot/infra/internal/telemetry';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { mkdirPathLocked } from '../directory/index.js';
@@ -49,6 +54,8 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  *     captureRollback?: boolean;
+ *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
+ *     capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -64,15 +71,16 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     contentHash: string;
  *     durability: Awaited<ReturnType<typeof writeAtomicOwnedBufferUnlocked>>;
  * }>}
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function writeFileAtomic(filePath, content, options = {}) {
+export async function writeFileAtomic(filePath, content, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     const contentHash = sha256(payload);
     const riskClass = options.riskClass ?? 'medium';
-    const captureRollback = shouldCaptureIoRollback(options.captureRollback === true);
+    const captureRollback = options.captureRollback ?? options.rollbackPolicy?.enabled ?? false;
     const rollbackCleanup = { path: /** @type {string | null} */ (null) };
     try {
         const lease = await acquireIoResourceLock(filePath, {
@@ -93,7 +101,9 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                         try {
                             previousSnapshot = await readBinaryMutationSnapshot(filePath, {
                                 snapshotMaxBytes: captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
-                                rollbackSidecar: captureRollback,
+                                rollbackSidecar: captureRollback
+                                    ? { ...(options.rollbackPolicy ? { policy: options.rollbackPolicy } : {}) }
+                                    : false,
                             });
                             if (!captureRollback) {
                                 previousSnapshot = {
@@ -128,6 +138,9 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                               : { expectedHash: options.expectedHash }),
                         ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                         ...(options.durability === undefined ? {} : { durability: options.durability }),
+                        ...(options.capacityPreflight === undefined
+                            ? {}
+                            : { capacityPreflight: options.capacityPreflight }),
                     });
                     return {
                         path: filePath,
@@ -148,7 +161,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
         })();
         rollbackCleanup.path = null;
         const waitMs = lease.waitMs;
-        invalidateIoCoherencePath(filePath);
+        invalidateIoCoherencePath(filePath, {}, invalidationBus);
         const io = publishIoOperationResult(
             buildIoMeta({
                 operation: 'write',
@@ -169,6 +182,8 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                 },
             }),
             true,
+            undefined,
+            getIoTelemetryRuntimeOption(options),
         );
         return { ...value, lockWaitMs: waitMs, io };
     } catch (error) {
@@ -188,6 +203,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
             }),
             false,
             finalError,
+            getIoTelemetryRuntimeOption(options),
         );
         throw finalError;
     }
@@ -199,16 +215,21 @@ export async function writeFileAtomic(filePath, content, options = {}) {
  * @param {string} filePath
  * @param {string | Buffer} content
  * @param {Parameters<typeof writeFileAtomic>[2] & { createParentDirs?: boolean }} [options]
+ * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
-export async function createOrReplaceFileAtomic(filePath, content, options = {}) {
+export async function createOrReplaceFileAtomic(filePath, content, options = {}, invalidationBus = undefined) {
     assertValidIoFilePath(filePath);
     if (options.createParentDirs !== false) {
-        await mkdirPathLocked(dirname(filePath), {
-            recursive: true,
-            advisoryLimits: {
-                operation: 'createOrReplaceFileAtomic.parentMkdir',
+        await mkdirPathLocked(
+            dirname(filePath),
+            {
+                recursive: true,
+                advisoryLimits: {
+                    operation: 'createOrReplaceFileAtomic.parentMkdir',
+                },
             },
-        });
+            invalidationBus,
+        );
     }
-    return writeFileAtomic(filePath, content, options);
+    return writeFileAtomic(filePath, content, options, invalidationBus);
 }

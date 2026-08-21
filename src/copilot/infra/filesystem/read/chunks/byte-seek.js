@@ -4,11 +4,6 @@
 import { toBufferView, utf8ByteLength } from '#copilot/infra/internal/platform';
 import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
-import {
-    getByteLineIndex,
-    recordByteLineIndexCapturedRangeReuse,
-    recordByteLineIndexRangeRead,
-} from '../line-index/index.js';
 import { chunkSnapshotMatchesStats, createStaleChunkSnapshotError, sameFileSnapshot } from '../snapshot/index.js';
 import { decodeUtf8Buffer, decodeUtf8Chunk, throwAbortError } from './codec.js';
 
@@ -25,6 +20,7 @@ import { decodeUtf8Buffer, decodeUtf8Chunk, throwAbortError } from './codec.js';
  *     signal?: AbortSignal;
  *     attempt?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     readRuntime?: {byteLineIndex:ReturnType<typeof import('../line-index/index.js').createByteLineIndexRuntime>};
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -60,7 +56,9 @@ export async function readTextLineChunksByByteIndex(filePath, options = {}) {
     // An open-ended tail is a one-pass workload. Building an index to EOF and then rereading the tail doubles IO.
     if (requestedEndLine === null) return null;
 
-    const lookup = await getByteLineIndex(filePath, {
+    const byteLineIndex = options.readRuntime?.byteLineIndex ?? null;
+    if (!byteLineIndex) return null;
+    const lookup = await byteLineIndex.get(filePath, {
         ...options,
         requiredLineStarts: requestedEndLine + 1,
         captureStartLine: startLine,
@@ -131,11 +129,11 @@ export async function readTextLineChunksByByteIndex(filePath, options = {}) {
         }
         text = decodeUtf8Buffer(capturedRange);
         rangeSource = 'index-capture';
-        recordByteLineIndexCapturedRangeReuse(rangeByteLength);
+        byteLineIndex.recordCapturedRangeReuse(rangeByteLength);
     } else {
         text = await readUtf8Range(filePath, byteStart, byteEndExclusive, byteIndex, options);
         rangeBytesRead = rangeByteLength;
-        recordByteLineIndexRangeRead(rangeBytesRead);
+        byteLineIndex.recordRangeRead(rangeBytesRead);
     }
     const lines = splitTextLinesLikeScanner(text);
     const chunks = buildTextLineChunks(lines, startLine, chunkLines);

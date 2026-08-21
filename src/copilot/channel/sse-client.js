@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/platform';
+import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { log } from '#copilot/observability';
 import http from 'node:http';
 import { logSwallowed } from '../core/error-handlers.js';

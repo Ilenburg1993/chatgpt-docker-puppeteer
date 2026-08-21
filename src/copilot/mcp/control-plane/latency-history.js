@@ -7,17 +7,27 @@
  * @module copilot/mcp/control-plane/latency-history
  */
 
-import { withIoResourceLock } from '#copilot/infra/public/concurrency/locks';
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
-import { readJsonlTailTrusted } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import path from 'node:path';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
+import { createBoundConfiguredJsonlStore } from './persistence/index.js';
 
 export const DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH = 'src/copilot/.ai/mcp/latency-dashboard.jsonl';
 const DEFAULT_MAX_LATENCY_HISTORY_SNAPSHOTS = 500;
 const MAX_LATENCY_HISTORY_SNAPSHOTS = 10_000;
 const MAX_LATENCY_HISTORY_READ_BYTES = 2 * 1024 * 1024;
+const MCP_LATENCY_HISTORY_PATH = path.resolve(getMcpWorkspaceRoot(), DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH);
+const MCP_LATENCY_HISTORY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.latency-history',
+        exactPaths: [MCP_LATENCY_HISTORY_PATH],
+        operations: ['append', 'read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+
+/** @typedef {ReturnType<typeof createConfiguredFsIo>} ConfiguredFsIo */
 
 /**
  * @typedef {{
@@ -40,73 +50,93 @@ const MAX_LATENCY_HISTORY_READ_BYTES = 2 * 1024 * 1024;
  */
 
 /**
- * @param {McpLatencyDashboardSnapshot} snapshot
- * @param {{ maxSnapshots?: number; filePath?: string }} [options]
- * @returns {Promise<
- *     | { persisted: true; path: string; maxSnapshots: number; retainedSnapshots: number }
- *     | { persisted: false; error: string; path: string | null }
- * >}
+ * Build one latency-history runtime around already-authorized IO. The factory cannot mint or widen filesystem authority;
+ * it exists for isolated white-box tests and future explicit composition roots.
+ *
+ * @param {{ filePath:string; io:ConfiguredFsIo }} binding
  */
-export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) {
-    const filePath = getLatencyHistoryPath(options.filePath);
-    const maxSnapshots = readMaxSnapshots(options.maxSnapshots);
-    const entry = {
-        schemaVersion: 1,
-        capturedAt: new Date().toISOString(),
-        snapshot: compactSnapshot(snapshot),
-    };
-    try {
-        const { value: retainedSnapshots } = await withIoResourceLock(
-            filePath,
-            async () => {
-                await mkdirPathLocked(path.dirname(filePath), {
-                    recursive: true,
-                    advisoryLimits: { domain: 'mcp-latency-history-parent' },
-                });
-                await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
-                    encoding: 'utf8',
-                    advisoryLimits: { domain: 'mcp-latency-history' },
-                });
-                return trimLatencyHistoryFile(filePath, maxSnapshots);
-            },
-            { operation: 'mcp-latency-history', target: filePath, riskClass: 'medium' },
-        );
-        return {
-            persisted: true,
-            path: toWorkspaceRelativePath(filePath),
-            maxSnapshots,
-            retainedSnapshots,
+export function createMcpLatencyHistoryRuntime(binding) {
+    const filePath = path.resolve(binding.filePath);
+    const store = createBoundConfiguredJsonlStore({
+        filePath,
+        io: binding.io,
+        maxReadBytes: MAX_LATENCY_HISTORY_READ_BYTES,
+    });
+
+    /** @param {McpLatencyDashboardSnapshot} snapshot @param {{maxSnapshots?:number}} [options] */
+    async function appendSnapshot(snapshot, options = {}) {
+        const maxSnapshots = readMaxSnapshots(options.maxSnapshots);
+        const entry = {
+            schemaVersion: 1,
+            capturedAt: new Date().toISOString(),
+            snapshot: compactSnapshot(snapshot),
         };
-    } catch (error) {
-        return { persisted: false, error: sanitizeError(error), path: toWorkspaceRelativePath(filePath) };
+        try {
+            const { retainedEntries } = await store.appendRecord(entry, { maxEntries: maxSnapshots });
+            return {
+                persisted: /** @type {const} */ (true),
+                path: toWorkspaceRelativePath(filePath),
+                maxSnapshots,
+                retainedSnapshots: retainedEntries,
+            };
+        } catch (error) {
+            return {
+                persisted: /** @type {const} */ (false),
+                error: sanitizeError(error),
+                path: toWorkspaceRelativePath(filePath),
+            };
+        }
     }
+
+    /** @param {{limit?:number}} [options] */
+    async function readHistory(options = {}) {
+        const limit = readBoundedInteger(options.limit, 20, 1, 500);
+        try {
+            const tail = await store.readTail({
+                maxLines: Math.min(10_000, Math.max(limit, limit * 10)),
+                maxBytes: MAX_LATENCY_HISTORY_READ_BYTES,
+            });
+            const entries = tail.records
+                .map(normalizeHistoryEntry)
+                .filter((entry) => entry !== null)
+                .slice(-limit);
+            return {
+                ok: /** @type {const} */ (true),
+                path: toWorkspaceRelativePath(filePath),
+                entries: /** @type {McpLatencyHistoryEntry[]} */ (entries),
+            };
+        } catch (error) {
+            if (isNotFoundError(error)) {
+                return { ok: /** @type {const} */ (true), path: toWorkspaceRelativePath(filePath), entries: [] };
+            }
+            return {
+                ok: /** @type {const} */ (false),
+                path: toWorkspaceRelativePath(filePath),
+                error: sanitizeError(error),
+                entries: /** @type {[]} */ ([]),
+            };
+        }
+    }
+
+    return Object.freeze({ appendSnapshot, readHistory });
 }
 
+const MCP_LATENCY_HISTORY_RUNTIME = createMcpLatencyHistoryRuntime({
+    filePath: MCP_LATENCY_HISTORY_PATH,
+    io: MCP_LATENCY_HISTORY_IO,
+});
+
 /**
- * @param {{ limit?: number; filePath?: string }} [options]
- * @returns {Promise<
- *     | { ok: true; path: string; entries: McpLatencyHistoryEntry[] }
- *     | { ok: false; path: string; error: string; entries: [] }
- * >}
+ * @param {McpLatencyDashboardSnapshot} snapshot
+ * @param {{ maxSnapshots?: number }} [options]
  */
+export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) {
+    return MCP_LATENCY_HISTORY_RUNTIME.appendSnapshot(snapshot, options);
+}
+
+/** @param {{ limit?: number }} [options] */
 export async function readMcpLatencyDashboardHistory(options = {}) {
-    const filePath = getLatencyHistoryPath(options.filePath);
-    const limit = readBoundedInteger(options.limit, 20, 1, 500);
-    try {
-        const tail = await readJsonlTailTrusted(filePath, {
-            caller: 'mcp.control-plane.latency-history',
-            maxLines: Math.min(10_000, Math.max(limit, limit * 10)),
-            maxBytes: MAX_LATENCY_HISTORY_READ_BYTES,
-        });
-        const entries = tail.records
-            .map(normalizeHistoryEntry)
-            .filter((entry) => entry !== null)
-            .slice(-limit);
-        return { ok: true, path: toWorkspaceRelativePath(filePath), entries };
-    } catch (error) {
-        if (isNotFoundError(error)) return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [] };
-        return { ok: false, path: toWorkspaceRelativePath(filePath), error: sanitizeError(error), entries: [] };
-    }
+    return MCP_LATENCY_HISTORY_RUNTIME.readHistory(options);
 }
 
 /**
@@ -157,14 +187,6 @@ export function compareMcpLatencyDashboardSnapshots(current, previous) {
 }
 
 /**
- * @param {string | undefined} overridePath
- * @returns {string}
- */
-function getLatencyHistoryPath(overridePath) {
-    return overridePath ?? path.join(getMcpWorkspaceRoot(), DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH);
-}
-
-/**
  * @param {McpLatencyDashboardSnapshot} snapshot
  * @returns {McpLatencyDashboardSnapshot}
  */
@@ -181,25 +203,6 @@ function compactSnapshot(snapshot) {
     if (snapshot.budgets !== undefined) compact.budgets = snapshot.budgets;
     if (snapshot.phaseTotals !== undefined) compact.phaseTotals = snapshot.phaseTotals;
     return compact;
-}
-
-/**
- * @param {string} filePath
- * @param {number} maxSnapshots
- * @returns {Promise<number>}
- */
-async function trimLatencyHistoryFile(filePath, maxSnapshots) {
-    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.latency-history' })).content;
-    const lines = raw.split('\n').filter((line) => line.trim());
-    if (lines.length <= maxSnapshots) return lines.length;
-    const retained = lines.slice(-maxSnapshots);
-    await writeFileAtomic(filePath, `${retained.join('\n')}\n`, {
-        encoding: 'utf8',
-        mode: 0o600,
-        riskClass: 'low',
-        advisoryLimits: { domain: 'mcp-latency-history-trim', maxSnapshots },
-    });
-    return retained.length;
 }
 
 /**

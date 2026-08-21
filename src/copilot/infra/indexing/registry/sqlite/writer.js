@@ -10,12 +10,12 @@
 
 import { toError } from '#copilot/core';
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
+import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser/parse';
 import { sha256 } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { basename, extname } from 'node:path';
 import { classifyContentKind, countLines, iterateLineChunks, SYMBOL_EXTENSIONS } from './content.js';
-import { buildIndexPathTreeRange, normalizeIndexPath, normalizeRelativePath } from './paths.js';
+import { buildIndexPathTreeRange, normalizeIndexPath, normalizeRelativePath } from './path/index.js';
 
 /** @typedef {ReturnType<typeof import('./statements.js').createIoIndexStatements>} IoIndexStatements */
 
@@ -27,9 +27,18 @@ import { buildIndexPathTreeRange, normalizeIndexPath, normalizeRelativePath } fr
  *     now: () => number;
  *     buildIndexMetadataJson: (filePath: string, metadata: Record<string, unknown> | undefined, fingerprint: Record<string, unknown>) => string;
  *     assertCurrentFileSnapshot: (filePath: string, snapshot: { sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number }, context: { action: string; attempt: number }) => Promise<void>;
+ *     parserWorkerRuntime?: ReturnType<typeof import('../../parser/worker/index.js').createParserWorkerRuntime>;
  * }} context
  */
-export function createIoIndexWriter({ db, statements, stats, now, buildIndexMetadataJson, assertCurrentFileSnapshot }) {
+export function createIoIndexWriter({
+    db,
+    statements,
+    stats,
+    now,
+    buildIndexMetadataJson,
+    assertCurrentFileSnapshot,
+    parserWorkerRuntime,
+}) {
     const {
         stmtDeleteFile,
         stmtDeleteFts,
@@ -110,11 +119,10 @@ export function createIoIndexWriter({ db, statements, stats, now, buildIndexMeta
         let parseError = symbols?.parseError ?? /** @type {string | null} */ (null);
         if (SYMBOL_EXTENSIONS.has(extension) && !symbols) {
             try {
-                symbols = await parseFileSymbols(
-                    filePath,
-                    input.content,
-                    internal.signal ? { signal: internal.signal } : {},
-                );
+                symbols = await parseFileSymbols(filePath, input.content, {
+                    ...(internal.signal ? { signal: internal.signal } : {}),
+                    ...(parserWorkerRuntime ? { workerRuntime: parserWorkerRuntime } : {}),
+                });
                 parseError = symbols.parseError;
             } catch (error) {
                 internal.signal?.throwIfAborted();

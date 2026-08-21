@@ -1,5 +1,3 @@
 // @ts-check
-/** Private indexing test-control aggregator. */
-export { resetParserCacheForTest } from './parser/test-control.js';
-export { resetIoIndexForTest } from './registry/test-control.js';
+/** Index/parser state is runtime-owned; only subprocess discovery retains process test-control. */
 export { resetSearchSubprocessCacheForTest } from './search/test-control.js';

@@ -9,12 +9,6 @@
  * @see EventBus
  */
 
-import {
-    listDirectoryNamesFreshTrusted,
-    readTextFreshTrusted,
-    statPathTrusted,
-    watchPathTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { logSwallowed, toError } from '../core/error-handlers.js';
@@ -42,7 +36,7 @@ const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.y
  * arquivo monitorado é modificado.
  *
  * @example
- *     const loader = new PinnedFilesLoader(['./context', './docs/pinned']);
+ *     const loader = new PinnedFilesLoader({ dirs: ['./context', './docs/pinned'], io });
  *     await loader.start();
  *     loader.on('changed', ({ file, content, type }) => console.log(file, type));
  *     const files = loader.getFiles();
@@ -52,6 +46,9 @@ const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.y
 export class PinnedFilesLoader extends EventEmitter {
     /** @type {string[]} */
     #dirs;
+
+    /** @type {ReturnType<typeof import('#copilot/infra/public/composition/filesystem/configured').createConfiguredFsIo>} */
+    #io;
 
     /** @type {Map<string, PinnedFile>} */
     #files = new Map();
@@ -66,11 +63,15 @@ export class PinnedFilesLoader extends EventEmitter {
     #started = false;
 
     /**
-     * @param {string[]} dirs - Diretórios a monitorar. Caminhos inexistentes são ignorados silenciosamente.
+     * The loader receives already-authorized IO. Authority is composed by the boot/config owner, never minted from
+     * constructor paths inside this operational resource.
+     *
+     * @param {{ dirs:string[]; io:ReturnType<typeof import('#copilot/infra/public/composition/filesystem/configured').createConfiguredFsIo> }} binding
      */
-    constructor(dirs) {
+    constructor(binding) {
         super();
-        this.#dirs = dirs.filter(Boolean);
+        this.#dirs = binding.dirs.filter(Boolean);
+        this.#io = binding.io;
     }
 
     /**
@@ -141,7 +142,7 @@ export class PinnedFilesLoader extends EventEmitter {
     async #loadDir(dir) {
         let entries;
         try {
-            entries = (await listDirectoryNamesFreshTrusted(dir, { caller: 'config.pinned-files' })).entries;
+            entries = (await this.#io.listDirectoryNamesFresh(dir)).entries;
         } catch (e) {
             logSwallowed(e, 'config.pinnedFiles.readdir');
             return;
@@ -151,7 +152,7 @@ export class PinnedFilesLoader extends EventEmitter {
             if (!SUPPORTED_EXTENSIONS.some((ext) => entry.endsWith(ext))) continue;
             const filePath = join(dir, entry);
             try {
-                const info = (await statPathTrusted(filePath, { caller: 'config.pinned-files' })).stats;
+                const info = (await this.#io.statPath(filePath)).stats;
                 if (!info.isFile()) continue;
                 await this.#loadFile(filePath);
             } catch (e) {
@@ -168,7 +169,7 @@ export class PinnedFilesLoader extends EventEmitter {
      */
     async #loadFile(filePath) {
         try {
-            const content = (await readTextFreshTrusted(filePath, { caller: 'config.pinned-files' })).content;
+            const content = (await this.#io.readTextFresh(filePath)).content;
             this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
         } catch (e) {
             logSwallowed(e, 'config.pinnedFiles.loadFile');
@@ -181,27 +182,27 @@ export class PinnedFilesLoader extends EventEmitter {
     async #startWatchers() {
         for (const dir of this.#dirs) {
             try {
-                await statPathTrusted(dir, { caller: 'config.pinned-files' });
+                await this.#io.statPath(dir);
             } catch {
                 continue;
             }
 
             // Node 19.1+ suporta fs.watch recursive também em Linux. No Node 24 do projeto, tentamos a primitive nativa
             // primeiro e só mantemos o fan-out manual como fallback para filesystems/plataformas que rejeitem a opção.
-            if (this.#tryStartRecursiveWatcher(dir)) continue;
+            if (await this.#tryStartRecursiveWatcher(dir)) continue;
             await this.#startFallbackWatchers(dir);
         }
     }
 
     /**
      * @param {string} dir
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
-    #tryStartRecursiveWatcher(dir) {
+    async #tryStartRecursiveWatcher(dir) {
         try {
-            const watcher = watchPathTrusted(
+            const watcher = await this.#io.watchPath(
                 dir,
-                { caller: 'config.pinned-files', persistent: false, recursive: true },
+                { persistent: false, recursive: true },
                 (_eventType, filename) => {
                     if (!filename) return;
                     const relativeName = String(filename);
@@ -226,33 +227,29 @@ export class PinnedFilesLoader extends EventEmitter {
      */
     async #startFallbackWatchers(dir) {
         try {
-            const rootWatcher = watchPathTrusted(
-                dir,
-                { caller: 'config.pinned-files', persistent: false },
-                (_eventType, filename) => {
-                    if (!filename) return;
-                    const name = String(filename);
-                    if (!SUPPORTED_EXTENSIONS.some((ext) => name.endsWith(ext))) return;
-                    this.#scheduleReload(join(dir, name));
-                },
-            );
+            const rootWatcher = await this.#io.watchPath(dir, { persistent: false }, (_eventType, filename) => {
+                if (!filename) return;
+                const name = String(filename);
+                if (!SUPPORTED_EXTENSIONS.some((ext) => name.endsWith(ext))) return;
+                this.#scheduleReload(join(dir, name));
+            });
             this.#registerWatcher(dir, rootWatcher, 'fallback-root');
 
-            const entries = (await listDirectoryNamesFreshTrusted(dir, { caller: 'config.pinned-files' })).entries;
+            const entries = (await this.#io.listDirectoryNamesFresh(dir)).entries;
             for (const entry of entries) {
                 const subPath = join(dir, entry);
                 let info;
                 try {
-                    info = (await statPathTrusted(subPath, { caller: 'config.pinned-files' })).stats;
+                    info = (await this.#io.statPath(subPath)).stats;
                 } catch (err) {
                     logSwallowed(err, 'config.pinnedFiles.watchSubdirStat');
                     continue;
                 }
                 if (!info.isDirectory()) continue;
                 try {
-                    const subWatcher = watchPathTrusted(
+                    const subWatcher = await this.#io.watchPath(
                         subPath,
-                        { caller: 'config.pinned-files', persistent: false },
+                        { persistent: false },
                         (_eventType, filename) => {
                             if (!filename) return;
                             const name = String(filename);
@@ -301,7 +298,7 @@ export class PinnedFilesLoader extends EventEmitter {
 
             let fileExists = true;
             try {
-                await statPathTrusted(filePath, { caller: 'config.pinned-files' });
+                await this.#io.statPath(filePath);
             } catch {
                 fileExists = false;
             }
@@ -317,7 +314,7 @@ export class PinnedFilesLoader extends EventEmitter {
             }
 
             try {
-                const content = (await readTextFreshTrusted(filePath, { caller: 'config.pinned-files' })).content;
+                const content = (await this.#io.readTextFresh(filePath)).content;
                 const existed = this.#files.has(filePath);
                 this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
                 const type = existed ? 'changed' : 'added';

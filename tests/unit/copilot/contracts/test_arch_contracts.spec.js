@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'vitest';
-import { checkCopilotTrustedIoBoundaries } from '../../../../scripts/ci/check-copilot-trusted-io-boundaries.mjs';
+import { checkCopilotNoTrustedIo } from '../../../../scripts/ci/check-copilot-no-trusted-io.mjs';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 
@@ -811,13 +811,14 @@ describe('IO-038 — writers síncronos diretos possuem allowlist formal', () =>
     });
 });
 
-describe('IO-014 — IO portable/trusted possui capability pública explícita', () => {
-    it('trusted-io coincide exatamente com a política declarativa fail-closed', async () => {
-        const report = await checkCopilotTrustedIoBoundaries();
-        assert.deepEqual(report.issues, [], `Drift de trusted-io:\n${report.issues.join('\n')}`);
+describe('IO-014 — generic trusted IO foi eliminado', () => {
+    it('não permite alias, implementação nem referência source para trusted filesystem', async () => {
+        const report = await checkCopilotNoTrustedIo();
+        assert.deepEqual(report.issues, [], `Regressão de trusted IO:\n${report.issues.join('\n')}`);
         assert.equal(report.ok, true);
-        assert.equal(report.importerCount, report.policyEntries);
-        assert.ok(report.importerCount > 0, 'A política trusted-io deve cobrir ao menos um boundary explícito.');
+        assert.equal(report.forbiddenImportReferences, 0);
+        assert.equal(report.forbiddenAliases, 0);
+        assert.equal(report.forbiddenImplementationPaths, 0);
     });
 
     it('capability portable permanece interna a infra e fora da facade workspace-facing', () => {

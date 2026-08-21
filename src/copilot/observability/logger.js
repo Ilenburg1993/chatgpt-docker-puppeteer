@@ -14,11 +14,7 @@
  * @see EventBus
  */
 
-import {
-    deleteFileTrusted,
-    listDirectoryNamesFreshTrusted,
-    lstatPathTrusted,
-} from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +48,15 @@ export const LOG_DIR = COPILOT_LOG_DIR
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');
 const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
+const LOGGER_RETENTION_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'observability.logger.retention',
+        roots: [LOG_DIR],
+        operations: ['delete', 'list', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -74,16 +79,15 @@ function isMissingPathError(error) {
 }
 
 /**
- * Remove archives antigos fora do hot path. Deletions passam pelo trusted IO para preservar lock, invalidation e
- * namespace durability mesmo quando COPILOT_LOG_DIR aponta para fora do workspace.
+ * Remove archives antigos fora do hot path. A capability é bound uma vez ao LOG_DIR resolvido no bootstrap; nomes
+ * derivados da listagem continuam sujeitos a root containment, symlink deny e locks do configured backend.
  *
  * @param {string} prefix
  * @returns {Promise<void>}
  */
 async function cleanOldFiles(prefix) {
     try {
-        const entries = (await listDirectoryNamesFreshTrusted(LOG_DIR, { caller: 'observability.logger.retention' }))
-            .entries;
+        const entries = (await LOGGER_RETENTION_IO.listDirectoryNamesFresh(LOG_DIR)).entries;
         const candidates = entries.filter(
             (entryName) => entryName.startsWith(prefix) && (entryName.endsWith('.log') || entryName.includes('.bak.')),
         );
@@ -91,7 +95,7 @@ async function cleanOldFiles(prefix) {
             await Promise.all(
                 candidates.map(async (entryName) => {
                     const filePath = path.join(LOG_DIR, entryName);
-                    const stats = await lstatPathTrusted(filePath, { caller: 'observability.logger.retention' })
+                    const stats = await LOGGER_RETENTION_IO.lstatPath(filePath)
                         .then((result) => result.stats)
                         .catch(() => null);
                     return stats?.isFile() && !stats.isSymbolicLink() ? { name: entryName, time: stats.mtimeMs } : null;
@@ -101,10 +105,7 @@ async function cleanOldFiles(prefix) {
             .filter((entry) => entry !== null)
             .sort((left, right) => right.time - left.time);
         for (const entry of files.slice(MAX_ARCHIVES)) {
-            await deleteFileTrusted(path.join(LOG_DIR, entry.name), {
-                caller: 'observability.logger.retention',
-                ignoreMissing: true,
-            });
+            await LOGGER_RETENTION_IO.deleteFile(path.join(LOG_DIR, entry.name), { ignoreMissing: true });
         }
     } catch (error) {
         if (isMissingPathError(error)) return;

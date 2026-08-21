@@ -1,54 +1,66 @@
+// @ts-check
+
+import { createIoL2CacheRuntime, getIoL2CacheConfiguration } from '#copilot/infra/internal/cache/l2';
+import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import {
-    getIoL2Cache,
-    getIoL2CacheConfiguration,
-    getIoL2CacheHealth,
-    getIoL2CacheStats,
-} from '#copilot/infra/internal/cache';
-import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
-import { listShutdownHandlers, SHUTDOWN_PRIORITY } from '../../../../src/copilot/core/index.js';
+import { listShutdownHandlers } from '../../../../src/copilot/core/index.js';
 import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/observability/health.js';
 
-import { resetInfraSqliteProviderForTest, resetIoL2CacheForTest } from '#copilot/infra/public/testing';
 /** @type {import('better-sqlite3').Database | null} */
 let testDb = null;
+/** @type {ReturnType<typeof createIoL2CacheRuntime> | null} */
+let l2Runtime = null;
+/** @type {ReturnType<typeof createInfraSqliteProviderBinding> | null} */
+let databaseBinding = null;
 
-describe('io-cache-l2-registry', () => {
+function requireL2Runtime() {
+    if (!l2Runtime) throw new Error('test L2 runtime is not initialized');
+    return l2Runtime;
+}
+
+function recreateL2Runtime() {
+    l2Runtime?.dispose();
+    if (!databaseBinding) throw new Error('test database binding is not initialized');
+    l2Runtime = createIoL2CacheRuntime({
+        database: databaseBinding,
+        runtimeId: `test-l2-${Date.now()}-${Math.random()}`,
+        configuration: getIoL2CacheConfiguration(),
+    });
+    return l2Runtime;
+}
+
+describe('io-cache-l2 runtime ownership', () => {
     beforeEach(() => {
-        resetInfraSqliteProviderForTest();
         testDb = new Database(':memory:');
-        configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+        databaseBinding = createInfraSqliteProviderBinding(
+            () => /** @type {import('better-sqlite3').Database} */ (testDb),
+        );
+        recreateL2Runtime();
     });
 
     afterEach(() => {
-        delete process.env['IO_L2_CACHE_ENABLED'];
         delete process.env['IO_L2_CACHE_PROFILE'];
         delete process.env['IO_L2_CACHE_TTL_MS'];
         delete process.env['IO_L2_CACHE_MAX_ENTRIES'];
         delete process.env['IO_L2_CACHE_PRUNE_MS'];
         delete process.env['IO_L2_CACHE_MIN_BYTES'];
-        resetIoL2CacheForTest();
-        resetInfraSqliteProviderForTest();
+        l2Runtime?.dispose();
+        l2Runtime = null;
+        databaseBinding = null;
         if (testDb?.open) testDb.close();
         testDb = null;
     });
 
     it('returns disabled status and health contract by default', () => {
-        const stats = getIoL2CacheStats();
+        const stats = requireL2Runtime().stats();
         expect(stats.enabled).toBe(false);
         expect('reason' in stats ? stats.reason : undefined).toBe('disabled');
 
-        const health = getIoL2CacheHealth();
+        const health = requireL2Runtime().health();
         expect(health.available).toBe(false);
         expect(health.reason).toBe('disabled');
-    });
-
-    it.each(['1', 'true', 'yes', 'on'])('accepts %s as an enabled boolean value', (value) => {
-        process.env['IO_L2_CACHE_ENABLED'] = value;
-        const health = getIoL2CacheHealth();
-        expect(health.reason).not.toBe('disabled');
     });
 
     it('uses conservative defaults for the experimental profile', () => {
@@ -66,20 +78,18 @@ describe('io-cache-l2-registry', () => {
         });
     });
 
-    it('registers persistence before the database shutdown handler', () => {
-        getIoL2Cache();
+    it('does not register process shutdown handlers when materialized', () => {
+        process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
+        recreateL2Runtime();
+        const before = listShutdownHandlers().filter((entry) => entry.name.includes('io-l2'));
 
-        expect(listShutdownHandlers()).toContainEqual(
-            expect.objectContaining({
-                name: 'copilot-io-l2.flush',
-                priority: SHUTDOWN_PRIORITY.CACHE_PERSISTENCE,
-            }),
-        );
-        expect(SHUTDOWN_PRIORITY.CACHE_PERSISTENCE).toBeLessThan(SHUTDOWN_PRIORITY.DATABASE);
+        expect(requireL2Runtime().get()).not.toBeNull();
+
+        const after = listShutdownHandlers().filter((entry) => entry.name.includes('io-l2'));
+        expect(after).toEqual(before);
     });
 
-    it('lets the explicit profile override the legacy enable flag', () => {
-        process.env['IO_L2_CACHE_ENABLED'] = 'true';
+    it('keeps explicit off as the single disabled configuration', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'off';
 
         expect(getIoL2CacheConfiguration()).toMatchObject({
@@ -89,35 +99,48 @@ describe('io-cache-l2-registry', () => {
         });
     });
 
-    it('reconfigures the live cache when the explicit profile changes', () => {
+    it('freezes the profile for a live runtime and captures changes only in a new runtime', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
-        const experimental = getIoL2Cache();
-        experimental?.set({ key: 'pending', path: '/tmp/pending', payload: 'pending' });
+        recreateL2Runtime();
+        const experimental = requireL2Runtime().get();
+        expect(experimental?.ttlMs).toBe(60_000);
 
         process.env['IO_L2_CACHE_PROFILE'] = 'on';
-        const on = getIoL2Cache();
+        expect(requireL2Runtime().get()).toBe(experimental);
+        expect(requireL2Runtime().snapshot()).toMatchObject({ profile: 'experimental' });
 
-        expect(experimental?.ttlMs).toBe(60_000);
-        expect(experimental?.getStats()).toMatchObject({ pendingSets: 0, batchedRows: 1 });
+        recreateL2Runtime();
+        const on = requireL2Runtime().get();
         expect(on?.ttlMs).toBe(300_000);
         expect(on).not.toBe(experimental);
+        expect(requireL2Runtime().snapshot()).toMatchObject({ profile: 'on' });
     });
 
-    it('fails closed and emits a health alert for invalid profiles', () => {
+    it('fails closed and emits a runtime-owned health alert for invalid profiles', async () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'turbo';
+        recreateL2Runtime();
 
-        expect(getIoL2CacheStats()).toMatchObject({
+        expect(requireL2Runtime().stats()).toMatchObject({
             enabled: false,
             reason: 'invalid-profile',
             profile: 'invalid',
             configurationValid: false,
             rawProfile: 'turbo',
         });
-        expect(readIoRuntimeHealthSnapshot().alerts).toContainEqual(
-            expect.objectContaining({
-                code: 'IO_L2_PROFILE_INVALID',
-                severity: 'high',
-            }),
-        );
+
+        const runtime = createInfraRuntime({
+            runtimeId: 'invalid-l2-health-test',
+            sqliteProvider: () => /** @type {import('better-sqlite3').Database} */ (testDb),
+        });
+        try {
+            expect(readIoRuntimeHealthSnapshot(runtime).alerts).toContainEqual(
+                expect.objectContaining({
+                    code: 'IO_L2_PROFILE_INVALID',
+                    severity: 'high',
+                }),
+            );
+        } finally {
+            await runtime.dispose();
+        }
     });
 });

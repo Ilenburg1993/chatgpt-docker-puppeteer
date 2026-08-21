@@ -1,6 +1,11 @@
 // @ts-check
 import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
-import { bufferIsUtf8, concatBufferViews, decodeUtf8Buffer, utf8ByteLength } from '#copilot/infra/public/platform';
+import {
+    bufferIsUtf8,
+    concatBufferViews,
+    decodeUtf8Buffer,
+    utf8ByteLength,
+} from '#copilot/infra/public/platform/buffer';
 import { publishIoOperation } from '#copilot/infra/public/telemetry';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';

@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { probeHealth } from './cli-probe.js';
-import { ensureDetachedProcess, readPidFileStatus, readProcessMetadata, stopPidFileProcess } from './cli-process.js';
+import { createCloudflareManagedProcessController } from './cli-process.js';
 import { buildManagedTunnelArgs, buildQuickTunnelArgs, extractTryCloudflareUrl } from './config.js';
 
 /**
@@ -26,8 +26,9 @@ export function selectMcpOriginTransport(config, env = process.env) {
  */
 export async function startManagedStack({ config, env = process.env, restart = false }) {
     const originTransport = selectMcpOriginTransport(config, env);
+    const processes = createCloudflareManagedProcessController(config);
     if (restart) {
-        const stopResult = await stopManagedStack(config);
+        const stopResult = await stopManagedStackWithController(processes);
         if (stopResult['ok'] !== true) {
             return {
                 ok: false,
@@ -39,20 +40,16 @@ export async function startManagedStack({ config, env = process.env, restart = f
             };
         }
     }
-    const mcpHttp = await ensureDetachedProcess({
+    const mcpHttp = await processes.mcpHttp.ensure({
         name: 'mcp-http',
         command: process.execPath,
         args: ['src/copilot/mcp/cli.js', '--transport', originTransport],
-        pidFile: config.mcpHttpPidFile,
-        logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
         env: buildMcpHttpEnvironment(config, originTransport, env),
     });
-    const cloudflared = await ensureDetachedProcess({
+    const cloudflared = await processes.cloudflared.ensure({
         name: 'cloudflared',
         command: 'cloudflared',
         args: buildManagedTunnelArgs(env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config),
-        pidFile: config.managedTunnelPidFile,
-        logFile: 'src/copilot/.ai/cloudflare/cloudflared.log',
         env: buildCloudflaredEnvironment(config, env),
     });
     return {
@@ -71,8 +68,13 @@ export async function startManagedStack({ config, env = process.env, restart = f
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function stopManagedStack(config) {
-    const cloudflared = await stopPidFileProcess(config.managedTunnelPidFile);
-    const mcpHttp = await stopPidFileProcess(config.mcpHttpPidFile);
+    return stopManagedStackWithController(createCloudflareManagedProcessController(config));
+}
+
+/** @param {ReturnType<typeof createCloudflareManagedProcessController>} processes */
+async function stopManagedStackWithController(processes) {
+    const cloudflared = await processes.cloudflared.stop();
+    const mcpHttp = await processes.mcpHttp.stop();
     return { ok: cloudflared.stopped && mcpHttp.stopped, cloudflared, mcpHttp };
 }
 
@@ -138,11 +140,11 @@ export async function buildOriginRuntimeReport(
     return buildRuntimeReport(config, originTransport, env);
 }
 
-/** @returns {{ mcpHttpLog: string; cloudflaredLog: string }} */
-export function buildCloudflareLogReport() {
+/** @param {import('./config.js').CloudflareTunnelConfig} config */
+export function buildCloudflareLogReport(config) {
     return {
-        mcpHttpLog: 'src/copilot/.ai/cloudflare/mcp-http.log',
-        cloudflaredLog: 'src/copilot/.ai/cloudflare/cloudflared.log',
+        mcpHttpLog: config.mcpHttpLogFile,
+        cloudflaredLog: config.managedTunnelLogFile,
     };
 }
 
@@ -183,7 +185,7 @@ function buildRuntimeReport(config, originTransport, env) {
         originTransport,
         edgeTransportProtocol: config.transportProtocol,
         metrics: buildCloudflareMetricsReport(config),
-        logs: buildCloudflareLogReport(),
+        logs: buildCloudflareLogReport(config),
         authMode: env['COPILOT_MCP_AUTH_MODE'] ?? null,
     };
 }
@@ -213,5 +215,3 @@ function buildCloudflaredEnvironment(config, env) {
         TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto',
     };
 }
-
-export { readPidFileStatus, readProcessMetadata };

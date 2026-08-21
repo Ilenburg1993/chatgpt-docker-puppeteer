@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 2,
+  "policy": "copilot-configured-fs-grants-explicit-owner-authority-shape",
+  "configuredFsSpecifiers": [
+    "#copilot/infra/internal/filesystem/configured",
+    "#copilot/infra/public/composition/filesystem/configured"
+  ],
+  "entries": [
+    {
+      "file": "src/copilot/agent/lifecycle/state/state-file-io.js",
+      "classification": "agent-state",
+      "grants": [
+        {
+          "id": "agent.lifecycle.state-file-io",
+          "pathMode": "exact",
+          "operations": ["delete", "mkdir", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns the exact agent lifecycle state directory and state-file capability."
+    },
+    {
+      "file": "src/copilot/agent/session/state/snapshot-store.js",
+      "classification": "agent-state",
+      "grants": [
+        {
+          "id": "agent.session.state.snapshot-store",
+          "pathMode": "roots",
+          "operations": ["delete", "list", "read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns the configured session-snapshot root; snapshot filenames remain schema-validated by the store."
+    },
+    {
+      "file": "src/copilot/model-gateway/health/provider-health.js",
+      "classification": "model-gateway-state",
+      "grants": [
+        {
+          "id": "model-gateway.health.provider-health.persistence",
+          "pathMode": "exact",
+          "operations": ["read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds provider-health persistence once to a bootstrap configuration snapshot. The process-global health ledger remains storage-neutral; tests may inject an already-authorized persistence store without changing env/path authority per hydrate or flush."
+    },
+    {
+      "file": "src/copilot/model-gateway/routing/selection-trace.js",
+      "classification": "model-gateway-state",
+      "grants": [
+        {
+          "id": "model-gateway.routing.selection-trace",
+          "pathMode": "roots",
+          "operations": ["delete", "list", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns one configured trace root. Runtime operations may choose only normalized trace file basenames; alternate roots require an explicitly injected store carrying already-authorized IO, and terminal --trace-dir retargeting is rejected."
+    },
+    {
+      "file": "src/copilot/model-gateway/automation/policy.js",
+      "classification": "model-gateway-state",
+      "grants": [
+        {
+          "id": "model-gateway.automation.policy",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Production owns one exact runtime-automation policy file. Alternate paths require an explicitly injected store carrying already-authorized IO; read/write operations no longer accept filePath overrides."
+    },
+    {
+      "file": "src/copilot/config/declarative-runtime-config.js",
+      "classification": "runtime-config",
+      "grants": [
+        {
+          "id": "config.declarative-runtime-config",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the exact persistent skills.json runtime configuration file."
+    },
+    {
+      "file": "src/copilot/config/system-prompt/sdk-defaults/snapshot.js",
+      "classification": "runtime-config",
+      "grants": [
+        {
+          "id": "config.system-prompt.sdk-defaults.snapshot",
+          "pathMode": "exact",
+          "operations": ["write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Writes only the exact date-stamped SDK-default metadata snapshot selected at script startup."
+    },
+    {
+      "file": "src/copilot/config/system-prompt/live-loader.js",
+      "classification": "runtime-config",
+      "grants": [
+        {
+          "id": "config.system-prompt.live-loader.sections",
+          "pathMode": "exact",
+          "operations": ["stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds live-reload metadata checks to the exact section modules declared by the internal section registry; operational section transforms cannot retarget filesystem authority."
+    },
+    {
+      "file": "src/copilot/config/system-prompt/status.js",
+      "classification": "runtime-config",
+      "grants": [
+        {
+          "id": "config.system-prompt.status.sections",
+          "pathMode": "exact",
+          "operations": ["stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only exact section-source metadata status; user append-file status is delegated to resolver-bound authority in user-config instead of minting a second capability."
+    },
+    {
+      "file": "src/copilot/config/system-prompt/user-config.js",
+      "classification": "runtime-config",
+      "grants": [
+        {
+          "id": "config.system-prompt.user-config.source",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "config.system-prompt.user-config.append-files",
+          "pathMode": "exact",
+          "operations": ["read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Resolves the explicit config source first, then binds exact append-file authority to the resolver-produced configuration object through an unforgeable WeakMap; caller-crafted config objects cannot acquire filesystem authority by naming paths."
+    },
+    {
+      "file": "src/copilot/infra/filesystem/skills/catalog.js",
+      "classification": "infra-owner",
+      "grants": [
+        {
+          "id": "infra.filesystem.skills",
+          "pathMode": "roots",
+          "operations": ["list", "read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns configured skill-directory discovery and canonical SKILL.md reads."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/dev-oauth.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.dev-oauth.storage",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds the finite OAuth control-plane state files from one configuration snapshot; queued persistence captures the resolved store so later configuration changes cannot retarget an in-flight write."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/jobs.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.jobs.artifacts",
+          "pathMode": "roots",
+          "operations": ["append", "list", "mkdir", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "mcp.control-plane.jobs.cgroup",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "mcp.control-plane.jobs.focused-tests",
+          "pathMode": "roots",
+          "operations": ["stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Separates validator job artifacts, exact cgroup telemetry files and focused-test existence checks into independent bound capabilities; job UUID/path validation remains in the owner and exclusive log creation uses configured failIfExists atomic publish."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/ai-artifacts.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.ai-artifacts",
+          "pathMode": "roots",
+          "operations": ["list", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds AI-artifact diagnostics to canonical .ai and rollback roots once; the runtime factory receives already-authorized metadata IO and cannot mint or retarget authority. Cleanup mutations remain owned by their dedicated mutation/rollback capabilities."
+    },
+    {
+      "file": "src/copilot/mcp/adapters/http2.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.adapters.http2.tls-material",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds TLS certificate/private-key reads to the exact paths resolved once from HTTP/2 bootstrap policy; request handling cannot retarget TLS material."
+    },
+    {
+      "file": "src/copilot/mcp/cloudflare/cli-process.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.cloudflare.cli-process",
+          "pathMode": "exact",
+          "operations": ["append", "delete", "mkdir", "move", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns exact managed MCP/cloudflared PID, metadata, log and rotated-log paths bound from Cloudflare config."
+    },
+    {
+      "file": "src/copilot/mcp/cloudflare/edge-backup.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.cloudflare.edge-backup",
+          "pathMode": "roots",
+          "operations": ["list", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns one bootstrap-bound backup directory root for dynamic sanitized snapshot filenames; operational APIs expose no directory override."
+    },
+    {
+      "file": "src/copilot/mcp/cloudflare/remote-api.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.cloudflare.remote-api",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Reads only the exact local Cloudflare environment file used to resolve remote-audit credentials."
+    },
+    {
+      "file": "src/copilot/mcp/cloudflare/state.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.cloudflare.state",
+          "pathMode": "exact",
+          "operations": ["delete", "read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns the exact Cloudflare quick-tunnel and connector-smoke state files."
+    },
+    {
+      "file": "src/copilot/mcp/cloudflare/transport-benchmark-state.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.cloudflare.transport-benchmark-state",
+          "pathMode": "exact",
+          "operations": ["read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Reads one exact transport-benchmark state file without generic trusted filesystem authority."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/audit.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.audit",
+          "pathMode": "exact",
+          "operations": ["append", "read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory", "none"]
+        }
+      ],
+      "reason": "Binds queued batch appends and bounded reads to one bootstrap-resolved immutable MCP audit path; enqueue remains filesystem-free."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/client-latency-evidence.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.client-latency-evidence",
+          "pathMode": "exact",
+          "operations": ["append", "read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns one exact client-latency evidence JSONL path; per-call path redirection is not exposed."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/io-cache-benchmark-state.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.io-cache-benchmark-state",
+          "pathMode": "exact",
+          "operations": ["read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Reads one exact IO-cache benchmark state file without generic trusted filesystem authority."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/latency-history.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.latency-history",
+          "pathMode": "exact",
+          "operations": ["append", "read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns one exact latency-dashboard JSONL path through a bound configured store; production operations expose no file-path override."
+    },
+    {
+      "file": "src/copilot/mcp/control-plane/openai-endpoint-latency.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.control-plane.openai-endpoint-latency",
+          "pathMode": "exact",
+          "operations": ["append", "read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns one exact OpenAI endpoint-latency history JSONL path; per-call path redirection is not exposed."
+    },
+    {
+      "file": "src/copilot/mcp/scripts/scheduled-restart-runner.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.scripts.scheduled-restart-runner",
+          "pathMode": "exact",
+          "operations": ["write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Persists only the exact governed MCP reload-state file used by the detached restart runner."
+    },
+    {
+      "file": "src/copilot/mcp/scripts/stateful-env.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.scripts.stateful-env.file",
+          "pathMode": "exact",
+          "operations": ["chmod", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "mcp.scripts.stateful-env.parent",
+          "pathMode": "exact",
+          "operations": ["mkdir"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds stateful-session env IO to one validated repo-relative file inside src/copilot/.ai/mcp and separates parent mkdir authority from file read/write/stat/chmod authority."
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "classification": "observability-state",
+      "grants": [
+        {
+          "id": "observability.logger.retention",
+          "pathMode": "roots",
+          "operations": ["delete", "list", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds archive retention once to the bootstrap-resolved LOG_DIR, including env override; dynamic archive names come only from the authorized directory listing and remain root-contained."
+    },
+    {
+      "file": "src/copilot/mcp/tools/devcontainer-network-posture.js",
+      "classification": "mcp-control-plane",
+      "grants": [
+        {
+          "id": "mcp.tools.devcontainer-network-posture.fixed",
+          "pathMode": "exact",
+          "operations": ["read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "mcp.tools.devcontainer-network-posture.configured-script",
+          "pathMode": "exact",
+          "operations": ["read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Separates fixed /tmp posture artifacts plus canonical script from the exact env-configured control-plane script snapshot; generic read helpers receive already-authorized IO and cannot mint authority from path arguments."
+    },
+    {
+      "file": "src/copilot/sdk/models/persistent-cache.js",
+      "classification": "sdk-state",
+      "grants": [
+        {
+          "id": "sdk.models.persistent-cache.primary",
+          "pathMode": "exact",
+          "operations": ["delete", "read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        },
+        {
+          "id": "sdk.models.persistent-cache.legacy",
+          "pathMode": "exact",
+          "operations": ["delete", "read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Captures primary + legacy cache paths once from bootstrap configuration. The primary capability owns read/write/delete/stat while the legacy capability is deliberately read/delete-only; each store owns its own mutation queue and operations never re-resolve env paths."
+    },
+    {
+      "file": "src/copilot/sdk/session/session-fs.js",
+      "classification": "sdk-state",
+      "grants": [
+        {
+          "id": "sdk.session.session-fs.state",
+          "pathMode": "roots",
+          "operations": ["stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds existence diagnostics to the boot-configured SessionFs storage root; session paths are derived from validated session storage keys under that root."
+    },
+    {
+      "file": "src/copilot/terminal/commands/byok.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.commands.byok.env-local",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the exact workspace .env.local used by the BYOK profile mutator; terminal command inputs cannot retarget credential persistence."
+    },
+    {
+      "file": "src/copilot/terminal/dev-watch.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.dev-watch",
+          "pathMode": "roots",
+          "operations": ["watch"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the module-derived src/copilot watch root; the former watchPath option was removed so runtime callers cannot retarget the watcher."
+    },
+    {
+      "file": "src/copilot/sdk/tools/custom.js",
+      "classification": "sdk-state",
+      "grants": [
+        {
+          "id": "sdk.tools.custom",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the exact SDK custom-tools persistence file."
+    },
+    {
+      "file": "src/copilot/sdk/tools/state.js",
+      "classification": "sdk-state",
+      "grants": [
+        {
+          "id": "sdk.tools.state",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the exact SDK tools-config persistence file."
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-pinned.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.boot.pinned-context",
+          "pathMode": "roots",
+          "operations": ["list", "read", "stat", "watch"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Boot composes authority once from resolved pinnedContextDirectories and injects already-authorized IO into PinnedFilesLoader; the loader itself cannot mint or retarget filesystem authority."
+    },
+    {
+      "file": "src/copilot/terminal/stores/alias-store.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.stores.alias-store",
+          "pathMode": "exact",
+          "operations": ["read", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Owns only the exact terminal alias persistence file."
+    },
+    {
+      "file": "src/copilot/tools/todo/store.js",
+      "classification": "tool-state",
+      "grants": [
+        {
+          "id": "tools.todo.store.migration",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Reads only the exact legacy todos.json file during bounded one-shot migration into SQLite."
+    }
+  ]
+}

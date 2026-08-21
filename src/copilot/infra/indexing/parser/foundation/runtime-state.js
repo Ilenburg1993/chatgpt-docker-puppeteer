@@ -1,7 +1,14 @@
 // @ts-check
-/** Mutable parser counters shared by sibling parser components. */
+/**
+ * Process-wide parser operational counters.
+ *
+ * The mutable record is deliberately private: sibling parser modules receive narrow mutation commands and health
+ * consumers receive immutable snapshots. This keeps process-global observability without exporting write authority.
+ *
+ * @module copilot/infra/indexing/parser/foundation/runtime-state
+ */
 
-export const parserRuntimeStats = {
+const parserRuntimeStats = {
     budgetExceeded: 0,
     skippedByLineGuard: 0,
     lastParseDurationMs: 0,
@@ -18,17 +25,48 @@ export const parserRuntimeStats = {
     workerRestartFailures: 0,
     workerInitFailures: 0,
     workerInitRecoveries: 0,
-    symbolCacheHits: 0,
-    symbolCacheMisses: 0,
-    symbolCacheStale: 0,
-    symbolSnapshotReads: 0,
-    symbolSuppliedSnapshots: 0,
-    symbolFreshnessChecks: 0,
-    symbolSnapshotPrechecksAvoided: 0,
-    symbolSnapshotConflicts: 0,
 };
 
-export function resetParserRuntimeStatsForTest() {
-    for (const key of /** @type {(keyof typeof parserRuntimeStats)[]} */ (Object.keys(parserRuntimeStats)))
-        parserRuntimeStats[key] = 0;
+/**
+ * @typedef {'budgetExceeded'
+ *     | 'skippedByLineGuard'
+ *     | 'workerRequests'
+ *     | 'workerTimeouts'
+ *     | 'workerFailures'
+ *     | 'workerFallbacks'
+ *     | 'workerQueueRejected'
+ *     | 'workerQueueTimeouts'
+ *     | 'workerRestarts'
+ *     | 'workerRestartFailures'
+ *     | 'workerInitFailures'
+ *     | 'workerInitRecoveries'} ParserRuntimeCounter
+ */
+
+/** @param {ParserRuntimeCounter} counter */
+export function incrementParserRuntimeCounter(counter) {
+    parserRuntimeStats[counter] += 1;
+}
+
+/** @param {number} durationMs */
+export function recordParserRuntimeDuration(durationMs) {
+    parserRuntimeStats.lastParseDurationMs = Math.max(0, Number(durationMs) || 0);
+}
+
+/** @param {number} waitMs */
+export function recordParserWorkerQueueWait(waitMs) {
+    const normalized = Math.max(0, Number(waitMs) || 0);
+    parserRuntimeStats.workerQueueWaitMsLast = normalized;
+    parserRuntimeStats.workerQueueWaitMsMax = Math.max(parserRuntimeStats.workerQueueWaitMsMax, normalized);
+}
+
+/** @param {number} depth */
+export function recordParserWorkerQueueDepth(depth) {
+    parserRuntimeStats.workerQueueHighWater = Math.max(
+        parserRuntimeStats.workerQueueHighWater,
+        Math.max(0, Math.trunc(Number(depth) || 0)),
+    );
+}
+
+export function getParserRuntimeStatsSnapshot() {
+    return Object.freeze({ ...parserRuntimeStats });
 }

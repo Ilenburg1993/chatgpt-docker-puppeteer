@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/remote-api
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import Cloudflare from 'cloudflare';
 import { createHash } from 'node:crypto';
@@ -16,6 +16,14 @@ import {
 } from './origin-request-profile.js';
 
 const DEFAULT_ENV_FILE = '.env.local';
+const REMOTE_API_ENV_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.cloudflare.remote-api',
+        exactPaths: [DEFAULT_ENV_FILE],
+        operations: ['read'],
+        symlinkPolicy: 'deny',
+    }),
+);
 const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 60_000;
 const DEFAULT_ENV_FILE_CACHE_TTL_MS = 2_000;
 
@@ -252,9 +260,7 @@ function createClientCacheKey(value) {
 async function readLocalEnvFile() {
     return localEnvFileCache.getOrLoad(DEFAULT_ENV_FILE, async () => {
         try {
-            return parseEnvFile(
-                (await readTextFreshTrusted(DEFAULT_ENV_FILE, { caller: 'mcp.cloudflare.remote-api' })).content,
-            );
+            return parseEnvFile((await REMOTE_API_ENV_IO.readTextFresh(DEFAULT_ENV_FILE)).content);
         } catch {
             return {};
         }

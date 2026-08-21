@@ -7,14 +7,9 @@
  * local e diagnóstico sem abrir o terminal permanente da LLM-B.
  */
 
-import {
-    buildIoIndexForDirectory,
-    findIoIndexSymbol,
-    getIoIndex,
-    getIoIndexStats,
-    searchIoIndex,
-} from '#copilot/infra/public/indexing';
-import { shutdownParserWorkerPool } from '#copilot/infra/public/indexing/parser';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { shutdownParserWorkerPool } from '#copilot/infra/public/diagnostic/indexing/parser';
+import { closeCopilotDb, ensureCopilotDbDir, getCopilotDb } from '../src/copilot/db/sqlite.js';
 
 /**
  * @typedef {object} BuildCliArgs
@@ -138,14 +133,19 @@ function print(value, json) {
     console.log(value);
 }
 
-async function main() {
+async function main(indexRegistry) {
+    const buildIoIndexForDirectory = indexRegistry.buildDirectory;
+    const clearIoIndex = indexRegistry.clear;
+    const findIoIndexSymbol = indexRegistry.findSymbol;
+    const searchIoIndex = indexRegistry.search;
+    const readIoIndexStatus = indexRegistry.status;
     const rawArgs = process.argv.slice(2);
     const json = rawArgs.includes('--json');
     const args = rawArgs.filter((arg) => arg !== '--json');
     const [cmd = 'status', ...parts] = args;
 
     if (cmd === 'status' || cmd === 'stats') {
-        const stats = getIoIndexStats();
+        const stats = readIoIndexStatus();
         if (json) print(stats, true);
         else {
             if ('files' in stats) {
@@ -208,7 +208,7 @@ async function main() {
     }
 
     if (cmd === 'clear') {
-        getIoIndex()?.clearAll();
+        clearIoIndex();
         print('index: cleared', json);
         return;
     }
@@ -218,7 +218,18 @@ async function main() {
     );
 }
 
-main()
+async function run() {
+    await ensureCopilotDbDir();
+    const runtime = createInfraRuntime({ runtimeId: 'copilot-index-cli', sqliteProvider: getCopilotDb });
+    try {
+        await main(runtime.indexRegistry);
+    } finally {
+        await runtime.dispose();
+        closeCopilotDb();
+    }
+}
+
+run()
     .catch((error) => {
         console.error(error instanceof Error ? error.message : String(error));
         process.exitCode = 1;

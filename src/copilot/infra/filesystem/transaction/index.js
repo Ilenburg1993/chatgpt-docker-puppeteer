@@ -9,24 +9,19 @@
 
 /** @typedef {import('./rollback/index.js').IoRollbackSidecar} IoRollbackSidecar */
 
-export { getIoCapacityPreflightConfiguration, preflightIoCapacity } from './capacity-preflight.js';
+export { preflightIoCapacity, readIoCapacityPreflightConfig } from './capacity-preflight.js';
 export { mkdirPathUnlocked } from './directory/index.js';
 export { runFileHandleOperation } from './file-handle-lifecycle.js';
 export { emitMutationPhase } from './phases/index.js';
 export {
     cleanupExpiredRollbackSidecars,
     cleanupRollbackSidecars,
+    createDefaultIoRollbackPolicy,
     createRollbackSidecarWriter,
-    getIoRollbackPolicy,
-    getRollbackSidecarDirectory,
-    getRollbackSidecarMaxBytes,
-    getRollbackSidecarMaxEntries,
-    getRollbackSidecarTtlMs,
-    isIoRollbackEnabled,
     listRollbackSidecars,
     persistRollbackSidecar,
+    readIoRollbackPolicy,
     readVerifiedRollbackSidecar,
-    shouldCaptureIoRollback,
 } from './rollback/index.js';
 export { readBinaryMutationSnapshot } from './snapshot.js';
 export {

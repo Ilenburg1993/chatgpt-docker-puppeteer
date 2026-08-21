@@ -1,14 +1,42 @@
 // @ts-check
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildAiArtifactsReport, cleanupAiArtifacts } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
+import { createAiArtifactsRuntime } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
 
 /** @type {string[]} */
 const roots = [];
+let runtimeSequence = 0;
+
+/** @param {string} workspaceRoot @param {boolean} [enabled] */
+function rollbackPolicyFor(workspaceRoot, enabled = false) {
+    return {
+        enabled,
+        directory: path.join(workspaceRoot, 'src/copilot/.ai/rollback'),
+        ttlMs: 24 * 60 * 60 * 1000,
+        maxEntries: 32,
+        maxBytes: 32 * 1024 * 1024,
+    };
+}
+
+/** @param {string} workspaceRoot @param {ReturnType<typeof rollbackPolicyFor>} [rollbackPolicy] */
+function createTestAiArtifactsRuntime(workspaceRoot, rollbackPolicy = rollbackPolicyFor(workspaceRoot)) {
+    const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: `test.mcp.ai-artifacts.${++runtimeSequence}`,
+            roots: [aiDir, rollbackPolicy.directory],
+            operations: ['list', 'stat'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    return createAiArtifactsRuntime({ workspaceRoot, rollbackPolicy, io });
+}
 
 afterEach(async () => {
     vi.unstubAllEnvs();
@@ -35,21 +63,12 @@ describe('MCP AI artifact cleanup', () => {
             await utimes(filePath, time, time);
         }
 
-        const dryRun = await cleanupAiArtifacts({
-            workspaceRoot,
-            dryRun: true,
-            retainNewest: 20,
-            maxDeleteCount: 2,
-        });
+        const runtime = createTestAiArtifactsRuntime(workspaceRoot);
+        const dryRun = await runtime.cleanup({ dryRun: true, retainNewest: 20, maxDeleteCount: 2 });
         expect(dryRun['deletedCount']).toBe(0);
         expect((await readdir(jobsDir)).sort()).toEqual([...names].sort());
 
-        const applied = await cleanupAiArtifacts({
-            workspaceRoot,
-            dryRun: false,
-            retainNewest: 20,
-            maxDeleteCount: 2,
-        });
+        const applied = await runtime.cleanup({ dryRun: false, retainNewest: 20, maxDeleteCount: 2 });
         expect(applied['deletedCount']).toBe(2);
         const remaining = await readdir(jobsDir);
         expect(remaining).toHaveLength(names.length - 2);
@@ -73,7 +92,9 @@ describe('MCP AI artifact cleanup', () => {
             await writeFile(path.join(rollbackDir, name), `${name}\n`);
         }
 
-        const report = await buildAiArtifactsReport({ workspaceRoot });
+        const rollbackPolicy = rollbackPolicyFor(workspaceRoot);
+        const runtime = createTestAiArtifactsRuntime(workspaceRoot, rollbackPolicy);
+        const report = await runtime.buildReport();
         const rollback = /** @type {Record<string, unknown>} */ (report['rollback']);
         expect(rollback['enabled']).toBe(false);
         expect(rollback['sidecarCount']).toBe(2);
@@ -83,21 +104,16 @@ describe('MCP AI artifact cleanup', () => {
         expect(rollback['purgeCandidateCount']).toBe(3);
         expect(rollback['maintenanceMutation']).toBe('explicit-only');
 
-        const applied = await cleanupAiArtifacts({
-            workspaceRoot,
-            dryRun: false,
-            retainNewest: 20,
-            maxDeleteCount: 10,
-        });
+        const applied = await runtime.cleanup({ dryRun: false, retainNewest: 20, maxDeleteCount: 10 });
         expect(applied['deletedCount']).toBe(0);
         expect((await readdir(rollbackDir)).sort()).toEqual([expired, active, pending, unknown].sort());
     });
 
     it('purges only recognized rollback artifacts when explicitly requested and automatic rollback is disabled', async () => {
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
         const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'mcp-ai-rollback-purge-'));
         roots.push(workspaceRoot);
         const rollbackDir = path.join(workspaceRoot, 'src/copilot/.ai/rollback');
+        const rollbackPolicy = rollbackPolicyFor(workspaceRoot, false);
         await mkdir(rollbackDir, { recursive: true });
 
         const uuid = '00000000-0000-4000-8000-000000000002';
@@ -107,8 +123,8 @@ describe('MCP AI artifact cleanup', () => {
         const unknown = 'preserve-me.txt';
         for (const name of [sidecar, pending, unknown]) await writeFile(path.join(rollbackDir, name), name);
 
-        const dryRun = await cleanupAiArtifacts({
-            workspaceRoot,
+        const runtime = createTestAiArtifactsRuntime(workspaceRoot, rollbackPolicy);
+        const dryRun = await runtime.cleanup({
             dryRun: true,
             retainNewest: 20,
             maxDeleteCount: 10,
@@ -123,8 +139,7 @@ describe('MCP AI artifact cleanup', () => {
         });
         expect(await readdir(rollbackDir)).toEqual(expect.arrayContaining([sidecar, pending, unknown]));
 
-        const applied = await cleanupAiArtifacts({
-            workspaceRoot,
+        const applied = await runtime.cleanup({
             dryRun: false,
             retainNewest: 20,
             maxDeleteCount: 10,
@@ -145,17 +160,17 @@ describe('MCP AI artifact cleanup', () => {
     });
 
     it('blocks active rollback purge while automatic rollback is enabled', async () => {
-        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
         const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'mcp-ai-rollback-enabled-'));
         roots.push(workspaceRoot);
         const rollbackDir = path.join(workspaceRoot, 'src/copilot/.ai/rollback');
+        const rollbackPolicy = rollbackPolicyFor(workspaceRoot, true);
         await mkdir(rollbackDir, { recursive: true });
         const uuid = '00000000-0000-4000-8000-000000000003';
         const sidecar = `${Date.now() + 60_000}-${'c'.repeat(64)}-${uuid}.rollback`;
         await writeFile(path.join(rollbackDir, sidecar), 'active');
 
-        const applied = await cleanupAiArtifacts({
-            workspaceRoot,
+        const runtime = createTestAiArtifactsRuntime(workspaceRoot, rollbackPolicy);
+        const applied = await runtime.cleanup({
             dryRun: false,
             retainNewest: 20,
             maxDeleteCount: 10,

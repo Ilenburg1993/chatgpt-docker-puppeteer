@@ -10,8 +10,8 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/platform';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/platform/buffer';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,
@@ -802,17 +802,17 @@ async function getKeyMaterial() {
  * @returns {Promise<CryptoKey | import('node:crypto').KeyObject>}
  */
 async function readOrCreatePrivateKey(alg = readDevOAuthSigningAlgorithm()) {
-    const keyFile = readDevOAuthKeyFile(alg);
+    const storage = getDevOAuthStorage();
     if (!isDevOAuthKeyRotationRequested()) {
         try {
-            const pem = (await readTextFreshTrusted(keyFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
+            const pem = await storage.readKey(alg);
             if (pem.trim()) return importPKCS8(pem, alg, { extractable: true });
         } catch {
             // Missing or unreadable key files are repaired by generating a new dev key.
         }
     }
     const { privateKey } = await generateKeyPair(alg, { extractable: true });
-    await persistPrivateKey(keyFile, privateKey);
+    await persistPrivateKey(alg, privateKey, storage);
     return privateKey;
 }
 
@@ -829,14 +829,15 @@ async function exportPublicJwk(privateKey) {
 }
 
 /**
- * @param {string} keyFile
+ * @param {'ES256' | 'RS256'} alg
  * @param {CryptoKey | import('node:crypto').KeyObject} privateKey
+ * @param {DevOAuthStorage} [storage]
  * @returns {Promise<void>}
  */
-async function persistPrivateKey(keyFile, privateKey) {
+async function persistPrivateKey(alg, privateKey, storage = getDevOAuthStorage()) {
     try {
         const pem = await exportPKCS8(privateKey);
-        await writeFileAtomicTrusted(keyFile, pem, { caller: 'mcp.control-plane.dev-oauth', mode: 0o600 });
+        await storage.writeKey(alg, pem);
     } catch {
         // The dev issuer can still operate with an in-memory key; persistence is a stability upgrade, not a hard dependency.
     }
@@ -865,16 +866,17 @@ function isLegacyRsaJwksOverlapEnabled(env = process.env) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {string}
  */
-function readDevOAuthKeyFile(alg = 'RS256') {
+function readDevOAuthKeyFile(alg = 'RS256', env = process.env) {
     if (alg === 'ES256') {
         return (
-            String(process.env['COPILOT_MCP_DEV_OAUTH_ES256_KEY_FILE'] ?? DEFAULT_ES256_KEY_FILE).trim() ||
+            String(env['COPILOT_MCP_DEV_OAUTH_ES256_KEY_FILE'] ?? DEFAULT_ES256_KEY_FILE).trim() ||
             DEFAULT_ES256_KEY_FILE
         );
     }
-    return String(process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] ?? DEFAULT_KEY_FILE).trim() || DEFAULT_KEY_FILE;
+    return String(env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] ?? DEFAULT_KEY_FILE).trim() || DEFAULT_KEY_FILE;
 }
 
 /**
@@ -2067,12 +2069,116 @@ export function readDevOAuthPersistenceConfig(env = process.env) {
 }
 
 /**
+ * @typedef {Readonly<{
+ *     storageConfigKey: string;
+ *     persistenceConfigKey: string;
+ *     keyFiles: Readonly<{ ES256: string; RS256: string }>;
+ *     refreshTokenFile: string;
+ *     clientFile: string;
+ * }>} DevOAuthStorageBinding
+ *
+ * @typedef {Readonly<{
+ *     storageConfigKey: string;
+ *     persistenceConfigKey: string;
+ *     keyFiles: Readonly<{ ES256: string; RS256: string }>;
+ *     refreshTokenFile: string;
+ *     clientFile: string;
+ *     readKey(alg: 'ES256' | 'RS256'): Promise<string>;
+ *     writeKey(alg: 'ES256' | 'RS256', pem: string): Promise<void>;
+ *     readRefreshTokenState(): Promise<string>;
+ *     writeRefreshTokenState(content: string): Promise<void>;
+ *     readClientState(): Promise<string>;
+ *     writeClientState(content: string): Promise<void>;
+ * }>} DevOAuthStorage
+ */
+
+/** @type {DevOAuthStorage | null} */
+let devOAuthStorage = null;
+
+/**
+ * Resolve all privileged OAuth state paths from configuration before any storage operation executes.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {DevOAuthStorageBinding}
+ */
+function resolveDevOAuthStorageBinding(env = process.env) {
+    const persistence = readDevOAuthPersistenceConfig(env);
+    const keyFiles = Object.freeze({
+        ES256: readDevOAuthKeyFile('ES256', env),
+        RS256: readDevOAuthKeyFile('RS256', env),
+    });
+    const persistenceConfigKey = `${persistence.refreshTokenFile}\n${persistence.clientFile}`;
+    return Object.freeze({
+        storageConfigKey: `${keyFiles.ES256}\n${keyFiles.RS256}\n${persistenceConfigKey}`,
+        persistenceConfigKey,
+        keyFiles,
+        refreshTokenFile: persistence.refreshTokenFile,
+        clientFile: persistence.clientFile,
+    });
+}
+
+/**
+ * @param {DevOAuthStorageBinding} binding
+ * @returns {DevOAuthStorage}
+ */
+function createDevOAuthStorage(binding) {
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.control-plane.dev-oauth.storage',
+            exactPaths: [
+                ...new Set([
+                    binding.keyFiles.ES256,
+                    binding.keyFiles.RS256,
+                    binding.refreshTokenFile,
+                    binding.clientFile,
+                ]),
+            ],
+            operations: ['read', 'write'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    return Object.freeze({
+        ...binding,
+        async readKey(alg) {
+            return (await io.readTextFresh(binding.keyFiles[alg])).content;
+        },
+        async writeKey(alg, pem) {
+            await io.writeFileAtomic(binding.keyFiles[alg], pem, { mode: 0o600 });
+        },
+        async readRefreshTokenState() {
+            return (await io.readTextFresh(binding.refreshTokenFile)).content;
+        },
+        async writeRefreshTokenState(content) {
+            await io.writeFileAtomic(binding.refreshTokenFile, content, { mode: 0o600 });
+        },
+        async readClientState() {
+            return (await io.readTextFresh(binding.clientFile)).content;
+        },
+        async writeClientState(content) {
+            await io.writeFileAtomic(binding.clientFile, content, { mode: 0o600 });
+        },
+    });
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {DevOAuthStorage}
+ */
+function getDevOAuthStorage(env = process.env) {
+    const binding = resolveDevOAuthStorageBinding(env);
+    if (!devOAuthStorage || devOAuthStorage.storageConfigKey !== binding.storageConfigKey) {
+        devOAuthStorage = createDevOAuthStorage(binding);
+    }
+    return devOAuthStorage;
+}
+
+/**
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {string}
  */
 function devOAuthPersistenceConfigKey(env = process.env) {
-    const config = readDevOAuthPersistenceConfig(env);
-    return `${config.refreshTokenFile}\n${config.clientFile}`;
+    return getDevOAuthStorage(env).persistenceConfigKey;
 }
 
 /**
@@ -2140,6 +2246,7 @@ export async function readDevOAuthPersistenceStatus(env = process.env) {
  * @returns {void}
  */
 export function resetDevOAuthRuntimeForTests() {
+    devOAuthStorage = null;
     keyMaterialPromise = null;
     authorizationCodes.clear();
     registeredClients.clear();
@@ -2774,14 +2881,14 @@ async function ensureRenewCredentialsLoaded(env = process.env) {
  * @returns {Promise<void>}
  */
 async function loadRenewCredentials(env = process.env) {
-    const { refreshTokenFile } = readDevOAuthPersistenceConfig(env);
+    const storage = getDevOAuthStorage(env);
     renewCredentials.clear();
     renewCredentialsLoaded = false;
     renewCredentialsLoadedFromFile = false;
     renewCredentialsLastLoadedAt = new Date().toISOString();
     renewCredentialsLastPersistenceError = null;
     try {
-        const text = (await readTextFreshTrusted(refreshTokenFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
+        const text = await storage.readRefreshTokenState();
         const parsed = JSON.parse(text);
         const records = parseRefreshTokenRecords(parsed);
         for (const record of records) {
@@ -2809,7 +2916,7 @@ async function loadRenewCredentials(env = process.env) {
             });
         }
         renewCredentialsLoadedFromFile = true;
-        renewCredentialsLoadedConfigKey = devOAuthPersistenceConfigKey(env);
+        renewCredentialsLoadedConfigKey = storage.persistenceConfigKey;
         pruneExpiredRenewCredentials();
         trimRenewCredentials(MAX_REFRESH_TOKEN_RECORDS);
     } catch (error) {
@@ -2818,7 +2925,7 @@ async function loadRenewCredentials(env = process.env) {
             renewCredentialsLastPersistenceError = error instanceof Error ? error.message : String(error);
     } finally {
         renewCredentialsLoaded = true;
-        renewCredentialsLoadedConfigKey ??= devOAuthPersistenceConfigKey(env);
+        renewCredentialsLoadedConfigKey ??= storage.persistenceConfigKey;
     }
 }
 /**
@@ -2905,18 +3012,18 @@ function parseRevokedRefreshTokenFamilyRecords(parsed) {
  * @returns {Promise<void>}
  */
 async function persistRenewCredentials(env = process.env) {
+    const storage = getDevOAuthStorage(env);
     renewCredentialsPersistPromise = renewCredentialsPersistPromise.then(
-        () => writeRenewCredentialsFile(env),
-        () => writeRenewCredentialsFile(env),
+        () => writeRenewCredentialsFile(storage),
+        () => writeRenewCredentialsFile(storage),
     );
     await renewCredentialsPersistPromise;
 }
 /**
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {DevOAuthStorage} storage
  * @returns {Promise<void>}
  */
-async function writeRenewCredentialsFile(env = process.env) {
-    const { refreshTokenFile } = readDevOAuthPersistenceConfig(env);
+async function writeRenewCredentialsFile(storage) {
     try {
         const body = {
             schemaVersion: REFRESH_TOKEN_STORE_SCHEMA_VERSION,
@@ -2938,10 +3045,7 @@ async function writeRenewCredentialsFile(env = process.env) {
                 .filter((record) => record.expiresAt > Date.now())
                 .sort((left, right) => left.expiresAt - right.expiresAt || left.familyId.localeCompare(right.familyId)),
         };
-        await writeFileAtomicTrusted(refreshTokenFile, `${JSON.stringify(body, null, 2)}\n`, {
-            caller: 'mcp.control-plane.dev-oauth',
-            mode: 0o600,
-        });
+        await storage.writeRefreshTokenState(`${JSON.stringify(body, null, 2)}\n`);
         renewCredentialsLastPersistedAt = body.updatedAt;
         renewCredentialsLastPersistenceError = null;
     } catch (error) {
@@ -2978,26 +3082,26 @@ async function ensureRegisteredClientsLoaded(env = process.env) {
  * @returns {Promise<void>}
  */
 async function loadRegisteredClients(env = process.env) {
-    const { clientFile } = readDevOAuthPersistenceConfig(env);
+    const storage = getDevOAuthStorage(env);
     registeredClients.clear();
     registeredClientsLoaded = false;
     registeredClientsLoadedFromFile = false;
     registeredClientsLastLoadedAt = new Date().toISOString();
     registeredClientsLastPersistenceError = null;
     try {
-        const text = (await readTextFreshTrusted(clientFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
+        const text = await storage.readClientState();
         const parsed = JSON.parse(text);
         for (const client of parseRegisteredClientRecords(parsed, env)) registeredClients.set(client.clientId, client);
         pruneRegisteredClients();
         registeredClientsLoadedFromFile = true;
-        registeredClientsLoadedConfigKey = devOAuthPersistenceConfigKey(env);
+        registeredClientsLoadedConfigKey = storage.persistenceConfigKey;
     } catch (error) {
         const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
         if (code !== 'ENOENT')
             registeredClientsLastPersistenceError = error instanceof Error ? error.message : String(error);
     } finally {
         registeredClientsLoaded = true;
-        registeredClientsLoadedConfigKey ??= devOAuthPersistenceConfigKey(env);
+        registeredClientsLoadedConfigKey ??= storage.persistenceConfigKey;
     }
 }
 /**
@@ -3054,19 +3158,19 @@ function parseRegisteredClientRecords(parsed, env = process.env) {
  * @returns {Promise<void>}
  */
 async function persistRegisteredClients(env = process.env) {
+    const storage = getDevOAuthStorage(env);
     registeredClientsPersistPromise = registeredClientsPersistPromise.then(
-        () => writeRegisteredClientsFile(env),
-        () => writeRegisteredClientsFile(env),
+        () => writeRegisteredClientsFile(storage),
+        () => writeRegisteredClientsFile(storage),
     );
     await registeredClientsPersistPromise;
 }
 /**
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {DevOAuthStorage} storage
  * @returns {Promise<void>}
  */
-async function writeRegisteredClientsFile(env = process.env) {
+async function writeRegisteredClientsFile(storage) {
     pruneRegisteredClients();
-    const { clientFile } = readDevOAuthPersistenceConfig(env);
     try {
         const body = {
             schemaVersion: CLIENT_STORE_SCHEMA_VERSION,
@@ -3075,10 +3179,7 @@ async function writeRegisteredClientsFile(env = process.env) {
                 .filter((client) => client.source === 'dcr')
                 .sort((left, right) => left.createdAt - right.createdAt || left.clientId.localeCompare(right.clientId)),
         };
-        await writeFileAtomicTrusted(clientFile, `${JSON.stringify(body, null, 2)}\n`, {
-            caller: 'mcp.control-plane.dev-oauth',
-            mode: 0o600,
-        });
+        await storage.writeClientState(`${JSON.stringify(body, null, 2)}\n`);
         registeredClientsLastPersistedAt = body.updatedAt;
         registeredClientsLastPersistenceError = null;
     } catch (error) {

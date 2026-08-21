@@ -9,11 +9,10 @@
  * @module copilot/sdk/session/session-fs
  */
 
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
 import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
-import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
-import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
@@ -177,15 +176,13 @@ function buildSafeSessionFsPathDisplay(absolutePath, workspaceRoot) {
 
 /**
  * @param {string | null} path
+ * @param {ReturnType<typeof createConfiguredFsIo>} io
  * @returns {Promise<boolean | null>}
  */
-async function pathExists(path) {
+async function pathExists(path, io) {
     if (!path) return null;
     try {
-        await statPathTrusted(path, {
-            caller: 'sdk.session.session-fs.state',
-            advisoryLimits: { source: 'session.fs.state' },
-        });
+        await io.statPath(path, { advisoryLimits: { source: 'session.fs.state' } });
         return true;
     } catch (error) {
         if (isNotFoundError(error)) return false;
@@ -207,6 +204,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
 
     const root = resolve(rootDir);
     const sessionId = typeof options.sessionId === 'string' && options.sessionId.trim() ? options.sessionId : undefined;
+    const sessionWorkspaceInfra = getApplicationWorkspaceInfra(root);
     const {
         appendTextLocked,
         createOrReplaceFileAtomic,
@@ -215,8 +213,8 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
         readText,
         removePathLocked,
         statPath,
-    } = createWorkspaceIo({ workspaceRoot: root });
-    const { scanDirectory } = createWorkspaceIndexing({ workspaceRoot: root });
+    } = sessionWorkspaceInfra.io;
+    const { scanDirectory } = sessionWorkspaceInfra.indexing;
 
     return {
         async readFile(path) {
@@ -492,9 +490,18 @@ export async function readConfiguredSessionFsState(sessionId) {
     const storageRootDir = resolve(config.storageRootDir);
     const sessionDir =
         descriptor.enabled && descriptor.session ? resolve(storageRootDir, descriptor.session.key) : null;
+    const stateIo = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'sdk.session.session-fs.state',
+            roots: [storageRootDir],
+            operations: ['stat'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
     const [storageRootExists, sessionExists] = await Promise.all([
-        descriptor.enabled ? pathExists(storageRootDir) : Promise.resolve(null),
-        descriptor.enabled ? pathExists(sessionDir) : Promise.resolve(null),
+        descriptor.enabled ? pathExists(storageRootDir, stateIo) : Promise.resolve(null),
+        descriptor.enabled ? pathExists(sessionDir, stateIo) : Promise.resolve(null),
     ]);
     return {
         ...descriptor,

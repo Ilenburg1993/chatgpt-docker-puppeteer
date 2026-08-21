@@ -10,7 +10,7 @@
  */
 
 import { runCloudflareSmoke } from './cli-smoke.js';
-import { writeConnectorSmokeState } from './state.js';
+import { createCloudflareStateStore } from './state.js';
 
 /** @type {() => string[]} */
 let localToolNamesProvider = () => [];
@@ -84,7 +84,7 @@ function finiteNumber(value) {
  *     deps?: {
  *         runUnauthenticatedSmoke?: typeof runCloudflareSmoke;
  *         runOauthSmoke?: (options: Record<string, unknown>) => Promise<Record<string, unknown>>;
- *         writeState?: typeof writeConnectorSmokeState;
+ *         writeState?: (state: import('./state.js').ConnectorSmokeState) => Promise<void>;
  *     };
  * }} input
  * @returns {Promise<CanonicalConnectorSmokeReport>}
@@ -164,7 +164,7 @@ export async function runCanonicalConnectorSmoke({
     if (persistState && config.smokeStateFile) {
         const authChallenge = asRecord(unauthenticated['authChallenge']);
         const criticalTools = asRecord(unauthenticated['criticalTools']);
-        const writeState = deps.writeState ?? writeConnectorSmokeState;
+        const writeState = deps.writeState ?? createCloudflareStateStore(config).writeConnectorSmokeState;
         try {
             const healthRecord = asRecord(unauthenticated['health']);
             /** @type {import('./state.js').ConnectorSmokeState} */
@@ -193,7 +193,7 @@ export async function runCanonicalConnectorSmoke({
                 authenticatedOAuthSmoke: report.authenticatedOAuthSmoke,
                 timings: report.orchestrationTimings,
             };
-            await writeState(config.smokeStateFile, smokeState);
+            await writeState(smokeState);
         } catch {
             // Canonical smoke state persistence is best-effort; the returned report remains authoritative for this call.
         }

@@ -9,9 +9,10 @@
  * @module copilot/mcp/control-plane/ai-artifacts
  */
 
+import { getApplicationInfraRuntime } from '#copilot/boot';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { removePathLocked } from '#copilot/infra/public/filesystem/mutation';
-import { listDirectoryNamesFreshTrusted, lstatPathTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/operations';
+import { cleanupRollbackSidecars } from '#copilot/infra/public/operations';
 import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
 
@@ -22,14 +23,10 @@ const DEFAULT_RETAIN_NEWEST = 240;
 const DEFAULT_CLOUDFLARE_LOG_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const REPORT_CACHE_TTL_MS = 5 * 1000;
 
-/** @type {{ key: string; expiresAt: number; report: Record<string, unknown> } | null} */
-let cachedReport = null;
-
 /**
  * @typedef {object} AiArtifactsReportOptions
  * @property {number} [retainNewest]
  * @property {number} [cloudflareLogThresholdBytes]
- * @property {string} [workspaceRoot]
  *
  * @typedef {object} JobArtifactSummary
  * @property {string} name
@@ -39,21 +36,22 @@ let cachedReport = null;
  */
 
 /** @typedef {{ name: string; stats: import('node:fs').Stats }} AiArtifactDirEntry */
+/** @typedef {ReturnType<typeof createConfiguredFsIo>} AiArtifactsReadIo */
+/** @typedef {ReturnType<typeof getApplicationInfraRuntime>['config']['rollback']} AiArtifactsRollbackPolicy */
+/** @typedef {{ workspaceRoot:string; aiDir:string; jobsDir:string; cloudflareDir:string; mcpDir:string; rollbackDir:string; rollbackPolicy:AiArtifactsRollbackPolicy; io:AiArtifactsReadIo }} AiArtifactsContext */
+/** @typedef {{ cachedReport: { key:string; expiresAt:number; report:Record<string,unknown> } | null }} AiArtifactsCacheState */
 
-/** @param {string} directory @returns {Promise<AiArtifactDirEntry[]>} */
-async function readdirSafe(directory) {
+/** @param {AiArtifactsContext} context @param {string} directory @returns {Promise<AiArtifactDirEntry[]>} */
+async function readdirSafe(context, directory) {
     try {
-        const names = (await listDirectoryNamesFreshTrusted(directory, { caller: 'mcp.control-plane.ai-artifacts' }))
-            .entries;
+        const names = (await context.io.listDirectoryNamesFresh(directory)).entries;
         const entries = [];
         for (const name of names) {
             try {
-                const { stats } = await lstatPathTrusted(path.join(directory, name), {
-                    caller: 'mcp.control-plane.ai-artifacts',
-                });
+                const { stats } = await context.io.lstatPath(path.join(directory, name));
                 entries.push({ name, stats });
             } catch {
-                // Concurrent cleanup may remove an entry between listing and lstat.
+                // Concurrent cleanup may remove an entry between listing and lstat; configured IO also denies symlinks.
             }
         }
         return entries;
@@ -62,26 +60,58 @@ async function readdirSafe(directory) {
     }
 }
 
-/** @param {string} filePath @returns {Promise<import('node:fs').Stats | null>} */
-async function statSafe(filePath) {
+/** @param {AiArtifactsContext} context @param {string} filePath @returns {Promise<import('node:fs').Stats | null>} */
+async function statSafe(context, filePath) {
     try {
-        return (await lstatPathTrusted(filePath, { caller: 'mcp.control-plane.ai-artifacts' })).stats;
+        return (await context.io.lstatPath(filePath)).stats;
     } catch {
         return null;
     }
 }
 
 /**
+ * Build one AI-artifact runtime around already-authorized metadata IO. The factory cannot mint or widen filesystem
+ * authority: workspace identity, rollback policy and cache lifetime are fixed once by the composition root.
+ *
+ * @param {{ workspaceRoot:string; rollbackPolicy:AiArtifactsRollbackPolicy; io:AiArtifactsReadIo }} binding
+ */
+export function createAiArtifactsRuntime(binding) {
+    const workspaceRoot = path.resolve(binding.workspaceRoot);
+    const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
+    /** @type {AiArtifactsContext} */
+    const context = Object.freeze({
+        workspaceRoot,
+        aiDir,
+        jobsDir: path.join(aiDir, 'jobs'),
+        cloudflareDir: path.join(aiDir, 'cloudflare'),
+        mcpDir: path.join(aiDir, 'mcp'),
+        rollbackDir: path.resolve(binding.rollbackPolicy.directory),
+        rollbackPolicy: binding.rollbackPolicy,
+        io: binding.io,
+    });
+    /** @type {AiArtifactsCacheState} */
+    const state = { cachedReport: null };
+    return Object.freeze({
+        context,
+        buildReport: (/** @type {AiArtifactsReportOptions} */ options = {}) =>
+            buildAiArtifactsReportForRuntime(context, state, options),
+        cleanup: (
+            /** @type {AiArtifactsReportOptions & {dryRun?:boolean;maxDeleteCount?:number;purgeDisabledRollback?:boolean}} */ options = {},
+        ) => cleanupAiArtifactsForRuntime(context, state, options),
+        clearCache: () => {
+            state.cachedReport = null;
+        },
+    });
+}
+
+/**
+ * @param {AiArtifactsContext} context
+ * @param {AiArtifactsCacheState} state
  * @param {AiArtifactsReportOptions} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function buildAiArtifactsReport(options = {}) {
-    const workspaceRoot = options.workspaceRoot ?? getMcpWorkspaceRoot();
-    const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
-    const jobsDir = path.join(aiDir, 'jobs');
-    const cloudflareDir = path.join(aiDir, 'cloudflare');
-    const mcpDir = path.join(aiDir, 'mcp');
-    const rollbackDir = path.join(aiDir, 'rollback');
+async function buildAiArtifactsReportForRuntime(context, state, options = {}) {
+    const { workspaceRoot, aiDir, jobsDir, cloudflareDir, mcpDir, rollbackDir, rollbackPolicy } = context;
     const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
     const cloudflareLogThresholdBytes = normalizePositiveInteger(
         options.cloudflareLogThresholdBytes,
@@ -89,12 +119,11 @@ export async function buildAiArtifactsReport(options = {}) {
         256 * 1024,
         256 * 1024 * 1024,
     );
-    const rollbackPolicy = getIoRollbackPolicy();
-    const cacheKey = JSON.stringify({ workspaceRoot, retainNewest, cloudflareLogThresholdBytes, rollbackPolicy });
-    if (cachedReport && cachedReport.key === cacheKey && cachedReport.expiresAt > Date.now())
-        return cachedReport.report;
+    const cacheKey = JSON.stringify({ retainNewest, cloudflareLogThresholdBytes });
+    if (state.cachedReport && state.cachedReport.key === cacheKey && state.cachedReport.expiresAt > Date.now())
+        return state.cachedReport.report;
 
-    const jobsEntries = await readdirSafe(jobsDir);
+    const jobsEntries = await readdirSafe(context, jobsDir);
     /** @type {JobArtifactSummary[]} */
     const jobArtifacts = [];
     let ignoredJobFileCount = 0;
@@ -105,7 +134,7 @@ export async function buildAiArtifactsReport(options = {}) {
             continue;
         }
         const filePath = path.join(jobsDir, entry.name);
-        const stats = await statSafe(filePath);
+        const stats = await statSafe(context, filePath);
         if (!stats) continue;
         jobArtifacts.push({
             name: entry.name,
@@ -122,12 +151,12 @@ export async function buildAiArtifactsReport(options = {}) {
 
     const oversizedCloudflareLogs = [];
     for (const name of ['cloudflared.log', 'mcp-http.log']) {
-        const stats = await statSafe(path.join(cloudflareDir, name));
+        const stats = await statSafe(context, path.join(cloudflareDir, name));
         if (stats && stats.size > cloudflareLogThresholdBytes)
             oversizedCloudflareLogs.push({ name, bytes: stats.size });
     }
 
-    const rollbackEntries = await readdirSafe(rollbackDir);
+    const rollbackEntries = await readdirSafe(context, rollbackDir);
     const rollbackNowMs = Date.now();
     let rollbackSidecarCount = 0;
     let rollbackSidecarBytes = 0;
@@ -149,7 +178,7 @@ export async function buildAiArtifactsReport(options = {}) {
             ignoredRollbackEntryCount += 1;
             continue;
         }
-        const stats = await statSafe(path.join(rollbackDir, entry.name));
+        const stats = await statSafe(context, path.join(rollbackDir, entry.name));
         if (!stats) continue;
         rollbackOldestMtimeMs =
             rollbackOldestMtimeMs === null ? stats.mtimeMs : Math.min(rollbackOldestMtimeMs, stats.mtimeMs);
@@ -169,7 +198,7 @@ export async function buildAiArtifactsReport(options = {}) {
         rollbackPendingBytes += stats.size;
     }
 
-    const mcpEntries = await readdirSafe(mcpDir);
+    const mcpEntries = await readdirSafe(context, mcpDir);
     const report = {
         aiPath: path.relative(workspaceRoot, aiDir),
         jobs: {
@@ -203,7 +232,12 @@ export async function buildAiArtifactsReport(options = {}) {
         rollback: {
             path: path.relative(workspaceRoot, rollbackDir),
             enabled: rollbackPolicy.enabled,
-            policy: rollbackPolicy,
+            policy: {
+                enabled: rollbackPolicy.enabled,
+                ttlMs: rollbackPolicy.ttlMs,
+                maxEntries: rollbackPolicy.maxEntries,
+                maxBytes: rollbackPolicy.maxBytes,
+            },
             sidecarCount: rollbackSidecarCount,
             sidecarBytes: rollbackSidecarBytes,
             expiredCount: rollbackExpiredCount,
@@ -234,18 +268,16 @@ export async function buildAiArtifactsReport(options = {}) {
                 'delete only allowlisted validator artifacts beyond retention; rollback purge is explicit and schema-restricted; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
         },
     };
-    cachedReport = { key: cacheKey, expiresAt: Date.now() + REPORT_CACHE_TTL_MS, report };
+    state.cachedReport = { key: cacheKey, expiresAt: Date.now() + REPORT_CACHE_TTL_MS, report };
     return report;
-}
-
-export function clearAiArtifactsReportCache() {
-    cachedReport = null;
 }
 
 /**
  * Delete strict UUID-named validator artifacts beyond retention. Rollback sidecars remain unreachable unless
  * purgeDisabledRollback=true and the global automatic rollback policy is currently disabled.
  *
+ * @param {AiArtifactsContext} context
+ * @param {AiArtifactsCacheState} state
  * @param {AiArtifactsReportOptions & {
  *     dryRun?: boolean;
  *     maxDeleteCount?: number;
@@ -253,22 +285,19 @@ export function clearAiArtifactsReportCache() {
  * }} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function cleanupAiArtifacts(options = {}) {
-    clearAiArtifactsReportCache();
-    const workspaceRoot = options.workspaceRoot ?? getMcpWorkspaceRoot();
+async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
+    state.cachedReport = null;
+    const { jobsDir, rollbackDir, rollbackPolicy } = context;
     const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
     const maxDeleteCount = normalizePositiveInteger(options.maxDeleteCount, 100, 1, 500);
     const dryRun = options.dryRun !== false;
     const purgeDisabledRollback = options.purgeDisabledRollback === true;
-    const rollbackPolicy = getIoRollbackPolicy();
-    const jobsDir = path.join(workspaceRoot, 'src/copilot/.ai/jobs');
-    const rollbackDir = path.join(workspaceRoot, 'src/copilot/.ai/rollback');
-    const entries = await readdirSafe(jobsDir);
+    const entries = await readdirSafe(context, jobsDir);
     const artifacts = [];
     for (const entry of entries) {
         if (!entry.stats.isFile() || entry.stats.isSymbolicLink() || !STRICT_UUID_JOB_ARTIFACT_RE.test(entry.name))
             continue;
-        const stats = await statSafe(path.join(jobsDir, entry.name));
+        const stats = await statSafe(context, path.join(jobsDir, entry.name));
         if (!stats) continue;
         artifacts.push({ name: entry.name, bytes: stats.size, mtimeMs: stats.mtimeMs });
     }
@@ -281,10 +310,10 @@ export async function cleanupAiArtifacts(options = {}) {
     const failures = [];
     const rollbackCandidates = [];
     if (purgeDisabledRollback && !rollbackPolicy.enabled) {
-        for (const entry of await readdirSafe(rollbackDir)) {
+        for (const entry of await readdirSafe(context, rollbackDir)) {
             if (!entry.stats.isFile() || entry.stats.isSymbolicLink()) continue;
             if (!ROLLBACK_SIDECAR_RE.test(entry.name) && !ROLLBACK_PENDING_RE.test(entry.name)) continue;
-            const stats = await statSafe(path.join(rollbackDir, entry.name));
+            const stats = await statSafe(context, path.join(rollbackDir, entry.name));
             if (!stats) continue;
             rollbackCandidates.push({ name: entry.name, bytes: stats.size, mtimeMs: stats.mtimeMs });
         }
@@ -313,6 +342,7 @@ export async function cleanupAiArtifacts(options = {}) {
         }
         if (purgeDisabledRollback && !rollbackPolicy.enabled && selectedRollback.length > 0) {
             rollbackCleanup = await cleanupRollbackSidecars({
+                policy: rollbackPolicy,
                 directory: rollbackDir,
                 purgeAll: true,
                 enforceBudget: false,
@@ -327,7 +357,8 @@ export async function cleanupAiArtifacts(options = {}) {
         }
     }
 
-    const after = await buildAiArtifactsReport({ ...options, workspaceRoot, retainNewest });
+    state.cachedReport = null;
+    const after = await buildAiArtifactsReportForRuntime(context, state, { ...options, retainNewest });
     return {
         success: failures.length === 0,
         dryRun,
@@ -342,7 +373,12 @@ export async function cleanupAiArtifacts(options = {}) {
         rollback: {
             requested: purgeDisabledRollback,
             allowed: purgeDisabledRollback && !rollbackPolicy.enabled,
-            policy: rollbackPolicy,
+            policy: {
+                enabled: rollbackPolicy.enabled,
+                ttlMs: rollbackPolicy.ttlMs,
+                maxEntries: rollbackPolicy.maxEntries,
+                maxBytes: rollbackPolicy.maxBytes,
+            },
             candidateCount: rollbackCandidates.length,
             selectedCount: selectedRollback.length,
             selectedBytes: selectedRollback.reduce((sum, artifact) => sum + artifact.bytes, 0),
@@ -371,6 +407,40 @@ export async function cleanupAiArtifacts(options = {}) {
             'all other paths outside the explicit cleanup domains',
         ],
     };
+}
+
+const DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT = getMcpWorkspaceRoot();
+const DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY = getApplicationInfraRuntime().config.rollback;
+const DEFAULT_AI_ARTIFACTS_DIR = path.join(DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT, 'src/copilot/.ai');
+const DEFAULT_AI_ARTIFACTS_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.ai-artifacts',
+        roots: [DEFAULT_AI_ARTIFACTS_DIR, path.resolve(DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY.directory)],
+        operations: ['list', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const DEFAULT_AI_ARTIFACTS_RUNTIME = createAiArtifactsRuntime({
+    workspaceRoot: DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT,
+    rollbackPolicy: DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY,
+    io: DEFAULT_AI_ARTIFACTS_IO,
+});
+
+/** @param {AiArtifactsReportOptions} [options] */
+export function buildAiArtifactsReport(options = {}) {
+    return DEFAULT_AI_ARTIFACTS_RUNTIME.buildReport(options);
+}
+
+export function clearAiArtifactsReportCache() {
+    DEFAULT_AI_ARTIFACTS_RUNTIME.clearCache();
+}
+
+/**
+ * @param {AiArtifactsReportOptions & {dryRun?:boolean;maxDeleteCount?:number;purgeDisabledRollback?:boolean}} [options]
+ */
+export function cleanupAiArtifacts(options = {}) {
+    return DEFAULT_AI_ARTIFACTS_RUNTIME.cleanup(options);
 }
 
 /**

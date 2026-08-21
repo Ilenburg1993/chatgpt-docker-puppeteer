@@ -29,6 +29,8 @@ export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick
 export const DEFAULT_CONNECTOR_SMOKE_STATE_FILE = 'src/copilot/.ai/cloudflare/connector-smoke.json';
 export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
 export const DEFAULT_MCP_HTTP_PID_FILE = 'src/copilot/.ai/cloudflare/mcp-http.pid';
+export const DEFAULT_MANAGED_TUNNEL_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
+export const DEFAULT_MCP_HTTP_LOG_FILE = 'src/copilot/.ai/cloudflare/mcp-http.log';
 export const DEFAULT_CLOUDFLARE_TUNNEL_TOKEN_FILE = 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token';
 export const DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR = 'src/copilot/.ai/cloudflare/edge-snapshots';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -75,6 +77,8 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a
  * @property {string} smokeStateFile
  * @property {string} managedTunnelPidFile
  * @property {string} mcpHttpPidFile
+ * @property {string} managedTunnelLogFile
+ * @property {string} mcpHttpLogFile
  * @property {number} staleAfterMs
  * @property {{
  *     http2PlusDefault: true;
@@ -139,6 +143,8 @@ export function readCloudflareTunnelConfig(env = process.env) {
             DEFAULT_MANAGED_TUNNEL_PID_FILE,
         ),
         mcpHttpPidFile: normalizeStateFile(env['COPILOT_MCP_HTTP_PID_FILE'], DEFAULT_MCP_HTTP_PID_FILE),
+        managedTunnelLogFile: DEFAULT_MANAGED_TUNNEL_LOG_FILE,
+        mcpHttpLogFile: DEFAULT_MCP_HTTP_LOG_FILE,
         staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),
         http2Plus: {
             http2PlusDefault: /** @type {const} */ (true),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
+import { resolveBabelParserOptions } from '#copilot/infra/public/diagnostic/code-analysis';
 import { parse } from '@babel/parser';
 import traverseModule from '@babel/traverse';
 import fs from 'node:fs';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const TARGET = path.join(ROOT, 'src', 'copilot');
-const CANONICAL_READER = path.join('src', 'copilot', 'infra', 'platform', 'http-response.js');
+const CANONICAL_READER = path.join('src', 'copilot', 'infra', 'platform', 'http-response', 'service.js');
 const RESPONSE_METHODS = new Set(['arrayBuffer', 'blob', 'formData', 'json', 'text']);
 const RESPONSE_CONSUMER_HINT =
     /(?:\.(?:arrayBuffer|blob|formData|json|text)\s*\(|\[\s*['"](?:arrayBuffer|blob|formData|json|text)['"]\s*\]\s*\()/u;

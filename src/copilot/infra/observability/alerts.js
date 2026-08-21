@@ -9,7 +9,7 @@
  *   durability: { fileSync: { failed: number }; directorySync: { failed: number } };
  *   locks: ReturnType<typeof import('#copilot/infra/internal/concurrency/locks').getIoLockStats>;
  *   coherence: { crossProcess?: unknown } & Record<string, unknown>;
- *   advisoryBudget: ReturnType<typeof import('#copilot/infra/internal/telemetry').getIoAdvisoryBudgetStats>;
+ *   advisoryBudget: ReturnType<ReturnType<typeof import('#copilot/infra/internal/telemetry').createIoTelemetryRuntime>['advisoryBudget']['stats']>;
  * }} input
  */
 export function buildIoRuntimeAlerts(input) {

@@ -8,18 +8,31 @@
  * @module copilot/mcp/control-plane/client-latency-evidence
  */
 
-import { withIoResourceLock } from '#copilot/infra/public/concurrency/locks';
-import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
-import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
-import { readJsonlTailTrusted } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
+import { createBoundConfiguredJsonlStore } from './persistence/index.js';
 
 export const DEFAULT_CLIENT_LATENCY_EVIDENCE_RELATIVE_PATH = 'src/copilot/.ai/mcp/client-latency-evidence.jsonl';
 const DEFAULT_MAX_ENTRIES = 2_000;
 const MAX_ENTRIES = 20_000;
 const MAX_READ_BYTES = 4 * 1024 * 1024;
+const CLIENT_LATENCY_EVIDENCE_PATH = path.resolve(getMcpWorkspaceRoot(), DEFAULT_CLIENT_LATENCY_EVIDENCE_RELATIVE_PATH);
+const CLIENT_LATENCY_EVIDENCE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.control-plane.client-latency-evidence',
+        exactPaths: [CLIENT_LATENCY_EVIDENCE_PATH],
+        operations: ['append', 'read', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
+);
+const CLIENT_LATENCY_EVIDENCE_STORE = createBoundConfiguredJsonlStore({
+    filePath: CLIENT_LATENCY_EVIDENCE_PATH,
+    io: CLIENT_LATENCY_EVIDENCE_IO,
+    maxReadBytes: MAX_READ_BYTES,
+});
 
 /**
  * @typedef {'manual' | 'har' | 'client-observer'} ClientLatencyEvidenceSource
@@ -62,10 +75,9 @@ const MAX_READ_BYTES = 4 * 1024 * 1024;
  *     vpnLabel?: string | null;
  *     seriesId?: string | null;
  * }} evidence
- * @param {{ maxEntries?: number; filePath?: string }} [options]
+ * @param {{ maxEntries?: number }} [options]
  */
 export async function appendClientLatencyEvidence(evidence, options = {}) {
-    const filePath = resolveEvidencePath(options.filePath);
     const maxEntries = boundedInteger(options.maxEntries, DEFAULT_MAX_ENTRIES, 1, MAX_ENTRIES);
     const nowIso = new Date().toISOString();
     /** @type {ClientLatencyEvidenceEntry} */
@@ -88,31 +100,17 @@ export async function appendClientLatencyEvidence(evidence, options = {}) {
             seriesId: nullableLabel(evidence.seriesId),
         },
     };
-    const { value: retainedEntries } = await withIoResourceLock(
-        filePath,
-        async () => {
-            await mkdirPathLocked(path.dirname(filePath), {
-                recursive: true,
-                advisoryLimits: { domain: 'client-latency-evidence-parent' },
-            });
-            await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
-                encoding: 'utf8',
-                advisoryLimits: { domain: 'client-latency-evidence' },
-            });
-            return trimEvidence(filePath, maxEntries);
-        },
-        { operation: 'client-latency-evidence', target: filePath, riskClass: 'low' },
-    );
+    const { retainedEntries } = await CLIENT_LATENCY_EVIDENCE_STORE.appendRecord(entry, { maxEntries });
     return {
         persisted: true,
-        path: toWorkspaceRelativePath(filePath),
+        path: toWorkspaceRelativePath(CLIENT_LATENCY_EVIDENCE_PATH),
         retainedEntries,
         entry,
     };
 }
 
 /**
- * @param {{ limit?: number; filePath?: string }} [options]
+ * @param {{ limit?: number }} [options]
  * @returns {Promise<{
  *     ok: boolean;
  *     path: string;
@@ -122,11 +120,9 @@ export async function appendClientLatencyEvidence(evidence, options = {}) {
  * }>}
  */
 export async function readClientLatencyEvidence(options = {}) {
-    const filePath = resolveEvidencePath(options.filePath);
     const limit = boundedInteger(options.limit, 500, 1, 5_000);
     try {
-        const tail = await readJsonlTailTrusted(filePath, {
-            caller: 'mcp.control-plane.client-latency-evidence',
+        const tail = await CLIENT_LATENCY_EVIDENCE_STORE.readTail({
             maxLines: Math.min(10_000, Math.max(limit, limit * 2)),
             maxBytes: MAX_READ_BYTES,
         });
@@ -136,17 +132,22 @@ export async function readClientLatencyEvidence(options = {}) {
             .slice(-limit);
         return {
             ok: true,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(CLIENT_LATENCY_EVIDENCE_PATH),
             entries: /** @type {ClientLatencyEvidenceEntry[]} */ (entries),
             truncatedByBytes: tail.truncatedByByteLimit,
         };
     } catch (error) {
         if (isNotFoundError(error)) {
-            return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [], truncatedByBytes: false };
+            return {
+                ok: true,
+                path: toWorkspaceRelativePath(CLIENT_LATENCY_EVIDENCE_PATH),
+                entries: [],
+                truncatedByBytes: false,
+            };
         }
         return {
             ok: false,
-            path: toWorkspaceRelativePath(filePath),
+            path: toWorkspaceRelativePath(CLIENT_LATENCY_EVIDENCE_PATH),
             entries: [],
             truncatedByBytes: false,
             error: sanitizeError(error),
@@ -305,26 +306,6 @@ function optionalTiming(value) {
 function nullableLabel(value) {
     if (value === null || value === undefined || value === '') return null;
     return String(value);
-}
-
-/** @param {string | undefined} overridePath */
-function resolveEvidencePath(overridePath) {
-    return overridePath ?? path.join(getMcpWorkspaceRoot(), DEFAULT_CLIENT_LATENCY_EVIDENCE_RELATIVE_PATH);
-}
-
-/** @param {string} filePath @param {number} maxEntries */
-async function trimEvidence(filePath, maxEntries) {
-    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.client-latency-evidence' })).content;
-    const lines = raw.split('\n').filter((line) => line.trim());
-    if (lines.length <= maxEntries) return lines.length;
-    const retained = lines.slice(-maxEntries);
-    await writeFileAtomic(filePath, `${retained.join('\n')}\n`, {
-        encoding: 'utf8',
-        mode: 0o600,
-        riskClass: 'low',
-        advisoryLimits: { domain: 'client-latency-evidence-trim', maxEntries },
-    });
-    return retained.length;
 }
 
 /** @param {unknown} value @returns {ClientLatencyEvidenceEntry | null} */
