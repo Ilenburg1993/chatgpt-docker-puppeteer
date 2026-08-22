@@ -240,7 +240,7 @@ Foram adicionados componentes de preparação (feature-flagged) para rollout gra
 - `src/copilot/infra/io-cache-l2-registry.js`
   - singleton controlado por `IO_L2_CACHE_ENABLED=1`;
   - fallback seguro: falha no L2 não derruba operação de leitura.
-- `src/copilot/db/migrations.js`
+- `src/copilot/infra/database/sqlite/application/migrations.js`
   - migração v9 `create_io_cache_l2_entries` para estrutura durável.
 
 ### 6.2 Preparo L3 (planejamento canônico)

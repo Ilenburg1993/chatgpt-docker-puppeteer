@@ -161,6 +161,15 @@ sdk/generated/session-events.d.ts
 
 ## Anti-drift
 
+- `package.json#imports` não possui wildcard `#copilot/**`: todo import interno resolve por
+  entrypoint exato e semanticamente deliberado;
+- `#copilot/testing/**` é a única audience para white-box leaf access e é proibida em `src/`,
+  `scripts/` e `tools/`; ela não cria API de produção;
+- qualquer alias `#copilot/**` sem consumer só pode sobreviver quando pertence a um manifest
+  arquitetural explícito; a mera existência de `index.js` não cria package surface. Barrels físicos
+  podem permanecer como owners locais sem alias público/interno no package map;
+- `scripts/ci/check-copilot-package-imports.mjs` é o gate canônico dessa relação e participa de
+  `copilot:architecture:check`/CI;
 - não recriar `plan mode`, `usage`, `streaming`, `mode`, `plan.md`, `ask_user` ou qualquer conceito
   já existente no SDK como semântica paralela;
 - quando o runtime ampliar algo, deixar explícito **qual é a base vanilla** e **qual é o valor

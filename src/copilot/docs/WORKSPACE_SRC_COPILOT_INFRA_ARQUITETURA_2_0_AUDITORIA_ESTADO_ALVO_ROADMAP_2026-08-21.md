@@ -1,5 +1,11 @@
 # WORKSPACE — `src/copilot/infra` — Auditoria pós-1.0, arquitetura-alvo 2.0 e roadmap
 
+> **STATUS HISTÓRICO — LEDGER DA ARQUITETURA 2.0.** Este documento preserva diagnóstico, decisões e
+> evidências do momento em que foi escrito; não deve ser usado como inventário vivo da árvore, das
+> APIs ou dos owners atuais. O estado corrente e o roadmap ativo estão em
+> `WORKSPACE_SRC_COPILOT_INFRA_ARQUITETURA_2_1_AUDITORIA_ESTADO_ALVO_ROADMAP_2026-08-21.md`,
+> complementados pelos manifests e gates executáveis de `src/copilot/infra/governance/`.
+
 **Data da auditoria:** 21 de agosto de 2026
 
 **Workspace auditado:** `/workspaces/chatgpt-docker-puppeteer`

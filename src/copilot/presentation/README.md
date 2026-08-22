@@ -132,6 +132,19 @@ presentation/
 | `files/index.js`        | leitura/embedding/routing de arquivos compartilhados                       |
 | `sdk/index.js`          | ownership/recovery e projections compartilhadas da sessão SDK              |
 
+## Package surfaces atuais
+
+A topologia física barrel-first **não** implica um alias por subdiretório. O package map é
+consumer-driven e hoje expõe somente três seams de `presentation/`:
+
+- `#copilot/presentation/agent/runtime` — seleção/lookup compartilhado de runtime;
+- `#copilot/presentation/runtime` — projeções de runtime consumidas por outras bordas/testes;
+- `#copilot/presentation/realtime` — SSE/replay compartilhado.
+
+Os demais `index.js` permanecem úteis como fronteiras físicas e para imports relativos internos, mas
+não constituem package API sem consumer. Wildcards e aliases preventivos são proibidos pelo gate
+`scripts/ci/check-copilot-package-imports.mjs`.
+
 ## Heurística prática
 
 - Se uma borda precisa consumir algo **igual** à outra, considere `presentation/`.

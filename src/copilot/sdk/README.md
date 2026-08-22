@@ -31,6 +31,7 @@ Se uma capability já existe no SDK vanilla, ela deve nascer aqui antes de qualq
 - `#copilot/sdk/event-helpers`
 - `#copilot/sdk/feature-flags`
 - `#copilot/sdk/utils`
+- `#copilot/sdk/http-request`
 - `#copilot/sdk/types` (type-only/JSDoc)
 
 ### Subsurface experimental controlada
@@ -41,14 +42,18 @@ Se uma capability já existe no SDK vanilla, ela deve nascer aqui antes de qualq
 
 ### Aliases removidos
 
-Não há mais aliases folha de compatibilidade para o SDK em `package.json#imports`.
+Não há mais aliases folha de **compatibilidade** para o SDK em `package.json#imports`.
 
 Foram removidos `tools-registry`, `tools-state`, `custom-tools`, `tracing`, `quota-monitor`,
 `server-rpc`, `rpc-session`, `rpc-ops`, `rpc-facade`, `health`, `client`, `client-events`,
-`provider`, `permissions`, `system-message` e o wildcard `#copilot/sdk/*`.
+`provider`, `permissions`, `system-message` e o wildcard `#copilot/sdk/*`. Um leaf só pode existir
+quando é uma surface semântica deliberada e inventariada em `SDK_ALIAS_LAYOUT` — por exemplo,
+`#copilot/sdk/http-request` é um helper bounded que evita carregar o root SDK para uma operação
+HTTP.
 
 Regra: consumidores usam somente as surfaces estáveis listadas acima; tipos auxiliares locais ficam
-em `#copilot/sdk/types`.
+em `#copilot/sdk/types`; qualquer nova surface precisa aparecer simultaneamente no package map e no
+`SDK_ALIAS_LAYOUT`.
 
 ## Mapeamento aprofundado de acesso (entrada)
 
@@ -85,13 +90,17 @@ operacional é:
 
 ## Mapeamento canônico de saída (SDK → outros domínios)
 
-Importações autorizadas dentro de `sdk/`:
+Importações autorizadas dentro de `sdk/` usam **somente entrypoints exatos declarados em
+`package.json#imports`**. Em termos de ownership, o SDK pode depender de:
 
-- `#copilot/core` e `#copilot/core/*`
-- `#copilot/boot` e `#copilot/boot/*`
-- `#copilot/infra/public/*` (membrana externa exclusiva de infra)
-- `#copilot/events`
-- `#copilot/config`
+- surfaces exatas de `#copilot/core/...` e do root `#copilot/core` quando o contrato agregado for o
+  owner correto;
+- surfaces exatas de `#copilot/boot/...` apenas nos seams de composição necessários;
+- entrypoints exatos de `#copilot/infra/public/...` — nunca `infra/internal`;
+- `#copilot/events` e `#copilot/config` quando esses roots são a surface semântica adequada.
+
+A notação `namespace/*` é apenas descritiva em texto; **não existe resolver wildcard `#copilot/**`
+no package map**. Cada subpath utilizável precisa ser promovido deliberadamente como seam exato.
 
 Importações proibidas por design:
 
@@ -174,10 +183,9 @@ O comando canônico é:
 npm run typecheck:strict:src.copilot.sdk
 ```
 
-Decisão de viabilidade: `skipLibCheck: false` foi avaliado, mas falha antes do código local por
-declarações de `vscode-jsonrpc` incompatíveis com iteradores do TS 6. A surface SDK fica com
-`skipLibCheck: true` até essa dependência ser atualizada ou isolada; o restante das flags rigorosas
-já é aplicado ao código local.
+A surface SDK participa do TypeScript 7 strict corrente. `skipLibCheck` permanece uma decisão de
+fronteira de dependências, não uma licença para afrouxar o código local: toda a implementação/JSDoc
+SDK continua sujeita às flags strict do workspace e aos typechecks segmentados.
 
 ## Anti-patterns que o módulo combate
 
@@ -192,7 +200,8 @@ já é aplicado ao código local.
 Consulte `module-map.js` para:
 
 - inventário de módulos (`SDK_MODULE_LAYOUT`);
-- inventário de aliases (`SDK_ALIAS_LAYOUT`);
+- inventário de aliases (`SDK_ALIAS_LAYOUT`), em bijeção com `package.json#imports` e
+  `package.json#exports` para as surfaces SDK publicadas;
 - política por camada consumidora (`SDK_LAYER_ACCESS_POLICY`);
 - scorecard da borda (`buildSdkModuleScorecard()`).
 
@@ -201,6 +210,7 @@ O README descreve intenção; o `module-map.js` descreve contrato verificável.
 ## Próxima onda recomendada
 
 1. Converter gradualmente arquivos do SDK de JS+JSDoc para TS preservando `erasableSyntaxOnly`.
-2. Isolar ou atualizar dependências que impedem `skipLibCheck: false` com TS 6.
+2. Isolar ou atualizar dependências externas que ainda impedem `skipLibCheck: false` sob o
+   TypeScript 7 corrente.
 3. Endurecer o ESLint type-aware do SDK para `no-unsafe-*` por subpasta, começando por `constants`,
    `errors`, `utils`, `models` e `telemetry`.

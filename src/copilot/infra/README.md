@@ -4,7 +4,7 @@
 
 **Runtime:** Node.js 24+ / ESM / `@ts-check` / TypeScript 7 strict
 
-**Data-base desta revisão:** 20 de agosto de 2026
+**Data-base desta revisão:** 22 de agosto de 2026
 
 `src/copilot/infra` é o package interno de capabilities técnicas compartilhadas do Copilot. Ele
 possui duas faces deliberadamente distintas:
@@ -110,7 +110,9 @@ Invariantes adicionais da membrana:
 - não existem aliases legados `#copilot/infra/<capability>`;
 - não existe wildcard `#copilot/infra/*`;
 - `public/` não contém implementação nem lifecycle;
-- todo diretório abaixo de `public/` possui `index.js`;
+- `public/**/index.js` existe somente para entrypoints declarados em `package.json#imports`;
+  namespace/marker barrels são proibidos;
+- aliases públicos e projection barrels formam uma bijeção verificável;
 - não existe `public/index.js` root;
 - controles `*ForTest` só são projetados pelo entrypoint deliberado `#copilot/infra/public/testing`.
 
@@ -120,7 +122,7 @@ Invariantes adicionais da membrana:
 
 ```text
 infra/
-├── public/                 # API membrane; projection barrels only
+├── public/                 # API membrane; declared projection entrypoints only
 ├── governance/             # manifests e verificadores arquiteturais
 ├── platform/               # primitives técnicas/Node
 ├── concurrency/            # bulk, queue, locks
@@ -145,47 +147,22 @@ fonte de verdade física.
 
 ## 3. API pública
 
-A documentação específica da membrana está em [`public/README.md`](./public/README.md).
+A documentação específica da membrana está em [`public/README.md`](./public/README.md), e o
+inventário nominal/custo/autoridade é gerado em
+[`public/API_REFERENCE.md`](./public/API_REFERENCE.md).
 
-Principais famílias externas:
+A API não possui lista manual paralela. Há três projeções deliberadamente distintas:
 
-```text
-#copilot/infra/public/platform
-#copilot/infra/public/platform/node
-#copilot/infra/public/platform/node/filesystem
-#copilot/infra/public/concurrency/bulk
-#copilot/infra/public/concurrency/locks
-#copilot/infra/public/filesystem/read
-#copilot/infra/public/filesystem/write
-#copilot/infra/public/filesystem/mutation
-#copilot/infra/public/filesystem/invalidation
-#copilot/infra/public/filesystem/workspace
-#copilot/infra/public/filesystem/skills
-#copilot/infra/public/persistence/json
-#copilot/infra/public/persistence/jsonl
-#copilot/infra/public/database
-#copilot/infra/public/cache
-#copilot/infra/public/code-analysis
-#copilot/infra/public/indexing
-#copilot/infra/public/indexing/context
-#copilot/infra/public/indexing/parser
-#copilot/infra/public/indexing/registry
-#copilot/infra/public/indexing/scanner
-#copilot/infra/public/indexing/storage
-#copilot/infra/public/indexing/workspace
-#copilot/infra/public/operations
-#copilot/infra/public/telemetry
-#copilot/infra/public/observability
-#copilot/infra/public/policy
-#copilot/infra/public/testing
-```
+1. `package.json#imports` — fonte de verdade para resolução de aliases;
+2. `governance/public-api-manifest.js` — fonte de verdade semântica para audience, privilege,
+   lifecycle, stability, cost tier e exports aprovados;
+3. `public/API_REFERENCE.md` — projeção humana determinística do manifest + closure estática atual,
+   regenerada por `npm run copilot:infra:public-api-docs` e verificada por
+   `copilot:architecture:check`.
 
-A lista efetiva é definida por `package.json#imports`. Não duplicar uma nova lista manual em código
-de governança.
-
-`indexing/storage` é deliberadamente mais estreito em intenção: existe para benchmark/auditoria da
-implementação SQLite do índice. Runtime comum deve preferir `public/indexing` ou
-`public/indexing/registry`.
+Surfaces diagnósticas são nomeadas explicitamente sob `public/diagnostic/**`; por exemplo,
+`diagnostic/indexing/storage` existe para benchmark/auditoria da implementação persistente e não é
+uma rota runtime alternativa ao owner de indexing.
 
 ---
 
@@ -309,23 +286,65 @@ workspace exigem primitives de domínio estreitas, sem aceitar paths arbitrário
 
 ### 4.11 `database/`
 
-É um **composition port**, não o owner do banco compartilhado. `src/copilot/db` continua responsável
-por:
+`infra/database` é o **owner único dos mecanismos SQLite** e da abstração estrutural usada pelo
+restante do Copilot. A antiga árvore `src/copilot/db` foi removida integralmente; não existe barrel,
+shim ou alias de compatibilidade.
 
-- path do banco;
-- abertura/fechamento;
-- migration ordering;
-- schema do índice.
+A separação de responsabilidades é deliberada:
 
-O boot injeta o provider em infra. A direção conceitual é:
+- `database/port/contract.js` define o port estrutural driver-agnostic;
+- `database/provider/service.js` mantém apenas o binding de capability já composta;
+- `database/transaction/{atomic,optional,required}/service.js` concentra a política transacional
+  portável;
+- `database/sqlite/better-sqlite3/` contém o adapter/runtime concreto default, sempre como
+  **resource instance-owned**;
+- `database/sqlite/node-sqlite/` contém o adapter experimental opt-in;
+- `database/sqlite/application/` contém migration runner e schema/migrations físicos compartilhados
+  da aplicação;
+- `indexing/registry/sqlite/schema/service.js` é o owner do schema específico do IO Index.
+
+O **path canônico da aplicação, preparação do diretório e lifecycle da instância** pertencem ao
+composition root `boot/ApplicationInfraHost`, não ao driver. O host cria a resource concreta, injeta
+apenas o port estrutural em `InfraRuntime.database`, revoga o provider durante teardown e então
+dispõe a conexão. Disposal é terminal: uma resource fechada não pode ser reaberta por uma referência
+antiga.
+
+A direção conceitual é:
 
 ```text
-boot → db
-boot → infra/database.configure(provider)
-infra consumers → infra/database
+boot/ApplicationInfraHost
+    → #copilot/infra/public/composition/database/sqlite
+        → infra/composition/database/sqlite/service
+            → infra/database/sqlite/better-sqlite3  (lazy default driver)
+    → InfraRuntime.database                         (injeção do port)
+
+domains/runtime consumers
+    → #copilot/infra/public/database/sqlite         (atomic transaction + structural types; sem raw-path)
+
+infra owners
+    → infra/internal/database/port
+    → infra/internal/database/provider
+    → infra/internal/database/transaction/{atomic|optional|required}
+
+diagnostic tooling → #copilot/infra/public/diagnostic/database/sqlite
+tests fora de infra → #copilot/infra/public/testing/database/sqlite
 ```
 
-Não criar `infra → db` para conveniência.
+Regras:
+
+- nenhum domínio runtime abre SQLite por path;
+- nenhum domínio de produção importa `better-sqlite3` ou `node:sqlite` diretamente;
+- a surface runtime de database não exporta driver, factory de conexão ou raw-path authority;
+- a surface de composition aceita `dbPath` deliberadamente como authority `configured-bound`; o
+  driver concreto permanece lazy e interno;
+- concrete adapters/runtimes públicos existem somente nas audiences `diagnostic` (`diagnostic-only`)
+  e `test` (`test-only`), e governance proíbe seu consumo por produção;
+- não reintroduzir aggregate/marker barrels `infra/database/index.js` ou
+  `infra/database/transaction/index.js`; consumers usam seams semânticos exatos;
+- não reintroduzir service locator global (`getCopilotDb`, `configureCopilotSqliteRuntime`,
+  equivalentes);
+- não criar dependência ascendente
+  `infra/database → model-gateway|mcp|tools|conversation-hub|observability`.
 
 ### 4.12 `cache/`
 

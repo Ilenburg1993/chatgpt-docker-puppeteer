@@ -245,20 +245,21 @@ Deve sair do `terminal/` quando virar:
 - imports do terminal para `#copilot/tools` ficam restritos ao gateway `frontend/gateways/tools.js`;
   comandos e projections devem consumir esse gateway.
 
-## Superfícies públicas autorizadas
+## Entry points de package autorizados
 
-Superfícies públicas canônicas do terminal no `package.json`:
+O terminal mantém package surfaces **somente quando há consumer real**. No estado atual:
 
-- `#copilot/terminal`
-- `#copilot/terminal/commands`
-- `#copilot/terminal/dialog`
 - `#copilot/terminal/frontend`
-- `#copilot/terminal/handlers`
 - `#copilot/terminal/stores`
 - `#copilot/terminal/state/repl-runtime`
 
-Regra: não expor wildcard `#copilot/terminal/*`; novos acessos públicos exigem barrel explícito e
-contrato deliberado.
+`terminal/index.js`, `commands/index.js`, `dialog/index.js` e `handlers/index.js` continuam sendo
+barrels físicos/owners locais, mas **não** ganham alias no `package.json#imports` apenas por
+existirem. O package map não é inventário de diretórios.
+
+Regra: não existe wildcard `#copilot/terminal/*`; novo entrypoint exige consumer concreto e contrato
+semântico deliberado. White-box access pertence a `#copilot/testing/**`, nunca a um alias de
+produção criado por conveniência.
 
 ## Nota de clareza arquitetural
 
