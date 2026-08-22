@@ -18,7 +18,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel, readConfiguredByokSummary } from '#copilot/config';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { classifySdkRateLimitScope, decideModelCallErrorHandling } from '#copilot/sdk/errors';
 import { hostname } from 'node:os';
 import { createErrorHandler } from './error-handler.js';

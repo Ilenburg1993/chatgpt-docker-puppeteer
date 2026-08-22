@@ -8,7 +8,6 @@
  * @see EventBus
  */
 
-import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '#copilot/config/agent';
 import { ConfigError, checkResolvedIp, toError, validateWebhookUrl } from '#copilot/core';
 import { log } from '../ports/logging/index.js';
@@ -175,15 +174,13 @@ export class WebhookManager {
 
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
-                // SEC-AGENT-005: verificar IP resolvido para mitigar DNS rebinding
-                if (!WEBHOOK_ALLOW_PRIVATE_HOSTS) {
-                    try {
-                        const hostname = new URL(url).hostname;
-                        await WebhookManager.#checkResolvedIp(hostname);
-                    } catch (e) {
-                        log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${toError(e).message}`);
-                        return;
-                    }
+                // SEC-AGENT-005: Core é o único owner do default allow-private; explicit policy override continua lá.
+                try {
+                    const hostname = new URL(url).hostname;
+                    await WebhookManager.#checkResolvedIp(hostname);
+                } catch (e) {
+                    log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${toError(e).message}`);
+                    return;
                 }
                 // GAP-ROUTE-002: retry com exponential backoff para falhas retriable
                 await WebhookManager.#deliverWithRetry(id, url, body, WEBHOOK_MAX_RETRIES);

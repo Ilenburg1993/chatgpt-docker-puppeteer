@@ -1276,8 +1276,8 @@ export const modelGatewayProbeExecuteTool = buildTool({
             correlationId: operationId,
             expectedResult: args.mode === 'plan' ? 'dry_run_plan' : 'persisted_runtime_probe',
         });
-        const replay =
-            args.mode === 'apply' && args.confirm ? await readModelGatewayProbeOperation(args.idempotencyKey) : null;
+        const sqliteStore = args.mode === 'apply' && args.confirm ? new SqliteModelGatewayCatalogStore() : null;
+        const replay = sqliteStore ? await readModelGatewayProbeOperation(args.idempotencyKey, { sqliteStore }) : null;
         if (replay) {
             const replayFailureScope =
                 optionalToolString(replay.failureScope) ?? optionalToolString(replay.result?.['failureScope']);
@@ -1441,6 +1441,9 @@ export const modelGatewayProbeExecuteTool = buildTool({
                     optionalToolString(authorizedRoute?.['routeProfile']) ?? optionalToolString(args.routeProfile),
                 providerId: args.providerId,
                 providerModel: args.modelId,
+            },
+            deps: {
+                sqliteStore: sqliteStore ?? new SqliteModelGatewayCatalogStore(),
             },
         });
         const actualProviderId = executed.result?.['providerId'] ?? null;

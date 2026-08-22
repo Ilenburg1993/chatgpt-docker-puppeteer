@@ -8,8 +8,8 @@ const DEFAULT_MAX_PENDING = 4096;
 export const HARD_MAX_BATCH = 1024;
 export const HARD_MAX_PENDING = 20_000;
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readIoExternalWatchConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readIoExternalWatchConfig(env = {}) {
     const testRuntime = env['VITEST'] === 'true' || env['NODE_ENV'] === 'test' || env['NODE_ENV'] === 'testing';
     const enabledRaw = String(env['IO_EXTERNAL_WATCH_ENABLED'] ?? (testRuntime ? '0' : '1'))
         .trim()
@@ -41,7 +41,7 @@ function clampNonNegative(value, fallback, maximum) {
  * @param {{ enabled?: boolean; debounceMs?: number; maxBatch?: number; maxPending?: number }} options
  * @param {ReturnType<typeof readIoExternalWatchConfig>} [base]
  */
-export function resolveIoExternalWatchRuntimeConfig(options = {}, base = readIoExternalWatchConfig()) {
+export function resolveIoExternalWatchRuntimeConfig(options = {}, base = readIoExternalWatchConfig({})) {
     return Object.freeze({
         enabled: options.enabled ?? base.enabled,
         debounceMs: clampNonNegative(options.debounceMs, base.debounceMs, 2_000),

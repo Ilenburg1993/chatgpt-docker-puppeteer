@@ -35,6 +35,12 @@ export * as ErrorCodes from './error-codes.js';
 export { isFatalError, isTransientError, logSwallowed, toError, toExecError, wrapAsync } from './error-handlers.js';
 export * from './errors.js';
 export { isAutoModelSelector, resolveModelSelectionMismatch } from './model-selection.js';
+export {
+    activateCoreProcessPolicy,
+    getCoreProcessPolicyConfig,
+    getCoreProcessPolicySnapshot,
+    readCoreProcessPolicyConfig,
+} from './process-policy.js';
 export { withRetry, withTimeout } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';
 export * from './schemas.js';
@@ -103,18 +109,8 @@ export {
     withIoMeta,
 } from './io-contracts.js';
 export {
-    DEFAULT_BLOCKED_PATH_SEGMENTS,
-    DEFAULT_BLOCKED_READ_PATH_PATTERNS,
-    DEFAULT_BLOCKED_WRITE_PATH_PATTERNS,
-    IO_POLICY_VERSION as IO_PATH_POLICY_VERSION,
     IO_URL_MAX_REDIRECTS,
-    evaluateIoPathPolicy,
-    evaluateIoPathPolicyAsync,
     evaluateIoUrlPolicy,
-    getIoPathPolicyCacheStats,
-    invalidateIoPathPolicyCache,
-    readIoPathPolicyCacheConfig,
-    resetIoPathPolicyCacheForTest,
     resolveIoAdvisoryLimits,
     sanitizeIoTextOutput,
 } from './io-policy.js';

@@ -22,11 +22,13 @@ function buildCacheKey(filePath, content, suppliedContentHash, parserCacheRuntim
     return `${normalized}\u0000${content.length}\u0000${hash}`;
 }
 
-/** @param {string} filePath @param {string} content @param {{ contentHash?: string; parserCacheRuntime?: ReturnType<typeof import('../cache/runtime/index.js').createParserCacheRuntime> }} [options] @returns {Promise<FileContext>} */
+/** @param {string} filePath @param {string} content @param {{ contentHash?: string; parserCacheRuntime?: ReturnType<typeof import('../cache/runtime/index.js').createParserCacheRuntime>; parserConfig?: ReturnType<typeof import('../foundation/index.js').readParserProcessConfig> }} [options] @returns {Promise<FileContext>} */
 export async function parseFileForContext(filePath, content, options = {}) {
     const parserCacheRuntime = options.parserCacheRuntime ?? null;
     if (!parserCacheRuntime) {
-        const symbols = await parseFileSymbols(filePath, content);
+        const symbols = await parseFileSymbols(filePath, content, {
+            ...(options.parserConfig ? { parserConfig: options.parserConfig } : {}),
+        });
         return { symbols, outline: buildOutline(symbols), topComments: extractTopComments(content) };
     }
     parserCacheRuntime.ensureInvalidationHook();
@@ -42,6 +44,7 @@ export async function parseFileForContext(filePath, content, options = {}) {
         fileContextCacheStats.misses += 1;
     } else fileContextCacheStats.bypasses += 1;
     const symbols = await parseFileSymbols(filePath, content, {
+        parserConfig: parserCacheRuntime.parserConfig,
         ...(parserCacheRuntime.workerRuntime ? { workerRuntime: parserCacheRuntime.workerRuntime } : {}),
     });
     const context = { symbols, outline: buildOutline(symbols), topComments: extractTopComments(content) };

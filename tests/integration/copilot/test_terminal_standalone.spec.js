@@ -22,7 +22,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { PinnedFilesLoader } from '#copilot/config/pinned-files';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { PinnedFilesLoader } from '#copilot/testing/config/pinned-files';
 import { getMcpStatus } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 import { getToolStats, recordToolCall } from '../../../src/copilot/observability/tool-stats.js';
 
@@ -59,16 +60,33 @@ describe('F13.4 terminal-standalone: MCP status sem server', () => {
 // F13.4 — Teste 2: PinnedFilesLoader resiliente
 // ─────────────────────────────────────────────────────────────────────────────
 
+let pinnedGrantSequence = 0;
+
+/** @param {string[]} dirs */
+function createPinnedLoader(dirs) {
+    const authorityRoots = dirs.length > 0 ? dirs : [process.cwd()];
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: `test.terminal-standalone.pinned.${++pinnedGrantSequence}`,
+            roots: authorityRoots,
+            operations: ['list', 'read', 'stat', 'watch'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+    return new PinnedFilesLoader({ dirs, io });
+}
+
 describe('F13.4 terminal-standalone: PinnedFilesLoader resiliente', () => {
     it('start() não lança com dirs inexistentes', async () => {
-        const loader = new PinnedFilesLoader(['/caminho/que/nao/existe/abc123', '/outro/caminho/inexistente/xyz789']);
+        const loader = createPinnedLoader(['/caminho/que/nao/existe/abc123', '/outro/caminho/inexistente/xyz789']);
         // Não deve lançar — deve ignorar silenciosamente dirs inexistentes
         await assert.doesNotReject(() => loader.start(), 'start() não deve rejeitar com dirs inexistentes');
         loader.stop();
     });
 
     it('getFiles() retorna array vazio com dirs inexistentes', async () => {
-        const loader = new PinnedFilesLoader(['/nao/existe/dir1', '/nao/existe/dir2']);
+        const loader = createPinnedLoader(['/nao/existe/dir1', '/nao/existe/dir2']);
         await loader.start();
         const files = loader.getFiles();
         assert.ok(Array.isArray(files), 'getFiles deve retornar array');
@@ -77,7 +95,7 @@ describe('F13.4 terminal-standalone: PinnedFilesLoader resiliente', () => {
     });
 
     it('buildContext() retorna string vazia quando sem arquivos', async () => {
-        const loader = new PinnedFilesLoader([]);
+        const loader = createPinnedLoader([]);
         await loader.start();
         const ctx = loader.buildContext();
         assert.strictEqual(ctx, '', 'buildContext deve retornar string vazia sem arquivos');
@@ -85,7 +103,7 @@ describe('F13.4 terminal-standalone: PinnedFilesLoader resiliente', () => {
     });
 
     it('start() com lista vazia de dirs não falha', async () => {
-        const loader = new PinnedFilesLoader([]);
+        const loader = createPinnedLoader([]);
         await assert.doesNotReject(() => loader.start(), 'start() com dirs vazio não deve rejeitar');
         loader.stop();
     });

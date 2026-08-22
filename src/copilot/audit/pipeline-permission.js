@@ -10,7 +10,8 @@
  */
 
 import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { join, resolve } from 'node:path';
 import { getLogDir, log } from './logger.js';
@@ -50,12 +51,23 @@ const TOOL_PERMISSIONS_LOG = COPILOT_TOOL_PERMISSIONS_LOG
       ? resolve(COPILOT_AUDIT_LOG_PATH)
       : join(resolve(getLogDir()), 'tool-permissions-audit.jsonl');
 const MAX_LOG_BYTES = TOOL_AUDIT_MAX_LOG_BYTES;
-const permissionAuditWriter = createJsonlFileWriter({
+const TOOL_PERMISSIONS_ROTATED_LOG = `${TOOL_PERMISSIONS_LOG}.1`;
+const PERMISSION_AUDIT_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'audit.permission.jsonl',
+        exactPaths: [TOOL_PERMISSIONS_LOG, TOOL_PERMISSIONS_ROTATED_LOG],
+        operations: ['append', 'move', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['file'],
+    }),
+);
+const permissionAuditWriter = createBoundJsonlFileWriter({
     filePath: TOOL_PERMISSIONS_LOG,
+    io: PERMISSION_AUDIT_IO,
     maxBytes: MAX_LOG_BYTES,
     maxQueueLines: 10_000,
     softQueueLines: 8_000,
-    flushToDisk: true,
+    durability: 'file',
     onError: (error) => logSwallowed(error, 'audit.pipeline.logPermission'),
 });
 

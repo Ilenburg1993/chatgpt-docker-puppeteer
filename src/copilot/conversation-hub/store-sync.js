@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
 import { log } from '#copilot/observability';
 
 /**
@@ -21,7 +22,7 @@ import { log } from '#copilot/observability';
  * - `ConversationMessage.content` → `content`
  * - `ConversationMessage.id` → usado como `metadata.sdkTurnId` para dedup
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {string} hubSessionId - ID da hub_session destino
  * @param {string} sdkSessionId - ID da sessão SDK de origem
  * @param {{ id?: string; type: string; content: string; createdAt?: number }[]} messages
@@ -31,7 +32,7 @@ export function syncFromSdkHistory(db, hubSessionId, sdkSessionId, messages) {
     let synced = 0;
     let skipped = 0;
 
-    const doSync = db.transaction(() => {
+    runSqliteTransaction(db, () => {
         for (const msg of messages) {
             // BUG-CRIT-03 fix: underscore canônico alinhado com TurnRole typedef ('llm_b', não 'llm-b')
             const role = msg.type === 'assistant' ? 'llm_b' : 'user';
@@ -82,7 +83,6 @@ export function syncFromSdkHistory(db, hubSessionId, sdkSessionId, messages) {
         }
     });
 
-    doSync();
     log('DEBUG', `[ConversationStore] syncFromSdkHistory: ${synced} sincronizados, ${skipped} ignorados (dupl).`);
     return { synced, skipped };
 }

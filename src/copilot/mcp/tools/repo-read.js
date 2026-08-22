@@ -5,10 +5,10 @@
  * @module copilot/mcp/tools/repo-read
  */
 
-import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import { windowFileContext } from '#copilot/infra/public/indexing/file-context';
 import { truncateUtf8String } from '#copilot/infra/public/platform/buffer';
+import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/infra/public/policy';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     errorResult,

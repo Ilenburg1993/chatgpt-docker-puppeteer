@@ -483,7 +483,10 @@ describe('infra/io-engine', () => {
 
         const cached = await readText(file);
         expect(cached.content).toBe('{"version":1}\n');
-        expect(infraRuntime.coherence.l1.stats().size).toBeGreaterThan(0);
+        const l1Stats = infraRuntime.coherence.l1.stats();
+        expect(l1Stats).not.toBeNull();
+        if (!l1Stats) throw new Error('L1 cache should be materialized after cached read');
+        expect(l1Stats.size).toBeGreaterThan(0);
 
         // Simula writer externo que não publica invalidation no processo atual. O cached read pode continuar dentro de sua
         // janela de stale-probe; o fresh read deve refletir o snapshot físico sem consultar L1/L2.
@@ -653,6 +656,7 @@ describe('infra/io-engine', () => {
         await infraRuntime.dispose();
         infraRuntime = createInfraRuntime({
             runtimeId: `io-engine-byte-index-disabled-${Date.now()}-${Math.random()}`,
+            env: process.env,
         });
         const dir = await createTempDir();
         const file = join(dir, 'chunks-fallback.txt');

@@ -13,7 +13,7 @@ echo ""
 
 # Test Vite (Frontend)
 echo "🔍 Testing Vite Dev Server..."
-if curl -sf "http://localhost:5173/dashboard/" >/dev/null; then
+if curl -sf "http://localhost:5173/dashboard/" > /dev/null; then
     echo "✅ Vite: OK (http://$CONTAINER_IP:5173/dashboard/)"
 else
     echo "❌ Vite: FAIL"
@@ -22,7 +22,7 @@ fi
 
 # Test Express (Backend)
 echo "🔍 Testing Express API..."
-if curl -sf "http://localhost:3008/api/health" >/dev/null; then
+if curl -sf "http://localhost:3008/api/health" > /dev/null; then
     echo "✅ Express: OK (http://localhost:3008/api/health)"
 else
     echo "❌ Express: FAIL"
@@ -31,7 +31,7 @@ fi
 
 # Test PM2
 echo "🔍 Testing PM2 processes..."
-PM2_ONLINE=$(npx pm2 jlist 2>/dev/null | jq -r '.[] | select(.pm2_env.status=="online") | .name' | wc -l)
+PM2_ONLINE=$(npx pm2 jlist 2> /dev/null | jq -r '.[] | select(.pm2_env.status=="online") | .name' | wc -l)
 echo "✅ PM2: $PM2_ONLINE processes online"
 
 echo ""

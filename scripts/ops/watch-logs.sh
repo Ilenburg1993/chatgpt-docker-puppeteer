@@ -20,7 +20,7 @@ COLOR_GREEN="\033[92m"
 COLOR_RESET="\033[0m"
 
 # Check if PM2 is available
-if ! command -v pm2 >/dev/null 2>&1; then
+if ! command -v pm2 > /dev/null 2>&1; then
     echo -e "${COLOR_RED}✗ PM2 not found! Install with: npm install -g pm2${COLOR_RESET}"
     exit 1
 fi
@@ -36,7 +36,10 @@ if [ -z "$FILTER" ] || [ "$FILTER" = "all" ]; then
     echo "Pressione Ctrl+C para sair"
     echo ""
     sleep 2
-    npx pm2 logs --raw --timestamp --lines 100 || { echo -e "${COLOR_RED}✗ Failed to read PM2 logs${COLOR_RESET}"; exit 1; }
+    npx pm2 logs --raw --timestamp --lines 100 || {
+        echo -e "${COLOR_RED}✗ Failed to read PM2 logs${COLOR_RESET}"
+        exit 1
+    }
 else
     echo -e "${COLOR_YELLOW}Modo: Filtro '$FILTER'${COLOR_RESET}"
     echo "Pressione Ctrl+C para sair"
@@ -44,16 +47,16 @@ else
 
     # Color code based on filter level
     case "$FILTER" in
-        error|ERROR)
+        error | ERROR)
             echo -e "${COLOR_RED}Mostrando apenas ERROs...${COLOR_RESET}"
             ;;
-        warn|WARN|warning|WARNING)
+        warn | WARN | warning | WARNING)
             echo -e "${COLOR_YELLOW}Mostrando apenas WARNINGs...${COLOR_RESET}"
             ;;
-        info|INFO)
+        info | INFO)
             echo -e "${COLOR_GREEN}Mostrando apenas INFO...${COLOR_RESET}"
             ;;
-        debug|DEBUG)
+        debug | DEBUG)
             echo -e "${COLOR_CYAN}Mostrando apenas DEBUG...${COLOR_RESET}"
             ;;
     esac

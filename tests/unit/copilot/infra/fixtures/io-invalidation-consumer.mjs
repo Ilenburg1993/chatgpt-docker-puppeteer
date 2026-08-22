@@ -1,3 +1,4 @@
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import { createCrossProcessInvalidationJournal } from '#copilot/infra/internal/filesystem/invalidation';
 import Database from 'better-sqlite3';
 
@@ -8,7 +9,7 @@ const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('busy_timeout = 1000');
 const journal = createCrossProcessInvalidationJournal({
-    db,
+    db: adaptBetterSqliteDatabase(db),
     processInstance: `consumer-${process.pid}`,
     config: {
         enabled: true,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import '../bootstrap-sqlite.mjs';
 /**
  * Canonical live runner for `terminal:llm-b`.
  *

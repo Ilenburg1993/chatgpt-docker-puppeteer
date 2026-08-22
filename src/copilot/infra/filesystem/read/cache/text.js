@@ -1,7 +1,7 @@
 // @ts-check
 /** Cached L1/L2 UTF-8 text read service and line projection. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import {
     bufferIsUtf8,
@@ -39,7 +39,7 @@ import { normalizeTextHashMode, resolveTextHashes } from './hash-policy.js';
  *     advisoryLimits?: Record<string, unknown>;
  *     signal?: AbortSignal;
  *     hashMode?: TextHashMode;
- *     cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2CacheRuntime>};
+ *     cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:{get:()=>ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2SqliteCache>|null}};
  *     readRuntime?: {hashes:ReturnType<typeof import('./hash-runtime.js').createIoReadHashRuntime>;lineOffsets:ReturnType<typeof import('./line-offset-runtime.js').createLineOffsetCacheRuntime>};
  * }} [options]
  */

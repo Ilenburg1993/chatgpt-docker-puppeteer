@@ -1,9 +1,5 @@
 // @ts-check
 /** @module copilot/infra/public/persistence/jsonl */
 
-export {
-    createJsonlFileWriter,
-    readJsonlTail,
-    readJsonlTailTrusted,
-    repairJsonlTrailingPartial,
-} from '../../../persistence/jsonl/index.js';
+export { createBoundJsonlFileWriter, createBoundJsonlTailReader } from '../../../persistence/jsonl/bound/index.js';
+export { parseJsonlTextRecords, trimJsonlTextEntries } from '../../../persistence/jsonl/kernel/index.js';

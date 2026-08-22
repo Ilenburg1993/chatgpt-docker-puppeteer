@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     SqliteModelGatewayCatalogStore,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 const args = process.argv.slice(2);
 /** @param {string} name */
@@ -24,14 +24,6 @@ const numberFor = (name, fallback) => {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : fallback;
 };
-
-if (hasFlag('--json')) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-sqlite-retention.mjs [options]

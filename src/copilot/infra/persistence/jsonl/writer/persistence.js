@@ -17,7 +17,7 @@ import path from 'node:path';
  *   resolveRotatedPath: (filePath:string)=>string;
  *   syncDirectory: typeof import('#copilot/infra/internal/platform/node/filesystem').syncParentDirectoryBestEffort;
  *   onPhase?: JsonlFileWriterOptions['onPhase'];
- *   sizeTracker: ReturnType<typeof import('./size-tracker.js').createJsonlSizeTracker>;
+ *   sizeTracker: ReturnType<typeof import('../size-tracker/index.js').createJsonlSizeTracker>;
  * }} options
  */
 export function createJsonlBatchPersistence(options) {

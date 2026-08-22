@@ -14,11 +14,11 @@
 // ─── Re-exports de tipos do SDK (via sdk/types.js como fonte canônica) ──────
 
 /**
- * @typedef {import('#copilot/sdk/types.js').PermissionHandler} PermissionHandler
+ * @typedef {import('#copilot/sdk/types').PermissionHandler} PermissionHandler
  *
- * @typedef {import('#copilot/sdk/types.js').PermissionRequest} PermissionRequest
+ * @typedef {import('#copilot/sdk/types').PermissionRequest} PermissionRequest
  *
- * @typedef {import('#copilot/sdk/types.js').PermissionRequestResult} PermissionRequestResult
+ * @typedef {import('#copilot/sdk/types').PermissionRequestResult} PermissionRequestResult
  */
 
 // ─── Tipos dos 6 hooks SDK ────────────────────────────────────────────────────
@@ -26,7 +26,7 @@
 /**
  * Conjunto de hooks para uma sessão Copilot SDK.
  *
- * @typedef {import('#copilot/sdk/types.js').SessionHooks} SessionHooks
+ * @typedef {import('#copilot/sdk/types').SessionHooks} SessionHooks
  */
 
 /**
@@ -37,7 +37,7 @@
  */
 
 /**
- * @typedef {import('#copilot/sdk/types.js').PreMcpToolCallHandler} PreMcpToolCallHandler
+ * @typedef {import('#copilot/sdk/types').PreMcpToolCallHandler} PreMcpToolCallHandler
  */
 
 /**
@@ -48,7 +48,7 @@
  */
 
 /**
- * @typedef {import('#copilot/sdk/types.js').PostToolUseFailureHandler} PostToolUseFailureHandler
+ * @typedef {import('#copilot/sdk/types').PostToolUseFailureHandler} PostToolUseFailureHandler
  */
 
 /**
@@ -90,7 +90,7 @@
  */
 
 /**
- * @typedef {import('#copilot/sdk/types.js').PreToolUseHookInput} PreToolUseHookInput
+ * @typedef {import('#copilot/sdk/types').PreToolUseHookInput} PreToolUseHookInput
  */
 
 /**
@@ -113,7 +113,7 @@
  * @property {string} [sessionId]
  * @property {string} toolName
  * @property {unknown} toolArgs
- * @property {import('#copilot/sdk/types.js').ToolResultObject} toolResult
+ * @property {import('#copilot/sdk/types').ToolResultObject} toolResult
  * @property {Date | number} timestamp
  * @property {string} [workingDirectory]
  * @property {string} [cwd]
@@ -162,7 +162,7 @@
  */
 
 /**
- * @typedef {import('#copilot/sdk/types.js').ErrorOccurredHookInput} ErrorOccurredHookInput
+ * @typedef {import('#copilot/sdk/types').ErrorOccurredHookInput} ErrorOccurredHookInput
  */
 
 /**
@@ -195,7 +195,7 @@
 
 /**
  * @typedef {object} PostToolUseHookOutput
- * @property {import('#copilot/sdk/types.js').ToolResultObject} [modifiedResult] - Resultado modificado pelo hook
+ * @property {import('#copilot/sdk/types').ToolResultObject} [modifiedResult] - Resultado modificado pelo hook
  * @property {string} [additionalContext] - Contexto adicional injetado no modelo
  * @property {boolean} [suppressOutput] - Solicita supressão da saída do hook/tool
  */

@@ -40,8 +40,8 @@ echo
 # Test 2: List Tools
 echo "[2/5] Testing tools/list..."
 tools=$(curl -s -X POST http://localhost:3008/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')
 
 if echo "$tools" | jq -e '.result.tools' > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Tools listed${NC}"
@@ -57,8 +57,8 @@ echo
 # Test 3: ollama_models
 echo "[3/5] Testing ollama_models..."
 models=$(curl -s -X POST http://localhost:3008/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ollama_models","arguments":{}}}')
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ollama_models","arguments":{}}}')
 
 if echo "$models" | jq -e '.result.content' > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Models listed${NC}"
@@ -75,8 +75,8 @@ echo "[4/5] Testing ollama_generate (small prompt)..."
 echo -e "${YELLOW}Generating with 50 tokens...${NC}"
 start=$(date +%s%3N)
 generate=$(curl -s -X POST http://localhost:3008/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ollama_generate","arguments":{"prompt":"Say hi in one sentence","max_tokens":50}}}')
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ollama_generate","arguments":{"prompt":"Say hi in one sentence","max_tokens":50}}}')
 end=$(date +%s%3N)
 duration=$((end - start))
 
@@ -98,29 +98,29 @@ echo -e "${YELLOW}This may take up to 90s (MCP timeout)...${NC}"
 start=$(date +%s%3N)
 
 timeout_test=$(curl -s -X POST http://localhost:3008/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ollama_generate","arguments":{"prompt":"Write a very long detailed essay about artificial intelligence, machine learning, neural networks, deep learning, transformers, and the history of AI research","max_tokens":2000}}}' \
-  2>&1 || echo "curl_error")
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ollama_generate","arguments":{"prompt":"Write a very long detailed essay about artificial intelligence, machine learning, neural networks, deep learning, transformers, and the history of AI research","max_tokens":2000}}}' \
+    2>&1 || echo "curl_error")
 
 end=$(date +%s%3N)
 duration=$((end - start))
 
 # Check if request completed or timed out
 if [[ $duration -gt 90000 ]]; then
-  echo -e "${RED}❌ Timeout not enforced (took ${duration}ms > 90s)${NC}"
-  exit 1
+    echo -e "${RED}❌ Timeout not enforced (took ${duration}ms > 90s)${NC}"
+    exit 1
 else
-  # Check if response contains error or timeout message
-  if echo "$timeout_test" | jq -e '.result.content[0].text' | grep -qi "timeout\|timed out" 2>/dev/null; then
-    echo -e "${GREEN}✅ Timeout enforced correctly (${duration}ms)${NC}"
-    echo "$timeout_test" | jq -r '.result.content[0].text' | head -5
-  elif echo "$timeout_test" | jq -e '.result.content' > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Completed within ${duration}ms (< 90s)${NC}"
-    echo "Response length: $(echo "$timeout_test" | jq -r '.result.content[0].text' | wc -c) chars"
-  else
-    echo -e "${YELLOW}⚠️  Unexpected response format (${duration}ms)${NC}"
-    echo "$timeout_test" | head -20
-  fi
+    # Check if response contains error or timeout message
+    if echo "$timeout_test" | jq -e '.result.content[0].text' | grep -qi "timeout\|timed out" 2> /dev/null; then
+        echo -e "${GREEN}✅ Timeout enforced correctly (${duration}ms)${NC}"
+        echo "$timeout_test" | jq -r '.result.content[0].text' | head -5
+    elif echo "$timeout_test" | jq -e '.result.content' > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Completed within ${duration}ms (< 90s)${NC}"
+        echo "Response length: $(echo "$timeout_test" | jq -r '.result.content[0].text' | wc -c) chars"
+    else
+        echo -e "${YELLOW}⚠️  Unexpected response format (${duration}ms)${NC}"
+        echo "$timeout_test" | head -20
+    fi
 fi
 
 echo

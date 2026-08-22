@@ -5,7 +5,7 @@
  * @module copilot/infra/operations/operation
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { randomUUID } from 'node:crypto';
 
 /** @typedef {import('./contracts/index.js').IoOperationStatus} IoOperationStatus */

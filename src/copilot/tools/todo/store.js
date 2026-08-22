@@ -1,7 +1,8 @@
 // @ts-check
 import { resolveHooksStateFile } from '#copilot/boot';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 import { logSwallowed, registerInterval, toError } from '#copilot/core';
-import { getCopilotDb } from '#copilot/db';
+import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
 import { log } from '../infra/logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
 /**
@@ -20,8 +21,8 @@ import { SCHEMA_VERSION } from './todo-schema.js';
  *
  * @module copilot/tools/todo/store
  * @see EventBus
- * @see module:copilot/db/migrations
- * @see module:copilot/db/sqlite
+ * @see module:copilot/infra/database/sqlite/application/migrations
+ * @see module:copilot/infra/database/sqlite/better-sqlite3/runtime
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
@@ -66,7 +67,7 @@ async function ensureTodoLegacyMigration() {
     if (_legacyMigrationPromise) return _legacyMigrationPromise;
     _legacyMigrationPromise = (async () => {
         try {
-            const db = getCopilotDb();
+            const db = getApplicationSqliteDatabase();
             const count = /** @type {{ n: number }} */ (
                 db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get()
             );
@@ -81,14 +82,13 @@ async function ensureTodoLegacyMigration() {
             const data = JSON.parse(raw);
             const tasks = typeof data?.tasks === 'object' ? data.tasks : {};
             const insert = db.prepare('INSERT OR IGNORE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');
-            const insertMany = db.transaction((/** @type {[string, string][]} */ rows) => {
-                for (const [id, json] of rows) insert.run(id, json);
-            });
             const rows = /** @type {[string, string][]} */ (
                 Object.entries(tasks).map(([id, task]) => [id, JSON.stringify(task)])
             );
             if (rows.length > 0) {
-                insertMany(rows);
+                runSqliteTransaction(db, () => {
+                    for (const [id, json] of rows) insert.run(id, json);
+                });
                 log('INFO', `[todo/store] Migração JSON->SQLite: ${rows.length} tarefas importadas.`);
             }
         } catch (error) {
@@ -148,7 +148,7 @@ export async function withStoreRead(fn) {
  */
 async function _readStoreRaw() {
     try {
-        const db = getCopilotDb();
+        const db = getApplicationSqliteDatabase();
         const rows = /** @type {{ id: string; data: string }[]} */ (
             db.prepare('SELECT id, data FROM copilot_todo_tasks').all()
         );
@@ -185,17 +185,16 @@ async function _readStoreRaw() {
  * @returns {Promise<void>}
  */
 async function _writeStoreRaw(store) {
-    const db = getCopilotDb();
+    const db = getApplicationSqliteDatabase();
     const upsert = db.prepare('INSERT OR REPLACE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');
     const del = db.prepare('DELETE FROM copilot_todo_tasks WHERE id NOT IN (SELECT value FROM json_each(?))');
     const ids = Object.keys(store.tasks);
-    const txn = db.transaction(() => {
+    runSqliteTransaction(db, () => {
         for (const [id, task] of Object.entries(store.tasks)) {
             upsert.run(id, JSON.stringify(task));
         }
         del.run(JSON.stringify(ids));
     });
-    txn();
 }
 
 /**
@@ -257,7 +256,7 @@ export async function readTasksPage(opts = {}) {
     const acquire = _storeMutex.then(() => undefined);
     await acquire;
 
-    const db = getCopilotDb();
+    const db = getApplicationSqliteDatabase();
     /** @type {string[]} */
     const where = [];
     /** @type {unknown[]} */
@@ -360,7 +359,7 @@ export async function searchTasksPage(opts) {
     const acquire = _storeMutex.then(() => undefined);
     await acquire;
 
-    const db = getCopilotDb();
+    const db = getApplicationSqliteDatabase();
     /** @type {string[]} */
     const where = [];
     /** @type {unknown[]} */

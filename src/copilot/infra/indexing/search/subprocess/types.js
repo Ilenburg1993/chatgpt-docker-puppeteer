@@ -6,6 +6,7 @@
  * @property {number} [timeout]
  * @property {number} [maxBuffer]
  * @property {AbortSignal} [signal]
+ * @property {Readonly<Record<string,string>>} [env]
  *
  * @typedef {SearchSubprocessOptions & {
  *     onStdoutLine?: (line: string) => boolean | void;

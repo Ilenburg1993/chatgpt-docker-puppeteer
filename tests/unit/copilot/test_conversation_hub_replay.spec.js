@@ -13,13 +13,14 @@
  * 5. Hub encerrado corretamente via close()
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
-import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
 
 /**
  * Aplica migrations copilot em banco in-memory.
@@ -36,7 +37,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -58,7 +59,7 @@ beforeAll(() => {
     applyCopilotMigrations(testDb);
 
     store = new ConversationStore();
-    store.init(testDb);
+    store.init(adaptBetterSqliteDatabase(testDb));
 });
 
 afterAll(() => {
@@ -204,7 +205,7 @@ describe('F35.5 — HubOrchestrator standalone flow', () => {
         orchDb = new Database(':memory:');
         applyCopilotMigrations(orchDb);
         orchStore = new ConversationStore();
-        orchStore.init(orchDb);
+        orchStore.init(adaptBetterSqliteDatabase(orchDb));
 
         const mockAgent = { sessionId: 'test-session' };
         orch = new HubOrchestrator(orchStore, mockAgent);

@@ -31,14 +31,14 @@ vi.mock('#copilot/observability/logger', () => ({
 
 describe('FG-3 — tools barrel contract', () => {
     it('exports allTools, buildTool, withSkipPermission', async () => {
-        const barrel = await import('#copilot/tools/index');
+        const barrel = await import('#copilot/tools');
         expect(barrel.allTools, 'missing allTools').toBeDefined();
         expect(barrel.buildTool, 'missing buildTool').toBeDefined();
         expect(barrel.withSkipPermission, 'missing withSkipPermission').toBeDefined();
     });
 
     it('allTools is an array', async () => {
-        const barrel = await import('#copilot/tools/index');
+        const barrel = await import('#copilot/tools');
         expect(Array.isArray(barrel.allTools)).toBe(true);
     });
 });
@@ -49,7 +49,7 @@ describe('FG-3 — tools barrel contract', () => {
 
 describe('FG-3 — core barrel contract', () => {
     it('exports fundamental error classes', async () => {
-        const barrel = await import('#copilot/core/index');
+        const barrel = await import('#copilot/core');
         const expected = [
             'CopilotError',
             'ConfigError',
@@ -65,7 +65,7 @@ describe('FG-3 — core barrel contract', () => {
     });
 
     it('exports resilience utilities', async () => {
-        const barrel = await import('#copilot/core/index');
+        const barrel = await import('#copilot/core');
         const expected = ['withRetry', 'withTimeout', 'CircuitBreaker', 'wrapAsync'];
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
@@ -73,7 +73,7 @@ describe('FG-3 — core barrel contract', () => {
     });
 
     it('exports shutdown management', async () => {
-        const barrel = await import('#copilot/core/index');
+        const barrel = await import('#copilot/core');
         const expected = [
             'registerShutdownHandler',
             'runShutdown',

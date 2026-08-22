@@ -2,7 +2,6 @@
 import { config as loadDotenv } from 'dotenv';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayValueRedaction,
@@ -19,6 +18,7 @@ import {
     refreshModelGatewayCatalog,
     SqliteModelGatewayCatalogStore,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });
@@ -45,13 +45,6 @@ const numberFor = (name, fallback) => {
 };
 
 const json = hasFlag('--json');
-if (json) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-metadata-build.mjs [options]

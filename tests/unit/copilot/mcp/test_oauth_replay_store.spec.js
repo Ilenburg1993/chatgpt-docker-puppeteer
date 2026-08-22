@@ -1,5 +1,7 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
+
 import { createOAuthReplayStore, OAUTH_REPLAY_NAMESPACES } from '#copilot/mcp/control-plane';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
@@ -16,8 +18,8 @@ describe('persistent OAuth replay store', () => {
     it('rejects a replay across independent store instances and stores only a hash', () => {
         const db = new Database(':memory:');
         databases.push(db);
-        const first = createOAuthReplayStore(db, { now: () => 1_000 });
-        const second = createOAuthReplayStore(db, { now: () => 1_001 });
+        const first = createOAuthReplayStore(adaptBetterSqliteDatabase(db), { now: () => 1_000 });
+        const second = createOAuthReplayStore(adaptBetterSqliteDatabase(db), { now: () => 1_001 });
         const rawKey = 'client-id:highly-sensitive-jti';
 
         assert.deepEqual(first.remember(OAUTH_REPLAY_NAMESPACES.privateKeyJwt, rawKey, 5_000), {
@@ -41,7 +43,7 @@ describe('persistent OAuth replay store', () => {
         const db = new Database(':memory:');
         databases.push(db);
         let nowMs = 1_000;
-        const store = createOAuthReplayStore(db, { now: () => nowMs });
+        const store = createOAuthReplayStore(adaptBetterSqliteDatabase(db), { now: () => nowMs });
 
         assert.equal(store.remember(OAUTH_REPLAY_NAMESPACES.resourceDpop, 'jkt:jti', 1_500).stored, true);
         nowMs = 1_501;
@@ -54,7 +56,10 @@ describe('persistent OAuth replay store', () => {
         const db = new Database(':memory:');
         databases.push(db);
         let nowMs = 1_000;
-        const store = createOAuthReplayStore(db, { now: () => nowMs, maxEntriesPerNamespace: 100 });
+        const store = createOAuthReplayStore(adaptBetterSqliteDatabase(db), {
+            now: () => nowMs,
+            maxEntriesPerNamespace: 100,
+        });
 
         for (let index = 0; index < 105; index += 1) {
             nowMs += 1;

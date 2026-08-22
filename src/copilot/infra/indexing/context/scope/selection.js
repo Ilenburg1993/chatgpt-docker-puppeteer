@@ -64,6 +64,7 @@ export async function selectAndWarmScopePaths(scope, opts, signal, runtime) {
                 selectionMode,
                 preferredPaths: effectivePreferredPaths,
                 recursive,
+                ...(runtime.scannerConfig ? { scannerConfig: runtime.scannerConfig } : {}),
             },
             {
                 concurrency,

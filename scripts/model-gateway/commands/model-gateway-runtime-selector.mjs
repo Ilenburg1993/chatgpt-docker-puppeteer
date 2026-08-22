@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
@@ -25,6 +24,7 @@ import {
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../../../src/copilot/model-gateway/index.js';
 import { shutdownClient } from '../../../src/copilot/sdk/session/index.js';
+import '../bootstrap-sqlite.mjs';
 import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
@@ -356,14 +356,6 @@ const fallbackExecutionProfiles = readArg('--fallback-profiles')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
-
-if (json) {
-    setDbLogger((level, message) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${message}\n`);
-        }
-    });
-}
 
 const context = await buildRuntimeSelectorContext({
     strict,

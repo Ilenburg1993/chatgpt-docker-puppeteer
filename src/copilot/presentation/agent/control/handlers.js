@@ -259,7 +259,7 @@ function createInjectTraceId() {
 }
 
 /**
- * @returns {import('#copilot/observability/metrics.js').MetricsStore | null}
+ * @returns {import('#copilot/observability/metrics').MetricsStore | null}
  */
 function resolveMetricsStoreSafe() {
     try {

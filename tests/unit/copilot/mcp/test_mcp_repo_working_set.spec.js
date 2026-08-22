@@ -34,14 +34,43 @@ const mocks = vi.hoisted(() => {
         completedAt: 2,
         maxActiveScopes: 32,
     };
+    const getScopeStats = vi.fn((sessionId = 'mock') => ({ ...stats, sessionId }));
+    const refreshScope = vi.fn(
+        async (/** @type {string} */ _sessionId, /** @type {string[] | undefined} */ _paths) => ({
+            refreshed: 0,
+            removed: 0,
+            failed: 0,
+            skipped: 0,
+        }),
+    );
+    const closeScope = vi.fn((sessionId = 'mock') => ({ ...stats, sessionId }));
+    const declareScope = vi.fn((options) => {
+        const sessionId = String(options.sessionId);
+        let active = true;
+        return Object.freeze({
+            sessionId,
+            get ready() {
+                return active;
+            },
+            awaitReady: vi.fn(async () => ({ ...stats, sessionId })),
+            refresh: vi.fn(async (paths) => refreshScope(sessionId, paths)),
+            snapshot: vi.fn(() => (active ? getScopeStats(sessionId) : null)),
+            close: vi.fn(() => {
+                if (!active) return null;
+                active = false;
+                return closeScope(sessionId);
+            }),
+            async [Symbol.asyncDispose]() {
+                if (!active) return;
+                active = false;
+                closeScope(sessionId);
+            },
+        });
+    });
     return {
         stats,
-        declareScope: vi.fn(() => ({
-            sessionId: 'ignored-by-tool',
-            ready: false,
-            awaitReady: vi.fn(async () => stats),
-        })),
-        getScopeStats: vi.fn(() => stats),
+        declareScope,
+        getScopeStats,
         getScopeContext: vi.fn(() => ({
             sessionId: 'mock',
             files: 2,
@@ -68,13 +97,13 @@ const mocks = vi.hoisted(() => {
                 symbol: { name: 'alpha', kind: 'function', line: 1, exported: true },
             },
         ]),
-        refreshScope: vi.fn(async () => ({ refreshed: 0, removed: 0, failed: 0, skipped: 0 })),
-        closeScope: vi.fn(() => stats),
+        refreshScope,
+        closeScope,
     };
 });
 
 vi.mock('#copilot/mcp/control-plane', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('#copilot/mcp/control-plane')} */ (await importOriginal());
     return {
         ...actual,
         getMcpWorkspaceIndexing: () => ({ context: mocks }),

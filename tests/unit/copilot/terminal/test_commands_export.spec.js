@@ -127,7 +127,10 @@ const readTerminalTimelineProjection = /** @type {import('vitest').Mock<
     )
 );
 
-const writeFileAtomic = vi.hoisted(() => vi.fn(async () => undefined));
+/** @type {import('vitest').Mock<(filePath:string,content:string|Buffer)=>Promise<void>>} */
+const writeFileAtomic = vi.hoisted(() =>
+    vi.fn(async (/** @type {string} */ _filePath, /** @type {string|Buffer} */ _content) => undefined),
+);
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,

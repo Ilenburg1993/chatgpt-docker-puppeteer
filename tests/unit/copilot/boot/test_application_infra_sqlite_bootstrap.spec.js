@@ -1,48 +1,74 @@
 // @ts-check
 
-import { bootstrapApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot/application-infra';
-import { closeCopilotDb } from '#copilot/db';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { createApplicationInfraHost } from '#copilot/boot';
+import { access, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-const previousDbPath = process.env['COPILOT_DB_PATH'];
-/** @type {string | undefined} */
-let tempDir;
+/** @type {Array<ReturnType<typeof createApplicationInfraHost>>} */
+const hosts = [];
+/** @type {string[]} */
+const tempDirs = [];
 
-function resetApplicationDbBinding() {
-    getApplicationInfraRuntime().database.reset();
-    closeCopilotDb();
+async function createTempDir() {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'copilot-application-infra-db-'));
+    tempDirs.push(dir);
+    return dir;
+}
+
+/** @param {string} filePath */
+async function pathExists(filePath) {
+    try {
+        await access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 afterEach(async () => {
-    resetApplicationDbBinding();
-    if (previousDbPath === undefined) delete process.env['COPILOT_DB_PATH'];
-    else process.env['COPILOT_DB_PATH'] = previousDbPath;
-    if (tempDir) await rm(tempDir, { recursive: true, force: true });
-    tempDir = undefined;
+    await Promise.allSettled(hosts.splice(0).map((host) => host.dispose()));
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe('application infra SQLite bootstrap', () => {
-    it('coalesces concurrent bootstrap and can bind again after an explicit reset', async () => {
-        resetApplicationDbBinding();
-        tempDir = await mkdtemp(path.join(os.tmpdir(), 'copilot-application-infra-db-'));
-        process.env['COPILOT_DB_PATH'] = path.join(tempDir, 'copilot.sqlite');
+    it('captures DB config once, coalesces bootstrap and owns connection shutdown', async () => {
+        const tempDir = await createTempDir();
+        const dbPath = path.join(tempDir, 'captured', 'copilot.sqlite');
+        const ignoredLaterPath = path.join(tempDir, 'retargeted', 'copilot.sqlite');
+        const env = { ...process.env, COPILOT_DB_PATH: dbPath };
+        const host = createApplicationInfraHost({
+            hostId: 'application-infra-sqlite-bootstrap-test',
+            defaultWorkspaceRoot: tempDir,
+            registerProcessShutdown: false,
+            env,
+        });
+        hosts.push(host);
 
-        const results = await Promise.all(Array.from({ length: 12 }, () => bootstrapApplicationInfraSqliteProvider()));
+        // Mutation after composition must not retarget this host generation.
+        env.COPILOT_DB_PATH = ignoredLaterPath;
+        const results = await Promise.all(Array.from({ length: 12 }, () => host.bootstrapSqliteProvider()));
         const firstRevision = results[0]?.revision ?? -1;
 
         expect(results).toHaveLength(12);
         expect(results.every((result) => result.configured)).toBe(true);
         expect(new Set(results.map((result) => result.revision))).toEqual(new Set([firstRevision]));
-        expect(getApplicationInfraRuntime().database.status()).toEqual({ configured: true, revision: firstRevision });
-        expect(getApplicationInfraRuntime().database.get().prepare('SELECT 1 AS value').get()).toEqual({ value: 1 });
-
-        resetApplicationDbBinding();
-        const rebound = await bootstrapApplicationInfraSqliteProvider();
+        expect(host.snapshot().applicationDbPath).toBe(dbPath);
+        expect(host.runtime.database.status()).toEqual({ configured: true, revision: firstRevision });
+        expect(host.runtime.database.get().prepare('SELECT 1 AS value').get()).toEqual({ value: 1 });
+        expect(await pathExists(dbPath)).toBe(true);
+        expect(await pathExists(ignoredLaterPath)).toBe(false);
+        host.runtime.database.reset();
+        const rebound = await host.bootstrapSqliteProvider();
         expect(rebound.configured).toBe(true);
         expect(rebound.revision).toBeGreaterThan(firstRevision);
-        expect(getApplicationInfraRuntime().database.get().open).toBe(true);
+        expect(host.runtime.database.get().prepare('SELECT 2 AS value').get()).toEqual({ value: 2 });
+
+        await host.dispose();
+        hosts.splice(hosts.indexOf(host), 1);
+        expect(host.snapshot().state).toBe('disposed');
+        expect(host.runtime.database.status().configured).toBe(false);
+        expect(() => host.runtime.database.get()).toThrow(/not configured/u);
     });
 });

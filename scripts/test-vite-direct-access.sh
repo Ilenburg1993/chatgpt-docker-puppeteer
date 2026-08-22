@@ -47,7 +47,7 @@ CONTAINER_IP=$(hostname -I | awk '{print $1}')
 
 # Test internal access
 echo "📡 Testando acesso interno..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://0.0.0.0:5173/dashboard/ 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://0.0.0.0:5173/dashboard/ 2> /dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then
     echo "   ✅ HTTP 200 OK"
 else

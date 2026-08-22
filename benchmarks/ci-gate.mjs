@@ -15,9 +15,9 @@
  * - Exit 0 se OK, Exit 1 se degradação detectada
  */
 
+import { readBytes as readBytesRaw, readText as readTextRaw } from '#copilot/infra/internal/filesystem/read';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import { parseAndCacheSymbols as parseAndCacheSymbolsRaw } from '#copilot/infra/public/diagnostic/indexing/parser';
-import { readBytes as readBytesRaw, readText as readTextRaw } from '#copilot/infra/public/filesystem/read';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';

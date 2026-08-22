@@ -2,6 +2,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
+import { listSourceFilesSync } from './lib/source-tree.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const TARGET = path.join(ROOT, 'src', 'copilot');
@@ -39,22 +40,9 @@ const ALLOWLIST = [
     },
 ];
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function walk(dir) {
-    /** @type {string[]} */
-    const out = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-            out.push(...walk(full));
-        } else if (entry.isFile() && full.endsWith('.js')) {
-            out.push(full);
-        }
-    }
-    return out;
+    return listSourceFilesSync(dir, { extensions: ['.js'] });
 }
 
 /**

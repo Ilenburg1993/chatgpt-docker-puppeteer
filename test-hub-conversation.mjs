@@ -15,6 +15,7 @@
 
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import { alwaysAliveAgent } from './src/copilot/agent/always-alive-singleton.js';
 import { LlmBridgeClient } from './src/copilot/channel/client.js';
@@ -51,7 +52,7 @@ function turn(role, content) {
 
 const testDb = new Database(':memory:');
 const store = new ConversationStore();
-store.init(testDb);
+store.init(adaptBetterSqliteDatabase(testDb));
 
 // ─── Conversa principal ───────────────────────────────────────────────────────
 

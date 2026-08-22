@@ -10,7 +10,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
+import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
 import { log } from '#copilot/observability';
 import http from 'node:http';
 import { createCopilotApp, registerErrorHandler } from './app.js';

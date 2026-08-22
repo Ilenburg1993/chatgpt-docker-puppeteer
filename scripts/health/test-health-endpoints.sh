@@ -28,7 +28,7 @@ test_endpoint() {
 
     if [ -f /tmp/health_response.json ]; then
         echo "   Response:"
-        cat /tmp/health_response.json | jq '.' 2>/dev/null || cat /tmp/health_response.json
+        cat /tmp/health_response.json | jq '.' 2> /dev/null || cat /tmp/health_response.json
         echo ""
     fi
 

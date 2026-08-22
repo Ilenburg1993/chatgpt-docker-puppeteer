@@ -1,293 +1,83 @@
 // @ts-check
 /**
- * @file Faixa 33 — CI Zero-Bypass Regression Guard
+ * SDK zero-bypass governance.
  *
- *   Testes que garantem que nenhum arquivo fora de src/copilot/sdk/ importa caminhos paralelos ou submodules não
- *   canônicos do SDK. Subpaths explícitos e canônicos são permitidos quando representam a surface autorizada.
- *
- *   EXCEÇÕES intencionais documentadas:
- *
- *   - boot-wiring.js: '#copilot/sdk/telemetry' (importação precisa intencional)
- *   - config/index.js: '#copilot/sdk/tools' (re-export de compatibilidade)
- *
- *   Faixas cobertas:
- *
- *   - F166: Auditoria completa de bypasses — apenas exceções intencionais restam
- *   - F167: Módulos de tools/ sem bypass (11 arquivos críticos)
- *   - F168: Módulos de api/express/ sem bypass
- *   - F169: Módulos de agent/ sem bypass
- *   - F170: Módulos de bridges/ e observability/ sem bypass
- *   - F171: Módulos de terminal/ sem bypass
- *   - F172: Módulos de hooks/ sem bypass
+ * The package map, SDK alias inventory and layer-access policy are the authorities. Runtime/dynamic usages are parsed
+ * with the shared package-import parser; JSDoc/type-only imports are governed by exact package resolution separately.
  */
 
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { collectCopilotImportUsages } from '../../../../scripts/lib/copilot-package-imports.mjs';
+import {
+    SDK_ALIAS_LAYOUT,
+    classifySdkLayerAccess,
+    resolveSdkConsumerLayer,
+} from '../../../../src/copilot/sdk/module-map.js';
 
-const ROOT = new URL('../../../../', import.meta.url).pathname.replace(/\/$/, '');
+const ROOT = new URL('../../../../', import.meta.url).pathname.replace(/\/$/u, '');
+const SRC_COPILOT = join(ROOT, 'src', 'copilot');
 
-const CANONICAL_SDK_SUBPATHS = new Set([
-    '#copilot/sdk/agents',
-    '#copilot/sdk/constants',
-    '#copilot/sdk/di',
-    '#copilot/sdk/errors',
-    '#copilot/sdk/event-helpers',
-    '#copilot/sdk/feature-flags',
-    '#copilot/sdk/models',
-    '#copilot/sdk/rpc',
-    '#copilot/sdk/rpc/experimental',
-    '#copilot/sdk/session',
-    '#copilot/sdk/session-runtime',
-    '#copilot/sdk/telemetry',
-    '#copilot/sdk/tools',
-    '#copilot/sdk/types',
-    '#copilot/sdk/utils',
-]);
-
-/**
- * Lê o conteúdo de um arquivo relativo ao root do projeto.
- *
- * @param {string} relPath
- * @returns {string}
- */
-function read(relPath) {
-    return readFileSync(join(ROOT, relPath), 'utf-8');
+function packageSdkAliases() {
+    const pkg = /** @type {{imports?:Record<string,unknown>}} */ (
+        JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+    );
+    return Object.keys(pkg.imports ?? {})
+        .filter((alias) => alias === '#copilot/sdk' || alias.startsWith('#copilot/sdk/'))
+        .sort();
 }
 
-/**
- * Retorna true se o arquivo tem import direto de submodule SDK (bypass do barrel).
- *
- * @param {string} content
- * @returns {string[]} Lista de bypasses encontrados
- */
-function findSdkBypasses(content) {
-    /** @type {string[]} */
-    const results = [];
-    for (const match of content.matchAll(/from\s+'(#copilot\/sdk\/[^']+)'/g)) {
-        const value = match[1];
-        if (value && !CANONICAL_SDK_SUBPATHS.has(value)) results.push(value);
-    }
-    return results;
+function runtimeSdkUsages() {
+    return collectCopilotImportUsages({ roots: [SRC_COPILOT], relativeTo: ROOT }).usages.filter(
+        (usage) =>
+            usage.kind !== 'jsdoc' &&
+            (usage.specifier === '#copilot/sdk' || usage.specifier.startsWith('#copilot/sdk/')) &&
+            !usage.file.startsWith('src/copilot/sdk/'),
+    );
 }
 
-// ─── F166: Auditoria completa de bypasses ─────────────────────────────────
-
-describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
-    // Zero bypasses intencionais restam; os subpaths canônicos permitidos abaixo representam surfaces autorizadas.
-    const KNOWN_INTENTIONAL_BYPASSES = new Map([
-        ['src/copilot/observability/bootstrap.js', ['#copilot/sdk/telemetry', '#copilot/sdk/tools']],
-        ['src/copilot/observability/collectors/assistant-handlers.js', ['#copilot/sdk/session']],
-        ['src/copilot/observability/collectors/tool-handlers.js', ['#copilot/sdk/session']],
-        ['src/copilot/observability/collectors/session-handlers.js', ['#copilot/sdk/session']],
-        ['src/copilot/observability/collectors/interaction-handlers.js', ['#copilot/sdk/session']],
-        ['src/copilot/tools/session/experimental-rpc-tools.js', ['#copilot/sdk/rpc', '#copilot/sdk/rpc/experimental']],
-        ['src/copilot/agent/ports/hook-port.js', ['#copilot/sdk/session']],
-        ['src/copilot/agent/ports/permission-port.js', ['#copilot/sdk/session']],
-        ['src/copilot/agent/ports/tool-port.js', ['#copilot/sdk/rpc']],
-        ['src/copilot/hooks/registry.js', ['#copilot/sdk/session']],
-        ['src/copilot/hooks/bus.js', ['#copilot/sdk/session']],
-        ['src/copilot/hooks/logger.js', ['#copilot/sdk/session']],
-        ['src/copilot/hooks/permission-controller.js', ['#copilot/sdk/session']],
-        ['src/copilot/server/routes/sdk/session-core-routes.js', ['#copilot/sdk/session']],
-        ['src/copilot/server/routes/sdk/session-send-helpers.js', ['#copilot/sdk/session']],
-        ['src/copilot/event-handlers/token-budget.js', ['#copilot/sdk/session']],
-        ['src/copilot/event-handlers/system-notifications.js', ['#copilot/sdk/session']],
-        ['src/copilot/config/sdk-config-port.js', ['#copilot/sdk/session']],
-        ['src/copilot/events/sdk-events.js', ['#copilot/sdk/session']],
-        ['src/copilot/terminal/events/sdk-session-events.js', ['#copilot/sdk/session']],
-    ]);
-
-    /**
-     * Varre todos os .js em src/copilot/ (exceto o próprio sdk/) e coleta bypasses.
-     *
-     * @returns {{ file: string; bypasses: string[] }[]}
-     */
-    function collectAllBypasses() {
-        let output;
-        try {
-            output = execSync(
-                `grep -rn "from '#copilot/sdk/[^']*'" ${join(ROOT, 'src/copilot')} --include="*.js" | grep -v "src/copilot/sdk/"`,
-                { encoding: 'utf-8', cwd: ROOT },
-            ).trim();
-        } catch {
-            // grep exit code 1 = no matches
-            return [];
-        }
-
-        if (!output) return [];
-
-        /** @type {Map<string, string[]>} */
-        const byFile = new Map();
-        for (const line of output.split('\n')) {
-            if (!line.trim()) continue;
-            const [filePath, , ...rest] = line.split(':');
-            const importPath = rest.join(':').match(/'(#copilot\/sdk\/[^']+)'/)?.[1];
-            if (!filePath || !importPath) continue;
-            const rel = filePath.replace(ROOT + '/', '').replace(ROOT, '');
-            if (!byFile.has(rel)) byFile.set(rel, []);
-            const existing = byFile.get(rel);
-            if (existing && !existing.includes(importPath)) existing.push(importPath);
-        }
-        return [...byFile.entries()].map(([file, bypasses]) => ({ file, bypasses }));
-    }
-
-    /**
-     * @param {string} file
-     * @param {string} bypass
-     * @returns {boolean}
-     */
-    function isAllowedDynamicBypass(file, bypass) {
-        if (file.startsWith('src/copilot/event-handlers/') && bypass === '#copilot/sdk/session') {
-            return true;
-        }
-        return false;
-    }
-
-    it('apenas bypasses intencionais restam no código-fonte', () => {
-        const allBypasses = collectAllBypasses();
-
-        // Filtrar bypasses que não constam como intencionais
-        const unexpected = allBypasses.filter(({ file, bypasses }) => {
-            const allowedForFile = KNOWN_INTENTIONAL_BYPASSES.get(file) ?? [];
-            return bypasses.some(
-                (bp) =>
-                    !CANONICAL_SDK_SUBPATHS.has(bp) &&
-                    !allowedForFile.includes(bp) &&
-                    !isAllowedDynamicBypass(file, bp),
-            );
-        });
-
-        if (unexpected.length > 0) {
-            const msg = unexpected.map(({ file, bypasses }) => `  ${file}: ${bypasses.join(', ')}`).join('\n');
-            throw new Error(
-                `Bypasses inesperados encontrados:\n${msg}\n\nUse a surface canônica adequada (root ou subpath autorizado) em vez de rotas paralelas.`,
-            );
-        }
-
-        expect(unexpected).toHaveLength(0);
+describe('SDK package surface governance', () => {
+    it('mantém bijeção entre SDK_ALIAS_LAYOUT e package.json#imports', () => {
+        const declared = SDK_ALIAS_LAYOUT.map((entry) => entry.alias).sort();
+        expect(packageSdkAliases()).toEqual(declared);
     });
 
-    it('boot-wiring.js usa fachada sdk-access para quota monitor (sem bypass)', () => {
-        const src = read('src/copilot/agent/session/boot/boot-wiring.js');
-        expect(src).toContain("from '../../facades/sdk-access.js'");
-        expect(src).toContain('startAgentSdkBootQuotaBridge');
-        expect(src).not.toContain("from '#copilot/sdk'");
+    it('todo acesso runtime/dynamic externo ao SDK é classificado pela policy da camada', () => {
+        const violations = [];
+        for (const usage of runtimeSdkUsages()) {
+            const layer = resolveSdkConsumerLayer(usage.file);
+            const classification = layer ? classifySdkLayerAccess(layer, usage.specifier) : 'forbidden';
+            if (!layer || classification === 'forbidden') {
+                violations.push(`${usage.file}: ${usage.specifier} (${usage.kind}; layer=${layer ?? 'unmapped'})`);
+            }
+        }
+        expect(violations, `Acessos SDK fora da policy:\n${violations.join('\n')}`).toEqual([]);
     });
 
-    // F54: re-export de tools-state removido de config/index.js (zero consumers)
-});
+    it('reserva o root #copilot/sdk exclusivamente ao boot validation path', () => {
+        const rootUsages = runtimeSdkUsages().filter((usage) => usage.specifier === '#copilot/sdk');
+        expect(rootUsages).toEqual([
+            {
+                file: 'src/copilot/boot/runtime-bootstrap.js',
+                specifier: '#copilot/sdk',
+                kind: 'dynamic',
+            },
+        ]);
+    });
 
-// ─── F167: tools/ sem bypass ───────────────────────────────────────────────
-
-describe('F167 — tools/ sem bypass direto de SDK', () => {
-    const TOOLS_FILES = [
-        'src/copilot/tools/session/session-rpc-tools.js',
-        'src/copilot/tools/git/index.js',
-        'src/copilot/tools/introspection/introspection-tools.js',
-        'src/copilot/tools/task/task-tools.js',
-        'src/copilot/tools/session/session-tools.js',
-        'src/copilot/tools/todo/bulk-tools.js',
-        'src/copilot/tools/todo/crud-tools.js',
-        'src/copilot/tools/todo/query-tools.js',
-        'src/copilot/tools/shell/index.js',
-        'src/copilot/tools/infra/tool-factory.js',
-        'src/copilot/bridges/mcp-tool-bridge.js',
-    ];
-
-    for (const file of TOOLS_FILES) {
-        it(`${file.split('/').pop()} usa barrel '#copilot/sdk'`, () => {
-            const src = read(file);
-            const bypasses = findSdkBypasses(src);
-            expect(bypasses, `Bypasses encontrados em ${file}: ${bypasses.join(', ')}`).toHaveLength(0);
-        });
-    }
-});
-
-// ─── F168: server/routes/sdk/ sem bypass ─────────────────────────────────────────
-
-describe('F168 — server/routes/sdk/ sem bypass direto de SDK', () => {
-    const API_FILES = [
-        'src/copilot/server/routes/sdk/session-crud.js',
-        'src/copilot/server/routes/sdk/session-messaging.js',
-        'src/copilot/server/routes/sdk/agent.js',
-        'src/copilot/server/routes/sdk/client.js',
-    ];
-
-    for (const file of API_FILES) {
-        it(`${file.split('/').pop()} usa barrel '#copilot/sdk'`, () => {
-            const src = read(file);
-            const bypasses = findSdkBypasses(src);
-            expect(bypasses, `Bypasses encontrados em ${file}: ${bypasses.join(', ')}`).toHaveLength(0);
-        });
-    }
-});
-
-// ─── F169: agent/ sem bypass ───────────────────────────────────────────────
-
-describe('F169 — agent/ sem bypass direto de SDK', () => {
-    const AGENT_FILES = [
-        'src/copilot/tools/bootstrap.js',
-        'src/copilot/agent/dialog/orchestrators/loop-manager.js',
-        'src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
-        'src/copilot/agent/session/initializers/initializer.js',
-        'src/copilot/agent/session/lifecycle/cleanup.js',
-        'src/copilot/agent/agent-context.js',
-        'src/copilot/agent/lifecycle/setup/session-setup.js',
-    ];
-
-    for (const file of AGENT_FILES) {
-        it(`${file.split('/').pop()} usa barrel '#copilot/sdk'`, () => {
-            const src = read(file);
-            const bypasses = findSdkBypasses(src);
-            expect(bypasses, `Bypasses encontrados em ${file}: ${bypasses.join(', ')}`).toHaveLength(0);
-        });
-    }
-});
-
-// ─── F170: bridges/ e observability/ sem bypass ────────────────────────────
-
-describe('F170 — bridges/ e observability/ sem bypass direto de SDK', () => {
-    const FILES = [
-        'src/copilot/observability/event-collector.js',
-        'src/copilot/observability/observers/dialog-task-handlers.js',
-    ];
-
-    for (const file of FILES) {
-        it(`${file.split('/').pop()} usa barrel '#copilot/sdk'`, () => {
-            const src = read(file);
-            const bypasses = findSdkBypasses(src);
-            expect(bypasses, `Bypasses encontrados em ${file}: ${bypasses.join(', ')}`).toHaveLength(0);
-        });
-    }
-});
-
-// ─── F171: terminal/ sem bypass ────────────────────────────────────────────
-
-describe('F171 — terminal/ sem bypass direto de SDK', () => {
-    const FILES = ['src/copilot/terminal/commands/config.js', 'src/copilot/terminal/handlers/system-config.js'];
-
-    for (const file of FILES) {
-        it(`${file.split('/').pop()} usa barrel '#copilot/sdk'`, () => {
-            const src = read(file);
-            const bypasses = findSdkBypasses(src);
-            expect(bypasses, `Bypasses encontrados em ${file}: ${bypasses.join(', ')}`).toHaveLength(0);
-        });
-    }
-});
-
-// ─── F172: hooks/ e config/ sem bypass (exceto re-export intencional) ──────
-
-describe('F172 — hooks/ e config/ sem bypass não-intencional de SDK', () => {
-    // hooks/session-lifecycle.js removido (L40 cleanup)
-    // config/session-config.js removido (L40 cleanup)
-
-    it('config/index.js re-export de tools-state está documentado como intencional', () => {
-        // Garantir que o comentário de intencionalidade existe, ou pelo menos o import está isolado a tools-state
-        const src = read('src/copilot/config/index.js');
-        const bypasses = findSdkBypasses(src);
-        // Apenas tools-state é permitido
-        expect(bypasses.every((bp) => bp === '#copilot/sdk/tools')).toBe(true);
+    it('mantém experimental RPC explícito e nunca o promove implicitamente a preferred', () => {
+        const experimental = runtimeSdkUsages().filter((usage) => usage.specifier === '#copilot/sdk/rpc/experimental');
+        expect(experimental.length).toBeGreaterThan(0);
+        for (const usage of experimental) {
+            const layer = resolveSdkConsumerLayer(usage.file);
+            expect(layer).not.toBeNull();
+            const classification = classifySdkLayerAccess(
+                /** @type {NonNullable<typeof layer>} */ (layer),
+                usage.specifier,
+            );
+            expect(['allowed', 'discouraged']).toContain(classification);
+            expect(classification).not.toBe('preferred');
+        }
     });
 });

@@ -65,17 +65,7 @@ export function readParserProcessConfig(env, parallelism = availableParallelism(
     });
 }
 
-// Parser workers are a ProcessInfra capability. Capture their policy once when the process loads the parser foundation.
-const PROCESS_PARSER_CONFIG = readParserProcessConfig(process.env);
-
-export const MAX_PARSE_BYTES = PROCESS_PARSER_CONFIG.maxParseBytes;
-export const MAX_PARSE_DURATION_MS = PROCESS_PARSER_CONFIG.maxParseDurationMs;
-export const MAX_PARSE_LINE_GUARD = PROCESS_PARSER_CONFIG.maxParseLines;
-export const PARSER_WORKER_ENABLED = PROCESS_PARSER_CONFIG.workerEnabled;
-export const PARSER_WORKER_POOL_POLICY = PROCESS_PARSER_CONFIG.workerPoolPolicy;
-export const PARSER_WORKER_POOL_SIZE = PARSER_WORKER_POOL_POLICY.size;
-export const PARSER_WORKER_QUEUE_POLICY = PROCESS_PARSER_CONFIG.workerQueuePolicy;
-export const PARSER_WORKER_QUEUE_MAX = PARSER_WORKER_QUEUE_POLICY.max;
-export const PARSER_WORKER_REQUEST_TIMEOUT_MS = PROCESS_PARSER_CONFIG.workerRequestTimeoutMs;
-export const PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES = PROCESS_PARSER_CONFIG.mainThreadFallbackMaxBytes;
+// Stateless parser calls use a deterministic environment-free default. Production runtimes receive the process-owned
+// snapshot from ProcessInfra instead; no parser module captures process.env during evaluation.
+export const DEFAULT_PARSER_PROCESS_CONFIG = readParserProcessConfig(Object.freeze({}));
 export const PARSER_WORKER_RESTART_BACKOFF_MS = Object.freeze([100, 250, 500, 1_000, 2_000, 5_000]);

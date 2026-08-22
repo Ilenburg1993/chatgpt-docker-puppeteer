@@ -1,33 +1,71 @@
 // @ts-check
 /**
- * Process-wide observability registry for workspace-owned scope runtimes.
+ * Process-wide observability registry for owner-bound workspace scope probes.
  *
- * A runtime registers only while it owns at least one active scope. The registry never creates, closes or mutates a
- * scope and therefore does not own lifecycle.
+ * The registry owns no scope lifecycle and never materializes a capability. Selection is performed from immutable probe
+ * metadata before `snapshot()` is called, so reading runtime A cannot even inspect runtime B's scope state.
  *
  * @module copilot/infra/indexing/context/scope/runtime-registry
  */
 
-/** @typedef {{ runtimeId:string; snapshot:() => { activeScopes:number; scopes:readonly import('./types.js').ScopeStats[] } }} ScopeRuntimeProbe */
+/**
+ * @typedef {Readonly<{
+ *   scope:'workspace';
+ *   ownerId:string;
+ *   runtimeOwnerId:string;
+ *   probeId:string;
+ *   mayMaterialize:false;
+ *   snapshot:() => { activeScopes:number; scopes:readonly import('./types.js').ScopeStats[] };
+ * }>} ScopeRuntimeProbe
+ */
+
 /** @type {Set<ScopeRuntimeProbe>} */
-const activeRuntimeProbes = new Set();
+const activeScopeProbes = new Set();
 
 /** @param {ScopeRuntimeProbe} probe */
 export function registerScopeRuntimeProbe(probe) {
-    activeRuntimeProbes.add(probe);
+    if (
+        probe?.scope !== 'workspace' ||
+        probe.mayMaterialize !== false ||
+        !probe.ownerId ||
+        !probe.runtimeOwnerId ||
+        !probe.probeId ||
+        typeof probe.snapshot !== 'function'
+    ) {
+        throw new TypeError('ScopeRuntimeProbe requires owner-bound workspace metadata and mayMaterialize=false.');
+    }
+    activeScopeProbes.add(probe);
 }
 
 /** @param {ScopeRuntimeProbe} probe */
 export function unregisterScopeRuntimeProbe(probe) {
-    activeRuntimeProbes.delete(probe);
+    activeScopeProbes.delete(probe);
 }
 
-export function readScopeRuntimeRegistrySnapshot() {
-    const runtimes = [...activeRuntimeProbes].map((probe) => ({ runtimeId: probe.runtimeId, ...probe.snapshot() }));
+/**
+ * @param {{runtimeOwnerId?:string;ownerId?:string;scope?:'workspace'}} [filter]
+ */
+export function readScopeRuntimeRegistrySnapshot(filter = {}) {
+    const selected = [...activeScopeProbes].filter((probe) => {
+        if (filter.scope !== undefined && probe.scope !== filter.scope) return false;
+        if (filter.runtimeOwnerId !== undefined && probe.runtimeOwnerId !== filter.runtimeOwnerId) return false;
+        if (filter.ownerId !== undefined && probe.ownerId !== filter.ownerId) return false;
+        return true;
+    });
+    const probes = selected.map((probe) =>
+        Object.freeze({
+            scope: probe.scope,
+            ownerId: probe.ownerId,
+            runtimeOwnerId: probe.runtimeOwnerId,
+            probeId: probe.probeId,
+            mayMaterialize: probe.mayMaterialize,
+            ...probe.snapshot(),
+        }),
+    );
     return Object.freeze({
-        activeRuntimes: runtimes.length,
-        activeScopes: runtimes.reduce((total, runtime) => total + runtime.activeScopes, 0),
-        runtimes: Object.freeze(runtimes),
-        scopes: Object.freeze(runtimes.flatMap((runtime) => runtime.scopes)),
+        activeProbes: probes.length,
+        activeScopes: probes.reduce((total, probe) => total + probe.activeScopes, 0),
+        probes: Object.freeze(probes),
+        scopes: Object.freeze(probes.flatMap((probe) => probe.scopes)),
     });
 }

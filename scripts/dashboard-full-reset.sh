@@ -8,9 +8,9 @@ echo ""
 
 # 1. Kill ALL Vite/Node processes
 echo "🔪 Killing all Vite/Node processes..."
-pkill -9 -f "vite" 2>/dev/null || true
-pkill -9 -f "esbuild" 2>/dev/null || true
-pkill -9 -f "node.*dashboard" 2>/dev/null || true
+pkill -9 -f "vite" 2> /dev/null || true
+pkill -9 -f "esbuild" 2> /dev/null || true
+pkill -9 -f "node.*dashboard" 2> /dev/null || true
 sleep 2
 
 # 2. Clear ALL caches
@@ -36,7 +36,7 @@ echo "   Vite PID: $VITE_PID"
 sleep 6
 
 # 5. Check if Vite started
-if ! curl -sf http://localhost:5173/dashboard/ >/dev/null 2>&1; then
+if ! curl -sf http://localhost:5173/dashboard/ > /dev/null 2>&1; then
     echo "❌ Vite FAILED to start!"
     echo "   Logs:"
     tail -30 /tmp/vite-clean.log

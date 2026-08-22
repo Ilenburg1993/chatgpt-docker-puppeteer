@@ -7,7 +7,7 @@
  *   lifecycle principal, mas reduzindo concentração semântica em `agent-lifecycle.js`.
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { disconnectAgentSdkSession, stopAgentSdkClient } from '../../facades/sdk-access.js';
 import { log } from '../../ports/logging/index.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';

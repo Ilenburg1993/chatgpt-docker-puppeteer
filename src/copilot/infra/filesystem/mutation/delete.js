@@ -1,7 +1,7 @@
 // @ts-check
 /** Locked delete/remove operations. */
 
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import {
     invalidateIoCoherencePath,

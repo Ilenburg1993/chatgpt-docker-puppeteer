@@ -5,5 +5,5 @@
 /** @typedef {import('./types.js').SearchStreamingSubprocessOptions} SearchStreamingSubprocessOptions */
 
 export { execSearchFile } from './exec.js';
-export { isRipgrepAvailable } from './ripgrep.js';
+export { acquireSearchSubprocessCapability, isRipgrepAvailable } from './ripgrep.js';
 export { streamSearchFile } from './stream.js';

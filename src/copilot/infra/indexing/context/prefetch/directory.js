@@ -141,6 +141,7 @@ function selectDirectoryWorkingSetPaths(allCandidateFiles, baseDir, requestedMax
  *   Default is `'coverage'`
  * @param {string[]} [opts.preferredPaths] Eligible candidate files to prioritize inside the same hard cap.
  * @param {boolean} [opts.recursive=true] Default is `true`
+ * @param {Readonly<{batchSize:number;hardMaxEntries:number}>} [opts.scannerConfig] Runtime-owned scanner policy.
  * @param {PrefetchOptions} [prefetchOpts]
  * @returns {Promise<{
  *     scanned: number;
@@ -173,6 +174,12 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
         showHidden: false,
         depth: recursive ? 20 : 1,
         respectGitignore: true,
+        ...(opts.scannerConfig
+            ? {
+                  batchSize: opts.scannerConfig.batchSize,
+                  hardMaxEntries: opts.scannerConfig.hardMaxEntries,
+              }
+            : {}),
         ...(prefetchOpts.signal ? { signal: prefetchOpts.signal } : {}),
     });
     prefetchOpts.signal?.throwIfAborted();

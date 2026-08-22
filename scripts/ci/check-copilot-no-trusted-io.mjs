@@ -9,14 +9,15 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { listSourceFilesSync } from '../lib/source-tree.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SOURCE_ROOT = path.join(ROOT, 'src', 'copilot');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
-const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
+const SOURCE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx'];
 const FORBIDDEN_ALIASES = Object.freeze([
     '#copilot/infra/internal/filesystem/trusted',
     '#copilot/infra/public/filesystem/trusted',
@@ -28,26 +29,10 @@ const FORBIDDEN_IMPLEMENTATION_PATHS = Object.freeze([
 
 /**
  * @param {string} directory
- * @returns {Promise<string[]>}
+ * @returns {string[]}
  */
-async function listSourceFiles(directory) {
-    /** @type {string[]} */
-    const files = [];
-    /** @type {string[]} */
-    const pending = [directory];
-    while (pending.length > 0) {
-        const current = /** @type {string} */ (pending.pop());
-        const entries = await readdir(current, { withFileTypes: true });
-        for (const entry of entries) {
-            const absolute = path.join(current, entry.name);
-            if (entry.isDirectory()) {
-                pending.push(absolute);
-                continue;
-            }
-            if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) files.push(absolute);
-        }
-    }
-    return files.sort();
+function listSourceFiles(directory) {
+    return listSourceFilesSync(directory, { extensions: SOURCE_EXTENSIONS });
 }
 
 /**
@@ -79,7 +64,7 @@ export async function checkCopilotNoTrustedIo() {
         issues.push(`forbidden-trusted-io-implementation:${relativePath}`);
     }
 
-    const sourceFiles = await listSourceFiles(SOURCE_ROOT);
+    const sourceFiles = listSourceFiles(SOURCE_ROOT);
     let forbiddenImportReferences = 0;
     for (const absolute of sourceFiles) {
         const source = await readFile(absolute, 'utf8');

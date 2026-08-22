@@ -1,7 +1,7 @@
 // @ts-check
 /** Observable chunked/streaming text read adapters. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

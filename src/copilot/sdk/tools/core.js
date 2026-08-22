@@ -18,7 +18,7 @@
  * @see module:copilot/sdk/tools/registry
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { BuiltInTools, ToolSet, convertMcpCallToolResult, defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { log } from '../logger.js';

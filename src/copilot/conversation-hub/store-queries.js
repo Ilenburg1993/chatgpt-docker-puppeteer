@@ -18,7 +18,7 @@ import { sanitizeFtsQuery } from './store-helpers.js';
 /**
  * Lê os turns de uma hub_session (paginado, mais antigos primeiro).
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {string} hubSessionId
  * @param {ReadTurnsOpts} [opts]
  * @returns {ConversationTurn[]}
@@ -53,7 +53,7 @@ export function readTurns(db, hubSessionId, opts = {}) {
 /**
  * Busca turns por conteúdo usando FTS5 (fulltext search).
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {SearchTurnsOpts} opts
  * @returns {ConversationTurn[]}
  */
@@ -85,7 +85,7 @@ export function searchTurns(db, opts) {
 /**
  * Obtém um turno específico pelo id.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {number} turnId
  * @returns {ConversationTurn | null}
  */
@@ -97,7 +97,7 @@ export function getTurn(db, turnId) {
 /**
  * Conta os turns de uma hub_session.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {string} hubSessionId
  * @returns {number}
  */

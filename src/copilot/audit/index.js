@@ -8,11 +8,10 @@
  * @see EventBus
  */
 
+/** @typedef {import('./pipeline-audit-log.js').AuditEntry} AuditEntry */
+
 // Ring buffer genérico
 export { AuditRingBuffer } from './ring-buffer.js';
-
-// JSONL writer
-export { createJsonlWriter } from './jsonl-writer.js';
 
 // Pipeline unificado
 export {

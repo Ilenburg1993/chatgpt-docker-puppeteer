@@ -8,7 +8,7 @@
  */
 
 import { classifyAgentError } from '#copilot/agent/error-policy';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 
 /** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
 

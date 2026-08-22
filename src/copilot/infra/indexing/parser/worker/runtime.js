@@ -11,10 +11,7 @@
 import { performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
 import {
-    PARSER_WORKER_ENABLED,
-    PARSER_WORKER_POOL_SIZE,
-    PARSER_WORKER_QUEUE_MAX,
-    PARSER_WORKER_REQUEST_TIMEOUT_MS,
+    DEFAULT_PARSER_PROCESS_CONFIG,
     PARSER_WORKER_RESTART_BACKOFF_MS,
     incrementParserRuntimeCounter,
     recordParserWorkerQueueDepth,
@@ -54,10 +51,11 @@ function isParserWorkerMessage(value) {
 /**
  * Create one parser-worker resource owner.
  *
- * @param {{ runtimeId?: string }} [options]
+ * @param {{ runtimeId?: string; config?: ReturnType<typeof import('../foundation/index.js').readParserProcessConfig> }} [options]
  */
 export function createParserWorkerRuntime(options = {}) {
     const runtimeId = options.runtimeId?.trim() || 'parser-worker-runtime';
+    const config = options.config ?? DEFAULT_PARSER_PROCESS_CONFIG;
     /** @type {WorkerSlot[]} */
     const workerPool = [];
     /** @type {WorkerTask[]} */
@@ -233,13 +231,13 @@ export function createParserWorkerRuntime(options = {}) {
 
     function ensurePool() {
         assertActive();
-        if (!PARSER_WORKER_ENABLED || poolInitialized || poolShuttingDown) return;
+        if (!config.workerEnabled || poolInitialized || poolShuttingDown) return;
         const now = Date.now();
         if (poolDisabledByError && now < nextInitAttemptAtMs) return;
         /** @type {WorkerSlot[]} */
         const provisional = [];
         try {
-            for (let index = 0; index < PARSER_WORKER_POOL_SIZE; index += 1) provisional.push(createSlot(index));
+            for (let index = 0; index < config.workerPoolPolicy.size; index += 1) provisional.push(createSlot(index));
             workerPool.push(...provisional);
             poolInitialized = true;
             poolDisabledByError = false;
@@ -271,18 +269,18 @@ export function createParserWorkerRuntime(options = {}) {
     async function parseSymbols(payload, signal) {
         signal?.throwIfAborted();
         ensurePool();
-        if (!PARSER_WORKER_ENABLED || poolDisabledByError || workerPool.length === 0) {
+        if (!config.workerEnabled || poolDisabledByError || workerPool.length === 0) {
             throw runtimeError('parser worker pool unavailable', 'ERR_IO_PARSER_WORKER_UNAVAILABLE');
         }
         incrementParserRuntimeCounter('workerRequests');
         const id = ++requestSeq;
         return await new Promise((resolve, reject) => {
             const free = workerPool.find((slot) => !slot.busy && !slot.restarting);
-            if (!free && workerQueue.length >= PARSER_WORKER_QUEUE_MAX) {
+            if (!free && workerQueue.length >= config.workerQueuePolicy.max) {
                 incrementParserRuntimeCounter('workerQueueRejected');
                 reject(
                     runtimeError(
-                        `parser worker queue full (${workerQueue.length}/${PARSER_WORKER_QUEUE_MAX})`,
+                        `parser worker queue full (${workerQueue.length}/${config.workerQueuePolicy.max})`,
                         'ERR_IO_PARSER_WORKER_QUEUE_FULL',
                     ),
                 );
@@ -292,7 +290,7 @@ export function createParserWorkerRuntime(options = {}) {
             const task = {
                 id,
                 payload,
-                timeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
+                timeoutMs: config.workerRequestTimeoutMs,
                 queuedAtMs: performance.now(),
                 queueTimeout: null,
                 abortCleanup: null,
@@ -387,6 +385,7 @@ export function createParserWorkerRuntime(options = {}) {
         return Object.freeze({
             runtimeId,
             disposed,
+            config,
             queueLength: workerQueue.length,
             inFlight: workerInFlight.size,
             poolSize: workerPool.length,
@@ -406,5 +405,5 @@ export function createParserWorkerRuntime(options = {}) {
         return disposePromise;
     }
 
-    return Object.freeze({ runtimeId, parseSymbols, status, dispose });
+    return Object.freeze({ runtimeId, config, parseSymbols, status, dispose });
 }

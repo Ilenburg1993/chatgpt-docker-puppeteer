@@ -9,7 +9,7 @@
  * @module copilot/mcp/control-plane/event-store
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 import { randomUUID } from 'node:crypto';
 
 export const MCP_EVENT_STORE_VERSION = '0.1.0';
@@ -104,11 +104,11 @@ export function createMcpInMemoryEventStore(options = {}) {
 }
 
 /**
- * @param {McpEventStoreOptions & { db?: import('better-sqlite3').Database }} [options]
+ * @param {McpEventStoreOptions & { db?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort }} [options]
  * @returns {McpSdkCompatibleEventStore & { snapshot(): Record<string, unknown>; clear(): void }}
  */
 export function createSqliteMcpEventStore(options = {}) {
-    const db = options.db ?? getCopilotDb();
+    const db = options.db ?? getApplicationSqliteDatabase();
     ensureMcpEventStoreSchema(db);
     const maxEventsPerStream = normalizePositiveInteger(options.maxEventsPerStream, DEFAULT_MCP_EVENTS_PER_STREAM, 1);
     const eventTtlMs = normalizePositiveInteger(options.eventTtlMs, DEFAULT_MCP_EVENT_TTL_MS, 10_000);
@@ -169,7 +169,7 @@ export function createSqliteMcpEventStore(options = {}) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function ensureMcpEventStoreSchema(db) {
@@ -244,7 +244,7 @@ function rebuildEventIndex(streams, eventsById) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {string} streamId
  * @param {number} maxEventsPerStream
  * @param {number} nowMs

@@ -7,7 +7,7 @@
 import { SseReplayBuffer } from './replay-buffer.js';
 
 /** @typedef {import('./utils.js').SseWriter} SseWriter */
-/** @typedef {import('#copilot/observability/metrics.js').MetricsStore} MetricsStore */
+/** @typedef {import('#copilot/observability/metrics').MetricsStore} MetricsStore */
 
 /**
  * @typedef {{ sse: SseWriter; filter: ((evt: string) => boolean) | null }} SseClientEntry

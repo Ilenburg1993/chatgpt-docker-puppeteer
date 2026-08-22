@@ -1569,6 +1569,20 @@ const {
 >} */ (vi.fn(() => [])),
     SqliteModelGatewayCatalogStore: vi.fn(function SqliteModelGatewayCatalogStore() {
         return {
+            readRuntimeProbeRunRecord: vi.fn(() => Promise.resolve(null)),
+            writeRuntimeProbeRun: vi.fn((input) =>
+                Promise.resolve({
+                    runId: input.runId ?? 'probe-run',
+                    probeResults: input.results?.length ?? 0,
+                    skippedResults: input.skippedCount ?? 0,
+                    successCount:
+                        input.results?.filter((/** @type {Record<string, unknown>} */ entry) => entry['ok'] === true)
+                            .length ?? 0,
+                    failureCount:
+                        input.results?.filter((/** @type {Record<string, unknown>} */ entry) => entry['ok'] !== true)
+                            .length ?? 0,
+                }),
+            ),
             readStorageDiagnostics: vi.fn(() =>
                 Promise.resolve({
                     schemaVersion: 3,
@@ -1989,6 +2003,10 @@ vi.mock('#copilot/infra/public/composition/filesystem/configured', async (import
             }
             if (grantId === 'observability.logger.retention') {
                 return {
+                    withPathLock: vi.fn((_path, _operation, callback) => callback()),
+                    appendText: vi.fn(() => Promise.resolve()),
+                    statPath: vi.fn(() => Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }))),
+                    moveFile: vi.fn(() => Promise.resolve()),
                     listDirectoryNamesFresh: vi.fn(() => Promise.resolve({ entries: [] })),
                     lstatPath: vi.fn(),
                     deleteFile: vi.fn(),

@@ -11,7 +11,8 @@
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
 import { SHUTDOWN_PRIORITY, logSwallowed, redactSecretRecord, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -32,7 +33,17 @@ import { log } from './logger.js';
 const _ecProjectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.join(_ecProjectRoot, 'var', 'logs', 'copilot');
 const EVENTS_FILE = path.join(LOGS_DIR, 'events.jsonl');
+const EVENTS_ROTATED_FILE = `${EVENTS_FILE}.1`;
 const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
+const EVENT_ARCHIVE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'observability.event-collector.archive',
+        exactPaths: [EVENTS_FILE, EVENTS_ROTATED_FILE],
+        operations: ['append', 'move', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['none'],
+    }),
+);
 
 /**
  * @typedef {{ remainingPercentage: number; resetDate?: string; [k: string]: unknown }} QuotaSnapshot
@@ -85,8 +96,9 @@ export function getCompactionHistory(sessionId) {
     return _compactionHistory.get(sessionId) ?? [];
 }
 
-const eventWriter = createJsonlFileWriter({
+const eventWriter = createBoundJsonlFileWriter({
     filePath: EVENTS_FILE,
+    io: EVENT_ARCHIVE_IO,
     maxBytes: MAX_EVENTS_BYTES,
     maxQueueLines: 10_000,
     softQueueLines: 8_000,

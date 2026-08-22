@@ -9,7 +9,8 @@
  * @module copilot/mcp/control-plane/round-trip-analytics
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
+import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
 import { readMcpAuditEventSlice } from './audit.js';
 
 const CURSOR_TABLE = 'copilot_mcp_round_trip_cursor';
@@ -53,7 +54,7 @@ const PLAN_APPLY_PAIRS = new Map([
 
 /**
  * @param {{
- *     db?: import('better-sqlite3').Database;
+ *     db?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
  *     readSlice?: typeof readMcpAuditEventSlice;
  *     chunkBytes?: number;
  *     maxChunks?: number;
@@ -62,7 +63,7 @@ const PLAN_APPLY_PAIRS = new Map([
  * }} [options]
  */
 export function createMcpRoundTripAnalytics(options = {}) {
-    const db = options.db ?? getCopilotDb();
+    const db = options.db ?? getApplicationInfraRuntime().database.get();
     const readSlice = options.readSlice ?? readMcpAuditEventSlice;
     const chunkBytes = boundedInteger(options.chunkBytes, DEFAULT_CHUNK_BYTES, 64 * 1024, 16 * 1024 * 1024);
     const maxChunks = boundedInteger(options.maxChunks, DEFAULT_MAX_CHUNKS, 1, 32);
@@ -119,10 +120,15 @@ export function createMcpRoundTripAnalytics(options = {}) {
             file_bytes = excluded.file_bytes,
             updated_at_ms = excluded.updated_at_ms
     `);
-    const ingestTransaction = db.transaction((rows, cursor) => {
-        for (const row of rows) insertEvent.run(row);
-        upsertCursor.run(cursor);
-    });
+    /**
+     * @param {Record<string, unknown>[]} rows
+     * @param {{cursorId:string;fileIdentity:string|null;byteOffset:number;fileBytes:number;updatedAtMs:number}} cursor
+     */
+    const ingestTransaction = (rows, cursor) =>
+        runSqliteTransaction(db, () => {
+            for (const row of rows) insertEvent.run(row);
+            upsertCursor.run(cursor);
+        });
 
     async function sync() {
         let cursor = readCursor(db);
@@ -259,7 +265,7 @@ export async function readMcpRoundTripAnalytics(options = {}) {
  * is safe for read-only dashboards; the background monitor or explicit analytics tool owns synchronization.
  *
  * @param {{
- *     db?: import('better-sqlite3').Database;
+ *     db?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
  *     windowMs?: number;
  *     top?: number;
  *     includeSynthetic?: boolean;
@@ -267,7 +273,7 @@ export async function readMcpRoundTripAnalytics(options = {}) {
  * }} [options]
  */
 export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
-    const db = options.db ?? getCopilotDb();
+    const db = options.db ?? getApplicationInfraRuntime().database.get();
     const exists = db
         .prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name=? LIMIT 1")
         .get(EVENT_TABLE);
@@ -545,7 +551,7 @@ function summarizeRows(rows, options) {
     };
 }
 
-/** @param {import('better-sqlite3').Database} db */
+/** @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db */
 function ensureSchema(db) {
     db.exec(`
         CREATE TABLE IF NOT EXISTS ${CURSOR_TABLE} (
@@ -587,7 +593,7 @@ function ensureSchema(db) {
     `);
 }
 
-/** @param {import('better-sqlite3').Database} db */
+/** @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db */
 function readCursor(db) {
     const row = /** @type {Record<string, unknown> | undefined} */ (
         db

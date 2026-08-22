@@ -4,6 +4,7 @@
 import { normalizePathResourceKey } from '#copilot/infra/internal/policy';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { getActiveProcessLockConfig } from '../process-state/index.js';
 
 /** @typedef {import('./types.js').FileResourceLockProfile} FileResourceLockProfile */
 
@@ -49,49 +50,46 @@ export function readFileResourceLockPolicy(env, cwd = process.cwd()) {
     });
 }
 
-// File locks coordinate the physical process and peer processes, not one InfraRuntime. Capture their environment once
-// when this process loads the capability; per-operation overrides remain explicit through lock options. An invalid
-// profile is fail-safe: automatic file locking is disabled, while diagnostics preserve the configuration error.
-const PROCESS_FILE_RESOURCE_LOCK_STATE = (() => {
-    try {
-        return Object.freeze({ policy: readFileResourceLockPolicy(process.env), configurationError: null });
-    } catch (error) {
-        return Object.freeze({
-            policy: readFileResourceLockPolicy({
-                ...process.env,
-                COPILOT_IO_FILE_LOCKS_ENABLED: 'off',
-            }),
-            configurationError: error instanceof Error ? error : new Error(String(error)),
-        });
-    }
-})();
-const PROCESS_FILE_RESOURCE_LOCK_POLICY = PROCESS_FILE_RESOURCE_LOCK_STATE.policy;
+/** @param {string} [cwd] */
+function createDefaultFileResourceLockPolicy(cwd = process.cwd()) {
+    return Object.freeze({
+        profile: /** @type {FileResourceLockProfile} */ ('off'),
+        staleMs: DEFAULT_STALE_MS,
+        acquireTimeoutMs: DEFAULT_ACQUIRE_TIMEOUT_MS,
+        lockDir: path.join(path.resolve(cwd), 'src', 'copilot', '.ai', 'locks'),
+    });
+}
+
+function activeFileResourceLockPolicy() {
+    return getActiveProcessLockConfig().file ?? createDefaultFileResourceLockPolicy();
+}
 
 export function getFileResourceLockProfile() {
-    if (PROCESS_FILE_RESOURCE_LOCK_STATE.configurationError) throw PROCESS_FILE_RESOURCE_LOCK_STATE.configurationError;
-    return PROCESS_FILE_RESOURCE_LOCK_POLICY.profile;
+    const configurationError = getFileResourceLockConfigurationError();
+    if (configurationError) throw configurationError;
+    return activeFileResourceLockPolicy().profile;
 }
 
 export function getFileResourceLockConfigurationError() {
-    return PROCESS_FILE_RESOURCE_LOCK_STATE.configurationError;
+    const message = getActiveProcessLockConfig().fileConfigurationError;
+    if (!message) return null;
+    const error = /** @type {Error & {code?:string}} */ (new Error(message));
+    error.code = 'ERR_IO_FILE_LOCK_PROFILE';
+    return error;
 }
 
 export function isFileResourceLockEnabled() {
-    return (
-        PROCESS_FILE_RESOURCE_LOCK_STATE.configurationError === null &&
-        PROCESS_FILE_RESOURCE_LOCK_POLICY.profile !== 'off'
-    );
+    return getFileResourceLockConfigurationError() === null && activeFileResourceLockPolicy().profile !== 'off';
 }
 
 /**
  * @param {{ explicit?: boolean; riskClass?: import('#copilot/core/io-contracts').IoRiskClass }} [options]
  * @param {ReturnType<typeof readFileResourceLockPolicy>} [policy]
  */
-export function shouldAcquireFileResourceLock(options = {}, policy = PROCESS_FILE_RESOURCE_LOCK_POLICY) {
+export function shouldAcquireFileResourceLock(options = {}, policy = undefined) {
     if (options.explicit === true) return true;
-    if (policy === PROCESS_FILE_RESOURCE_LOCK_POLICY && PROCESS_FILE_RESOURCE_LOCK_STATE.configurationError)
-        return false;
-    const profile = policy.profile;
+    if (!policy && getFileResourceLockConfigurationError()) return false;
+    const profile = (policy ?? activeFileResourceLockPolicy()).profile;
     if (profile === 'off') return false;
     if (profile === 'all') return true;
     if (profile === 'high-risk') return options.riskClass === 'high' || options.riskClass === 'critical';
@@ -99,15 +97,15 @@ export function shouldAcquireFileResourceLock(options = {}, policy = PROCESS_FIL
 }
 
 export function defaultFileResourceLockStaleMs() {
-    return PROCESS_FILE_RESOURCE_LOCK_POLICY.staleMs;
+    return activeFileResourceLockPolicy().staleMs;
 }
 
 export function defaultFileResourceLockAcquireTimeoutMs() {
-    return PROCESS_FILE_RESOURCE_LOCK_POLICY.acquireTimeoutMs;
+    return activeFileResourceLockPolicy().acquireTimeoutMs;
 }
 
 export function getFileResourceLockDir() {
-    return PROCESS_FILE_RESOURCE_LOCK_POLICY.lockDir;
+    return activeFileResourceLockPolicy().lockDir;
 }
 
 /** @param {string} resourceKey */

@@ -11,6 +11,7 @@ export {
     createWorkspacePathAuthority,
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
+    getWorkspacePathAuthorityStats,
     resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
     resolveWorkspacePathAuthority,
@@ -18,4 +19,11 @@ export {
 export { assertWorkspaceIoContext, requireValidatedWorkspaceReadPath, resolveWorkspacePath } from './boundary/index.js';
 export { createWorkspaceIo } from './io.js';
 export { createWorkspaceMutationIo } from './mutation-io/index.js';
+export {
+    activateWorkspacePathPolicyCacheConfig,
+    evaluateWorkspacePathPolicyAsync,
+    getWorkspacePathPolicyCacheStats,
+    invalidateWorkspacePathPolicyCache,
+    readWorkspacePathPolicyCacheConfig,
+} from './path-policy/index.js';
 export { createWorkspaceReadIo } from './read-io/index.js';

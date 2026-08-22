@@ -1,7 +1,8 @@
 // @ts-check
 
 import { createIoL2CacheRuntime, getIoL2CacheConfiguration } from '#copilot/infra/internal/cache/l2';
-import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database';
+import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database/provider';
+import { createBetterSqliteProvider } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -26,7 +27,7 @@ function recreateL2Runtime() {
     l2Runtime = createIoL2CacheRuntime({
         database: databaseBinding,
         runtimeId: `test-l2-${Date.now()}-${Math.random()}`,
-        configuration: getIoL2CacheConfiguration(),
+        configuration: getIoL2CacheConfiguration(process.env),
     });
     return l2Runtime;
 }
@@ -35,7 +36,7 @@ describe('io-cache-l2 runtime ownership', () => {
     beforeEach(() => {
         testDb = new Database(':memory:');
         databaseBinding = createInfraSqliteProviderBinding(
-            () => /** @type {import('better-sqlite3').Database} */ (testDb),
+            createBetterSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb)),
         );
         recreateL2Runtime();
     });
@@ -66,7 +67,7 @@ describe('io-cache-l2 runtime ownership', () => {
     it('uses conservative defaults for the experimental profile', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
 
-        expect(getIoL2CacheConfiguration()).toMatchObject({
+        expect(getIoL2CacheConfiguration(process.env)).toMatchObject({
             enabled: true,
             profile: 'experimental',
             profileSource: 'IO_L2_CACHE_PROFILE',
@@ -92,7 +93,7 @@ describe('io-cache-l2 runtime ownership', () => {
     it('keeps explicit off as the single disabled configuration', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'off';
 
-        expect(getIoL2CacheConfiguration()).toMatchObject({
+        expect(getIoL2CacheConfiguration(process.env)).toMatchObject({
             enabled: false,
             profile: 'off',
             profileSource: 'IO_L2_CACHE_PROFILE',
@@ -130,7 +131,8 @@ describe('io-cache-l2 runtime ownership', () => {
 
         const runtime = createInfraRuntime({
             runtimeId: 'invalid-l2-health-test',
-            sqliteProvider: () => /** @type {import('better-sqlite3').Database} */ (testDb),
+            env: process.env,
+            sqliteProvider: createBetterSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb)),
         });
         try {
             expect(readIoRuntimeHealthSnapshot(runtime).alerts).toContainEqual(

@@ -7,7 +7,7 @@ import { createCrossProcessInvalidationJournal } from './store.js';
 
 /**
  * @param {{
- *   database:{get:()=>import('better-sqlite3').Database;status:()=>{configured:boolean;revision:number}};
+ *   database:import('#copilot/infra/internal/database/port').InfraSqliteProviderReader;
  *   runtimeId?:string;
  *   processInstance?:string;
  *   config?:ReturnType<typeof readCrossProcessInvalidationConfig>;

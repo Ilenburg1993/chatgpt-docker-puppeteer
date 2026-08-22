@@ -378,7 +378,7 @@ describe('F93 - Provider config validation + session creation', () => {
 
     it('provider config + session config merge funciona', async () => {
         const { openaiProvider } = await import('#copilot/sdk/session');
-        const { SessionConfigBuilder } = await import('#copilot/config/session-config');
+        const { SessionConfigBuilder } = await import('#copilot/testing/config/session-config');
 
         const providerConfig = openaiProvider({
             baseUrl: 'https://api.openai.com/v1',
@@ -452,7 +452,7 @@ describe('F94 - System-message customize mode with section overrides', () => {
 
     it('system-message + config merge produz session config valido', async () => {
         const { customizeSystemMessage, sectionOverride } = await import('#copilot/sdk/session');
-        const { SessionConfigBuilder } = await import('#copilot/config/session-config');
+        const { SessionConfigBuilder } = await import('#copilot/testing/config/session-config');
 
         const sysMsg = customizeSystemMessage(
             {

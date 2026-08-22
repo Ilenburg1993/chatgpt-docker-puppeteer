@@ -35,7 +35,7 @@ function createRuntime(/** @type {string} */ root) {
         createConfiguredFsGrant({
             id: `test.mcp.ai-artifacts-cache.${++runtimeSequence}`,
             roots: [aiDir],
-            operations: ['list', 'stat'],
+            operations: ['delete', 'list', 'stat'],
             symlinkPolicy: 'deny',
             durability: ['file-and-directory'],
         }),

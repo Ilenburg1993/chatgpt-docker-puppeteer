@@ -50,7 +50,7 @@ print_info() {
 # =============================================================================
 print_test "Teste 1/6: Validando sintaxe do src/main.js..."
 
-if node --check src/main.js 2>/dev/null; then
+if node --check src/main.js 2> /dev/null; then
     print_pass "Sintaxe JavaScript válida"
 else
     print_fail "Sintaxe JavaScript inválida"
@@ -61,7 +61,7 @@ fi
 # =============================================================================
 print_test "Teste 2/6: Executando ESLint..."
 
-if npx eslint src/main.js --quiet 2>/dev/null; then
+if npx eslint src/main.js --quiet 2> /dev/null; then
     print_pass "ESLint passou sem erros"
 else
     print_fail "ESLint encontrou erros"
@@ -120,7 +120,7 @@ print_info "Teste Opcional 7: Simular PM2 + integrated (deve falhar)"
 print_info "═══════════════════════════════════════════════════════════"
 
 export SERVER_MODE=integrated
-export pm_id=test_simulation  # Simula PM2
+export pm_id=test_simulation # Simula PM2
 
 timeout 3s node src/main.js 2>&1 | head -20 || EXIT_CODE=$?
 

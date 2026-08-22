@@ -6,12 +6,13 @@
  * copilot.
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import { syncFromSdkHistory } from '../../../../src/copilot/conversation-hub/store-sync.js';
-import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 /** @param {import('better-sqlite3').Database} db */
 function applyCopilotMigrations(db) {
@@ -24,7 +25,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -35,12 +36,15 @@ function applyCopilotMigrations(db) {
 
 /** @type {import('better-sqlite3').Database} */
 let db;
+/** @type {ReturnType<typeof adaptBetterSqliteDatabase>} */
+let port;
 
 const HUB_SESSION = 'sync-test-session';
 const SDK_SESSION = 'sdk-session-001';
 
 beforeAll(() => {
     db = new Database(':memory:');
+    port = adaptBetterSqliteDatabase(db);
     applyCopilotMigrations(db);
     db.prepare(
         `INSERT INTO copilot_hub_sessions (id, title, status, created_at, updated_at)
@@ -58,7 +62,7 @@ describe('syncFromSdkHistory', () => {
             { id: 'msg-1', type: 'user', content: 'Olá LLM-B' },
             { id: 'msg-2', type: 'assistant', content: 'Olá! Como posso ajudar?' },
         ];
-        const result = syncFromSdkHistory(db, HUB_SESSION, SDK_SESSION, messages);
+        const result = syncFromSdkHistory(port, HUB_SESSION, SDK_SESSION, messages);
         assert.strictEqual(result.synced, 2);
         assert.strictEqual(result.skipped, 0);
     });
@@ -94,7 +98,7 @@ describe('syncFromSdkHistory', () => {
             { id: 'msg-1', type: 'user', content: 'Olá LLM-B' },
             { id: 'msg-3', type: 'user', content: 'Nova mensagem' },
         ];
-        const result = syncFromSdkHistory(db, HUB_SESSION, SDK_SESSION, messages);
+        const result = syncFromSdkHistory(port, HUB_SESSION, SDK_SESSION, messages);
         assert.strictEqual(result.skipped, 1, 'msg-1 já existe, deve ser skipada');
         assert.strictEqual(result.synced, 1, 'msg-3 é nova');
     });
@@ -134,7 +138,7 @@ describe('syncFromSdkHistory', () => {
             { type: 'user', content: 'Sem ID 1' },
             { type: 'user', content: 'Sem ID 2' },
         ];
-        const result = syncFromSdkHistory(db, HUB_SESSION, SDK_SESSION, messages);
+        const result = syncFromSdkHistory(port, HUB_SESSION, SDK_SESSION, messages);
         assert.strictEqual(result.synced, 2);
         assert.strictEqual(result.skipped, 0);
     });

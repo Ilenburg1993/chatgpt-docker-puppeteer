@@ -61,7 +61,7 @@ detect_platform() {
         echo "windows"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Verifica se está no WSL
-        if grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then
+        if grep -qEi "(Microsoft|WSL)" /proc/version 2> /dev/null; then
             echo "wsl"
         else
             echo "linux"
@@ -76,7 +76,7 @@ find_chrome_path() {
     local platform="$1"
 
     case "$platform" in
-        windows|wsl)
+        windows | wsl)
             # Windows paths (WSL pode acessar via /mnt/c/)
             local paths=(
                 "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
@@ -114,7 +114,7 @@ find_chrome_path() {
 
 is_chrome_running() {
     # Tenta conectar ao endpoint de health check
-    if curl -s --connect-timeout 2 "$HEALTH_CHECK_URL" &>/dev/null; then
+    if curl -s --connect-timeout 2 "$HEALTH_CHECK_URL" &> /dev/null; then
         return 0
     fi
     return 1
@@ -143,7 +143,7 @@ start_chrome() {
                 --no-default-browser-check \
                 --disable-features=TranslateUI \
                 --remote-allow-origins=* \
-                &>/dev/null &
+                &> /dev/null &
             ;;
         wsl)
             # WSL chama Chrome do Windows
@@ -157,7 +157,7 @@ start_chrome() {
                 --no-default-browser-check \
                 --disable-features=TranslateUI \
                 --remote-allow-origins=* \
-                &>/dev/null &
+                &> /dev/null &
             ;;
         linux)
             # Linux nativo
@@ -168,7 +168,7 @@ start_chrome() {
                 --no-default-browser-check \
                 --disable-features=TranslateUI \
                 --remote-allow-origins=* \
-                &>/dev/null &
+                &> /dev/null &
             ;;
         *)
             log_error "Plataforma não suportada: $platform"
@@ -214,7 +214,7 @@ main() {
 
         # Mostra informações da versão
         local version_info
-        version_info=$(curl -s "$HEALTH_CHECK_URL" 2>/dev/null || echo "{}")
+        version_info=$(curl -s "$HEALTH_CHECK_URL" 2> /dev/null || echo "{}")
 
         if [[ "$version_info" != "{}" ]]; then
             local browser_version
@@ -237,7 +237,7 @@ main() {
         echo ""
         echo "Por favor, instale o Google Chrome:"
         case "$platform" in
-            windows|wsl)
+            windows | wsl)
                 echo "  → https://www.google.com/chrome/"
                 ;;
             linux)

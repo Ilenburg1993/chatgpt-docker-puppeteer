@@ -285,13 +285,11 @@ const sdkRealtimeOps = Object.freeze({
 });
 
 /**
- * @returns {import('#copilot/observability/metrics.js').MetricsStore}
+ * @returns {import('#copilot/observability/metrics').MetricsStore}
  */
 function resolveMetricsStore() {
     try {
-        return /** @type {import('#copilot/observability/metrics.js').MetricsStore} */ (
-            container.resolve(METRICS_STORE)
-        );
+        return /** @type {import('#copilot/observability/metrics').MetricsStore} */ (container.resolve(METRICS_STORE));
     } catch {
         return defaultMetrics;
     }
@@ -305,7 +303,7 @@ function resolveMetricsStore() {
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
- *     metrics: import('#copilot/observability/metrics.js').MetricsStore;
+ *     metrics: import('#copilot/observability/metrics').MetricsStore;
  *     getClient: typeof getClient;
  *     getClientState: typeof getClientState;
  *     stopClient: typeof stopClient;

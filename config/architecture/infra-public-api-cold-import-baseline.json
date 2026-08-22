@@ -1,0 +1,363 @@
+{
+  "schemaVersion": 1,
+  "node": "v24.15.0",
+  "platform": "linux",
+  "arch": "x64",
+  "compileCache": "disabled",
+  "samples": 7,
+  "warmups": 1,
+  "entries": [
+    {
+      "alias": "#copilot/infra/public/cache/keys",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 11.336,
+        "wallMs": 66.473,
+        "rssMiB": 58.695,
+        "rssDeltaMiB": 3
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/cache/tiering",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.864,
+        "wallMs": 57.791,
+        "rssMiB": 56.199,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/database/sqlite",
+      "audience": "composition",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.904,
+        "wallMs": 56.002,
+        "rssMiB": 56.23,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/filesystem/configured",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 7.859,
+        "wallMs": 61.98,
+        "rssMiB": 58.059,
+        "rssDeltaMiB": 2.25
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/process",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 209.221,
+        "wallMs": 268.889,
+        "rssMiB": 135.125,
+        "rssDeltaMiB": 79.289
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/runtime",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 200.747,
+        "wallMs": 260.572,
+        "rssMiB": 133.129,
+        "rssDeltaMiB": 77.355
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/workspace/authority",
+      "audience": "composition",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 15.542,
+        "wallMs": 68.996,
+        "rssMiB": 60.57,
+        "rssDeltaMiB": 4.875
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/workspace/indexing",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 164.071,
+        "wallMs": 220.824,
+        "rssMiB": 121.914,
+        "rssDeltaMiB": 66.23
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/workspace/io",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 120.586,
+        "wallMs": 179.69,
+        "rssMiB": 119.527,
+        "rssDeltaMiB": 63.91
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/workspace/mutation-io",
+      "audience": "composition",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 121.641,
+        "wallMs": 178.426,
+        "rssMiB": 119.926,
+        "rssDeltaMiB": 64.25
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/composition/workspace/read-io",
+      "audience": "composition",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 52.779,
+        "wallMs": 107.996,
+        "rssMiB": 77.801,
+        "rssDeltaMiB": 22.145
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/concurrency/bulk",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.337,
+        "wallMs": 55.662,
+        "rssMiB": 56.367,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/database/sqlite",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.602,
+        "wallMs": 54.88,
+        "rssMiB": 56.344,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/database/sqlite/model-gateway-schema",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.763,
+        "wallMs": 53.378,
+        "rssMiB": 56.328,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/filesystem/invalidation/replay",
+      "audience": "runtime",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 12.231,
+        "wallMs": 69.613,
+        "rssMiB": 58.98,
+        "rssDeltaMiB": 3.25
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/filesystem/skills",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 8.056,
+        "wallMs": 64.786,
+        "rssMiB": 58.246,
+        "rssDeltaMiB": 2.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/indexing/file-context",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 8.683,
+        "wallMs": 64.837,
+        "rssMiB": 57.66,
+        "rssDeltaMiB": 2
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/indexing/search",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 17.452,
+        "wallMs": 71.018,
+        "rssMiB": 60.172,
+        "rssDeltaMiB": 4.375
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/observability",
+      "audience": "runtime",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 160.059,
+        "wallMs": 217.308,
+        "rssMiB": 121.293,
+        "rssDeltaMiB": 65.641
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/observability/process",
+      "audience": "runtime",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 125.929,
+        "wallMs": 183.413,
+        "rssMiB": 119.793,
+        "rssDeltaMiB": 64.145
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/operations",
+      "audience": "runtime",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 134.582,
+        "wallMs": 194.398,
+        "rssMiB": 119.953,
+        "rssDeltaMiB": 64.281
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/persistence/json",
+      "audience": "composition",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.915,
+        "wallMs": 57.558,
+        "rssMiB": 56.297,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/persistence/jsonl",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 17.856,
+        "wallMs": 75.51,
+        "rssMiB": 60.656,
+        "rssDeltaMiB": 4.875
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/persistence/jsonl/queue",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.052,
+        "wallMs": 58.865,
+        "rssMiB": 56.352,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/buffer",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.12,
+        "wallMs": 57.112,
+        "rssMiB": 56.293,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/http-response",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.903,
+        "wallMs": 59.345,
+        "rssMiB": 56.367,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/node",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 8.318,
+        "wallMs": 65.071,
+        "rssMiB": 57.695,
+        "rssDeltaMiB": 1.875
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/process-output",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.828,
+        "wallMs": 56.98,
+        "rssMiB": 56.395,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/process/executable",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 3.021,
+        "wallMs": 57.017,
+        "rssMiB": 56.809,
+        "rssDeltaMiB": 1.125
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/process/introspection",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 3.616,
+        "wallMs": 59.1,
+        "rssMiB": 57.039,
+        "rssDeltaMiB": 1.25
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/policy",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 11.22,
+        "wallMs": 65.333,
+        "rssMiB": 58.434,
+        "rssDeltaMiB": 2.75
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/telemetry",
+      "audience": "runtime",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 16.815,
+        "wallMs": 73.363,
+        "rssMiB": 60.063,
+        "rssDeltaMiB": 4.375
+      }
+    }
+  ]
+}

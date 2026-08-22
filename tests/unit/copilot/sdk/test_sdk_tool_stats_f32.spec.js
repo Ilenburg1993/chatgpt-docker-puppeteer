@@ -20,7 +20,7 @@ import {
     recordBlockedToolCall,
     recordToolCall,
     wrapWithStats,
-} from '#copilot/observability/tool-stats';
+} from '#copilot/testing/observability/tool-stats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**

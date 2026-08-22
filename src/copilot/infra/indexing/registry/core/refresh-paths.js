@@ -5,7 +5,7 @@
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
 import { readTextFileSnapshot, statPathSnapshot } from '#copilot/infra/internal/filesystem/read';
 import { loadGitignoreMatcher } from '#copilot/infra/internal/indexing/scanner';
-import { readEnvPositiveInt, richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform';
 import { extname, relative, resolve } from 'node:path';
 import pLimit from 'p-limit';
 import { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';
@@ -67,7 +67,7 @@ export async function executeIoIndexPathRefresh(index, filePaths, options, conte
         32,
         Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
             ? Math.max(1, Math.floor(Number(options.concurrency)))
-            : readEnvPositiveInt('IO_INDEX_REFRESH_CONCURRENCY', 8),
+            : 8,
     );
     const limit = pLimit(concurrency);
     const uniquePaths = [...new Set(filePaths.map((value) => resolve(value)))];

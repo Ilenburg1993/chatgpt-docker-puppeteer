@@ -1,10 +1,10 @@
 // @ts-check
 /** Metrics, active-lease registry and health projection for process-local resource locks. */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { getFileResourceLockStats } from '../file/index.js';
 import { createBoundedLockWaitMetrics, sanitizeLockOperation } from '../metrics/index.js';
+import { getActiveProcessLockConfig } from '../process-state/index.js';
 
 const lockWaitMetrics = createBoundedLockWaitMetrics();
 const lockCounters = {
@@ -22,7 +22,6 @@ const lockCounters = {
 const activeLeases = new Map();
 const warnedLeaseKeys = new Set();
 const MAX_ACTIVE_LEASE_SAMPLE = 32;
-const ACTIVE_LEASE_WARN_MS = readEnvPositiveInt('IO_LOCK_ACTIVE_LEASE_WARN_MS', 60_000);
 
 export function recordIoLockAttempt() {
     lockCounters.attempts += 1;
@@ -70,21 +69,25 @@ export function forgetIoLockLease(key) {
     warnedLeaseKeys.delete(key);
 }
 
-/** @param {number} pendingResources @param {{nowMs?:number}} [options] */
+/** @param {number} pendingResources @param {{nowMs?:number;emitStaleEvents?:boolean}} [options] */
 export function getIoLockStatsSnapshot(pendingResources, options = {}) {
     const now = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
+    const emitStaleEvents = options.emitStaleEvents !== false;
+    const activeLeaseWarnMs = getActiveProcessLockConfig().observability.activeLeaseWarnMs;
     const leasesByAge = [...activeLeases.entries()].sort(([, a], [, b]) => a.acquiredAtMs - b.acquiredAtMs);
-    const staleLeases = leasesByAge.filter(([, lease]) => now - lease.acquiredAtMs >= ACTIVE_LEASE_WARN_MS);
-    for (const [key, lease] of staleLeases) {
-        if (warnedLeaseKeys.has(key)) continue;
-        warnedLeaseKeys.add(key);
-        publishIoLifecycleEvent('lock', 'lease.stale', {
-            resourceHash: lease.resourceHash,
-            operation: lease.operation,
-            ageMs: Math.max(0, now - lease.acquiredAtMs),
-            thresholdMs: ACTIVE_LEASE_WARN_MS,
-            fileLockEnabled: lease.fileLockEnabled,
-        });
+    const staleLeases = leasesByAge.filter(([, lease]) => now - lease.acquiredAtMs >= activeLeaseWarnMs);
+    if (emitStaleEvents) {
+        for (const [key, lease] of staleLeases) {
+            if (warnedLeaseKeys.has(key)) continue;
+            warnedLeaseKeys.add(key);
+            publishIoLifecycleEvent('lock', 'lease.stale', {
+                resourceHash: lease.resourceHash,
+                operation: lease.operation,
+                ageMs: Math.max(0, now - lease.acquiredAtMs),
+                thresholdMs: activeLeaseWarnMs,
+                fileLockEnabled: lease.fileLockEnabled,
+            });
+        }
     }
     return {
         pendingResources,
@@ -98,7 +101,7 @@ export function getIoLockStatsSnapshot(pendingResources, options = {}) {
         timeouts: lockCounters.timeouts,
         aborts: lockCounters.aborts,
         failures: lockCounters.failures,
-        activeLeaseWarnMs: ACTIVE_LEASE_WARN_MS,
+        activeLeaseWarnMs,
         staleActiveLeases: staleLeases.length,
         oldestActiveLeaseAgeMs:
             leasesByAge.length > 0 ? Math.max(0, now - Number(leasesByAge[0]?.[1].acquiredAtMs ?? now)) : 0,

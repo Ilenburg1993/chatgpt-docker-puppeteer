@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
     extensionsReload: vi.fn(async () => ({ reloaded: true })),
 }));
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,

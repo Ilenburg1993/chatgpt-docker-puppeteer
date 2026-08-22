@@ -1,4 +1,6 @@
 // @ts-check
+
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
@@ -150,7 +152,7 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
 
     it('initConvergenceTracePersistence enables SQLite persistence', () => {
         const db = openInMemoryDb();
-        initConvergenceTracePersistence(db);
+        initConvergenceTracePersistence(adaptBetterSqliteDatabase(db));
 
         const store = createConvergenceTraceStore();
         store.recordMetric({
@@ -181,7 +183,7 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
 
     it('getPersistedSnapshot filters by operation', () => {
         const db = openInMemoryDb();
-        initConvergenceTracePersistence(db);
+        initConvergenceTracePersistence(adaptBetterSqliteDatabase(db));
 
         const store = createConvergenceTraceStore();
         store.recordMetric({
@@ -202,7 +204,7 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
 
     it('getPersistedSnapshot respects limit', () => {
         const db = openInMemoryDb();
-        initConvergenceTracePersistence(db);
+        initConvergenceTracePersistence(adaptBetterSqliteDatabase(db));
 
         const store = createConvergenceTraceStore();
         for (let i = 0; i < 10; i++) {
@@ -221,7 +223,7 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
 
     it('getPersistedSnapshot redige segredos persistidos', () => {
         const db = openInMemoryDb();
-        initConvergenceTracePersistence(db);
+        initConvergenceTracePersistence(adaptBetterSqliteDatabase(db));
         const store = createConvergenceTraceStore();
         const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
         const byokToken = 'sk-testsecret1234567890';

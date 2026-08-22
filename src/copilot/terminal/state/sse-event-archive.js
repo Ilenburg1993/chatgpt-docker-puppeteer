@@ -8,8 +8,9 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
-import { createJsonlFileWriter, readJsonlTail } from '#copilot/infra/public/persistence/jsonl';
-import { join } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter, createBoundJsonlTailReader } from '#copilot/infra/public/persistence/jsonl';
+import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
 
@@ -52,36 +53,62 @@ function isTerminalSseEventArchiveEnabled() {
 }
 
 /**
- * @returns {string}
+ * @typedef {{
+ *   archiveDir:string;
+ *   io:ReturnType<typeof createConfiguredFsIo>;
+ *   writer:ReturnType<typeof createBoundJsonlFileWriter>;
+ *   tail:ReturnType<typeof createBoundJsonlTailReader>;
+ * }} TerminalSseArchiveBinding
  */
-function resolveTerminalSseEventArchiveDir() {
-    const configured = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
-    return typeof configured === 'string' && configured.trim() ? configured : DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR;
-}
 
-/**
- * @returns {string}
- */
-function resolveTerminalSseEventArchivePath() {
+/** @type {TerminalSseArchiveBinding | null} */
+let _terminalSseEventArchiveBinding = null;
+
+/** @param {string} archiveDir @returns {string} */
+function resolveTerminalSseEventArchivePath(archiveDir) {
     const day = new Date().toISOString().slice(0, 10);
     if (_terminalSseEventArchivePath && _terminalSseEventArchiveDay === day) return _terminalSseEventArchivePath;
     _terminalSseEventArchiveDay = day;
-    _terminalSseEventArchivePath = join(resolveTerminalSseEventArchiveDir(), `terminal-sse-events-${day}.jsonl`);
+    _terminalSseEventArchivePath = join(archiveDir, `terminal-sse-events-${day}.jsonl`);
     return _terminalSseEventArchivePath;
 }
 
-const terminalSseEventArchiveWriter = createJsonlFileWriter({
-    filePath: resolveTerminalSseEventArchivePath,
-    batchLines: TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES,
-    maxQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_CATASTROPHIC_QUEUE,
-    softQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE,
-    onError: (error) => {
-        _terminalSseEventArchiveError = toError(error).message;
-    },
-    onSuccess: () => {
-        _terminalSseEventArchiveError = null;
-    },
-});
+/** @returns {TerminalSseArchiveBinding} */
+function createTerminalSseArchiveBinding() {
+    const configured = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+    const archiveDir = resolve(
+        typeof configured === 'string' && configured.trim() ? configured : DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR,
+    );
+    const io = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'terminal.sse-event.archive',
+            roots: [archiveDir],
+            operations: ['append', 'read'],
+            symlinkPolicy: 'deny',
+            durability: ['none'],
+        }),
+    );
+    const filePath = () => resolveTerminalSseEventArchivePath(archiveDir);
+    const writer = createBoundJsonlFileWriter({
+        filePath,
+        io,
+        batchLines: TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES,
+        maxQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_CATASTROPHIC_QUEUE,
+        softQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE,
+        onError: (error) => {
+            _terminalSseEventArchiveError = toError(error).message;
+        },
+        onSuccess: () => {
+            _terminalSseEventArchiveError = null;
+        },
+    });
+    return Object.freeze({ archiveDir, io, writer, tail: createBoundJsonlTailReader({ filePath, io }) });
+}
+
+/** @returns {TerminalSseArchiveBinding} */
+function getTerminalSseArchiveBinding() {
+    return (_terminalSseEventArchiveBinding ??= createTerminalSseArchiveBinding());
+}
 
 /**
  * @param {unknown} value
@@ -143,8 +170,10 @@ function projectTerminalSseEventEnvelope(data) {
  * @returns {Promise<void>}
  */
 export async function flushTerminalSseEventArchive() {
+    const writer = _terminalSseEventArchiveBinding?.writer;
+    if (!writer) return;
     try {
-        await terminalSseEventArchiveWriter.flush();
+        await writer.flush();
         _terminalSseEventArchiveError = null;
     } catch (error) {
         _terminalSseEventArchiveError = toError(error).message;
@@ -177,11 +206,13 @@ export function recordTerminalSseEventArchive(input) {
             ...envelope,
             payload: safeData,
         };
+        const binding = getTerminalSseArchiveBinding();
+        const path = resolveTerminalSseEventArchivePath(binding.archiveDir);
         const line = `${JSON.stringify(record)}\n`;
-        terminalSseEventArchiveWriter.enqueueLine(line);
+        binding.writer.enqueueLine(line);
         _terminalSseEventArchiveEvents += 1;
         _terminalSseEventArchiveLastEventId = input.eventId;
-        return { queued: true, path: resolveTerminalSseEventArchivePath(), error: null };
+        return { queued: true, path, error: null };
     } catch (error) {
         _terminalSseEventArchiveError = toError(error).message;
         _terminalSseEventArchiveRejectedEvents += 1;
@@ -205,7 +236,14 @@ export function recordTerminalSseEventArchive(input) {
  * }}
  */
 export function readTerminalSseEventArchiveState() {
-    const writerState = terminalSseEventArchiveWriter.getState();
+    const writerState = _terminalSseEventArchiveBinding?.writer.getState() ?? {
+        persistedBytes: 0,
+        queueDepth: 0,
+        scheduled: false,
+        inFlight: false,
+        failedBatches: 0,
+        droppedLines: 0,
+    };
     return {
         enabled: isTerminalSseEventArchiveEnabled(),
         path: _terminalSseEventArchivePath,
@@ -277,7 +315,7 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
     }
     const hasFilter = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value));
     const fetchCount = hasFilter ? limit * 20 : limit;
-    const { records, bytesRead, maxBytes, truncatedByByteLimit } = await readJsonlTail(path, {
+    const { records, bytesRead, maxBytes, truncatedByByteLimit } = await getTerminalSseArchiveBinding().tail.readTail({
         maxLines: fetchCount,
     });
     /** @type {TerminalSseEventArchiveEntry[]} */
@@ -324,10 +362,11 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
  * @returns {void}
  */
 export function resetTerminalSseEventArchiveForTests() {
+    _terminalSseEventArchiveBinding?.writer.reset();
+    _terminalSseEventArchiveBinding = null;
     _terminalSseEventArchivePath = null;
     _terminalSseEventArchiveDay = null;
     _terminalSseEventArchiveError = null;
-    terminalSseEventArchiveWriter.reset();
     _terminalSseEventArchiveEvents = 0;
     _terminalSseEventArchiveRejectedEvents = 0;
     _terminalSseEventArchiveLastEventId = null;

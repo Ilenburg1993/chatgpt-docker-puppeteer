@@ -1,16 +1,18 @@
 // @ts-check
 
-import { createInfraOperationContext } from '#copilot/infra/public/composition/operation';
+import {
+    adaptBetterSqliteDatabase,
+    createBetterSqliteProvider,
+} from '#copilot/infra/internal/database/sqlite/better-sqlite3';
+import { ensureIoIndexSchema } from '#copilot/infra/internal/indexing/registry/sqlite/schema';
 import { createProcessInfra } from '#copilot/infra/public/composition/process';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
-import { createWorkspaceInfra } from '#copilot/infra/public/composition/workspace/instance';
 import { markMutationAppliedError } from '#copilot/infra/public/policy';
 import Database from 'better-sqlite3';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
 /** @type {{ dispose:() => Promise<void> }[]} */
 const disposables = [];
@@ -34,8 +36,9 @@ async function waitUntil(predicate) {
 
 describe('infra 2.0 composition scopes', () => {
     it('WorkspaceInfra binds one authority and memoizes capability facets lazily', async () => {
-        const workspace = createWorkspaceInfra({ workspaceRoot: process.cwd(), workspaceId: 'unit-workspace' });
-        disposables.push(workspace);
+        const runtime = createInfraRuntime({ runtimeId: 'unit-workspace-owner' });
+        disposables.push(runtime);
+        const workspace = runtime.workspace(process.cwd());
 
         expect(workspace.workspaceRoot).toBe(process.cwd());
         expect(workspace.lifecycleSnapshot()).toMatchObject({ state: 'active', registered: [] });
@@ -46,6 +49,19 @@ describe('infra 2.0 composition scopes', () => {
 
         const token = await workspace.authority.authorizeRead('package.json');
         await expect(workspace.readIo.readTextValidated(token)).resolves.toMatchObject({ content: expect.any(String) });
+    });
+
+    it('InfraRuntime expõe asyncDispose como o mesmo teardown idempotente do owner', async () => {
+        const runtime = createInfraRuntime({ runtimeId: 'async-dispose-runtime' });
+        disposables.push(runtime);
+        runtime.workspace(process.cwd());
+
+        expect(typeof runtime[Symbol.asyncDispose]).toBe('function');
+        const viaAsyncDispose = runtime[Symbol.asyncDispose]();
+        const viaDispose = runtime.dispose();
+        expect(viaAsyncDispose).toBe(viaDispose);
+        await viaAsyncDispose;
+        expect(runtime.lifecycleSnapshot()).toMatchObject({ state: 'disposed', workspaces: 0 });
     });
 
     it('InfraRuntime captures one deeply immutable config snapshot from the supplied environment', () => {
@@ -229,7 +245,7 @@ describe('infra 2.0 composition scopes', () => {
         expect(firstAfterWrite.advisoryBudget).toMatchObject({ operations: 1, active: 0 });
         expect(firstAfterWrite.durability.operationsObserved).toBe(2);
         expect(firstAfterWrite.durability.operationsWithMetadata).toBe(1);
-        expect(firstAfterWrite.latency.write?.count).toBe(1);
+        expect(firstAfterWrite.latency['write']?.count).toBe(1);
         expect(secondAfterWrite).toMatchObject({
             advisoryBudget: { operations: 0, active: 0 },
             durability: { operationsObserved: 1, operationsWithMetadata: 0 },
@@ -326,10 +342,16 @@ describe('infra 2.0 composition scopes', () => {
         ]);
         const dbA = new Database(':memory:');
         const dbB = new Database(':memory:');
-        ensureIoIndexSchema(dbA);
-        ensureIoIndexSchema(dbB);
-        const first = createInfraRuntime({ runtimeId: 'index-runtime-a', sqliteProvider: () => dbA });
-        const second = createInfraRuntime({ runtimeId: 'index-runtime-b', sqliteProvider: () => dbB });
+        ensureIoIndexSchema(adaptBetterSqliteDatabase(dbA));
+        ensureIoIndexSchema(adaptBetterSqliteDatabase(dbB));
+        const first = createInfraRuntime({
+            runtimeId: 'index-runtime-a',
+            sqliteProvider: createBetterSqliteProvider(() => dbA),
+        });
+        const second = createInfraRuntime({
+            runtimeId: 'index-runtime-b',
+            sqliteProvider: createBetterSqliteProvider(() => dbB),
+        });
         disposables.push(first, second);
         try {
             const [indexedA, indexedB] = await Promise.all([
@@ -364,10 +386,18 @@ describe('infra 2.0 composition scopes', () => {
         const workspace = runtime.workspace(process.cwd());
         /** @type {string[]} */
         const order = [];
-        processInfra.registerDisposable('process-hook', () => order.push('process'));
-        runtime.registerDisposable('runtime-hook', () => order.push('runtime'));
-        workspace.registerDisposable('workspace-first', () => order.push('workspace-first'));
-        workspace.registerDisposable('workspace-last', () => order.push('workspace-last'));
+        processInfra.registerDisposable('process-hook', () => {
+            order.push('process');
+        });
+        runtime.registerDisposable('runtime-hook', () => {
+            order.push('runtime');
+        });
+        workspace.registerDisposable('workspace-first', () => {
+            order.push('workspace-first');
+        });
+        workspace.registerDisposable('workspace-last', () => {
+            order.push('workspace-last');
+        });
 
         const firstDispose = processInfra.dispose();
         const secondDispose = processInfra.dispose();
@@ -379,6 +409,51 @@ describe('infra 2.0 composition scopes', () => {
         expect(runtime.lifecycleSnapshot().state).toBe('disposed');
         expect(workspace.lifecycleSnapshot().state).toBe('disposed');
         expect(() => runtime.workspace(process.cwd())).toThrow(/disposed/u);
+    });
+
+    it('direct workspace disposal deregisters the child and recreation gets a fresh monotonic identity', async () => {
+        const runtime = createInfraRuntime({ runtimeId: 'workspace-deregister-runtime' });
+        disposables.push(runtime);
+        const root = await mkdtemp(join(tmpdir(), 'infra-workspace-deregister-'));
+        tempDirs.push(root);
+        const first = runtime.workspace(root);
+        const firstId = first.workspaceId;
+        expect(runtime.listWorkspaces()).toEqual([first]);
+
+        await first.dispose();
+        expect(runtime.listWorkspaces()).toEqual([]);
+        const second = runtime.workspace(root);
+        expect(Object.is(second, first)).toBe(false);
+        expect(second.workspaceId).not.toBe(firstId);
+        expect(runtime.lifecycleSnapshot()).toMatchObject({ workspaces: 1, workspaceGeneration: 2 });
+    });
+
+    it('direct runtime disposal deregisters it from ProcessInfra and permits explicit-id recreation', async () => {
+        const processInfra = createProcessInfra({ processId: 'runtime-deregister-process' });
+        disposables.push(processInfra);
+        const first = processInfra.createRuntime({ runtimeId: 'reusable-runtime' });
+        expect(processInfra.listRuntimes()).toEqual([first]);
+        await first.dispose();
+        expect(processInfra.listRuntimes()).toEqual([]);
+
+        const second = processInfra.createRuntime({ runtimeId: 'reusable-runtime' });
+        expect(Object.is(second, first)).toBe(false);
+        expect(first.generation).toBe(1);
+        expect(second.generation).toBe(2);
+        expect(processInfra.listRuntimes()).toEqual([second]);
+        expect(processInfra.lifecycleSnapshot()).toMatchObject({
+            runtimes: 1,
+            runtimeGeneration: 2,
+            runtimeIds: ['reusable-runtime'],
+        });
+    });
+
+    it('rejects duplicate runtime ids before constructing a second child', async () => {
+        const processInfra = createProcessInfra({ processId: 'duplicate-runtime-process' });
+        disposables.push(processInfra);
+        const first = processInfra.createRuntime({ runtimeId: 'duplicate-runtime' });
+        expect(() => processInfra.createRuntime({ runtimeId: 'duplicate-runtime' })).toThrow(/Duplicate InfraRuntime/u);
+        expect(processInfra.listRuntimes()).toEqual([first]);
     });
 
     it('workspace scope runtimes isolate equal session IDs and dispose independently', async () => {
@@ -456,31 +531,6 @@ describe('infra 2.0 composition scopes', () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         expect(eventsA).toHaveLength(eventCountA);
         expect(second.externalWatchStats()[0]).toMatchObject({ watching: true });
-    });
-
-    it('OperationContext is frozen correlation data and carries no implicit authorization', () => {
-        const controller = new AbortController();
-        const context = createInfraOperationContext({
-            traceId: 'trace-test',
-            runtimeId: 'runtime-test',
-            workspaceId: 'workspace-test',
-            caller: 'unit-test',
-            signal: controller.signal,
-            deadlineAt: 1234,
-        });
-        expect(context).toEqual(
-            expect.objectContaining({
-                traceId: 'trace-test',
-                runtimeId: 'runtime-test',
-                workspaceId: 'workspace-test',
-                caller: 'unit-test',
-                signal: controller.signal,
-                deadlineAt: 1234,
-            }),
-        );
-        expect(Object.isFrozen(context)).toBe(true);
-        expect(context).not.toHaveProperty('authority');
-        expect(context).not.toHaveProperty('workspaceRoot');
     });
 
     it('composition/import does not materialize the persistent index', () => {

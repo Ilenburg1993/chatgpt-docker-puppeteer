@@ -1,7 +1,8 @@
 // @ts-check
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database';
+import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/database/provider';
+import { createBetterSqliteProvider } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,7 +31,7 @@ vi.mock('#copilot/infra/internal/filesystem/invalidation', () => ({
 }));
 
 vi.mock('#copilot/infra/internal/filesystem/read', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('#copilot/infra/internal/filesystem/read')} */ (await importOriginal());
     return {
         ...actual,
         statPathSnapshot: mocks.statPathSnapshot,
@@ -39,7 +40,7 @@ vi.mock('#copilot/infra/internal/filesystem/read', async (importOriginal) => {
 });
 
 vi.mock('#copilot/infra/internal/indexing/scanner', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('#copilot/infra/internal/indexing/scanner')} */ (await importOriginal());
     return {
         ...actual,
         loadGitignoreMatcher: mocks.loadGitignoreMatcher,
@@ -47,7 +48,9 @@ vi.mock('#copilot/infra/internal/indexing/scanner', async (importOriginal) => {
 });
 
 vi.mock('../../../../src/copilot/infra/indexing/registry/sqlite/index.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('../../../../src/copilot/infra/indexing/registry/sqlite/index.js')} */ (
+        await importOriginal()
+    );
     return {
         ...actual,
         createIoIndexSqlite: () => ({
@@ -71,7 +74,7 @@ let databaseBinding = null;
 /** @type {ReturnType<typeof createIoIndexRegistryRuntime> | null} */
 let indexRuntime = null;
 
-import { createIoIndexRegistryRuntime } from '#copilot/infra/internal/indexing/registry';
+import { createIoIndexRegistryRuntime, readIoIndexRuntimeConfig } from '#copilot/infra/internal/indexing/registry';
 
 function requireIndexRuntime() {
     if (!indexRuntime) throw new Error('test index runtime is not initialized');
@@ -85,6 +88,7 @@ async function recreateIndexRuntime() {
         database: databaseBinding,
         invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
         runtimeId: `test-index-${Date.now()}-${Math.random()}`,
+        config: readIoIndexRuntimeConfig(process.env),
     });
     mocks.registerIoInvalidationHook.mockClear();
     return indexRuntime;
@@ -95,11 +99,14 @@ beforeEach(() => {
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', '10000');
     testDb = new Database(':memory:');
-    databaseBinding = createInfraSqliteProviderBinding(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    databaseBinding = createInfraSqliteProviderBinding(
+        createBetterSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb)),
+    );
     indexRuntime = createIoIndexRegistryRuntime({
         database: databaseBinding,
         invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
         runtimeId: `test-index-${Date.now()}-${Math.random()}`,
+        config: readIoIndexRuntimeConfig(process.env),
     });
     mocks.registerIoInvalidationHook.mockClear();
     mocks.indexDirectory.mockReset();
@@ -212,6 +219,7 @@ describe('io-index-registry build coalescing', () => {
             database: databaseBinding,
             invalidationBus: { registerHook: mocks.registerIoInvalidationHook },
             runtimeId: `test-index-recreated-${Date.now()}-${Math.random()}`,
+            config: readIoIndexRuntimeConfig(process.env),
         });
 
         await requireIndexRuntime().buildDirectory('/tmp/ws-hook');
@@ -243,6 +251,38 @@ describe('io-index-registry build coalescing', () => {
             indexed: 1,
             failed: 0,
         });
+    });
+
+    it('classifica pending persistente pelo orçamento temporal derivado e preserva high-water após convergência', async () => {
+        const workspaceRoot = '/tmp/ws-auto-refresh-stale-health';
+        const filePath = `${workspaceRoot}/aging.js`;
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        mocks.indexTextFile.mockResolvedValue({});
+
+        await requireIndexRuntime().buildDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+        hook(filePath, { recursive: false, source: 'stale-health-test' });
+
+        const initial = requireIndexRuntime().stats().autoRefresh;
+        expect(initial).toMatchObject({ pending: 1, stalePending: 0 });
+        expect(initial.staleAfterMs).toBeGreaterThanOrEqual(10_000);
+        const realNow = Date.now();
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(realNow + initial.staleAfterMs + 1);
+        try {
+            const stale = requireIndexRuntime().stats().autoRefresh;
+            expect(stale.stalePending).toBe(1);
+            expect(stale.oldestPendingAgeMs).toBeGreaterThan(stale.staleAfterMs);
+
+            const result = await requireIndexRuntime().flushAutoRefresh();
+            expect(result).toMatchObject({ indexed: 1, failed: 0 });
+        } finally {
+            clock.mockRestore();
+        }
+
+        const converged = requireIndexRuntime().stats().autoRefresh;
+        expect(converged).toMatchObject({ pending: 0, stalePending: 0, oldestPendingAgeMs: 0 });
+        expect(converged.maxPendingAgeMs).toBeGreaterThan(initial.staleAfterMs);
     });
 
     it('mantém falha transitória pending e converge no retry seguinte', async () => {
@@ -458,24 +498,26 @@ describe('io-index-registry build coalescing', () => {
             attempts: 1,
             consistent: /** @type {const} */ (true),
         };
+        /** @type {import('#copilot/infra/internal/indexing/parser').FileSymbols} */
         const parsedSymbols = {
             filePath,
+            ext: '.js',
             parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
             symbols: [],
             imports: [],
             exports: [],
             parseError: null,
+            truncated: false,
+            lines: 1,
+            bytes: snapshot.bytesRead,
+            parsedBytes: snapshot.bytesRead,
+            parseDurationMs: 0,
         };
 
         const result = await requireIndexRuntime().refreshPaths([filePath], {
             workspaceRoot,
             snapshots: new Map([[filePath, snapshot]]),
-            parsedSymbols: new Map([
-                [
-                    filePath,
-                    /** @type {import('#copilot/infra/internal/indexing/parser').FileSymbols} */ (parsedSymbols),
-                ],
-            ]),
+            parsedSymbols: new Map([[filePath, parsedSymbols]]),
         });
 
         expect(result).toMatchObject({

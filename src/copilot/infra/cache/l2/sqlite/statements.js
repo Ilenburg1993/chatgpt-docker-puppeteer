@@ -1,6 +1,6 @@
 // @ts-check
 /** Schema ownership and prepared statements for the SQLite L2 cache. */
-/** @param {{ exec: Function; prepare: Function }} db */
+/** @param {import('#copilot/infra/internal/database/port').SqliteDatabasePort} db */
 export function ensureIoL2Schema(db) {
     db.exec(`
         CREATE TABLE IF NOT EXISTS copilot_io_cache_l2 (
@@ -21,7 +21,7 @@ export function ensureIoL2Schema(db) {
         CREATE INDEX IF NOT EXISTS idx_copilot_io_cache_l2_expires ON copilot_io_cache_l2(expires_at_ms);
     `);
 }
-/** @param {{ exec: Function; prepare: Function }} db */
+/** @param {import('#copilot/infra/internal/database/port').SqliteDatabasePort} db */
 export function createIoL2Statements(db) {
     ensureIoL2Schema(db);
     return {

@@ -16,23 +16,27 @@ import { registerScopeRuntimeProbe, unregisterScopeRuntimeProbe } from './runtim
 import { createScopeRuntimeState } from './state.js';
 
 /** @param {{
- * runtimeId?:string; workspaceRoot?:string; maxActiveScopes?:number;
+ * runtimeId?:string; runtimeOwnerId?:string; workspaceOwnerId?:string; workspaceRoot?:string; maxActiveScopes?:number;
  * indexRegistry?: ReturnType<typeof import('../../registry/instance/index.js').createIoIndexRegistryRuntime>;
  * cacheRuntime: {l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>};
  * invalidationBus: ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime>;
  * parserCacheRuntime?: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime>;
+ * scannerConfig?: Readonly<{batchSize:number;hardMaxEntries:number}>;
  * }} [options] */
 export function createWorkspaceScopeRuntime(options) {
     if (!options?.cacheRuntime || !options?.invalidationBus) {
         throw new TypeError('createWorkspaceScopeRuntime requires runtime-owned cacheRuntime and invalidationBus.');
     }
     const runtimeId = options.runtimeId?.trim() || `scope-runtime-${randomUUID()}`;
+    const runtimeOwnerId = options.runtimeOwnerId?.trim() || runtimeId;
+    const workspaceOwnerId = options.workspaceOwnerId?.trim() || runtimeId;
     const runtime = createScopeRuntimeState({
         ...(options.maxActiveScopes === undefined ? {} : { maxActiveScopes: options.maxActiveScopes }),
         ...(options.indexRegistry ? { indexRegistry: options.indexRegistry } : {}),
         cacheRuntime: options.cacheRuntime,
         invalidationBus: options.invalidationBus,
         ...(options.parserCacheRuntime ? { parserCacheRuntime: options.parserCacheRuntime } : {}),
+        ...(options.scannerConfig ? { scannerConfig: options.scannerConfig } : {}),
     });
     let state = /** @type {'active' | 'disposing' | 'disposed'} */ ('active');
     /** @type {Promise<void> | null} */
@@ -54,9 +58,26 @@ export function createWorkspaceScopeRuntime(options) {
         }
     }
 
+    /** @param {string} sessionId @param {import('./types.js')._InternalScope} scope */
+    function isCurrentScopeGeneration(sessionId, scope) {
+        return state === 'active' && runtime.registry.get(sessionId) === scope;
+    }
+
+    /** @param {string} sessionId */
+    function staleHandleError(sessionId) {
+        return Object.assign(new Error(`Scope handle for ${sessionId} no longer owns the active generation.`), {
+            code: 'ERR_SCOPE_HANDLE_STALE',
+            sessionId,
+        });
+    }
+
     /** @type {import('./runtime-registry.js').ScopeRuntimeProbe} */
-    const probe = {
-        runtimeId,
+    const probe = Object.freeze({
+        scope: /** @type {const} */ ('workspace'),
+        ownerId: workspaceOwnerId,
+        runtimeOwnerId,
+        probeId: runtimeId,
+        mayMaterialize: /** @type {const} */ (false),
         snapshot() {
             const ids = listScopes(runtime);
             return Object.freeze({
@@ -66,25 +87,60 @@ export function createWorkspaceScopeRuntime(options) {
                 ),
             });
         },
-    };
+    });
 
     const api = Object.freeze({
         runtimeId,
+        maxActiveScopes: runtime.maxActiveScopes,
         get state() {
             return state;
         },
         /** @param {import('./types.js').ScopeDeclareOptions} opts */
         declareScope(opts) {
             assertActive();
-            const handle = declareScope(
+            const declared = declareScope(
                 {
                     ...opts,
                     ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}),
                 },
                 runtime,
             );
+            const { sessionId, scope } = declared;
             syncProbeRegistration();
-            return handle;
+
+            return Object.freeze({
+                sessionId,
+                get ready() {
+                    if (!isCurrentScopeGeneration(sessionId, scope)) return false;
+                    return peekScopeStats(sessionId, runtime)?.ready === true;
+                },
+                async awaitReady() {
+                    return declared.awaitReady();
+                },
+                /** @param {string[]} [modifiedPaths] */
+                async refresh(modifiedPaths) {
+                    assertActive();
+                    if (!isCurrentScopeGeneration(sessionId, scope)) throw staleHandleError(sessionId);
+                    const result = await refreshScope(sessionId, modifiedPaths, runtime);
+                    syncProbeRegistration();
+                    return result;
+                },
+                snapshot() {
+                    if (!isCurrentScopeGeneration(sessionId, scope)) return null;
+                    return peekScopeStats(sessionId, runtime);
+                },
+                close() {
+                    if (!isCurrentScopeGeneration(sessionId, scope)) return null;
+                    const result = closeScope(sessionId, runtime);
+                    syncProbeRegistration();
+                    return result;
+                },
+                async [Symbol.asyncDispose]() {
+                    if (!isCurrentScopeGeneration(sessionId, scope)) return;
+                    closeScope(sessionId, runtime);
+                    syncProbeRegistration();
+                },
+            });
         },
         /** @param {string} sessionId @param {string[]} [modifiedPaths] */
         async refreshScope(sessionId, modifiedPaths) {
@@ -128,6 +184,8 @@ export function createWorkspaceScopeRuntime(options) {
         snapshot() {
             return Object.freeze({
                 runtimeId,
+                runtimeOwnerId,
+                workspaceOwnerId,
                 state,
                 activeScopes: runtime.registry.size,
                 warming: runtime.warmPromises.size,

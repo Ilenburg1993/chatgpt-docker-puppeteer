@@ -8,8 +8,8 @@
  * @module copilot/infra/filesystem/workspace/boundary/service
  */
 
-import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import { resolveValidatedReadWorkspacePath } from '../authority/index.js';
+import { evaluateWorkspacePathPolicyAsync } from '../path-policy/index.js';
 
 /**
  * @typedef {'append' | 'copy' | 'delete' | 'metadata' | 'mkdir' | 'move' | 'patch' | 'read' | 'scan' | 'search' | 'stat' | 'write'} WorkspaceIoMode
@@ -33,7 +33,7 @@ export function assertWorkspaceIoContext(context) {
  */
 export async function resolveWorkspacePath(filePath, mode, context) {
     assertWorkspaceIoContext(context);
-    const result = await evaluateIoPathPolicyAsync(filePath, {
+    const result = await evaluateWorkspacePathPolicyAsync(filePath, {
         workspaceRoot: context.workspaceRoot,
         ...(context.blockedSegments?.length ? { blockedSegments: context.blockedSegments } : {}),
         mode,
@@ -52,7 +52,7 @@ export async function resolveWorkspacePath(filePath, mode, context) {
  */
 export async function resolveWorkspaceLstatPath(filePath, context) {
     assertWorkspaceIoContext(context);
-    const result = await evaluateIoPathPolicyAsync(filePath, {
+    const result = await evaluateWorkspacePathPolicyAsync(filePath, {
         workspaceRoot: context.workspaceRoot,
         ...(context.blockedSegments?.length ? { blockedSegments: context.blockedSegments } : {}),
         mode: 'stat',
@@ -62,7 +62,7 @@ export async function resolveWorkspaceLstatPath(filePath, context) {
     throw workspacePolicyError(result);
 }
 
-/** @param {import('#copilot/core/io-policy').IoPathPolicyFailure} result */
+/** @param {import('#copilot/infra/internal/policy').WorkspacePathPolicyFailure} result */
 function workspacePolicyError(result) {
     const error = /** @type {Error & { code?: string; policyVersion?: string }} */ (
         new Error(`Workspace IO denied: ${result.reason}`)

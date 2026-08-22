@@ -1,7 +1,7 @@
 // @ts-check
 /** Observable physical directory/stat adapters. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

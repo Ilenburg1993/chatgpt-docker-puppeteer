@@ -1,7 +1,7 @@
 // @ts-check
 /** Physical snapshot reads that intentionally bypass L1/L2 caches. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { decodeUtf8Buffer, sha256 } from '#copilot/infra/internal/platform';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {

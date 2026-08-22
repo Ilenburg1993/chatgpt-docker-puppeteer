@@ -46,14 +46,50 @@ const rollbackPolicyMock = vi.hoisted(() => ({
     maxBytes: 32 * 1024 * 1024,
 }));
 
+const rollbackCapabilityMock = vi.hoisted(() => ({
+    issue: vi.fn((changeSet) => {
+        const steps = [...changeSet.entries]
+            .reverse()
+            .filter((entry) => entry.rollback)
+            .map((entry, index) => ({ order: index + 1, entryId: entry.entryId, ...entry.rollback }));
+        return {
+            token: {
+                version: 4,
+                audience: 'copilot.file.rollback',
+                tokenId: 'test-rollback-token-id',
+                stepCount: steps.length,
+                steps,
+                expiresAtMs: Date.now() + rollbackPolicyMock.ttlMs,
+            },
+            serialized: 'test-authenticated-rollback-capability',
+        };
+    }),
+    parse: vi.fn(() => ({
+        tokenId: 'test-rollback-token-id',
+        stepCount: 0,
+        steps: [],
+    })),
+    execute: vi.fn(async () => ({
+        success: true,
+        dryRun: true,
+        status: 'ready',
+        tokenId: 'test-rollback-token-id',
+        changeSetId: 'test-change-set',
+        appliedCount: 0,
+        steps: [],
+    })),
+    listSidecars: vi.fn(async () => ({ count: 0, sidecars: [] })),
+}));
+
 vi.mock('#copilot/infra/public/composition/workspace/io', () => ({
     createWorkspaceIo: vi.fn(() => workspaceIoMocks),
 }));
 
-vi.mock('#copilot/tools/file/shared', () => ({
+vi.mock('#copilot/testing/tools/file/shared', () => ({
     validatePath: mockValidatePath,
     WORKSPACE_IO: workspaceIoMocks,
     WORKSPACE_MUTATION_AUDIT: mutationAuditMock,
+    WORKSPACE_ROLLBACK: rollbackCapabilityMock,
     WORKSPACE_ROLLBACK_POLICY: rollbackPolicyMock,
     WORKSPACE_PATH_AUTHORITY: Object.freeze({ workspaceRoot: '/workspace' }),
     WORKSPACE_ROOT: '/workspace',
@@ -747,6 +783,30 @@ describe('patch_file — exact patch contract over validated path', () => {
             expect.anything(),
             expect.objectContaining({ newString: '' }),
         );
+    });
+});
+
+describe('rollback tools — workspace-bound authenticated capability', () => {
+    it('valida e executa rollback somente pela capability do workspace', async () => {
+        const handler = /** @type {Function} */ (rollbackFileChangesTool.handler);
+        const result = await handler({
+            token: 'test-authenticated-rollback-capability',
+            dryRun: true,
+            confirm: false,
+        });
+
+        expect(result).toMatchObject({ success: true, status: 'ready' });
+        expect(rollbackCapabilityMock.parse).toHaveBeenCalledWith('test-authenticated-rollback-capability');
+        expect(rollbackCapabilityMock.execute).toHaveBeenCalledWith(
+            expect.objectContaining({ tokenId: 'test-rollback-token-id' }),
+            expect.objectContaining({ dryRun: true, allowedPaths: expect.any(Set) }),
+        );
+    });
+
+    it('lista sidecars pela mesma capability bound, sem policy/path na operação', async () => {
+        const handler = /** @type {Function} */ (rollbackSidecarsStatusTool.handler);
+        await handler({ maxEntries: 10, verifyContent: true });
+        expect(rollbackCapabilityMock.listSidecars).toHaveBeenCalledWith({ maxEntries: 10, verifyContent: true });
     });
 });
 

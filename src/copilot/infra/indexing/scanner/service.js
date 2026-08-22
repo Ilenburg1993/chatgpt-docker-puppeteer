@@ -8,15 +8,14 @@
  * @module copilot/infra/indexing/scanner/service
  */
 
+import { toError } from '#copilot/core/error-handlers';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
+import { evaluateWorkspacePathPolicyAsync } from '#copilot/infra/internal/filesystem/workspace';
 import {
     DEFAULT_BLOCKED_PATH_SEGMENTS,
-    buildIoMeta,
-    createIoTraceId,
-    evaluateIoPathPolicyAsync,
-    toError,
-} from '#copilot/core';
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
-import { assertValidIoFilePath, normalizeWorkspaceRoot } from '#copilot/infra/internal/policy';
+    assertValidIoFilePath,
+    normalizeWorkspaceRoot,
+} from '#copilot/infra/internal/policy';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from '#copilot/infra/internal/telemetry';
 import ignore from 'ignore';
 import { lstat, readdir } from 'node:fs/promises';
@@ -27,8 +26,8 @@ import { buildFileFingerprint, classifyStats } from './fingerprint.js';
 import { loadGitignoreMatcher } from './gitignore.js';
 import { IO_GLOB_ENGINE, matchesAnyPattern, matchesFilter } from './glob-match/index.js';
 
-const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
-const DEFAULT_SCAN_HARD_MAX_ENTRIES = readEnvPositiveInt('IO_SCAN_HARD_MAX_ENTRIES', 20_000);
+const DEFAULT_SCAN_BATCH_SIZE = 512;
+const DEFAULT_SCAN_HARD_MAX_ENTRIES = 20_000;
 
 /**
  * @typedef {object} IoScanEntry
@@ -71,6 +70,7 @@ const DEFAULT_SCAN_HARD_MAX_ENTRIES = readEnvPositiveInt('IO_SCAN_HARD_MAX_ENTRI
  *     fingerprint?: boolean;
  *     redactProtectedPaths?: boolean;
  *     maxEntries?: number;
+ *     hardMaxEntries?: number;
  *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
@@ -103,10 +103,15 @@ export async function scanDirectory(rootPath, options = {}) {
             : 16;
     const batchSize = normalizeBatchSize(Number(options.batchSize), DEFAULT_SCAN_BATCH_SIZE);
     const requestedMaxEntries = Number(options.maxEntries);
+    const configuredHardMaxEntries = Number(options.hardMaxEntries);
+    const effectiveHardMaxEntries =
+        Number.isInteger(configuredHardMaxEntries) && configuredHardMaxEntries > 0
+            ? Math.floor(configuredHardMaxEntries)
+            : DEFAULT_SCAN_HARD_MAX_ENTRIES;
     const hardMaxEntries =
         Number.isInteger(requestedMaxEntries) && requestedMaxEntries > 0
-            ? Math.min(requestedMaxEntries, DEFAULT_SCAN_HARD_MAX_ENTRIES)
-            : DEFAULT_SCAN_HARD_MAX_ENTRIES;
+            ? Math.min(requestedMaxEntries, effectiveHardMaxEntries)
+            : effectiveHardMaxEntries;
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
     options.signal?.throwIfAborted();
@@ -116,6 +121,10 @@ export async function scanDirectory(rootPath, options = {}) {
             .map((segment) => segment.toLowerCase()),
     );
     let scannedEntries = 0;
+    // Admission is separate from completion accounting. Multiple async dirent callbacks may be in flight at once; the
+    // hard cap must therefore be reserved in one synchronous section after eligibility checks and before any further
+    // await. `scannedEntries` alone cannot safely gate concurrent callbacks because they may all observe the same value.
+    let admittedEntries = 0;
     let blockedEntries = 0;
     let fingerprintRealpathReuses = 0;
     let fingerprintRealpathComputations = 0;
@@ -142,10 +151,6 @@ export async function scanDirectory(rootPath, options = {}) {
         const entries = await mapInBatches(dirents, batchSize, async (dirent) => {
             options.signal?.throwIfAborted();
             const name = dirent.name;
-            if (hardLimitReached || scannedEntries >= hardMaxEntries) {
-                hardLimitReached = true;
-                return null;
-            }
             if (!showHidden && name.startsWith('.')) return null;
             if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
             const absolutePath = join(dir, name);
@@ -155,7 +160,7 @@ export async function scanDirectory(rootPath, options = {}) {
             /** @type {string | null} */
             let validatedRealPath = null;
             if (redactProtectedPaths) {
-                const policy = await evaluateIoPathPolicyAsync(absolutePath, {
+                const policy = await evaluateWorkspacePathPolicyAsync(absolutePath, {
                     workspaceRoot: normalizeWorkspaceRoot(workspaceRoot),
                     mode: 'read',
                     blockedSegments: [...blockedSegments],
@@ -191,6 +196,15 @@ export async function scanDirectory(rootPath, options = {}) {
             const includeEntry = (matchesFilter(name, options.filter) && includeByPattern) || isDirectory;
             if (!includeEntry) return null;
 
+            // Synchronous admission section: no await may occur between the capacity check and reservation. This makes
+            // hardMaxEntries deterministic even when mapInBatches executes many eligible dirents concurrently.
+            if (admittedEntries >= hardMaxEntries) {
+                hardLimitReached = true;
+                return null;
+            }
+            admittedEntries += 1;
+            if (admittedEntries >= hardMaxEntries) hardLimitReached = true;
+
             const entry = /** @type {IoScanEntry} */ ({
                 name,
                 type,
@@ -210,9 +224,6 @@ export async function scanDirectory(rootPath, options = {}) {
                 options.signal?.throwIfAborted();
             }
             scannedEntries += 1;
-            if (scannedEntries >= hardMaxEntries) {
-                hardLimitReached = true;
-            }
             if (scannedEntries % 500 === 0) {
                 publishIoLifecycleEvent('scan', 'progress', {
                     traceId,

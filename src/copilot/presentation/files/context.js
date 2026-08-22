@@ -11,7 +11,6 @@ import { normalizeIoCacheKey } from '#copilot/infra/public/cache/keys';
 import { decodeBase64ToOwnedBuffer } from '#copilot/infra/public/platform/buffer';
 import { extname, resolve as pathResolve, sep } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
-import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
 export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
@@ -20,8 +19,7 @@ export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 const FILE_CACHE_TTL_MS = 30_000;
 const FILE_CACHE_MAX_ENTRIES = Math.max(1, Number(process.env['FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 200));
 const DIRECTORY_CONTEXT_MAX_FILES = Math.max(1, Number(process.env['FILE_CONTEXT_DIRECTORY_MAX_FILES'] ?? 50));
-const presentationWorkspaceRoot = process.cwd();
-const presentationWorkspaceInfra = getApplicationWorkspaceInfra(presentationWorkspaceRoot);
+const presentationWorkspaceInfra = getApplicationWorkspaceInfra();
 const { readText } = presentationWorkspaceInfra.readIo;
 const { scanDirectory } = presentationWorkspaceInfra.indexing;
 
@@ -199,11 +197,7 @@ export function detectLang(filePath) {
  * @throws {Error} Se o arquivo não existir
  */
 export async function readFileContext(filePath) {
-    const policy = await evaluateIoPathPolicyAsync(filePath, { workspaceRoot: process.cwd(), mode: 'read' });
-    if (!policy.ok) {
-        throw new Error(policy.reason);
-    }
-    const absPath = pathResolve(policy.realPath);
+    const absPath = pathResolve(await presentationWorkspaceInfra.authority.resolvePath(filePath, 'read'));
     const cacheKey = fileContextCacheKey(absPath);
 
     const now = Date.now();
@@ -310,11 +304,7 @@ export function extractAtReferences(message) {
  * @throws {Error} Se o diretório não existir ou não for legível
  */
 export async function readDirectoryContextDetailed(dirPath, options = {}) {
-    const policy = await evaluateIoPathPolicyAsync(dirPath, { workspaceRoot: process.cwd(), mode: 'read' });
-    if (!policy.ok) {
-        throw new Error(policy.reason);
-    }
-    const absPath = pathResolve(policy.realPath);
+    const absPath = pathResolve(await presentationWorkspaceInfra.authority.resolvePath(dirPath, 'read'));
     const maxFiles =
         Number.isFinite(options.maxFiles) && Number(options.maxFiles) > 0
             ? Math.floor(Number(options.maxFiles))

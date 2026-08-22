@@ -11,7 +11,6 @@
 
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
-import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
@@ -102,27 +101,6 @@ function normalizeRelativeSegments(inputPath) {
         throw error;
     }
     return segments;
-}
-
-/**
- * @param {string} rootDir
- * @param {string} inputPath
- * @param {'read' | 'write'} [mode]
- * @returns {Promise<string>}
- */
-async function resolveWithinRoot(rootDir, inputPath, mode = 'read') {
-    const policy = await evaluateIoPathPolicyAsync(inputPath, {
-        workspaceRoot: rootDir,
-        mode,
-    });
-
-    if (!policy.ok) {
-        const error = new Error(`[sdk/session-fs] ${policy.reason}`);
-        /** @type {{ code?: string }} */ (error).code = 'EINVAL';
-        throw error;
-    }
-
-    return policy.realPath;
 }
 
 /**
@@ -221,7 +199,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.readFile',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'read');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'read');
                     const result = await readText(target, { advisoryLimits: { source: 'session.fs' } });
                     return result.content;
                 },
@@ -232,7 +210,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.writeFile',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'write');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'write');
                     await createOrReplaceFileAtomic(target, content, {
                         encoding: 'utf8',
                         createParentDirs: true,
@@ -252,7 +230,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.appendFile',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'write');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'write');
                     await mkdirPathLocked(dirname(target), {
                         recursive: true,
                         advisoryLimits: { source: 'session.fs.parent' },
@@ -275,7 +253,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
                 'session.fs.exists',
                 async () => {
                     try {
-                        await statPath(await resolveWithinRoot(root, path, 'read'), {
+                        await statPath(await sessionWorkspaceInfra.authority.resolvePath(path, 'read'), {
                             advisoryLimits: { source: 'session.fs' },
                         });
                         return true;
@@ -291,7 +269,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.stat',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'read');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'read');
                     const { stats } = await statPath(target, { advisoryLimits: { source: 'session.fs' } });
                     return {
                         isFile: stats.isFile(),
@@ -308,7 +286,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.mkdir',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'write');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'write');
                     await mkdirPathLocked(target, {
                         recursive,
                         advisoryLimits: { source: 'session.fs' },
@@ -326,7 +304,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.readdir',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'read');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'read');
                     const scan = await scanDirectory(target, {
                         workspaceRoot: root,
                         showHidden: true,
@@ -341,7 +319,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.readdirWithTypes',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'read');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'read');
                     const scan = await scanDirectory(target, {
                         workspaceRoot: root,
                         showHidden: true,
@@ -361,7 +339,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.rm',
                 async () => {
-                    const target = await resolveWithinRoot(root, path, 'write');
+                    const target = await sessionWorkspaceInfra.authority.resolvePath(path, 'write');
                     await removePathLocked(target, {
                         recursive,
                         force,
@@ -380,8 +358,8 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.rename',
                 async () => {
-                    const srcTarget = await resolveWithinRoot(root, src, 'read');
-                    const destTarget = await resolveWithinRoot(root, dest, 'write');
+                    const srcTarget = await sessionWorkspaceInfra.authority.resolvePath(src, 'read');
+                    const destTarget = await sessionWorkspaceInfra.authority.resolvePath(dest, 'write');
                     await moveFileLocked(srcTarget, destTarget, { overwrite: true });
                 },
                 createOperationContext(sessionId, {

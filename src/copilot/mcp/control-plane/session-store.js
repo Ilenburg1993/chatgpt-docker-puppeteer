@@ -8,7 +8,7 @@
  * @module copilot/mcp/control-plane/session-store
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 
 /**
  * @typedef {'active' | 'terminated' | 'expired'} McpHttpStoredSessionStatus
@@ -42,11 +42,11 @@ import { getCopilotDb } from '#copilot/db';
  * @returns {McpHttpSessionStore}
  */
 export function createSqliteMcpHttpSessionStore() {
-    return createSqliteMcpHttpSessionStoreForDb(getCopilotDb());
+    return createSqliteMcpHttpSessionStoreForDb(getApplicationSqliteDatabase());
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {McpHttpSessionStore}
  */
 export function createSqliteMcpHttpSessionStoreForDb(db) {
@@ -128,7 +128,7 @@ export function createSqliteMcpHttpSessionStoreForDb(db) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function ensureMcpHttpSessionStoreSchema(db) {

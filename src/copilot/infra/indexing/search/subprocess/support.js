@@ -1,8 +1,28 @@
 // @ts-check
 /** Validation, errors and child termination policy shared by search subprocess modes. */
 
+import { isAbsolute } from 'node:path';
+
 const DEFAULT_SEARCH_SUBPROCESS_MAX_BUFFER_BYTES = 1024 * 1024;
 const SEARCH_SUBPROCESS_KILL_GRACE_MS = 3_000;
+const EMPTY_SEARCH_SUBPROCESS_ENV = Object.freeze({});
+
+/**
+ * Named executables require an explicit process-owned environment. Absolute executables may run with an empty,
+ * deterministic environment, which is useful for isolated tests and avoids Node's implicit ambient inheritance.
+ * @param {string} executable
+ * @param {Readonly<Record<string,string>> | undefined} environment
+ * @returns {Readonly<Record<string,string>>}
+ */
+export function resolveSearchSpawnEnvironment(executable, environment) {
+    if (environment !== undefined) return environment;
+    if (isAbsolute(executable)) return EMPTY_SEARCH_SUBPROCESS_ENV;
+    const error = /** @type {TypeError & {code?:string}} */ (
+        new TypeError('Named search subprocess requires an explicit process-owned environment.')
+    );
+    error.code = 'ERR_SEARCH_SUBPROCESS_ENV_REQUIRED';
+    throw error;
+}
 
 /**
  * Envia SIGTERM e escala para SIGKILL se o processo não fechar dentro da janela de graça.

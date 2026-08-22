@@ -11,8 +11,9 @@
  * @module copilot/infra/filesystem/workspace/authority/service
  */
 
-import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { IO_PATH_POLICY_VERSION } from '#copilot/infra/internal/policy';
 import path from 'node:path';
+import { evaluateWorkspacePathPolicyAsync } from '../path-policy/index.js';
 
 const VALIDATED_READ_PATH_BRAND = Symbol('copilot.validated-read-workspace-path');
 const VALIDATED_MUTABLE_PATH_BRAND = Symbol('copilot.validated-mutable-workspace-path');
@@ -23,23 +24,29 @@ const MUTABLE_AUTHORIZATION_MODES = new Set(['write', 'patch', 'metadata']);
 // Consumption intentionally remains narrower than the core write-policy equivalence class.
 const VALIDATED_MUTABLE_MODES = new Set(['write', 'patch', 'metadata']);
 
-const readStats = {
-    issued: 0,
-    accepted: 0,
-    rejectedUnbranded: 0,
-    rejectedAuthority: 0,
-    rejectedWorkspace: 0,
-    rejectedMode: 0,
-};
+/** @typedef {{issued:number;accepted:number;rejectedUnbranded:number;rejectedAuthority:number;rejectedWorkspace:number;rejectedMode:number}} CapabilityStats */
+/** @typedef {keyof CapabilityStats} CapabilityStatKey */
 
-const mutableStats = {
-    issued: 0,
-    accepted: 0,
-    rejectedUnbranded: 0,
-    rejectedAuthority: 0,
-    rejectedWorkspace: 0,
-    rejectedMode: 0,
-};
+/** @returns {CapabilityStats} */
+function createCapabilityStats() {
+    return {
+        issued: 0,
+        accepted: 0,
+        rejectedUnbranded: 0,
+        rejectedAuthority: 0,
+        rejectedWorkspace: 0,
+        rejectedMode: 0,
+    };
+}
+
+const aggregateReadStats = createCapabilityStats();
+const aggregateMutableStats = createCapabilityStats();
+
+/** @param {CapabilityStats} aggregate @param {CapabilityStats} local @param {CapabilityStatKey} key */
+function recordCapabilityStat(aggregate, local, key) {
+    aggregate[key] += 1;
+    local[key] += 1;
+}
 
 /**
  * @typedef {{
@@ -76,6 +83,7 @@ const mutableStats = {
  * @typedef {{
  *     authorityId: symbol;
  *     context: Readonly<{ workspaceRoot: string; blockedSegments: readonly string[] }>;
+ *     stats: { read: CapabilityStats; mutable: CapabilityStats };
  * }} WorkspacePathAuthorityInternals
  */
 
@@ -94,13 +102,14 @@ export function createWorkspacePathAuthority(context) {
     const blockedSegments = Object.freeze([...(context.blockedSegments ?? [])]);
     const authorityId = Symbol(`copilot.workspace-path-authority:${workspaceRoot}`);
     const authorityContext = Object.freeze({ workspaceRoot, blockedSegments });
+    const authorityStats = { read: createCapabilityStats(), mutable: createCapabilityStats() };
 
     /**
      * @param {string} filePath
      * @param {'append'|'copy'|'delete'|'fetch'|'metadata'|'mkdir'|'move'|'patch'|'read'|'scan'|'search'|'stat'|'write'} mode
      */
     async function evaluate(filePath, mode) {
-        const result = await evaluateIoPathPolicyAsync(filePath, {
+        const result = await evaluateWorkspacePathPolicyAsync(filePath, {
             workspaceRoot,
             ...(blockedSegments.length > 0 ? { blockedSegments } : {}),
             mode,
@@ -121,7 +130,7 @@ export function createWorkspacePathAuthority(context) {
             if (!READ_ONLY_MODES.has(mode)) {
                 throw capabilityError(`Workspace read authority cannot authorize mode ${mode}.`, 'EVALIDATEDPATHMODE');
             }
-            return issueReadCapability(await evaluate(filePath, mode), authorityId);
+            return issueReadCapability(await evaluate(filePath, mode), authorityId, authorityStats.read);
         },
         async authorizeMutation(filePath, mode = 'write') {
             if (!MUTABLE_AUTHORIZATION_MODES.has(mode)) {
@@ -130,11 +139,11 @@ export function createWorkspacePathAuthority(context) {
                     'EVALIDATEDMUTABLEPATHMODE',
                 );
             }
-            return issueMutableCapability(await evaluate(filePath, mode), authorityId);
+            return issueMutableCapability(await evaluate(filePath, mode), authorityId, authorityStats.mutable);
         },
     });
 
-    authorityInternals.set(authority, { authorityId, context: authorityContext });
+    authorityInternals.set(authority, { authorityId, context: authorityContext, stats: authorityStats });
     return authority;
 }
 
@@ -165,36 +174,36 @@ export function resolveValidatedReadWorkspacePath(value, authority, mode) {
     const internals = requireAuthorityInternals(authority);
     const candidate = value && typeof value === 'object' ? /** @type {Record<PropertyKey, unknown>} */ (value) : null;
     if (!candidate || candidate[VALIDATED_READ_PATH_BRAND] !== true) {
-        readStats.rejectedUnbranded += 1;
+        recordCapabilityStat(aggregateReadStats, internals.stats.read, 'rejectedUnbranded');
         throw capabilityError('Workspace IO received an unbranded validated-path object.', 'EINVALIDVALIDATEDPATH');
     }
     const capability = /** @type {ValidatedReadWorkspacePath} */ (value);
     if (!READ_ONLY_MODES.has(mode)) {
-        readStats.rejectedMode += 1;
+        recordCapabilityStat(aggregateReadStats, internals.stats.read, 'rejectedMode');
         throw capabilityError(
             `Validated read capability cannot be used for workspace mode ${mode}.`,
             'EVALIDATEDPATHMODE',
         );
     }
     if (capability[AUTHORITY_TOKEN] !== internals.authorityId) {
-        readStats.rejectedAuthority += 1;
+        recordCapabilityStat(aggregateReadStats, internals.stats.read, 'rejectedAuthority');
         throw capabilityError(
             'Validated read capability belongs to a different workspace authority.',
             'EVALIDATEDPATHAUTHORITY',
         );
     }
     if (capability.workspaceRoot !== internals.context.workspaceRoot) {
-        readStats.rejectedWorkspace += 1;
+        recordCapabilityStat(aggregateReadStats, internals.stats.read, 'rejectedWorkspace');
         throw capabilityError('Validated read capability belongs to a different workspace.', 'EVALIDATEDPATHWORKSPACE');
     }
     if (capability.policyVersion !== IO_PATH_POLICY_VERSION || capability.access !== 'read-only') {
-        readStats.rejectedUnbranded += 1;
+        recordCapabilityStat(aggregateReadStats, internals.stats.read, 'rejectedUnbranded');
         throw capabilityError(
             'Validated read capability policy version/access is stale or invalid.',
             'EINVALIDVALIDATEDPATH',
         );
     }
-    readStats.accepted += 1;
+    recordCapabilityStat(aggregateReadStats, internals.stats.read, 'accepted');
     return capability.realPath;
 }
 
@@ -211,7 +220,7 @@ export function resolveValidatedMutableWorkspacePath(value, authority, mode) {
     const internals = requireAuthorityInternals(authority);
     const candidate = value && typeof value === 'object' ? /** @type {Record<PropertyKey, unknown>} */ (value) : null;
     if (!candidate || candidate[VALIDATED_MUTABLE_PATH_BRAND] !== true) {
-        mutableStats.rejectedUnbranded += 1;
+        recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'rejectedUnbranded');
         throw capabilityError(
             'Workspace IO received an unbranded mutable validated-path object.',
             'EINVALIDVALIDATEDMUTABLEPATH',
@@ -219,21 +228,21 @@ export function resolveValidatedMutableWorkspacePath(value, authority, mode) {
     }
     const capability = /** @type {ValidatedMutableWorkspacePath} */ (value);
     if (!VALIDATED_MUTABLE_MODES.has(mode)) {
-        mutableStats.rejectedMode += 1;
+        recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'rejectedMode');
         throw capabilityError(
             `Validated mutable capability cannot be used for workspace mode ${mode}.`,
             'EVALIDATEDMUTABLEPATHMODE',
         );
     }
     if (capability[AUTHORITY_TOKEN] !== internals.authorityId) {
-        mutableStats.rejectedAuthority += 1;
+        recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'rejectedAuthority');
         throw capabilityError(
             'Validated mutable capability belongs to a different workspace authority.',
             'EVALIDATEDMUTABLEPATHAUTHORITY',
         );
     }
     if (capability.workspaceRoot !== internals.context.workspaceRoot) {
-        mutableStats.rejectedWorkspace += 1;
+        recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'rejectedWorkspace');
         throw capabilityError(
             'Validated mutable capability belongs to a different workspace.',
             'EVALIDATEDMUTABLEPATHWORKSPACE',
@@ -244,38 +253,61 @@ export function resolveValidatedMutableWorkspacePath(value, authority, mode) {
         capability.access !== 'mutable' ||
         capability.policyClass !== 'write'
     ) {
-        mutableStats.rejectedUnbranded += 1;
+        recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'rejectedUnbranded');
         throw capabilityError(
             'Validated mutable capability policy version/access/class is stale or invalid.',
             'EINVALIDVALIDATEDMUTABLEPATH',
         );
     }
-    mutableStats.accepted += 1;
+    recordCapabilityStat(aggregateMutableStats, internals.stats.mutable, 'accepted');
     return capability.realPath;
 }
 
 export function getValidatedReadWorkspacePathStats() {
-    return { ...readStats, compatibleModes: [...READ_ONLY_MODES], policyVersion: IO_PATH_POLICY_VERSION };
+    return { ...aggregateReadStats, compatibleModes: [...READ_ONLY_MODES], policyVersion: IO_PATH_POLICY_VERSION };
 }
 
 export function getValidatedMutableWorkspacePathStats() {
-    return { ...mutableStats, compatibleModes: [...VALIDATED_MUTABLE_MODES], policyVersion: IO_PATH_POLICY_VERSION };
+    return {
+        ...aggregateMutableStats,
+        compatibleModes: [...VALIDATED_MUTABLE_MODES],
+        policyVersion: IO_PATH_POLICY_VERSION,
+    };
+}
+
+/** @param {WorkspacePathAuthority} authority */
+export function getWorkspacePathAuthorityStats(authority) {
+    const internals = requireAuthorityInternals(authority);
+    return Object.freeze({
+        read: Object.freeze({
+            ...internals.stats.read,
+            compatibleModes: Object.freeze([...READ_ONLY_MODES]),
+            policyVersion: IO_PATH_POLICY_VERSION,
+        }),
+        mutable: Object.freeze({
+            ...internals.stats.mutable,
+            compatibleModes: Object.freeze([...VALIDATED_MUTABLE_MODES]),
+            policyVersion: IO_PATH_POLICY_VERSION,
+        }),
+    });
 }
 
 export function resetValidatedReadWorkspacePathStatsForTest() {
-    for (const key of Object.keys(readStats)) readStats[/** @type {keyof typeof readStats} */ (key)] = 0;
+    for (const key of Object.keys(aggregateReadStats)) aggregateReadStats[/** @type {CapabilityStatKey} */ (key)] = 0;
 }
 
 export function resetValidatedMutableWorkspacePathStatsForTest() {
-    for (const key of Object.keys(mutableStats)) mutableStats[/** @type {keyof typeof mutableStats} */ (key)] = 0;
+    for (const key of Object.keys(aggregateMutableStats))
+        aggregateMutableStats[/** @type {CapabilityStatKey} */ (key)] = 0;
 }
 
 /**
- * @param {import('#copilot/core/io-policy').IoPathPolicySuccess} result
+ * @param {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} result
  * @param {symbol} authorityId
+ * @param {CapabilityStats} localStats
  * @returns {ValidatedReadWorkspacePath}
  */
-function issueReadCapability(result, authorityId) {
+function issueReadCapability(result, authorityId, localStats) {
     /** @type {ValidatedReadWorkspacePath} */
     const capability = {
         [VALIDATED_READ_PATH_BRAND]: /** @type {const} */ (true),
@@ -285,16 +317,17 @@ function issueReadCapability(result, authorityId) {
         policyVersion: result.policyVersion,
         access: /** @type {const} */ ('read-only'),
     };
-    readStats.issued += 1;
+    recordCapabilityStat(aggregateReadStats, localStats, 'issued');
     return Object.freeze(capability);
 }
 
 /**
- * @param {import('#copilot/core/io-policy').IoPathPolicySuccess} result
+ * @param {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} result
  * @param {symbol} authorityId
+ * @param {CapabilityStats} localStats
  * @returns {ValidatedMutableWorkspacePath}
  */
-function issueMutableCapability(result, authorityId) {
+function issueMutableCapability(result, authorityId, localStats) {
     /** @type {ValidatedMutableWorkspacePath} */
     const capability = {
         [VALIDATED_MUTABLE_PATH_BRAND]: /** @type {const} */ (true),
@@ -305,7 +338,7 @@ function issueMutableCapability(result, authorityId) {
         access: /** @type {const} */ ('mutable'),
         policyClass: /** @type {const} */ ('write'),
     };
-    mutableStats.issued += 1;
+    recordCapabilityStat(aggregateMutableStats, localStats, 'issued');
     return Object.freeze(capability);
 }
 

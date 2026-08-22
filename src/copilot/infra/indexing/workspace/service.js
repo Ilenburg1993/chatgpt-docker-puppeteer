@@ -35,6 +35,10 @@ import {
  *   cacheRuntime?: {l1:ReturnType<typeof import('../../cache/memory/index.js').createIoL1CacheRuntime>};
  *   invalidationBus?: ReturnType<typeof import('../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime>;
  *   parserCacheRuntime?: ReturnType<typeof import('../parser/cache/runtime/index.js').createParserCacheRuntime>;
+ *   maxActiveScopes?: number;
+ *   runtimeOwnerId?: string;
+ *   workspaceOwnerId?: string;
+ *   indexRuntimeConfig?: ReturnType<typeof import('../registry/instance/index.js').readIoIndexRuntimeConfig>;
  * }} [options]
  */
 export function createWorkspaceIndexing(input, options = {}) {
@@ -44,6 +48,7 @@ export function createWorkspaceIndexing(input, options = {}) {
     const cacheRuntime = options.cacheRuntime ?? null;
     const invalidationBus = options.invalidationBus ?? null;
     const parserCacheRuntime = options.parserCacheRuntime ?? null;
+    const scannerConfig = options.indexRuntimeConfig?.scanner ?? null;
     /** @type {ReturnType<typeof createWorkspaceScopeRuntime> | undefined} */
     let scopeRuntime;
     let disposed = false;
@@ -56,6 +61,12 @@ export function createWorkspaceIndexing(input, options = {}) {
     const scanDirectory = async (rootPath, options = {}) =>
         scanDirectoryRaw(await resolveWorkspacePath(rootPath, 'scan', context), {
             ...options,
+            ...(scannerConfig
+                ? {
+                      batchSize: options.batchSize ?? scannerConfig.batchSize,
+                      hardMaxEntries: scannerConfig.hardMaxEntries,
+                  }
+                : {}),
             workspaceRoot: context.workspaceRoot,
         });
 
@@ -63,6 +74,12 @@ export function createWorkspaceIndexing(input, options = {}) {
     const scanDirectoryValidated = async (capability, options = {}) =>
         scanDirectoryRaw(requireValidatedWorkspaceReadPath(capability, 'scan', context), {
             ...options,
+            ...(scannerConfig
+                ? {
+                      batchSize: options.batchSize ?? scannerConfig.batchSize,
+                      hardMaxEntries: scannerConfig.hardMaxEntries,
+                  }
+                : {}),
             workspaceRoot: context.workspaceRoot,
         });
 
@@ -135,12 +152,18 @@ export function createWorkspaceIndexing(input, options = {}) {
                 );
             }
             return (scopeRuntime ??= createWorkspaceScopeRuntime({
-                runtimeId: `workspace-context:${context.workspaceRoot}`,
+                runtimeId: options.workspaceOwnerId
+                    ? `${options.workspaceOwnerId}:scope-runtime`
+                    : `workspace-context:${context.workspaceRoot}`,
+                ...(options.runtimeOwnerId ? { runtimeOwnerId: options.runtimeOwnerId } : {}),
+                ...(options.workspaceOwnerId ? { workspaceOwnerId: options.workspaceOwnerId } : {}),
                 workspaceRoot: context.workspaceRoot,
                 cacheRuntime,
                 invalidationBus,
+                ...(options.maxActiveScopes === undefined ? {} : { maxActiveScopes: options.maxActiveScopes }),
                 ...(indexRegistry ? { indexRegistry } : {}),
                 ...(parserCacheRuntime ? { parserCacheRuntime } : {}),
+                ...(scannerConfig ? { scannerConfig } : {}),
             }));
         },
         async dispose() {

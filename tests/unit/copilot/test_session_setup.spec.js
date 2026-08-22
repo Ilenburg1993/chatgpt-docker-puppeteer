@@ -48,7 +48,7 @@ vi.mock('#copilot/config', async (importOriginal) => ({
 }));
 vi.mock('#copilot/hooks/bus', () => ({ attachBus: vi.fn((h) => h) }));
 vi.mock('#copilot/hooks/factory', () => ({ createHooks: vi.fn((opts) => opts) }));
-vi.mock('#copilot/hooks/session-hooks', () => ({
+vi.mock('#copilot/testing/hooks/session-hooks', () => ({
     createSessionHooks: vi.fn(() => ({
         onSessionStart: vi.fn(),
         onSessionEnd: vi.fn(),

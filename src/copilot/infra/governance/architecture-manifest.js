@@ -62,7 +62,7 @@ export const INFRA_ARCHITECTURE_MANIFEST = /** @type {readonly InfraModuleDescri
                 risk: 'stable',
                 public: true,
                 summary:
-                    'Exclusive outward-facing API membrane; projection barrels only, with no implementation ownership.',
+                    'Exclusive outward-facing API membrane; only declared entrypoints own projection barrels, with no implementation ownership.',
             },
             {
                 path: 'governance/',
@@ -80,8 +80,7 @@ export const INFRA_ARCHITECTURE_MANIFEST = /** @type {readonly InfraModuleDescri
                 tier: 'primary',
                 risk: 'watch',
                 public: false,
-                summary:
-                    'Explicit ProcessInfra, InfraRuntime, WorkspaceInfra and OperationContext ownership/lifecycle scopes.',
+                summary: 'Explicit ProcessInfra, InfraRuntime and WorkspaceInfra ownership/lifecycle scopes.',
             },
             {
                 path: 'platform/',
@@ -109,7 +108,7 @@ export const INFRA_ARCHITECTURE_MANIFEST = /** @type {readonly InfraModuleDescri
                 risk: 'hotspot',
                 public: false,
                 summary:
-                    'Read, transaction, write, mutation, patch, invalidation and workspace/trusted filesystem boundaries.',
+                    'Read, transaction, write, mutation, patch, invalidation and workspace/configured filesystem boundaries.',
             },
             {
                 path: 'database/',

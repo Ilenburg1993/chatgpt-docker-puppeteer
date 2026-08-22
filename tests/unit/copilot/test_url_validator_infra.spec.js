@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/config/env', () => ({
+vi.mock('#copilot/testing/config/env', () => ({
     WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
     NODE_ENV: 'test',
     COPILOT_LOG_DIR: '',

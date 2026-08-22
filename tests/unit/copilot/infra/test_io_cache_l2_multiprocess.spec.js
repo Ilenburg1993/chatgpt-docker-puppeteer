@@ -1,5 +1,6 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -8,7 +9,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const CACHE_URL = new URL('../../../../src/copilot/infra/cache/l2/sqlite/index.js', import.meta.url).href;
-const DB_URL = new URL('../../../../src/copilot/db/sqlite.js', import.meta.url).href;
+const DB_URL = new URL('../../../../src/copilot/infra/database/sqlite/better-sqlite3/runtime.js', import.meta.url).href;
 
 const CHILD_SCRIPT = `
 const options = JSON.parse(process.env['COPILOT_L2_MULTIPROCESS_CASE']);
@@ -28,39 +29,49 @@ try {
         print({ ready: true });
         await new Promise(() => {});
     } else if (options.operation === 'graceful') {
-        const [{ createInfraRuntime }, database] = await Promise.all([
+        const [{ createInfraRuntime }, database, { createBetterSqliteProvider }] = await Promise.all([
             import('#copilot/infra/public/composition/runtime'),
             import(options.dbUrl),
+            import('#copilot/infra/internal/database/sqlite/better-sqlite3'),
         ]);
-        await database.ensureCopilotDbDir();
-        const runtime = createInfraRuntime({ runtimeId: 'l2-multiprocess-graceful', sqliteProvider: database.getCopilotDb });
+        const sqlite = database.createBetterSqliteApplicationRuntime({ dbPath: options.dbPath });
+        const runtime = createInfraRuntime({
+            runtimeId: 'l2-multiprocess-graceful',
+            env: process.env,
+            sqliteProvider: createBetterSqliteProvider(sqlite.getDatabase),
+        });
         const cache = runtime.coherence.l2.get();
         if (!cache) throw new Error('L2 cache unavailable');
         cache.clearAll();
         cache.set({ key: options.key, path: '/l2/graceful', payload: 'graceful' });
-        const before = database
-            .getCopilotDb()
+        const before = sqlite
+            .getDatabase()
             .prepare('SELECT COUNT(*) AS total FROM copilot_io_cache_l2 WHERE cache_key = ?')
             .get(options.key);
         await runtime.dispose();
-        database.closeCopilotDb();
+        sqlite.close();
         print({ ok: true, persistedBeforeShutdown: Number(before?.total || 0) });
     } else if (options.operation === 'signal-graceful') {
         const nativeSetTimeout = globalThis.setTimeout;
         globalThis.setTimeout = (handler, delay, ...args) =>
             nativeSetTimeout(handler, delay === 25 ? 60_000 : delay, ...args);
-        const [{ createInfraRuntime }, database] = await Promise.all([
+        const [{ createInfraRuntime }, database, { createBetterSqliteProvider }] = await Promise.all([
             import('#copilot/infra/public/composition/runtime'),
             import(options.dbUrl),
+            import('#copilot/infra/internal/database/sqlite/better-sqlite3'),
         ]);
-        await database.ensureCopilotDbDir();
-        const runtime = createInfraRuntime({ runtimeId: 'l2-multiprocess-signal', sqliteProvider: database.getCopilotDb });
+        const sqlite = database.createBetterSqliteApplicationRuntime({ dbPath: options.dbPath });
+        const runtime = createInfraRuntime({
+            runtimeId: 'l2-multiprocess-signal',
+            env: process.env,
+            sqliteProvider: createBetterSqliteProvider(sqlite.getDatabase),
+        });
         const keepAlive = setInterval(() => {}, 60_000);
         const shutdownFromSignal = (signal) => {
             clearInterval(keepAlive);
             void runtime.dispose().then(
                 () => {
-                    database.closeCopilotDb();
+                    sqlite.close();
                     process.exit(0);
                 },
                 () => process.exit(1),
@@ -72,8 +83,8 @@ try {
         if (!cache) throw new Error('L2 cache unavailable');
         cache.clearAll();
         cache.set({ key: options.key, path: '/l2/signal-graceful', payload: 'signal-graceful' });
-        const before = database
-            .getCopilotDb()
+        const before = sqlite
+            .getDatabase()
             .prepare('SELECT COUNT(*) AS total FROM copilot_io_cache_l2 WHERE cache_key = ?')
             .get(options.key);
         print({ ready: true, persistedBeforeShutdown: Number(before?.total || 0) });
@@ -143,7 +154,6 @@ function spawnCase(options) {
         cwd: process.cwd(),
         env: {
             ...process.env,
-            COPILOT_DB_PATH: String(options['dbPath']),
             IO_L2_CACHE_PROFILE: 'experimental',
             COPILOT_L2_MULTIPROCESS_CASE: JSON.stringify({
                 cacheUrl: CACHE_URL,
@@ -311,7 +321,7 @@ describe('io-cache-l2 write-behind multiprocess proofs', () => {
 
         const setup = new Database(dbPath);
         const { createIoL2SqliteCache } = await import('../../../../src/copilot/infra/cache/l2/sqlite/index.js');
-        createIoL2SqliteCache({ db: setup }).clearAll();
+        createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(setup) }).clearAll();
         setup.close();
 
         const holder = spawnCase({ operation: 'lock-holder', dbPath, holdMs: 700 });

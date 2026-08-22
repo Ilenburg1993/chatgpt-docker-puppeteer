@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('#copilot/audit/pipeline', () => ({
+vi.mock('#copilot/testing/audit/pipeline', () => ({
     globalAuditBuffer: { push: vi.fn() },
 }));
 vi.mock('#copilot/observability/logger', () => ({
@@ -85,7 +85,7 @@ describe('F48 — attachToolHandlers', () => {
 
     beforeEach(async () => {
         ctx = createMockContext();
-        const { attachToolHandlers } = await import('#copilot/observability/collectors/tool-handlers');
+        const { attachToolHandlers } = await import('#copilot/testing/observability/collectors/tool-handlers');
         unsubs = attachToolHandlers(/** @type {any} */ (ctx));
     });
 
@@ -116,7 +116,7 @@ describe('F48 — attachToolHandlers', () => {
     });
 
     it('tool.execution_complete registra métricas e audit', async () => {
-        const { globalAuditBuffer } = await import('#copilot/audit/pipeline');
+        const { globalAuditBuffer } = await import('#copilot/testing/audit/pipeline');
         ctx.pending.set('tc-3', { toolName: 'bash', mcpServerName: null, startTs: Date.now() - 100, toolArgs: {} });
         ctx._emit('tool.execution_complete', {
             toolCallId: 'tc-3',
@@ -200,7 +200,8 @@ describe('F48 — attachAssistantHandlers', () => {
 
     beforeEach(async () => {
         ctx = createMockContext();
-        const { attachAssistantHandlers } = await import('#copilot/observability/collectors/assistant-handlers');
+        const { attachAssistantHandlers } =
+            await import('#copilot/testing/observability/collectors/assistant-handlers');
         attachAssistantHandlers(/** @type {any} */ (ctx));
     });
 
@@ -231,7 +232,7 @@ describe('F48 — attachAssistantHandlers', () => {
     });
 
     it('quotaState é atualizado com quotaSnapshots', async () => {
-        const { quotaState } = await import('#copilot/observability/collectors/assistant-handlers');
+        const { quotaState } = await import('#copilot/testing/observability/collectors/assistant-handlers');
         ctx._emit('assistant.usage', {
             model: 'gpt-4o',
             inputTokens: 0,
@@ -255,7 +256,8 @@ describe('F48 — attachInteractionHandlers', () => {
 
     beforeEach(async () => {
         ctx = createMockContext();
-        const { attachInteractionHandlers } = await import('#copilot/observability/collectors/interaction-handlers');
+        const { attachInteractionHandlers } =
+            await import('#copilot/testing/observability/collectors/interaction-handlers');
         unsubs = attachInteractionHandlers(/** @type {any} */ (ctx));
     });
 

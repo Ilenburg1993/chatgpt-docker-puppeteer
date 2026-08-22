@@ -12,14 +12,14 @@ cd "$ROOT_DIR"
 echo "==== STARTING TEST SUITE ===="
 
 for t in test_lock.js test_control_pause.js test_running_recovery.js test_stall_mitigation.js; do
-  echo "---------------------------------------------------"
-  echo "Running: $t"
-  if node "tests/$t"; then
-    echo -e "${GREEN}[PASS] $t${NC}"
-  else
-    echo -e "${RED}[FAIL] $t${NC}"
-    exit 1
-  fi
+    echo "---------------------------------------------------"
+    echo "Running: $t"
+    if node "tests/$t"; then
+        echo -e "${GREEN}[PASS] $t${NC}"
+    else
+        echo -e "${RED}[FAIL] $t${NC}"
+        exit 1
+    fi
 done
 
 echo -e "\n${GREEN}==== ALL TESTS PASSED ====${NC}"

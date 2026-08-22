@@ -10,7 +10,7 @@
  * @module copilot/model-gateway/health/provider-failure
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 
 /**
  * @typedef {'credits'

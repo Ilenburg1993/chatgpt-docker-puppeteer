@@ -1,7 +1,7 @@
 // @ts-check
 /** Locked append operations, including detached inherited append descriptors. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';

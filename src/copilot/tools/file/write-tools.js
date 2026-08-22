@@ -1,5 +1,5 @@
 // @ts-check
-import { withIoMeta } from '#copilot/core';
+import { withIoMeta } from '#copilot/core/io-contracts';
 import { createIoOperationEnvelope } from '#copilot/infra/public/operations';
 import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/platform/buffer';
 import { z } from 'zod';

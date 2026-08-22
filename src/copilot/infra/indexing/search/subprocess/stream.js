@@ -10,6 +10,7 @@ import {
     normalizeSearchArgs,
     normalizeSearchExecutable,
     normalizeTimeout,
+    resolveSearchSpawnEnvironment,
     terminateSearchChild,
 } from './support.js';
 
@@ -31,6 +32,7 @@ export async function streamSearchFile(file, args, options = {}) {
     const normalizedArgs = normalizeSearchArgs(args);
     const maxBuffer = normalizeMaxBuffer(options.maxBuffer);
     const timeoutMs = normalizeTimeout(options.timeout);
+    const environment = resolveSearchSpawnEnvironment(executable, options.env);
     const collectStdout = options.collectStdout !== false;
 
     return new Promise((resolve, reject) => {
@@ -53,6 +55,7 @@ export async function streamSearchFile(file, args, options = {}) {
             /** @type {import('node:child_process').SpawnOptions} */ ({
                 windowsHide: true,
                 stdio: ['ignore', 'pipe', 'pipe'],
+                env: environment,
                 ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
             }),
         );

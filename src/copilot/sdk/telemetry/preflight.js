@@ -4,7 +4,7 @@
  * @file Preflight canônico do SDK/CLI usado pelo boot antes de expor HTTP/REPL.
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 
 /**
  * @typedef {{

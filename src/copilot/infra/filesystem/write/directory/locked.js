@@ -1,7 +1,7 @@
 // @ts-check
 /** Locked directory creation and namespace-durability orchestration. */
 
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core/io-contracts';
 import { withIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';

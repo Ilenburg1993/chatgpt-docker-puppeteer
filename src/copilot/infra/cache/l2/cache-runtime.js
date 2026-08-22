@@ -1,6 +1,6 @@
 // @ts-check
 /** Instance-owned L2 lifecycle, prune timer and initialization circuit breaker. */
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { getIoL2CacheConfiguration } from './config.js';
 import { createIoL2SqliteCache } from './sqlite/index.js';
@@ -10,7 +10,7 @@ const CIRCUIT_BACKOFF_MS = [1000, 5000, 30000];
 
 /**
  * @param {{
- *   database:{get:()=>import('better-sqlite3').Database;status:()=>{configured:boolean;revision:number}};
+ *   database:import('#copilot/infra/internal/database/port').InfraSqliteProviderReader;
  *   runtimeId?:string;
  *   configuration?:ReturnType<typeof getIoL2CacheConfiguration>;
  *   debug?:boolean;
@@ -20,7 +20,6 @@ export function createIoL2CacheRuntime(options) {
     if (!options?.database) throw new TypeError('createIoL2CacheRuntime requires { database }.');
     const runtimeId = options.runtimeId ?? 'io-l2-runtime';
     const configuration = options.configuration ?? getIoL2CacheConfiguration();
-    const debug = options.debug === true;
     /** @type {ReturnType<typeof createIoL2SqliteCache>|null} */ let cache = null;
     /** @type {NodeJS.Timeout|null} */ let pruneTimer = null;
     /** @type {string|null} */ let lastInitError = null;
@@ -49,8 +48,7 @@ export function createIoL2CacheRuntime(options) {
         pruneTimer = setInterval(() => {
             try {
                 const removed = cache?.pruneExpired() ?? 0;
-                if (removed > 0 && debug)
-                    console.debug(`[io-cache-l2:${runtimeId}] Pruned ${removed} expired entries.`);
+                if (removed > 0) publishIoLifecycleEvent('cache', 'l2.pruned', { runtimeId, removed });
             } catch (error) {
                 lastPruneError = toError(error ?? 'unknown-prune-error').message;
                 lastPruneErrorAtMs = Date.now();
@@ -123,6 +121,7 @@ export function createIoL2CacheRuntime(options) {
             lastPruneError,
             lastPruneErrorAtMs,
             materialized: cache !== null,
+            pruneTimerPending: pruneTimer !== null,
             databaseRevision: activeDatabaseRevision,
             disposed,
         });

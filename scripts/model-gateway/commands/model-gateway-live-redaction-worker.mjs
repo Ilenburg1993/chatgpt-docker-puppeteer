@@ -1,10 +1,10 @@
 #!/usr/bin/env node
+import '../bootstrap-sqlite.mjs';
 
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { isMainThread, parentPort, workerData } from 'node:worker_threads';
 
-const DEFAULT_SQLITE_PATH = 'data/copilot.sqlite';
 const MODES = new Set(['catalog', 'sqlite']);
 const workerStartedAt = performance.now();
 /** @type {Map<string, Promise<Record<string, any>>>} */
@@ -77,14 +77,11 @@ async function loadModeContext(mode) {
                 store: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
             };
         }
-        const [{ SqliteModelGatewayCatalogStore }, dbModule] = await Promise.all([
-            import('../../../src/copilot/model-gateway/catalog/sqlite-catalog-store.js'),
-            import('../../../src/copilot/db/sqlite.js'),
-        ]);
-        dbModule.setDbLogger(() => {});
+        const { SqliteModelGatewayCatalogStore } =
+            await import('../../../src/copilot/model-gateway/catalog/sqlite-catalog-store.js');
         return {
             redactionModule,
-            store: new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH }),
+            store: new SqliteModelGatewayCatalogStore(),
         };
     })();
     modeContexts.set(mode, contextPromise);

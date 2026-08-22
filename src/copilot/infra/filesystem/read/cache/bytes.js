@@ -1,7 +1,7 @@
 // @ts-check
 /** Cached L1/L2 byte read service. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { makeBytesKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import { isBufferValue, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
@@ -24,7 +24,7 @@ import {
  * Lê bytes completos de um arquivo.
  *
  * @param {string} filePath
- * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown>; signal?: AbortSignal; cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2CacheRuntime>} }} [options]
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown>; signal?: AbortSignal; cacheRuntime?: {l1:ReturnType<typeof import('#copilot/infra/internal/cache/memory/runtime').createIoL1CacheRuntime>;l2:{get:()=>ReturnType<typeof import('#copilot/infra/internal/cache/l2').createIoL2SqliteCache>|null}} }} [options]
  */
 export async function readBytes(filePath, options = {}) {
     assertValidIoFilePath(filePath);

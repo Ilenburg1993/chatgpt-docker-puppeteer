@@ -18,7 +18,7 @@
  * @module copilot/terminal/dev-watch
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

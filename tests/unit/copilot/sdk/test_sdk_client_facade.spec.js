@@ -93,7 +93,7 @@ vi.mock('../../../../src/copilot/sdk/session/lifecycle.js', () => ({
     listSessions: vi.fn(),
 }));
 
-vi.mock('#copilot/config/env', () => ({
+vi.mock('#copilot/testing/config/env', () => ({
     COPILOT_CLI_URL: undefined,
     OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
 

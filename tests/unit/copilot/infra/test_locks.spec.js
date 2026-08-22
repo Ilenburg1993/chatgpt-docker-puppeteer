@@ -18,6 +18,7 @@ import {
     shouldAcquireFileResourceLock,
     withIoResourceLock,
 } from '#copilot/infra/internal/concurrency/locks';
+import { createProcessInfra } from '#copilot/infra/public/composition/process';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -362,5 +363,60 @@ describe('infra locks', () => {
             profile: getFileResourceLockProfile(),
             configurationValid: true,
         });
+    });
+
+    it('ProcessInfra ativa uma única policy processual e dispose restaura o fallback puro', async () => {
+        const processInfra = createProcessInfra({
+            processId: `lock-owner-${Date.now()}`,
+            env: {
+                COPILOT_IO_FILE_LOCKS_ENABLED: 'high-risk',
+                IO_LOCK_ACTIVE_LEASE_WARN_MS: '1234',
+            },
+            activateProcessPolicies: true,
+        });
+        try {
+            expect(getFileResourceLockProfile()).toBe('high-risk');
+            expect(getIoLockStats()).toMatchObject({
+                activeLeaseWarnMs: 1234,
+                fileLocks: { profile: 'high-risk', configurationValid: true, processDefaultEnabled: true },
+            });
+            expect(processInfra.lifecycleSnapshot().locks).toMatchObject({
+                state: 'active',
+                owner: { active: true, processId: processInfra.processId, fileProfile: 'high-risk' },
+            });
+            expect(() =>
+                createProcessInfra({
+                    processId: 'competing-lock-owner',
+                    env: { COPILOT_IO_FILE_LOCKS_ENABLED: 'all' },
+                    activateProcessPolicies: true,
+                }),
+            ).toThrow(expect.objectContaining({ code: 'ERR_PROCESS_LOCK_OWNER_ACTIVE' }));
+        } finally {
+            await processInfra.dispose();
+        }
+        expect(getFileResourceLockProfile()).toBe('off');
+        expect(getIoLockStats().activeLeaseWarnMs).toBe(60_000);
+    });
+
+    it('ProcessInfra captura profile inválido como fail-safe observável sem habilitar file locks', async () => {
+        const processInfra = createProcessInfra({
+            processId: `lock-invalid-${Date.now()}`,
+            env: { COPILOT_IO_FILE_LOCKS_ENABLED: 'surprise' },
+            activateProcessPolicies: true,
+        });
+        try {
+            expect(processInfra.config.locks.file.profile).toBe('off');
+            expect(processInfra.config.locks.fileConfigurationError).toMatch(/surprise/iu);
+            expect(() => getFileResourceLockProfile()).toThrow(
+                expect.objectContaining({ code: 'ERR_IO_FILE_LOCK_PROFILE' }),
+            );
+            expect(getIoLockStats().fileLocks).toMatchObject({
+                profile: 'off',
+                configurationValid: false,
+                processDefaultEnabled: false,
+            });
+        } finally {
+            await processInfra.dispose();
+        }
     });
 });

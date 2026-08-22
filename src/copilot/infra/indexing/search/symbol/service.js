@@ -1,7 +1,7 @@
 // @ts-check
 /** Workspace symbol search via registry index with ripgrep fallback. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { utf8ByteLength } from '#copilot/infra/internal/platform';
 import { hasNullByte } from '#copilot/infra/internal/policy';
 import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
@@ -15,7 +15,7 @@ import {
     paginateSearchText,
     sanitizeSearchOutput,
 } from '../shared/index.js';
-import { isRipgrepAvailable, streamSearchFile } from '../subprocess/index.js';
+import { acquireSearchSubprocessCapability, streamSearchFile } from '../subprocess/index.js';
 
 /** @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind */
 
@@ -76,6 +76,7 @@ export async function searchWorkspaceSymbols(targetPath, options, context = {}) 
     const resolvedKind = options.kind ?? 'all';
     const searchWindow = normalizeSearchWindow(options);
     const ioSearchBudget = getIoSearchBudget();
+    const searchExec = acquireSearchSubprocessCapability();
     const advisoryLimitsBase = {
         requestedMaxResults: searchWindow.maxResults,
         cursorOffset: searchWindow.cursorOffset,
@@ -154,7 +155,7 @@ export async function searchWorkspaceSymbols(targetPath, options, context = {}) 
             }
         }
 
-        if (!(await isRipgrepAvailable())) {
+        if (!(await searchExec.isRipgrepAvailable())) {
             throw new Error('ripgrep (rg) não está disponível neste ambiente. workspace_symbol_search requer rg.');
         }
 
@@ -184,6 +185,7 @@ export async function searchWorkspaceSymbols(targetPath, options, context = {}) 
                 cwd: options.workspaceRoot,
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
+                env: searchExec.environment,
                 collectStdout: false,
                 onStdoutLine: (line) => streamingCollector.accept(line),
             },

@@ -39,7 +39,7 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  *
  * @typedef {object} AgentRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
- * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
+ * @property {import('#copilot/observability/metrics').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('#copilot/sdk/types').CopilotClient>} getClient - Factory do SDK client.
  * @property {() => import('#copilot/sdk/types').ConnectionState} [getClientState] - Estado local da conexão SDK.
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection

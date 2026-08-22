@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // @ts-check
 
-import Database from 'better-sqlite3';
+import {
+    adaptBetterSqliteDatabase,
+    createBetterSqliteApplicationRuntime,
+} from '#copilot/infra/public/diagnostic/database/sqlite';
+import { buildIndexPathTreeRange, createIoIndexSqlite } from '#copilot/infra/public/diagnostic/indexing/storage';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-
-import { buildIndexPathTreeRange, createIoIndexSqlite } from '#copilot/infra/public/diagnostic/indexing/storage';
 
 /**
  * @param {string} name
@@ -56,7 +58,8 @@ async function main() {
     const tmpRoot = path.resolve('tmp');
     await mkdir(tmpRoot, { recursive: true });
     const workspace = await mkdtemp(path.join(tmpRoot, '.io-index-workload-'));
-    const db = new Database(':memory:');
+    const sqliteRuntime = createBetterSqliteApplicationRuntime({ dbPath: ':memory:' });
+    const db = sqliteRuntime.getDatabase();
 
     try {
         const writes = [];
@@ -72,7 +75,7 @@ async function main() {
         }
         await Promise.all(writes);
 
-        const index = createIoIndexSqlite({ db });
+        const index = createIoIndexSqlite({ db: adaptBetterSqliteDatabase(db) });
         const initial = await measureAsync(() =>
             index.indexDirectory(workspace, {
                 workspaceRoot: workspace,
@@ -166,7 +169,7 @@ async function main() {
             ),
         );
     } finally {
-        db.close();
+        sqliteRuntime.close();
         await rm(workspace, { recursive: true, force: true });
     }
 }

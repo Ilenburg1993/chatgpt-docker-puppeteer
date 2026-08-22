@@ -54,6 +54,11 @@ export const INFRA_STATE_SCOPE_MANIFEST = Object.freeze([
         rationale: 'Promise tails serialize resources across the whole process.',
     }),
     state({
+        path: 'concurrency/locks/process-state/service.js',
+        scope: 'process',
+        rationale: 'Exactly one explicitly activated process-lock configuration owner coordinates all lock kernels.',
+    }),
+    state({
         path: 'filesystem/configured/service.js',
         scope: 'process',
         rationale:
@@ -75,6 +80,12 @@ export const INFRA_STATE_SCOPE_MANIFEST = Object.freeze([
         rationale:
             'Weak authority internals and aggregate issuance counters are process bookkeeping; capabilities remain instance-bound.',
     }),
+    state({
+        path: 'filesystem/workspace/path-policy/cache.js',
+        scope: 'process',
+        rationale:
+            'Physical workspace path-policy decisions, process owner identity and bounded cache counters are process coordination state; authority issuance remains workspace-instance bound.',
+    }),
 
     state({
         path: 'indexing/context/scope/runtime-registry.js',
@@ -93,14 +104,16 @@ export const INFRA_STATE_SCOPE_MANIFEST = Object.freeze([
         rationale: 'Lazy Babel parser binding is immutable after resolution and safe to share process-wide.',
     }),
     state({
-        path: 'indexing/search/shared/policy.js',
+        path: 'policy/budgets.js',
         scope: 'process',
-        rationale: 'Resolved immutable search budget is a process configuration cache.',
+        rationale:
+            'One token-bound process owner supplies immutable search defaults to stateless search operations; per-call budget resolution remains pure.',
     }),
     state({
-        path: 'indexing/search/subprocess/ripgrep.js',
+        path: 'indexing/search/subprocess/process/service.js',
         scope: 'process',
-        rationale: 'Ripgrep availability probe is process-environment capability cache.',
+        rationale:
+            'Exactly one token-bound process owner supplies the minimal subprocess environment and memoizes ripgrep capability per generation.',
     }),
     state({
         path: 'platform/node/compile-cache.js',

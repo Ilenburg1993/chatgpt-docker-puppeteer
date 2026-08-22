@@ -5,7 +5,7 @@
  * @module copilot/infra/filesystem/patch/diff/service
  */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { readText } from '#copilot/infra/internal/filesystem/read';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {

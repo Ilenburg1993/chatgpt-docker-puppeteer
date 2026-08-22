@@ -30,7 +30,7 @@ function createMockSession() {
 
 describe('event-handlers/streaming', () => {
     it('wireStreamingEvents retorna unsubscribe functions', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const unsubs = wireStreamingEvents(/** @type {any} */ (session), {
             emit: vi.fn(),
@@ -42,7 +42,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('emite assistant.streaming_delta com totalResponseSizeBytes', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 
@@ -61,7 +61,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('emite dialog.delta quando dialogLoopActive=true', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 
@@ -85,7 +85,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('emite task.delta quando dialogLoopActive=false e não está processing', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 
@@ -110,7 +110,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('deduplica o mesmo assistant.message_delta quando a sessão foi wireada duas vezes', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 
@@ -132,7 +132,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('preserva chunks repetidos legítimos quando não há identidade de evento duplicada', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 
@@ -151,7 +151,7 @@ describe('event-handlers/streaming', () => {
     });
 
     it('deduplica por identidade de evento sem deduplicar pelo texto do chunk', async () => {
-        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const { wireStreamingEvents } = await import('#copilot/testing/event-handlers/streaming');
         const session = createMockSession();
         const emit = vi.fn();
 

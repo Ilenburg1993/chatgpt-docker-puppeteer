@@ -30,7 +30,7 @@ const DEFAULT_INDEX_QUERY_POLICY = Object.freeze({ defaultMaxResults: 50, hardMa
  * Read the version of an index schema already prepared by the database owner. Indexing never migrates the shared
  * database itself; fresh isolated databases must be prepared explicitly before this store is constructed.
  *
- * @param {{ prepare: Function }} db
+ * @param {import('#copilot/infra/internal/database/port').SqliteDatabasePort} db
  * @returns {number}
  */
 function readPreparedIoIndexSchemaVersion(db) {
@@ -54,13 +54,15 @@ function readPreparedIoIndexSchemaVersion(db) {
 
 /**
  * @param {{
- *     db: { exec: Function; prepare: Function; transaction?: Function };
+ *     db: import('#copilot/infra/internal/database/port').SqliteDatabasePort;
  *     now?: () => number;
  *     hashVerifyMaxBytes?: number;
  *     hashVerifyIntervalMs?: number;
  *     recheckUnchangedSnapshot?: boolean;
  *     snapshotRetries?: number;
  *     queryPolicy?: {defaultMaxResults:number;hardMaxResults:number};
+ *     buildConfig?: {concurrency:number;maxFiles:number};
+ *     scannerConfig?: {batchSize:number;hardMaxEntries:number};
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     parserWorkerRuntime?: ReturnType<typeof import('../../parser/worker/index.js').createParserWorkerRuntime>;
  * }} options
@@ -147,6 +149,8 @@ export function createIoIndexSqlite(options) {
         buildIndexMetadataJson,
         pruneMissingRows,
         indexTextFile,
+        ...(options.buildConfig ? { buildConfig: options.buildConfig } : {}),
+        ...(options.scannerConfig ? { scannerConfig: options.scannerConfig } : {}),
     });
     const queryApi = createIoIndexQueryApi({ db, statements, stats, queryPolicy });
     const getStats = createIoIndexStatsReader({ statements, stats, schemaVersion, freshnessPolicy });

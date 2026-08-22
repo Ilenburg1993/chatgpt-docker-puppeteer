@@ -12,22 +12,6 @@ const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathna
 const PRESENTATION_ROOT = join(COPILOT_ROOT, 'presentation');
 const TERMINAL_ROOT = join(COPILOT_ROOT, 'terminal');
 const SERVER_ROOT = join(COPILOT_ROOT, 'server');
-const PACKAGE_JSON_PATH = join(new URL('../../../../', import.meta.url).pathname, 'package.json');
-
-const ALLOWED_PRESENTATION_PUBLIC_IMPORTS = new Set([
-    '#copilot/presentation',
-    '#copilot/presentation/agent',
-    '#copilot/presentation/agent/runtime',
-    '#copilot/presentation/contracts',
-    '#copilot/presentation/conversation',
-    '#copilot/presentation/files',
-    '#copilot/presentation/routing',
-    '#copilot/presentation/realtime',
-    '#copilot/presentation/runtime',
-    '#copilot/presentation/sdk',
-    '#copilot/presentation/state',
-    '#copilot/presentation/system',
-]);
 
 const BARRELED_PRESENTATION_SUBDOMAINS = new Set([
     'agent',
@@ -120,17 +104,6 @@ function toPosixPresentationRelative(abs) {
 }
 
 describe('W115 — presentation barrel governance', () => {
-    it('package.json expõe apenas superfícies públicas explícitas de presentation', () => {
-        const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf8'));
-        const imports = pkg['imports'] ?? {};
-        const presentationKeys = Object.keys(imports)
-            .filter((key) => key === '#copilot/presentation' || key.startsWith('#copilot/presentation/'))
-            .sort();
-
-        assert.deepEqual(presentationKeys, [...ALLOWED_PRESENTATION_PUBLIC_IMPORTS].sort());
-        assert.equal('#copilot/presentation/*' in imports, false);
-    });
-
     it('todo index.js de presentation é barrel puro', () => {
         const indexFiles = listJsFilesRecursive(PRESENTATION_ROOT).filter((abs) => basename(abs) === 'index.js');
         /** @type {string[]} */

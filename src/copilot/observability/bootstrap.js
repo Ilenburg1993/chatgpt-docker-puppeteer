@@ -15,8 +15,8 @@
 
 import { AUDIT_LOGGER } from '#copilot/audit';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-import { defaultHookBus, setHooksLogger } from '#copilot/sdk';
 import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
+import { defaultBus as defaultHookBus, setHooksLogger } from '#copilot/sdk/session';
 import { setSdkMetricEmitter } from '#copilot/sdk/telemetry';
 import { setCustomToolsBuilder } from '#copilot/sdk/tools';
 import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools/observability';
@@ -27,7 +27,6 @@ import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
 import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } from '../core/shutdown.js';
-import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
@@ -199,7 +198,6 @@ export function bootstrapObservability() {
     );
 
     setShutdownLogger(log);
-    setDbLogger(log);
     setSdkLogger(log);
     setAuditLogger(log, LOG_DIR);
     setHooksLogger(log);
@@ -228,9 +226,9 @@ export function bootstrapLateDeps(deps) {
 
 /**
  * Habilita persistência SQLite no trace-store de convergência. Deve ser chamado após `bootstrapObservability()` e após
- * `ensureCopilotDbDir()` + `getCopilotDb()`.
+ * the application SQLite provider has been bootstrapped.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function bootstrapConvergencePersistence(db) {

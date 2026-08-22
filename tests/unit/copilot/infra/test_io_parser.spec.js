@@ -19,7 +19,7 @@ import {
     resolveParserWorkerQueuePolicy,
     windowFileContext,
 } from '#copilot/infra/internal/indexing/parser';
-import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';
+import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';
 import { sha256 } from '#copilot/infra/internal/platform';
 import * as assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -46,6 +46,7 @@ const parseAndCacheSymbols = (filePath, options = {}) =>
 const parseFileForContext = (filePath, content, options = {}) =>
     parseFileForContextRaw(filePath, content, { ...options, parserCacheRuntime });
 const getParserCacheStats = () => getParserCacheStatsRaw(parserCacheRuntime);
+/** @param {string} filePath */
 const invalidateParserCache = (filePath) => parserCacheRuntime.invalidate(filePath);
 
 const execFileAsync = promisify(execFile);
@@ -195,8 +196,9 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('aplica line guard também a arquivos com CR isolado', async () => {
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
-            const result = await parseFileSymbols('/tmp/cr-only.js', 'a\\rb\\rc\\rd');
+            import { parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';
+            const parserConfig = readParserProcessConfig(process.env);
+            const result = await parseFileSymbols('/tmp/cr-only.js', 'a\\rb\\rc\\rd', { parserConfig });
             console.log(JSON.stringify({ lines: result.lines, parseError: result.parseError }));
         `;
         const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
@@ -217,9 +219,10 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('trunca o source pelo orçamento UTF-8 real', async () => {
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
+            import { parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';
+            const parserConfig = readParserProcessConfig(process.env);
             const content = "export const before = 1;\\n// 🚀🚀🚀🚀🚀🚀🚀🚀\\nexport const afterBudget = 1;";
-            const result = await parseFileSymbols('/tmp/byte-budget.js', content);
+            const result = await parseFileSymbols('/tmp/byte-budget.js', content, { parserConfig });
             console.log(JSON.stringify({
                 truncated: result.truncated,
                 bytes: result.bytes,
@@ -397,8 +400,9 @@ describe('Babel parser policy', () => {
         const workerResult = await parseFileSymbols(filePath, content, { workerRuntime: parserWorkerRuntime });
         const workerStats = getParserCacheStats();
         const script = `
-            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
-            const result = await parseFileSymbols(${JSON.stringify(filePath)}, ${JSON.stringify(content)});
+            import { parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';
+            const parserConfig = readParserProcessConfig(process.env);
+            const result = await parseFileSymbols(${JSON.stringify(filePath)}, ${JSON.stringify(content)}, { parserConfig });
             console.log(JSON.stringify(result));
         `;
         const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
@@ -598,7 +602,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('remove tarefa abortada da fila de workers', async () => {
         const script = `
-            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserConfig = readParserProcessConfig(process.env);\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers', config: parserConfig });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', parserConfig, workerRuntime });
             const slowContent = Array.from({ length: 20_000 }, (_, index) => 'export function f' + index + '() { return ' + index + '; }').join('\\n');
             const first = parseFileSymbols('/tmp/abort-holder.js', slowContent, { workerRuntime });
             const controller = new AbortController();
@@ -639,7 +643,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('rejeita backlog quando a fila de workers atinge o limite configurado', async () => {
         const script = `
-            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserConfig = readParserProcessConfig(process.env);\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers', config: parserConfig });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', parserConfig, workerRuntime });
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
                 Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/queued-' + index + '.js', content, { workerRuntime })),
@@ -678,7 +682,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('faz fallback síncrono limitado para arquivos pequenos sob overload', async () => {
         const script = `
-            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers' });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', workerRuntime });
+            import { createParserWorkerRuntime, getParserCacheStats, parseFileSymbols, readParserProcessConfig } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserConfig = readParserProcessConfig(process.env);\n            const workerRuntime = createParserWorkerRuntime({ runtimeId: 'parser-child:workers', config: parserConfig });\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child', parserConfig, workerRuntime });
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
                 Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/fallback-' + index + '.js', content, { workerRuntime })),
@@ -837,6 +841,7 @@ describe('parseFileForContext', () => {
         parserCacheRuntime = createParserCacheRuntime({
             invalidationBus: INVALIDATION_BUS,
             runtimeId: `parser-disabled-${Date.now()}-${Math.random()}`,
+            config: readParserCacheRuntimeConfig(process.env),
         });
 
         const first = await parseFileForContext(filePath, JS_CONTENT);
@@ -851,7 +856,7 @@ describe('parseFileForContext', () => {
 
     it('recusa retenção de FileContext maior que o orçamento configurado', async () => {
         const script = `
-            import { getParserCacheStats, parseFileForContext } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child-context' });
+            import { getParserCacheStats, parseFileForContext } from '#copilot/infra/internal/indexing/parser';\n            import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';\n            const parserCacheRuntime = createParserCacheRuntime({ invalidationBus: { registerHook: () => () => {} }, runtimeId: 'parser-child-context', config: readParserCacheRuntimeConfig(process.env) });
             await parseFileForContext('/tmp/oversized-context.js', 'export const oversizedContext = 1;', { parserCacheRuntime });
             const stats = getParserCacheStats(parserCacheRuntime);
             parserCacheRuntime.dispose();

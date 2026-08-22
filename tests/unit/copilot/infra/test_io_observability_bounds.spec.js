@@ -1,17 +1,24 @@
 // @ts-check
 
 import { publishIoOperation } from '#copilot/infra/internal/telemetry';
-import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { createProcessInfra } from '#copilot/infra/public/composition/process';
+import { readIoProcessHealthSnapshot } from '#copilot/infra/public/observability/process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/observability/health.js';
 
-/** @type {ReturnType<typeof createInfraRuntime>} */
+/** @type {ReturnType<typeof createProcessInfra>} */
+let processInfra;
+/** @type {ReturnType<ReturnType<typeof createProcessInfra>['createRuntime']>} */
 let runtime;
 beforeEach(() => {
-    runtime = createInfraRuntime({ runtimeId: `observability-test-${Date.now()}-${Math.random()}` });
+    processInfra = createProcessInfra({
+        processId: `observability-process-${Date.now()}-${Math.random()}`,
+        activateProcessPolicies: true,
+    });
+    runtime = processInfra.createRuntime({ runtimeId: `observability-test-${Date.now()}-${Math.random()}` });
 });
 afterEach(async () => {
-    await runtime.dispose();
+    await processInfra.dispose();
 });
 
 describe('infra/io-observability bounds', () => {
@@ -58,13 +65,75 @@ describe('infra/io-observability bounds', () => {
         );
     });
 
-    it('projeta locks bounded no health sem recursos em claro', () => {
-        const health = readIoRuntimeHealthSnapshot(runtime);
-        expect(health.locks.wait.maxOperationCardinality).toBe(32);
-        expect(health.locks.wait.operationCardinality).toBeLessThanOrEqual(32);
-        expect(health.locks.activeLeaseSample).toHaveLength(0);
-        expect(health.locks.fileLocks.activeLeaseSample).toHaveLength(0);
-        expect(health.locks).not.toHaveProperty('resources');
-        expect(health.locks.fileLocks).not.toHaveProperty('lockDir');
+    it('projeta retry exhaustion do index como runtime degraded sem materializar outro owner', () => {
+        const baseIndex = runtime.indexRegistry.status();
+        const degradedRuntime = /** @type {typeof runtime} */ (
+            /** @type {unknown} */ ({
+                ...runtime,
+                indexRegistry: Object.freeze({
+                    ...runtime.indexRegistry,
+                    status() {
+                        return Object.freeze({
+                            ...baseIndex,
+                            autoRefresh: Object.freeze({ ...baseIndex.autoRefresh, exhausted: 2 }),
+                        });
+                    },
+                }),
+            })
+        );
+
+        const health = readIoRuntimeHealthSnapshot(degradedRuntime);
+        expect(health.status).toBe('degraded');
+        expect(health.alerts).toContainEqual(
+            expect.objectContaining({ code: 'IO_INDEX_AUTO_REFRESH_EXHAUSTED', severity: 'medium' }),
+        );
+    });
+
+    it('projeta pending persistentemente stale do index como runtime degraded sem expor paths', () => {
+        const baseIndex = runtime.indexRegistry.status();
+        const degradedRuntime = /** @type {typeof runtime} */ (
+            /** @type {unknown} */ ({
+                ...runtime,
+                indexRegistry: Object.freeze({
+                    ...runtime.indexRegistry,
+                    status() {
+                        return Object.freeze({
+                            ...baseIndex,
+                            autoRefresh: Object.freeze({
+                                ...baseIndex.autoRefresh,
+                                pending: 3,
+                                stalePending: 2,
+                                oldestPendingAgeMs: 45_000,
+                                staleAfterMs: 30_000,
+                            }),
+                        });
+                    },
+                }),
+            })
+        );
+
+        const health = readIoRuntimeHealthSnapshot(degradedRuntime);
+        expect(health.status).toBe('degraded');
+        expect(health.alerts).toContainEqual(
+            expect.objectContaining({ code: 'IO_INDEX_AUTO_REFRESH_STALE_PENDING', severity: 'medium' }),
+        );
+        expect(JSON.stringify(health.alerts)).not.toContain('/tmp/');
+    });
+
+    it('projeta locks somente no process health, bounded e sem recursos em claro', () => {
+        const runtimeHealth = readIoRuntimeHealthSnapshot(runtime);
+        expect(runtimeHealth).not.toHaveProperty('locks');
+        expect(runtimeHealth.cache).not.toHaveProperty('pathPolicy');
+        expect(runtimeHealth.cache).not.toHaveProperty('validatedReadPath');
+        expect(runtimeHealth.cache).not.toHaveProperty('validatedMutablePath');
+
+        const processHealth = readIoProcessHealthSnapshot(processInfra);
+        expect(processHealth.ownership).toMatchObject({ expected: true, complete: true });
+        expect(processHealth.locks?.wait.maxOperationCardinality).toBe(32);
+        expect(processHealth.locks?.wait.operationCardinality).toBeLessThanOrEqual(32);
+        expect(processHealth.locks?.activeLeaseSample).toHaveLength(0);
+        expect(processHealth.locks?.fileLocks.activeLeaseSample).toHaveLength(0);
+        expect(processHealth.locks).not.toHaveProperty('resources');
+        expect(processHealth.locks?.fileLocks).not.toHaveProperty('lockDir');
     });
 });

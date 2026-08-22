@@ -1,7 +1,6 @@
 // @ts-check
 import { defaultAuditLog } from '#copilot/audit';
 import { getShellTimeoutPolicy } from '#copilot/config';
-import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
@@ -76,10 +75,10 @@ function resolveTimeoutConfig(timeoutSeconds, enforceTimeout, fallbackSeconds) {
  * @returns {Promise<{ ok: true; resolved: string } | { ok: false; reason: string }>}
  */
 async function resolveWorkspaceRealPathSafe(resolved) {
-    const policy = await evaluateIoPathPolicyAsync(resolved, { workspaceRoot: WORKSPACE_ROOT, mode: 'read' });
-    return policy.ok
-        ? { ok: true, resolved: policy.realPath }
-        : { ok: false, reason: `Acesso negado: ${policy.reason} (${resolved})` };
+    const checked = await validateCwd(resolved);
+    return checked.ok
+        ? { ok: true, resolved: checked.resolved }
+        : { ok: false, reason: `Acesso negado: ${checked.reason ?? 'path bloqueado'} (${resolved})` };
 }
 
 /**

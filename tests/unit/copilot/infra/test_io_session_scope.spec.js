@@ -19,13 +19,21 @@ let tmpDir = '';
 let scopeRuntime;
 /** @type {ReturnType<typeof createInfraRuntime>} */
 let infraRuntime;
+/** @typedef {ReturnType<typeof createWorkspaceScopeRuntime>} ScopeRuntime */
+/** @param {string} sessionId */
 const closeScope = (sessionId) => scopeRuntime.closeScope(sessionId);
+/** @param {Parameters<ScopeRuntime['declareScope']>[0]} options */
 const declareScope = (options) => scopeRuntime.declareScope(options);
+/** @param {string} sessionId @param {string} name @param {Parameters<ScopeRuntime['findSymbol']>[2]} [options] */
 const findSymbol = (sessionId, name, options = {}) => scopeRuntime.findSymbol(sessionId, name, options);
+/** @param {string} sessionId @param {Parameters<ScopeRuntime['getScopeContext']>[1]} [options] */
 const getScopeContext = (sessionId, options = {}) => scopeRuntime.getScopeContext(sessionId, options);
+/** @param {string} sessionId */
 const getScopeStats = (sessionId) => scopeRuntime.getScopeStats(sessionId);
+/** @param {string} sessionId @param {string} filePath */
 const invalidateScopePath = (sessionId, filePath) => scopeRuntime.invalidateScopePath(sessionId, filePath);
 const listScopes = () => scopeRuntime.listScopes();
+/** @param {string} sessionId @param {string[]} [paths] */
 const refreshScope = (sessionId, paths) => scopeRuntime.refreshScope(sessionId, paths);
 const JS_A = `
 // Módulo A
@@ -46,7 +54,9 @@ beforeEach(() => {
     infraRuntime = createInfraRuntime({ runtimeId: `session-infra-${Date.now()}-${Math.random()}` });
     scopeRuntime = createWorkspaceScopeRuntime({
         runtimeId: `session-scope-test-${Date.now()}-${Math.random()}`,
-        workspaceRoot: tmpDir || undefined,
+        runtimeOwnerId: infraRuntime.runtimeId,
+        workspaceOwnerId: `${infraRuntime.runtimeId}:workspace:test`,
+        ...(tmpDir ? { workspaceRoot: tmpDir } : {}),
         cacheRuntime: infraRuntime.coherence,
         invalidationBus: infraRuntime.coherence.invalidation,
         parserCacheRuntime: infraRuntime.parserCache,
@@ -77,8 +87,13 @@ describe('declareScope + getScopeStats', () => {
         const handle = declareScope({ sessionId, paths, parseSymbols: true });
         assert.strictEqual(handle.sessionId, sessionId);
         assert.strictEqual(handle.ready, false);
+        assert.strictEqual(typeof handle.refresh, 'function');
+        assert.strictEqual(typeof handle.snapshot, 'function');
+        assert.strictEqual(typeof handle.close, 'function');
+        assert.strictEqual(typeof handle[Symbol.asyncDispose], 'function');
+        assert.strictEqual(Object.isFrozen(handle), true);
 
-        // Aguarda warm + parse
+        // Aguarda warm + parse da mesma generation ligada ao handle.
         const stats = await handle.awaitReady();
         assert.ok(stats.ready === true, `stats.ready=${stats.ready}`);
         assert.strictEqual(stats.status, 'ready');
@@ -88,8 +103,41 @@ describe('declareScope + getScopeStats', () => {
         assert.strictEqual(stats.selection.mode, 'explicit');
         assert.ok(stats.preloaded >= 0);
         assert.ok(stats.parsed >= 0);
+        assert.strictEqual(handle.ready, true);
+        assert.strictEqual(handle.snapshot()?.status, 'ready');
+        assert.deepEqual(await handle.refresh(), { refreshed: 0, removed: 0, failed: 0, skipped: 0 });
+        const closed = handle.close();
+        assert.strictEqual(closed?.sessionId, sessionId);
+        assert.strictEqual(handle.snapshot(), null);
+        assert.strictEqual(handle.close(), null);
+    });
 
-        closeScope(sessionId);
+    it('liga handle à generation concreta e não transfere lifecycle após redeclaração do mesmo sessionId', async () => {
+        const sessionId = 'test-scope-generation-bound-handle';
+        const first = declareScope({ sessionId, paths: [path.join(tmpDir, 'a.js')], parseSymbols: false });
+        await first.awaitReady();
+        const second = declareScope({ sessionId, paths: [path.join(tmpDir, 'b.js')], parseSymbols: false });
+        await second.awaitReady();
+
+        assert.strictEqual(first.snapshot(), null);
+        assert.strictEqual(first.ready, false);
+        await assert.rejects(
+            () => first.refresh(),
+            /** @param {any} error */ (error) => error?.code === 'ERR_SCOPE_HANDLE_STALE',
+        );
+        assert.strictEqual(first.close(), null);
+        assert.strictEqual(second.snapshot()?.sessionId, sessionId);
+        assert.strictEqual(second.snapshot()?.pathCount, 1);
+        second.close();
+    });
+
+    it('Symbol.asyncDispose fecha apenas a generation possuída pelo handle', async () => {
+        const sessionId = 'test-scope-async-dispose';
+        const handle = declareScope({ sessionId, paths: [path.join(tmpDir, 'a.js')], parseSymbols: false });
+        await handle.awaitReady();
+        await handle[Symbol.asyncDispose]();
+        assert.strictEqual(handle.snapshot(), null);
+        assert.strictEqual(getScopeStats(sessionId), null);
     });
 
     it('aplica maxFiles como hard cap no working set de diretório', async () => {

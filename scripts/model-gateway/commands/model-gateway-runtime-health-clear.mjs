@@ -6,6 +6,7 @@ import {
     listByokProviderModelHealth,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
+import '../bootstrap-sqlite.mjs';
 
 import { createArgReader } from '../cli-args.mjs';
 

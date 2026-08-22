@@ -1,11 +1,12 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase, createBetterSqliteProvider } from '#copilot/infra/public/testing/database/sqlite';
+import { ensureIoIndexSchema } from '#copilot/infra/public/testing/indexing/sqlite';
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
 import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot';
 import { cmdIndex } from '../../../../src/copilot/terminal/commands/workspace-index.js';
@@ -31,8 +32,9 @@ function mockCtx() {
 beforeEach(async () => {
     getApplicationInfraRuntime().database.reset();
     testDb = new Database(':memory:');
-    ensureIoIndexSchema(testDb);
-    configureApplicationInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    const db = /** @type {import('better-sqlite3').Database} */ (testDb);
+    ensureIoIndexSchema(adaptBetterSqliteDatabase(db));
+    configureApplicationInfraSqliteProvider(createBetterSqliteProvider(() => db));
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-index-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
     await mkdir(join(tmpDir, 'nested'), { recursive: true });

@@ -1,32 +1,34 @@
 // @ts-check
-/** Parse, authorize, lock, preflight and apply signed I/O rollback tokens. */
+/** Execute one rollback token after authentication has already succeeded in the owning runtime/workspace capability. */
 import { acquireIoResourceLocks } from '#copilot/infra/internal/concurrency/locks';
 import path from 'node:path';
 import { applyIoRollbackExecution } from './apply.js';
 import { preflightIoRollbackExecution } from './preflight.js';
 import { loadRollbackStepPayload, rollbackStepPaths } from './support.js';
-import { parseIoRollbackToken, verifyIoRollbackToken } from './token.js';
 /** @typedef {import('./types.js').RollbackExecutionResult} RollbackExecutionResult */
 
 /**
- * @param {string|import('./token.js').IoRollbackToken} tokenOrSerialized
+ * This function is deliberately internal. It performs physical rollback preflight/application but does not authenticate
+ * tokens. Authentication, expiry, runtime/workspace binding and replay control belong to `capability.js`.
+ *
+ * @param {import('./token.js').IoRollbackToken} token
  * @param {{dryRun?:boolean;allowedPaths?:ReadonlySet<string>;sidecarDirectory?:string;nowMs?:number;onPhase?:(phase:string,details:Record<string,unknown>)=>void|Promise<void>}} [options]
  * @returns {Promise<RollbackExecutionResult>}
  */
-export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
-    const token = typeof tokenOrSerialized === 'string' ? parseIoRollbackToken(tokenOrSerialized) : tokenOrSerialized;
-    if (!verifyIoRollbackToken(token)) throw new Error('Rollback token inválido.');
+export async function executeAuthenticatedIoRollbackToken(token, options = {}) {
     const dryRun = options.dryRun !== false;
     const paths = [...new Set(token.steps.flatMap(rollbackStepPaths).map((entry) => path.resolve(entry)))];
     if (options.allowedPaths) {
-        for (const filePath of paths)
+        for (const filePath of paths) {
             if (!options.allowedPaths.has(filePath)) {
                 const error = new Error(`Path fora da allowlist do rollback: ${filePath}`);
                 /** @type {{code?:string}} */ (error).code = 'EROLLBACKPATHDENIED';
                 throw error;
             }
+        }
     }
-    /** @type {Map<number,Buffer>} */ const payloads = new Map();
+    /** @type {Map<number,Buffer>} */
+    const payloads = new Map();
     for (const step of token.steps) {
         const payload = await loadRollbackStepPayload(step, options);
         if (payload) payloads.set(step.order, payload);
@@ -40,7 +42,7 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
     try {
         return await lease.run(async () => {
             const preflight = await preflightIoRollbackExecution(token, paths, payloads, dryRun);
-            if (!preflight.ok)
+            if (!preflight.ok) {
                 return {
                     success: false,
                     dryRun,
@@ -52,7 +54,8 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                     error: preflight.error,
                     code: preflight.code,
                 };
-            if (dryRun)
+            }
+            if (dryRun) {
                 return {
                     success: true,
                     dryRun: true,
@@ -62,8 +65,9 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                     appliedCount: 0,
                     steps: preflight.steps,
                 };
+            }
             const applied = await applyIoRollbackExecution(token, payloads, preflight.steps, options);
-            if (!applied.ok)
+            if (!applied.ok) {
                 return {
                     success: false,
                     dryRun: false,
@@ -82,6 +86,7 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                           }
                         : {}),
                 };
+            }
             return {
                 success: true,
                 dryRun: false,

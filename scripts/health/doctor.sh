@@ -2,7 +2,7 @@
 # Doctor script - Diagnóstico completo do sistema
 # Usage: npm run doctor
 
-set +e  # Don't exit on errors, we're diagnosing
+set +e # Don't exit on errors, we're diagnosing
 
 echo "🏥 GPT-Agent Doctor - Diagnóstico do Sistema"
 echo "=============================================="
@@ -22,7 +22,7 @@ WARNINGS=0
 check() {
     local name=$1
     local command=$2
-    local type=${3:-error}  # error or warning
+    local type=${3:-error} # error or warning
 
     echo -n "[$name] "
     if eval "$command" &> /dev/null; then
@@ -146,7 +146,7 @@ echo "-------------------------------------------"
 # Check if PM2 is available
 if command -v pm2 &> /dev/null; then
     echo "PM2 Status:"
-    pm2 list 2>/dev/null || echo "   Nenhum processo PM2 rodando"
+    pm2 list 2> /dev/null || echo "   Nenhum processo PM2 rodando"
 else
     echo -e "${YELLOW}⚠️  PM2 não instalado globalmente${NC}"
     ((WARNINGS++))
@@ -168,7 +168,7 @@ echo "-------------------------------------------"
 if [ -d "fila" ]; then
     PENDING=$(find fila -maxdepth 1 -name "*.json" -not -name "*.tmp.*" | wc -l)
     LOCKED=$(find fila -maxdepth 1 -name "*.tmp.*" | wc -l)
-    CORRUPTED=$(find fila/corrupted -name "*.json" 2>/dev/null | wc -l)
+    CORRUPTED=$(find fila/corrupted -name "*.json" 2> /dev/null | wc -l)
 
     echo "   Pendentes: $PENDING"
     echo "   Travadas: $LOCKED"
@@ -194,8 +194,8 @@ echo ""
 echo -e "${BLUE}💾 Espaço em Disco${NC}"
 echo "-------------------------------------------"
 
-DISK_USAGE=$(df -h . 2>/dev/null | awk 'END {print $5}' | sed 's/%//')
-DISK_AVAIL=$(df -h . 2>/dev/null | awk 'END {print $4}')
+DISK_USAGE=$(df -h . 2> /dev/null | awk 'END {print $5}' | sed 's/%//')
+DISK_AVAIL=$(df -h . 2> /dev/null | awk 'END {print $4}')
 
 echo "   Uso: $DISK_USAGE% | Disponível: $DISK_AVAIL"
 
@@ -206,13 +206,13 @@ fi
 
 # Check logs size
 if [ -d "logs" ]; then
-    LOGS_SIZE=$(du -sh logs 2>/dev/null | cut -f1)
+    LOGS_SIZE=$(du -sh logs 2> /dev/null | cut -f1)
     echo "   Tamanho dos logs: $LOGS_SIZE"
 fi
 
 # Check responses size
 if [ -d "respostas" ]; then
-    RESP_SIZE=$(du -sh respostas 2>/dev/null | cut -f1)
+    RESP_SIZE=$(du -sh respostas 2> /dev/null | cut -f1)
     RESP_COUNT=$(find respostas -name "*.txt" | wc -l)
     echo "   Respostas: $RESP_COUNT arquivos ($RESP_SIZE)"
 fi
@@ -236,7 +236,7 @@ fi
 
 # Check for error patterns in logs
 if [ -f "logs/agente.log" ]; then
-    ERROR_COUNT=$(grep -c "ERROR" logs/agente.log 2>/dev/null || echo 0)
+    ERROR_COUNT=$(grep -c "ERROR" logs/agente.log 2> /dev/null || echo 0)
     echo "   Erros no log (agente.log): $ERROR_COUNT"
 fi
 echo ""

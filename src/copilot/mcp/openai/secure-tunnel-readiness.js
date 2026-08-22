@@ -8,8 +8,7 @@
  * @module copilot/mcp/openai/secure-tunnel-readiness
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
+import { resolveExecutable } from '#copilot/infra/public/platform/process/executable';
 
 const TUNNEL_ID_ENV_KEYS = ['OPENAI_MCP_TUNNEL_ID', 'OPENAI_TUNNEL_ID', 'MCP_TUNNEL_ID', 'TUNNEL_ID'];
 const RUNTIME_KEY_ENV_KEYS = ['CONTROL_PLANE_API_KEY', 'OPENAI_CONTROL_PLANE_API_KEY'];
@@ -25,7 +24,22 @@ export function auditOpenAiSecureMcpTunnelReadiness(options = {}) {
     const tunnelIdPresent = hasAnyEnv(env, TUNNEL_ID_ENV_KEYS);
     const runtimeKeyPresent = hasAnyEnv(env, RUNTIME_KEY_ENV_KEYS);
     const mcpUrl = firstEnvValue(env, MCP_URL_ENV_KEYS) ?? 'http://127.0.0.1:3333/mcp';
-    const tunnelClient = findExecutable(binaryName, options.pathEnv ?? env['PATH'] ?? '');
+    const executable = resolveExecutable(binaryName, {
+        env: {
+            PATH: options.pathEnv ?? env['PATH'] ?? env['Path'] ?? env['path'] ?? '',
+            PATHEXT: env['PATHEXT'],
+        },
+        cwd: process.cwd(),
+        platform: process.platform,
+    });
+    const tunnelClient = executable.found
+        ? {
+              found: true,
+              binaryName,
+              pathHint: `*/${binaryName}`,
+              searchedPathEntries: executable.searchedPathEntries,
+          }
+        : { found: false, binaryName, searchedPathEntries: executable.searchedPathEntries };
 
     const blockers = [];
     const warnings = [];
@@ -135,25 +149,6 @@ function firstEnvValue(env, keys) {
         if (value) return value;
     }
     return null;
-}
-
-/**
- * @param {string} binaryName
- * @param {string} pathEnv
- * @returns {{ found: boolean; binaryName: string; pathHint?: string; searchedPathEntries: number }}
- */
-function findExecutable(binaryName, pathEnv) {
-    const entries = pathEnv.split(path.delimiter).filter(Boolean);
-    for (const entry of entries) {
-        const candidate = path.join(entry, binaryName);
-        try {
-            fs.accessSync(candidate, fs.constants.X_OK);
-            return { found: true, binaryName, pathHint: `*/${binaryName}`, searchedPathEntries: entries.length };
-        } catch {
-            // continue
-        }
-    }
-    return { found: false, binaryName, searchedPathEntries: entries.length };
 }
 
 /**

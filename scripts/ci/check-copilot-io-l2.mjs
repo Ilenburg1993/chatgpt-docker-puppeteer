@@ -35,16 +35,16 @@ function printJson(value) {
 }
 
 async function loadL2Modules() {
-    const [{ createInfraRuntime }, db] = await Promise.all([
+    const [{ createInfraRuntime }, database] = await Promise.all([
         import('#copilot/infra/public/composition/runtime'),
-        import('../../src/copilot/db/sqlite.js'),
+        import('#copilot/infra/public/composition/database/sqlite'),
     ]);
-    return { createInfraRuntime, db };
+    return { createInfraRuntime, createApplicationSqliteRuntime: database.createApplicationSqliteRuntime };
 }
 
 async function runDefaultPhase() {
     const { createInfraRuntime } = await loadL2Modules();
-    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-default' });
+    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-default', env: process.env });
     try {
         const configuration = runtime.coherence.l2.snapshot();
         assert.deepEqual(
@@ -64,10 +64,14 @@ async function runDefaultPhase() {
 
 /** @param {string} dbPath */
 async function runSeedPhase(dbPath) {
-    assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { createInfraRuntime, db } = await loadL2Modules();
-    await db.ensureCopilotDbDir();
-    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-seed', sqliteProvider: db.getCopilotDb });
+    assert.equal(process.env['COPILOT_DB_PATH'], undefined, 'L2 CI seed must use an explicit SQLite runtime path.');
+    const { createInfraRuntime, createApplicationSqliteRuntime } = await loadL2Modules();
+    const sqliteRuntime = await createApplicationSqliteRuntime({ dbPath });
+    const runtime = createInfraRuntime({
+        runtimeId: 'l2-ci-seed',
+        sqliteProvider: sqliteRuntime.getStructuralDatabase,
+        env: process.env,
+    });
     try {
         const configuration = runtime.coherence.l2.snapshot();
         assert.deepEqual(
@@ -107,16 +111,20 @@ async function runSeedPhase(dbPath) {
         });
     } finally {
         await runtime.dispose();
-        db.closeCopilotDb();
+        sqliteRuntime.close();
     }
 }
 
 /** @param {string} dbPath */
 async function runReadPhase(dbPath) {
-    assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { createInfraRuntime, db } = await loadL2Modules();
-    await db.ensureCopilotDbDir();
-    const runtime = createInfraRuntime({ runtimeId: 'l2-ci-read', sqliteProvider: db.getCopilotDb });
+    assert.equal(process.env['COPILOT_DB_PATH'], undefined, 'L2 CI read must use an explicit SQLite runtime path.');
+    const { createInfraRuntime, createApplicationSqliteRuntime } = await loadL2Modules();
+    const sqliteRuntime = await createApplicationSqliteRuntime({ dbPath });
+    const runtime = createInfraRuntime({
+        runtimeId: 'l2-ci-read',
+        sqliteProvider: sqliteRuntime.getStructuralDatabase,
+        env: process.env,
+    });
     try {
         const cache = runtime.coherence.l2.get();
         assert.ok(cache, 'read process must initialize the experimental L2 cache');
@@ -140,7 +148,7 @@ async function runReadPhase(dbPath) {
         });
     } finally {
         await runtime.dispose();
-        db.closeCopilotDb();
+        sqliteRuntime.close();
     }
 }
 
@@ -150,7 +158,8 @@ async function runReadPhase(dbPath) {
  */
 function runChild(phase, dbPath) {
     /** @type {NodeJS.ProcessEnv} */
-    const env = { ...process.env, COPILOT_DB_PATH: dbPath };
+    const env = { ...process.env };
+    delete env['COPILOT_DB_PATH'];
     delete env['IO_L2_CACHE_TTL_MS'];
     delete env['IO_L2_CACHE_MAX_ENTRIES'];
     delete env['IO_L2_CACHE_PRUNE_MS'];

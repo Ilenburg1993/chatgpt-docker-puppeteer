@@ -1,4 +1,6 @@
 // @ts-check
+
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 /**
  * Tests for MCP Streamable HTTP process-local session runtime and redacted SQLite metadata store.
  */
@@ -89,7 +91,7 @@ describe('MCP HTTP stateful session runtime', () => {
     it('persists only redacted session metadata in SQLite', () => {
         const db = new Database(':memory:');
         try {
-            const store = createSqliteMcpHttpSessionStoreForDb(db);
+            const store = createSqliteMcpHttpSessionStoreForDb(adaptBetterSqliteDatabase(db));
             let now = 100;
             const runtime = createMcpHttpSessionRuntime({
                 now: () => now,

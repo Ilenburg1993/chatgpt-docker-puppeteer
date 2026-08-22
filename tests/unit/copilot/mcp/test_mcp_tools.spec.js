@@ -3,6 +3,7 @@
  * Tests for first-band Copilot MCP tools.
  */
 
+import { adaptBetterSqliteDatabase, createBetterSqliteProvider } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import { join, relative } from 'node:path';
 import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
 import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot';
+import { ensureIoIndexSchema } from '#copilot/infra/public/testing/indexing/sqlite';
 import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
     getTtlCacheStats,
@@ -18,7 +20,6 @@ import {
     resolveReadPath,
     resolveValidatedReadPath,
 } from '#copilot/mcp/control-plane';
-import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 import {
     readRepoReadFileResultCacheStats,
     resetRepoReadResponseCacheForTest,
@@ -29,9 +30,9 @@ let testInfraDb = null;
 
 beforeAll(() => {
     testInfraDb = new Database(':memory:');
-    ensureIoIndexSchema(testInfraDb);
-    const provider = () => /** @type {import('better-sqlite3').Database} */ (testInfraDb);
-    configureApplicationInfraSqliteProvider(provider);
+    const db = /** @type {import('better-sqlite3').Database} */ (testInfraDb);
+    ensureIoIndexSchema(adaptBetterSqliteDatabase(db));
+    configureApplicationInfraSqliteProvider(createBetterSqliteProvider(() => db));
 });
 
 afterAll(() => {

@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
-import { probeJsonWithRetry, readSmokeBearerToken } from '#copilot/mcp/cloudflare/cli-probe.js';
-import { runCloudflareSmoke } from '#copilot/mcp/cloudflare/cli-smoke.js';
-import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
+import { probeJsonWithRetry, readSmokeBearerToken } from '#copilot/testing/mcp/cloudflare/cli-probe';
+import { runCloudflareSmoke } from '#copilot/testing/mcp/cloudflare/cli-smoke';
+import { readCloudflareTunnelConfig } from '#copilot/testing/mcp/cloudflare/config';
 
 /** @type {http.Server[]} */
 const servers = [];

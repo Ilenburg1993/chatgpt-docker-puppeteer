@@ -1,7 +1,6 @@
 // @ts-check
 /** Registry state, bounded invariants and pure scope helpers. @module copilot/infra/indexing/context/scope/state */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import * as nodePath from 'node:path';
 import { createPrefetchSessionRegistry } from '../prefetch/index.js';
 
@@ -20,6 +19,7 @@ import { createPrefetchSessionRegistry } from '../prefetch/index.js';
  *   cacheRuntime: {l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>};
  *   invalidationBus: ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime> | null;
  *   parserCacheRuntime: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime> | null;
+ *   scannerConfig: Readonly<{batchSize:number;hardMaxEntries:number}> | null;
  * }} ScopeRuntimeState
  */
 
@@ -29,10 +29,11 @@ import { createPrefetchSessionRegistry } from '../prefetch/index.js';
  * cacheRuntime: {l1:ReturnType<typeof import('../../../cache/memory/index.js').createIoL1CacheRuntime>};
  * invalidationBus?: ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime>;
  * parserCacheRuntime?: ReturnType<typeof import('../../parser/cache/runtime/index.js').createParserCacheRuntime>;
+ * scannerConfig?: Readonly<{batchSize:number;hardMaxEntries:number}>;
  * }} options @returns {ScopeRuntimeState} */
 export function createScopeRuntimeState(options) {
     if (!options?.cacheRuntime) throw new TypeError('createScopeRuntimeState requires runtime-owned cacheRuntime.');
-    const configuredMax = options.maxActiveScopes ?? readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
+    const configuredMax = options.maxActiveScopes ?? 10;
     return {
         registry: new Map(),
         warmPromises: new Map(),
@@ -45,6 +46,7 @@ export function createScopeRuntimeState(options) {
         cacheRuntime: options.cacheRuntime,
         invalidationBus: options.invalidationBus ?? null,
         parserCacheRuntime: options.parserCacheRuntime ?? null,
+        scannerConfig: options.scannerConfig ?? null,
     };
 }
 

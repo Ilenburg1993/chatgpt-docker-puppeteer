@@ -1,6 +1,6 @@
 // @ts-check
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';

@@ -19,20 +19,20 @@ const router = express.Router();
 
 // ─── Importação lazy do hub (não bloqueia se COPILOT_SDK_ENABLED=false) ────────
 
-/** @type {import('#copilot/conversation-hub/hub').ConversationHub | null} */
+/** @type {import('#copilot/conversation-hub').ConversationHub | null} */
 let _hubModule = null;
 
 /**
  * Obtém o módulo do hub de forma lazy.
  *
- * @returns {Promise<import('#copilot/conversation-hub/hub').ConversationHub | null>}
+ * @returns {Promise<import('#copilot/conversation-hub').ConversationHub | null>}
  */
 async function getHub() {
     if (process.env['COPILOT_SDK_ENABLED'] === 'false') return null;
 
     try {
         if (!_hubModule) {
-            _hubModule = (await import('#copilot/conversation-hub/hub')).conversationHub;
+            _hubModule = (await import('#copilot/conversation-hub')).conversationHub;
         }
         return _hubModule;
     } catch (/** @type {any} */ err) {

@@ -9,7 +9,7 @@
  * @module copilot/mcp/control-plane/index-auto-build-checkpoint
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 import { execFile } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -51,9 +51,9 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
  */
 
 /**
- * @param {import('better-sqlite3').Database} [db]
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} [db]
  */
-function ensureCheckpointSchema(db = getCopilotDb()) {
+function ensureCheckpointSchema(db = getApplicationSqliteDatabase()) {
     db.exec(`
         CREATE TABLE IF NOT EXISTS ${TABLE} (
             scope_path TEXT PRIMARY KEY,
@@ -71,8 +71,8 @@ function ensureCheckpointSchema(db = getCopilotDb()) {
     return db;
 }
 
-/** @param {string} scopePath @param {import('better-sqlite3').Database} [db] */
-export function readIndexStartupCheckpoint(scopePath, db = getCopilotDb()) {
+/** @param {string} scopePath @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} [db] */
+export function readIndexStartupCheckpoint(scopePath, db = getApplicationSqliteDatabase()) {
     ensureCheckpointSchema(db);
     const row = /** @type {IndexStartupCheckpoint | undefined} */ (
         db
@@ -96,9 +96,9 @@ export function readIndexStartupCheckpoint(scopePath, db = getCopilotDb()) {
  *     nowMs?: number;
  *     journalSequence?: number;
  * }} input
- * @param {import('better-sqlite3').Database} [db]
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} [db]
  */
-export function writeIndexStartupCheckpoint(input, db = getCopilotDb()) {
+export function writeIndexStartupCheckpoint(input, db = getApplicationSqliteDatabase()) {
     ensureCheckpointSchema(db);
     const previous = readIndexStartupCheckpoint(input.scopePath, db);
     const nowMs = input.nowMs ?? Date.now();

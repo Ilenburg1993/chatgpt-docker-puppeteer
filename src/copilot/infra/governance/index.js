@@ -18,6 +18,7 @@ export {
     findInfraMutableModuleState,
     listMutableModuleBindings,
 } from './mutable-state.js';
+export { buildInfraPublicAuthorityReport, inspectPublicApiAuthoritySource } from './public-api-authority.js';
 export {
     buildInfraPublicApiCostReport,
     buildStaticImportClosure,

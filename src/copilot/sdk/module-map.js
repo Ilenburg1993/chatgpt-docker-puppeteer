@@ -638,14 +638,23 @@ export const SDK_ALIAS_LAYOUT = Object.freeze([
         tier: 'stable-subsurface',
         summary: 'Utilitários mínimos e puros do SDK local.',
     },
+    {
+        alias: '#copilot/sdk/http-request',
+        target: 'src/copilot/sdk/http-request.js',
+        tier: 'stable-subsurface',
+        summary: 'HTTP helper bounded usado por integrações locais sem carregar o root SDK.',
+    },
 ]);
 
 /**
  * @typedef {'agent'
  *     | 'boot'
+ *     | 'bridges'
  *     | 'config'
  *     | 'event-handlers'
  *     | 'hooks'
+ *     | 'mcp'
+ *     | 'model-gateway'
  *     | 'observability'
  *     | 'runtime-wiring.js'
  *     | 'server'
@@ -670,6 +679,8 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
     {
         layer: 'agent',
         preferred: [
+            '#copilot/sdk/agents',
+            '#copilot/sdk/constants',
             '#copilot/sdk/errors',
             '#copilot/sdk/event-helpers',
             '#copilot/sdk/feature-flags',
@@ -693,9 +704,16 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
         notes: 'Boot usa root apenas para validação da surface pública; composição usa subpaths.',
     },
     {
+        layer: 'bridges',
+        preferred: ['#copilot/sdk/tools'],
+        allowed: [],
+        discouraged: [],
+        notes: 'Bridges convertem contratos externos em tools SDK por uma surface estreita.',
+    },
+    {
         layer: 'config',
         preferred: ['#copilot/sdk/constants', '#copilot/sdk/session', '#copilot/sdk/rpc'],
-        allowed: [],
+        allowed: ['#copilot/sdk/tools'],
         discouraged: ['#copilot/sdk/rpc/experimental'],
         notes: 'Config integra system-message e session setup; evita surfaces de execução.',
     },
@@ -712,6 +730,20 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
         allowed: [],
         discouraged: ['#copilot/sdk/rpc/experimental'],
         notes: 'Hooks devem operar por session contracts e evitar RPC direta.',
+    },
+    {
+        layer: 'mcp',
+        preferred: ['#copilot/sdk/session'],
+        allowed: [],
+        discouraged: [],
+        notes: 'MCP expõe somente projeções read-only da sessão SDK viva.',
+    },
+    {
+        layer: 'model-gateway',
+        preferred: ['#copilot/sdk/session', '#copilot/sdk/telemetry', '#copilot/sdk/tools'],
+        allowed: [],
+        discouraged: ['#copilot/sdk/rpc/experimental'],
+        notes: 'Model Gateway compõe probes e binding por surfaces SDK estáveis e explícitas.',
     },
     {
         layer: 'observability',
@@ -749,7 +781,7 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
     },
     {
         layer: 'tools',
-        preferred: ['#copilot/sdk/tools', '#copilot/sdk/rpc', '#copilot/sdk/session'],
+        preferred: ['#copilot/sdk/tools', '#copilot/sdk/rpc', '#copilot/sdk/session', '#copilot/sdk/http-request'],
         allowed: ['#copilot/sdk/rpc/experimental'],
         discouraged: [],
         notes: 'Tools de sessão podem consumir RPC experimental quando explicitamente gated.',
@@ -776,6 +808,40 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
         notes: 'Camada de tipos consome contratos estáveis.',
     },
 ]);
+
+/**
+ * @typedef {'preferred' | 'allowed' | 'discouraged' | 'forbidden'} SdkAccessClassification
+ */
+
+/**
+ * Resolve the policy layer from a repository-relative Copilot source file.
+ * Type-only imports are governed by package exactness separately; this resolver is for runtime/dynamic SDK access.
+ *
+ * @param {string} filePath
+ * @returns {SdkConsumerLayer | null}
+ */
+export function resolveSdkConsumerLayer(filePath) {
+    const normalized = filePath.replaceAll('\\', '/').replace(/^.*?src\/copilot\//u, '');
+    if (normalized === 'runtime-wiring.js') return 'runtime-wiring.js';
+    const root = normalized.split('/')[0] ?? '';
+    return SDK_LAYER_ACCESS_POLICY.some((entry) => entry.layer === root)
+        ? /** @type {SdkConsumerLayer} */ (root)
+        : null;
+}
+
+/**
+ * @param {SdkConsumerLayer} layer
+ * @param {string} alias
+ * @returns {SdkAccessClassification}
+ */
+export function classifySdkLayerAccess(layer, alias) {
+    const policy = getSdkLayerAccessPolicy(layer);
+    if (!policy) return 'forbidden';
+    if (policy.preferred.includes(alias)) return 'preferred';
+    if (policy.allowed.includes(alias)) return 'allowed';
+    if (policy.discouraged.includes(alias)) return 'discouraged';
+    return 'forbidden';
+}
 
 /**
  * @param {SdkAliasTier} tier

@@ -1,67 +1,72 @@
 // @ts-check
 /**
- * Canonical application composition root for infra 2.0.
+ * Canonical application Infra 2.1 composition façade.
  *
- * One process-level application runtime owns runtime-scoped database/index/cache resources; workspace capabilities are
- * memoized below that runtime by canonical root. Resource activation remains lazy.
+ * Production owns exactly one ApplicationInfraHost. The host owns ProcessInfra → InfraRuntime → WorkspaceInfra,
+ * SQLite bootstrap coalescing and the single graceful-shutdown registration. This module deliberately contains no
+ * second process/runtime lifecycle or bootstrap state.
  *
  * @module copilot/boot/application-infra
  */
 
-import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import { createApplicationInfraHost } from './application-infra-host.js';
 import { WORKSPACE_ROOT } from './workspace.js';
 
-const APPLICATION_INFRA_RUNTIME = createInfraRuntime({ runtimeId: 'copilot-application' });
-/** @type {Promise<Readonly<{ configured: boolean; revision: number }>> | null} */
-let applicationInfraSqliteBootstrap = null;
+const APPLICATION_INFRA_HOST = createApplicationInfraHost({
+    hostId: 'copilot-application-host',
+    processId: 'copilot-application-process',
+    runtimeId: 'copilot-application',
+    defaultWorkspaceRoot: WORKSPACE_ROOT,
+    registerProcessShutdown: true,
+    activateProcessPolicies: true,
+});
+
+export function getApplicationInfraHost() {
+    return APPLICATION_INFRA_HOST;
+}
 
 export function getApplicationInfraRuntime() {
-    return APPLICATION_INFRA_RUNTIME;
+    return APPLICATION_INFRA_HOST.runtime;
+}
+
+/**
+ * Return the already-configured application database capability.
+ *
+ * This accessor never opens a path or creates a second database owner. Callers that may run before application
+ * bootstrap must await `bootstrapApplicationInfraSqliteProvider()` first.
+ *
+ * @returns {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort}
+ */
+export function getApplicationSqliteDatabase() {
+    return APPLICATION_INFRA_HOST.runtime.database.get();
 }
 
 /** @param {string} [workspaceRoot=WORKSPACE_ROOT] */
 export function getApplicationWorkspaceInfra(workspaceRoot = WORKSPACE_ROOT) {
-    return APPLICATION_INFRA_RUNTIME.workspace(workspaceRoot);
+    return APPLICATION_INFRA_HOST.workspace(workspaceRoot);
 }
 
-/** @param {() => import('better-sqlite3').Database} provider */
+/** @param {import('#copilot/infra/public/database/sqlite').InfraSqliteProvider} provider */
 export function configureApplicationInfraSqliteProvider(provider) {
-    return APPLICATION_INFRA_RUNTIME.database.configure(provider);
+    return APPLICATION_INFRA_HOST.configureSqliteProvider(provider);
 }
 
 /**
- * Ensure the process-wide application infra runtime is bound to the canonical Copilot SQLite provider.
+ * Ensure the process-owned application runtime is bound to the canonical Copilot SQLite provider.
  *
- * The DB module remains dynamically loaded so importing the composition root does not eagerly load better-sqlite3.
- * Concurrent hosts share one in-flight bootstrap; a later reset can bootstrap again because only in-flight work is
- * cached, never a completed provider result.
+ * The host keeps exactly one in-flight bootstrap and dynamically loads the DB module, preserving cold-start isolation
+ * while preventing provider activation after application infra teardown has begun.
  *
  * @returns {Promise<Readonly<{ configured: boolean; revision: number }>>}
  */
-export async function bootstrapApplicationInfraSqliteProvider() {
-    const current = APPLICATION_INFRA_RUNTIME.database.status();
-    if (current.configured) return current;
-    if (applicationInfraSqliteBootstrap) return applicationInfraSqliteBootstrap;
-
-    applicationInfraSqliteBootstrap = (async () => {
-        const { ensureCopilotDbDir, getCopilotDb } = await import('../db/sqlite.js');
-        await ensureCopilotDbDir();
-        configureApplicationInfraSqliteProvider(getCopilotDb);
-        // Fail during bootstrap rather than deferring a broken native binding/path until the first indexed read.
-        getCopilotDb();
-        return APPLICATION_INFRA_RUNTIME.database.status();
-    })();
-    try {
-        return await applicationInfraSqliteBootstrap;
-    } finally {
-        applicationInfraSqliteBootstrap = null;
-    }
+export function bootstrapApplicationInfraSqliteProvider() {
+    return APPLICATION_INFRA_HOST.bootstrapSqliteProvider();
 }
 
 export function readApplicationInfraSnapshot() {
-    return APPLICATION_INFRA_RUNTIME.lifecycleSnapshot();
+    return APPLICATION_INFRA_HOST.snapshot();
 }
 
 export function disposeApplicationInfra() {
-    return APPLICATION_INFRA_RUNTIME.dispose();
+    return APPLICATION_INFRA_HOST.dispose();
 }

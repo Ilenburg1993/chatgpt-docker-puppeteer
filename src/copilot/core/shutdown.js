@@ -1,6 +1,7 @@
 // @ts-check
 import { toError } from './error-handlers.js';
 import { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
+export { SHUTDOWN_PRIORITY };
 /**
  * src/copilot/core/shutdown.js
  *

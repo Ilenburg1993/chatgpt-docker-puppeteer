@@ -15,8 +15,8 @@ const BYTE_LINE_INDEX_MEDIUM_EXTENSION_MAX_BYTES = 1024 * 1024;
 const DEFAULT_BYTE_LINE_INDEX_MAX_LINES = 1_000_000;
 const HARD_BYTE_LINE_INDEX_MAX_LINES = 5_000_000;
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readByteLineIndexConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readByteLineIndexConfig(env = {}) {
     const configuredBytes = Number(env['COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_BYTES);
     const configuredLines = Number(env['COPILOT_IO_BYTE_LINE_INDEX_MAX_LINES'] ?? DEFAULT_BYTE_LINE_INDEX_MAX_LINES);
     return Object.freeze({

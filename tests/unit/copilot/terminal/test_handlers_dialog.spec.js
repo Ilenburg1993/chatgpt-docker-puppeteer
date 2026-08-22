@@ -6,10 +6,10 @@
  * integração real com ConversationStore.
  */
 
+import { adaptBetterSqliteDatabase, COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
-import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 /**
  * @param {import('better-sqlite3').Database} db
@@ -24,7 +24,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -45,11 +45,12 @@ const { _storeRef, hubRef } = vi.hoisted(() => ({
     hubRef: { isReady: true },
 }));
 
-// Mock conversationStore using vi.fn-based passthroughs
-vi.mock('#copilot/conversation-hub/store', async (importOriginal) => {
+// Mock the canonical conversation-hub surface used by presentation/conversation.
+vi.mock('#copilot/conversation-hub', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
+        conversationHub: hubRef,
         conversationStore: {
             listHubSessions: vi.fn((...args) => _storeRef.current?.listHubSessions(...args)),
             readTurns: vi.fn((...args) => _storeRef.current?.readTurns(...args)),
@@ -63,10 +64,6 @@ vi.mock('#copilot/conversation-hub/store', async (importOriginal) => {
         },
     };
 });
-
-vi.mock('#copilot/conversation-hub/hub', () => ({
-    conversationHub: hubRef,
-}));
 
 // Import handlers DEPOIS dos mocks
 const {
@@ -86,7 +83,7 @@ describe('handlers/dialog — sessions', () => {
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
-        store.init(testDb);
+        store.init(adaptBetterSqliteDatabase(testDb));
         _storeRef.current = store;
     });
 
@@ -122,7 +119,7 @@ describe('handlers/dialog — turns', () => {
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
-        store.init(testDb);
+        store.init(adaptBetterSqliteDatabase(testDb));
         _storeRef.current = store;
     });
 
@@ -156,7 +153,7 @@ describe('handlers/dialog — memory', () => {
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
-        store.init(testDb);
+        store.init(adaptBetterSqliteDatabase(testDb));
         _storeRef.current = store;
     });
 
@@ -205,7 +202,7 @@ describe('handlers/dialog — hub-health', () => {
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
-        store.init(testDb);
+        store.init(adaptBetterSqliteDatabase(testDb));
         _storeRef.current = store;
     });
 

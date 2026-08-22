@@ -12,6 +12,7 @@ import {
     refreshModelGatewayCatalog,
     SqliteModelGatewayCatalogStore,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });

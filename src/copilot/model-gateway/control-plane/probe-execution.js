@@ -6,14 +6,25 @@
  */
 
 import { createHash } from 'node:crypto';
-import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
 
 /**
- * Persistência mínima exigida pelo executor de probes. O executor não depende das demais responsabilidades do catálogo
- * SQLite; manter esta porta estrutural permite stores alternativos e harnesses determinísticos sem herdar a classe
- * inteira.
+ * Persistência mínima exigida pelo executor de probes. O control-plane depende desta porta estrutural, nunca da classe
+ * SQLite concreta; composition roots escolhem e injetam a implementação.
  *
- * @typedef {Pick<SqliteModelGatewayCatalogStore, 'readRuntimeProbeRunRecord' | 'writeRuntimeProbeRun'>} ModelGatewayProbeStore
+ * @typedef {{
+ *   readRuntimeProbeRunRecord:(runId:string)=>Promise<Record<string,unknown>|null>;
+ *   writeRuntimeProbeRun:(input:{
+ *     runId?:string;
+ *     probeProfile?:string|null;
+ *     accountScope?:string|null;
+ *     status?:string|null;
+ *     startedAt?:string|number|Date;
+ *     completedAt?:string|number|Date;
+ *     skippedCount?:number;
+ *     payload?:Record<string,unknown>;
+ *     results?:Record<string,unknown>[];
+ *   })=>Promise<{runId:string;probeResults:number;skippedResults:number;successCount:number;failureCount:number}>;
+ * }} ModelGatewayProbeStore
  */
 import {
     classifyByokProviderFailure,
@@ -65,7 +76,7 @@ import { redactModelGatewayAuditedValue } from '../secrets/index.js';
 
 /**
  * @callback ModelGatewayProbeAdmissionEvaluator
- * @param {ReturnType<typeof import('#copilot/sdk/session/provider').readConfiguredByokState>['summary']} summary
+ * @param {ReturnType<typeof import('#copilot/sdk/session').readConfiguredByokState>['summary']} summary
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  * @returns {ReturnType<typeof import('../probes/admission.js').evaluateModelGatewayProbeAdmission>}
@@ -340,14 +351,26 @@ function projectProbeReplay(replay, operationId, idempotencyKey) {
 
 /**
  * @param {string} idempotencyKey
- * @param {{ sqliteStore?: ModelGatewayProbeStore }} [options]
+ * @param {{ sqliteStore: ModelGatewayProbeStore }} options
  */
-export async function readModelGatewayProbeOperation(idempotencyKey, options = {}) {
+export async function readModelGatewayProbeOperation(idempotencyKey, options) {
     const operationId = createModelGatewayProbeOperationId(idempotencyKey);
-    const replay = await (options.sqliteStore ?? new SqliteModelGatewayCatalogStore()).readRuntimeProbeRunRecord(
-        operationId,
-    );
+    const sqliteStore = requireModelGatewayProbeStore(options?.sqliteStore);
+    const replay = await sqliteStore.readRuntimeProbeRunRecord(operationId);
     return replay ? projectProbeReplay(replay, operationId, idempotencyKey) : null;
+}
+
+/** @param {unknown} value @returns {ModelGatewayProbeStore} */
+function requireModelGatewayProbeStore(value) {
+    const store = /** @type {Partial<ModelGatewayProbeStore>|null|undefined} */ (value);
+    if (
+        !store ||
+        typeof store.readRuntimeProbeRunRecord !== 'function' ||
+        typeof store.writeRuntimeProbeRun !== 'function'
+    ) {
+        throw new TypeError('Model Gateway probe execution requires an explicit persistence store.');
+    }
+    return /** @type {ModelGatewayProbeStore} */ (store);
 }
 
 /**
@@ -359,8 +382,8 @@ export async function readModelGatewayProbeOperation(idempotencyKey, options = {
  *     idempotencyKey: string;
  *     source?: string;
  *     identity?: { routeProfile?: string | null; providerId?: string | null; providerModel?: string | null };
- *     deps?: {
- *         sqliteStore?: ModelGatewayProbeStore;
+ *     deps: {
+ *         sqliteStore: ModelGatewayProbeStore;
  *         evaluateAdmission?: ModelGatewayProbeAdmissionEvaluator;
  *         classifyProviderFailure?: typeof classifyByokProviderFailure;
  *         emit?: (event: Record<string, unknown>) => void;
@@ -383,7 +406,7 @@ export async function executeModelGatewayProbe(input) {
     if (!MODEL_GATEWAY_EXECUTABLE_PROBE_KINDS.includes(input.kind)) {
         throw new Error(`MODEL_GATEWAY_PROBE_KIND_UNSUPPORTED: ${input.kind}`);
     }
-    const sqliteStore = input.deps?.sqliteStore ?? new SqliteModelGatewayCatalogStore();
+    const sqliteStore = requireModelGatewayProbeStore(input.deps?.sqliteStore);
     const operationId = createModelGatewayProbeOperationId(input.idempotencyKey);
     const replay = await sqliteStore.readRuntimeProbeRunRecord(operationId);
     if (replay) return projectProbeReplay(replay, operationId, input.idempotencyKey);

@@ -19,7 +19,7 @@ if ! pgrep -f "vite" > /dev/null; then
 fi
 
 # Verify Vite is responding
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2> /dev/null || echo "000")
 
 if [ "$HTTP_CODE" != "200" ]; then
     echo "❌ Vite is not responding (HTTP $HTTP_CODE)"
@@ -52,9 +52,9 @@ chmod +x /tmp/open-dashboard.sh
 
 # Try to execute
 if command -v code &> /dev/null; then
-    code --command simpleBrowser.show "http://localhost:5173/dashboard/" 2>/dev/null && \
-      echo "✅ Simple Browser opened" || \
-      echo "⚠️  Could not auto-open. Follow manual instructions below."
+    code --command simpleBrowser.show "http://localhost:5173/dashboard/" 2> /dev/null \
+        && echo "✅ Simple Browser opened" \
+        || echo "⚠️  Could not auto-open. Follow manual instructions below."
 else
     echo "⚠️  'code' CLI not available in PATH"
 fi

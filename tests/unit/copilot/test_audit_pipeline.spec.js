@@ -12,11 +12,25 @@
  * - buildAuditingPermissionHandler: delegação ao base handler + fallback approveAll
  */
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildAuditingPermissionHandler, createAuditLog, isHighRiskTool } from '../../../src/copilot/audit/pipeline.js';
+
+/** @param {string} auditFile @param {string} toolAuditFile */
+function createAuditTestIo(auditFile, toolAuditFile) {
+    return createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'test.audit.pipeline',
+            exactPaths: [auditFile, toolAuditFile, `${toolAuditFile}.1`],
+            operations: ['append', 'move', 'read', 'stat'],
+            symlinkPolicy: 'deny',
+            durability: ['none'],
+        }),
+    );
+}
 
 // ─── Part 2: createAuditLog ──────────────────────────────────────────────────
 
@@ -25,12 +39,25 @@ describe('audit/pipeline › createAuditLog', () => {
     let auditLog;
 
     beforeEach(() => {
-        // Usa paths temporários que não serão escritos (flush testado separadamente)
+        // Paths alternativos são testáveis somente quando a authority correspondente é injetada explicitamente.
+        const suffix = Date.now();
+        const auditFile = `/tmp/.test-audit-pipeline-${suffix}.jsonl`;
+        const toolAuditFile = `/tmp/.test-tool-audit-pipeline-${suffix}.jsonl`;
         auditLog = createAuditLog({
             maxEntries: 5,
-            auditFile: '/tmp/.test-audit-pipeline-' + Date.now() + '.jsonl',
-            toolAuditFile: '/tmp/.test-tool-audit-pipeline-' + Date.now() + '.jsonl',
+            auditFile,
+            toolAuditFile,
+            io: createAuditTestIo(auditFile, toolAuditFile),
         });
+    });
+
+    it('rejeita paths alternativos sem IO já autorizado', () => {
+        expect(() =>
+            createAuditLog({
+                auditFile: '/tmp/unauthorized-audit.jsonl',
+                toolAuditFile: '/tmp/unauthorized-tool-audit.jsonl',
+            }),
+        ).toThrow('Alternate audit JSONL paths require already-authorized IO.');
     });
 
     it('record adiciona entrada com ts', () => {
@@ -164,7 +191,12 @@ describe('audit/pipeline › createAuditLog', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-pipeline-'));
         const auditFile = join(dir, 'audit.jsonl');
         const toolAuditFile = join(dir, 'tool-audit.jsonl');
-        const log = createAuditLog({ maxEntries: 5, auditFile, toolAuditFile });
+        const log = createAuditLog({
+            maxEntries: 5,
+            auditFile,
+            toolAuditFile,
+            io: createAuditTestIo(auditFile, toolAuditFile),
+        });
         try {
             log.record({ type: 'one' });
             log.record({ type: 'two' });
@@ -185,7 +217,12 @@ describe('audit/pipeline › createAuditLog', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-summary-'));
         const auditFile = join(dir, 'audit.jsonl');
         const toolAuditFile = join(dir, 'tool-audit.jsonl');
-        const log = createAuditLog({ maxEntries: 5, auditFile, toolAuditFile });
+        const log = createAuditLog({
+            maxEntries: 5,
+            auditFile,
+            toolAuditFile,
+            io: createAuditTestIo(auditFile, toolAuditFile),
+        });
         try {
             log.recordToolStart({ toolCallId: 'summary-1', toolName: 'read_file', args: { path: '/tmp/a' } });
             log.recordToolComplete({ toolCallId: 'summary-1', success: true, sessionId: 'session-a' });

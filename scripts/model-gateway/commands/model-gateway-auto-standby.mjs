@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import '../bootstrap-sqlite.mjs';
 
 import { SqliteModelGatewayCatalogStore, buildModelGatewayRuntimeStandbyPlan } from '#copilot/model-gateway';
 
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
 import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
@@ -11,14 +11,6 @@ import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
 const args = process.argv.slice(2);
 const readArg = createArgReader(args);
 const argSet = new Set(args);
-
-if (argSet.has('--json')) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout

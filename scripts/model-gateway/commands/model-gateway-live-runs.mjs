@@ -1,20 +1,12 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { SqliteModelGatewayCatalogStore } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 import { createArgReader } from '../cli-args.mjs';
 
 const args = process.argv.slice(2);
 const readArg = createArgReader(args);
 const argSet = new Set(args);
-
-if (argSet.has('--json')) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-runs.mjs [--json] [--limit N]

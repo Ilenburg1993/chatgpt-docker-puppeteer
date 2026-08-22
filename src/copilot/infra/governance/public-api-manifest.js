@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Public API contract for infra 2.0.
+ * Public API contract for Infra 2.1.
  *
  * Semantic metadata is reviewed manually. Nominal exports are regenerated only for already-approved aliases by
  * `node scripts/audit/rebaseline-infra-public-api.mjs --write`.
@@ -14,12 +14,70 @@
  * @typedef {'stable' | 'experimental' | 'deprecated'} PublicApiStability
  * @typedef {'none' | 'process' | 'runtime' | 'workspace'} PublicApiLifecycle
  * @typedef {'micro' | 'standard' | 'heavy'} PublicApiCostTier
- * @typedef {{ alias:string; target:string; audience:PublicApiAudience; privilege:PublicApiPrivilege; stability:PublicApiStability; lifecycle:PublicApiLifecycle; costTier:PublicApiCostTier; exports:readonly string[] }} PublicApiDescriptor
+ * @typedef {'none' | 'configured-bound' | 'workspace-bound' | 'diagnostic-only' | 'test-only'} PublicApiPathAuthority
+ * @typedef {{pathAuthority:PublicApiPathAuthority;acceptsOperationalRawPath:boolean;issuer:boolean}} PublicApiAuthorityMetadata
+ * @typedef {{ alias:string; target:string; audience:PublicApiAudience; privilege:PublicApiPrivilege; stability:PublicApiStability; lifecycle:PublicApiLifecycle; costTier:PublicApiCostTier; pathAuthority:PublicApiPathAuthority; acceptsOperationalRawPath:boolean; issuer:boolean; exports:readonly string[] }} PublicApiDescriptor
+ * @typedef {Omit<PublicApiDescriptor, keyof PublicApiAuthorityMetadata>} PublicApiDescriptorInput
  */
 
-/** @param {PublicApiDescriptor} entry @returns {PublicApiDescriptor} */
+/** @param {PublicApiPathAuthority} pathAuthority @param {boolean} [acceptsOperationalRawPath] @param {boolean} [issuer] @returns {PublicApiAuthorityMetadata} */
+function authority(pathAuthority, acceptsOperationalRawPath = false, issuer = false) {
+    return Object.freeze({ pathAuthority, acceptsOperationalRawPath, issuer });
+}
+
+/**
+ * Exhaustive semantic path-authority classification. This is deliberately separate from nominal exports so the
+ * rebaseliner can update symbol snapshots without gaining permission to rewrite authority semantics.
+ */
+const PUBLIC_API_AUTHORITY = Object.freeze({
+    '#copilot/infra/public/cache/keys': authority('none'),
+    '#copilot/infra/public/cache/tiering': authority('none'),
+    '#copilot/infra/public/composition/database/sqlite': authority('configured-bound', true, true),
+    '#copilot/infra/public/composition/filesystem/configured': authority('configured-bound', true, true),
+    '#copilot/infra/public/composition/process': authority('none'),
+    '#copilot/infra/public/composition/runtime': authority('workspace-bound', true, true),
+    '#copilot/infra/public/composition/workspace/authority': authority('workspace-bound', true, true),
+    '#copilot/infra/public/composition/workspace/indexing': authority('workspace-bound', true),
+    '#copilot/infra/public/composition/workspace/io': authority('workspace-bound', true),
+    '#copilot/infra/public/composition/workspace/mutation-io': authority('workspace-bound', true),
+    '#copilot/infra/public/composition/workspace/read-io': authority('workspace-bound', true),
+    '#copilot/infra/public/concurrency/bulk': authority('none'),
+    '#copilot/infra/public/database/sqlite': authority('none'),
+    '#copilot/infra/public/database/sqlite/model-gateway-schema': authority('none'),
+    '#copilot/infra/public/diagnostic/code-analysis': authority('none'),
+    '#copilot/infra/public/diagnostic/database/sqlite': authority('diagnostic-only', true, true),
+    '#copilot/infra/public/diagnostic/governance': authority('none'),
+    '#copilot/infra/public/diagnostic/indexing/parser': authority('diagnostic-only', true),
+    '#copilot/infra/public/diagnostic/indexing/scanner': authority('diagnostic-only', true),
+    '#copilot/infra/public/diagnostic/indexing/storage': authority('diagnostic-only', true),
+    '#copilot/infra/public/filesystem/invalidation/replay': authority('none'),
+    '#copilot/infra/public/filesystem/skills': authority('configured-bound', false, true),
+    '#copilot/infra/public/indexing/file-context': authority('none'),
+    '#copilot/infra/public/indexing/search': authority('none'),
+    '#copilot/infra/public/observability': authority('none'),
+    '#copilot/infra/public/observability/process': authority('none'),
+    '#copilot/infra/public/operations': authority('none'),
+    '#copilot/infra/public/persistence/json': authority('configured-bound'),
+    '#copilot/infra/public/persistence/jsonl': authority('configured-bound'),
+    '#copilot/infra/public/persistence/jsonl/queue': authority('none'),
+    '#copilot/infra/public/platform/buffer': authority('none'),
+    '#copilot/infra/public/platform/http-response': authority('none'),
+    '#copilot/infra/public/platform/node': authority('none'),
+    '#copilot/infra/public/platform/process-output': authority('none'),
+    '#copilot/infra/public/platform/process/executable': authority('none'),
+    '#copilot/infra/public/platform/process/introspection': authority('none'),
+    '#copilot/infra/public/policy': authority('none'),
+    '#copilot/infra/public/telemetry': authority('none'),
+    '#copilot/infra/public/testing': authority('none'),
+    '#copilot/infra/public/testing/database/sqlite': authority('test-only', true, true),
+    '#copilot/infra/public/testing/indexing/sqlite': authority('none'),
+});
+
+/** @param {PublicApiDescriptorInput} entry @returns {PublicApiDescriptor} */
 function definePublicApi(entry) {
-    return Object.freeze({ ...entry, exports: Object.freeze([...entry.exports]) });
+    const authorityMetadata = PUBLIC_API_AUTHORITY[/** @type {keyof typeof PUBLIC_API_AUTHORITY} */ (entry.alias)];
+    if (!authorityMetadata) throw new Error(`Missing public API authority classification: ${entry.alias}`);
+    return Object.freeze({ ...entry, ...authorityMetadata, exports: Object.freeze([...entry.exports]) });
 }
 
 export const INFRA_PUBLIC_API_COST_TIER_LIMITS = Object.freeze({
@@ -50,6 +108,16 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         exports: ['aggregateIoCacheTierStats', 'buildIoCacheTierPlan'],
     }),
     definePublicApi({
+        alias: '#copilot/infra/public/composition/database/sqlite',
+        target: './src/copilot/infra/public/composition/database/sqlite/index.js',
+        audience: 'composition',
+        privilege: 'lifecycle',
+        stability: 'stable',
+        lifecycle: 'runtime',
+        costTier: 'micro',
+        exports: ['createApplicationSqliteRuntime'],
+    }),
+    definePublicApi({
         alias: '#copilot/infra/public/composition/filesystem/configured',
         target: './src/copilot/infra/public/composition/filesystem/configured/index.js',
         audience: 'composition',
@@ -58,16 +126,6 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         lifecycle: 'none',
         costTier: 'heavy',
         exports: ['createConfiguredFsGrant', 'createConfiguredFsIo'],
-    }),
-    definePublicApi({
-        alias: '#copilot/infra/public/composition/operation',
-        target: './src/copilot/infra/public/composition/operation/index.js',
-        audience: 'composition',
-        privilege: 'pure',
-        stability: 'stable',
-        lifecycle: 'none',
-        costTier: 'micro',
-        exports: ['createInfraOperationContext'],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/composition/process',
@@ -108,16 +166,6 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         lifecycle: 'workspace',
         costTier: 'heavy',
         exports: ['createWorkspaceIndexing'],
-    }),
-    definePublicApi({
-        alias: '#copilot/infra/public/composition/workspace/instance',
-        target: './src/copilot/infra/public/composition/workspace/instance/index.js',
-        audience: 'composition',
-        privilege: 'authority',
-        stability: 'stable',
-        lifecycle: 'workspace',
-        costTier: 'heavy',
-        exports: ['createWorkspaceInfra'],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/composition/workspace/io',
@@ -166,14 +214,45 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         ],
     }),
     definePublicApi({
-        alias: '#copilot/infra/public/concurrency/locks',
-        target: './src/copilot/infra/public/concurrency/locks/index.js',
+        alias: '#copilot/infra/public/database/sqlite',
+        target: './src/copilot/infra/public/database/sqlite/index.js',
         audience: 'runtime',
         privilege: 'mutate',
         stability: 'stable',
-        lifecycle: 'process',
+        lifecycle: 'none',
+        costTier: 'micro',
+        exports: ['runSqliteTransaction'],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/database/sqlite/model-gateway-schema',
+        target: './src/copilot/infra/public/database/sqlite/model-gateway-schema/index.js',
+        audience: 'runtime',
+        privilege: 'pure',
+        stability: 'stable',
+        lifecycle: 'none',
+        costTier: 'micro',
+        exports: [
+            'MODEL_GATEWAY_SQLITE_SCHEMA_SQL',
+            'MODEL_GATEWAY_SQLITE_SCHEMA_VERSION',
+            'MODEL_GATEWAY_SQLITE_TABLES',
+        ],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/diagnostic/database/sqlite',
+        target: './src/copilot/infra/public/diagnostic/database/sqlite/index.js',
+        audience: 'diagnostic',
+        privilege: 'lifecycle',
+        stability: 'stable',
+        lifecycle: 'none',
         costTier: 'standard',
-        exports: ['withIoResourceLock'],
+        exports: [
+            'adaptBetterSqliteDatabase',
+            'adaptNodeSqliteDatabase',
+            'createBetterSqliteApplicationRuntime',
+            'createBetterSqliteProvider',
+            'createNodeSqliteApplicationRuntime',
+            'createNodeSqliteInfraRuntime',
+        ],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/diagnostic/code-analysis',
@@ -208,6 +287,7 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'INFRA_PUBLIC_API_MANIFEST',
             'buildInfraMutableStateReport',
             'buildInfraPublicApiCostReport',
+            'buildInfraPublicAuthorityReport',
             'buildStaticImportClosure',
         ],
     }),
@@ -296,55 +376,6 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         exports: ['readCrossProcessInvalidationReplay'],
     }),
     definePublicApi({
-        alias: '#copilot/infra/public/filesystem/mutation',
-        target: './src/copilot/infra/public/filesystem/mutation/index.js',
-        audience: 'runtime',
-        privilege: 'mutate',
-        stability: 'stable',
-        lifecycle: 'none',
-        costTier: 'heavy',
-        exports: [
-            'copyFileLocked',
-            'deleteFileLocked',
-            'moveFileLocked',
-            'patchTextBatchLocked',
-            'patchTextLocked',
-            'removePathLocked',
-        ],
-    }),
-    definePublicApi({
-        alias: '#copilot/infra/public/filesystem/read',
-        target: './src/copilot/infra/public/filesystem/read/index.js',
-        audience: 'runtime',
-        privilege: 'read',
-        stability: 'stable',
-        lifecycle: 'runtime',
-        costTier: 'heavy',
-        exports: [
-            'createStaleSnapshotError',
-            'listDirectoryNamesFresh',
-            'lstatPath',
-            'lstatPathSnapshot',
-            'readBytes',
-            'readBytesFileRangeSnapshot',
-            'readBytesFileSnapshot',
-            'readBytesFresh',
-            'readBytesRangeFresh',
-            'readLines',
-            'readText',
-            'readTextChunks',
-            'readTextChunksStream',
-            'readTextFileSnapshot',
-            'readTextFresh',
-            'readTextLineChunks',
-            'readTextLineChunksStream',
-            'readTextLinesSnapshot',
-            'sameFileSnapshot',
-            'statPath',
-            'statPathSnapshot',
-        ],
-    }),
-    definePublicApi({
         alias: '#copilot/infra/public/filesystem/skills',
         target: './src/copilot/infra/public/filesystem/skills/index.js',
         audience: 'runtime',
@@ -353,16 +384,6 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         lifecycle: 'none',
         costTier: 'micro',
         exports: ['readConfiguredSkillCatalog'],
-    }),
-    definePublicApi({
-        alias: '#copilot/infra/public/filesystem/write',
-        target: './src/copilot/infra/public/filesystem/write/index.js',
-        audience: 'runtime',
-        privilege: 'mutate',
-        stability: 'stable',
-        lifecycle: 'runtime',
-        costTier: 'heavy',
-        exports: ['appendTextLocked', 'mkdirPathLocked', 'writeFileAtomic'],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/indexing/file-context',
@@ -402,6 +423,16 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         exports: ['readIoRuntimeHealthSnapshot'],
     }),
     definePublicApi({
+        alias: '#copilot/infra/public/observability/process',
+        target: './src/copilot/infra/public/observability/process/index.js',
+        audience: 'runtime',
+        privilege: 'read',
+        stability: 'experimental',
+        lifecycle: 'process',
+        costTier: 'heavy',
+        exports: ['readIoProcessHealthSnapshot'],
+    }),
+    definePublicApi({
         alias: '#copilot/infra/public/operations',
         target: './src/copilot/infra/public/operations/index.js',
         audience: 'runtime',
@@ -415,30 +446,22 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'applyIoChangeSet',
             'beginIoChangeSet',
             'buildIoMutationAuditRecord',
-            'buildIoRollbackPlan',
-            'cleanupRollbackSidecars',
             'completeIoOperationEnvelope',
             'createIoOperationEnvelope',
-            'createIoRollbackToken',
-            'executeIoRollbackToken',
             'failIoChangeSet',
             'failIoOperationEnvelope',
-            'listRollbackSidecars',
-            'parseIoRollbackToken',
             'rollbackIoChangeSet',
-            'serializeIoRollbackToken',
-            'verifyIoRollbackToken',
         ],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/persistence/json',
         target: './src/copilot/infra/public/persistence/json/index.js',
-        audience: 'runtime',
+        audience: 'composition',
         privilege: 'read-write',
-        stability: 'stable',
+        stability: 'experimental',
         lifecycle: 'none',
-        costTier: 'heavy',
-        exports: ['fileExists', 'readJson', 'writeJson'],
+        costTier: 'micro',
+        exports: ['createBoundJsonStore'],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/persistence/jsonl',
@@ -447,8 +470,13 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         privilege: 'read-write',
         stability: 'stable',
         lifecycle: 'runtime',
-        costTier: 'heavy',
-        exports: ['createJsonlFileWriter', 'readJsonlTail', 'readJsonlTailTrusted', 'repairJsonlTrailingPartial'],
+        costTier: 'micro',
+        exports: [
+            'createBoundJsonlFileWriter',
+            'createBoundJsonlTailReader',
+            'parseJsonlTextRecords',
+            'trimJsonlTextEntries',
+        ],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/persistence/jsonl/queue',
@@ -502,25 +530,8 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'enableCopilotNodeCompileCache',
             'flushCopilotNodeCompileCache',
             'getCopilotNodeCompileCacheHealth',
+            'readCopilotNodeCompileCacheConfig',
             'withCopilotNodeCompileCacheEnv',
-        ],
-    }),
-    definePublicApi({
-        alias: '#copilot/infra/public/platform/node/filesystem',
-        target: './src/copilot/infra/public/platform/node/filesystem/index.js',
-        audience: 'runtime',
-        privilege: 'mutate',
-        stability: 'stable',
-        lifecycle: 'none',
-        costTier: 'micro',
-        exports: [
-            'assertSuccessfulSync',
-            'normalizeIoDurability',
-            'shouldFlushFile',
-            'shouldSyncDirectory',
-            'syncFileBestEffort',
-            'syncFileHandleBestEffort',
-            'syncParentDirectoryBestEffort',
         ],
     }),
     definePublicApi({
@@ -534,6 +545,31 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         exports: ['createBoundedProcessOutputCapture'],
     }),
     definePublicApi({
+        alias: '#copilot/infra/public/platform/process/executable',
+        target: './src/copilot/infra/public/platform/process/executable/index.js',
+        audience: 'runtime',
+        privilege: 'read',
+        stability: 'stable',
+        lifecycle: 'none',
+        costTier: 'micro',
+        exports: ['resolveExecutable'],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/platform/process/introspection',
+        target: './src/copilot/infra/public/platform/process/introspection/index.js',
+        audience: 'runtime',
+        privilege: 'read',
+        stability: 'stable',
+        lifecycle: 'none',
+        costTier: 'micro',
+        exports: [
+            'DEFAULT_LINUX_PROCESS_CMDLINE_MAX_BYTES',
+            'MAX_LINUX_PROCESS_CMDLINE_MAX_BYTES',
+            'readLinuxProcessArgv',
+            'readProcessResourceSnapshot',
+        ],
+    }),
+    definePublicApi({
         alias: '#copilot/infra/public/policy',
         target: './src/copilot/infra/public/policy/index.js',
         audience: 'runtime',
@@ -542,11 +578,15 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         lifecycle: 'none',
         costTier: 'micro',
         exports: [
+            'DEFAULT_BLOCKED_PATH_SEGMENTS',
+            'DEFAULT_BLOCKED_READ_PATH_PATTERNS',
+            'DEFAULT_BLOCKED_WRITE_PATH_PATTERNS',
             'DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES',
             'DEFAULT_IO_SEARCH_TIMEOUT_MS',
             'DEFAULT_PROCESS_MAX_BUFFER_BYTES',
             'DEFAULT_PROCESS_TIMEOUT_MS',
             'IO_CAPABILITY',
+            'IO_PATH_POLICY_VERSION',
             'IO_RISK',
             'MIN_BUFFER_BYTES',
             'MIN_TIMEOUT_MS',
@@ -566,7 +606,6 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'normalizePathResourceKey',
             'normalizePositiveIntegerBudget',
             'normalizeWorkspaceRoot',
-            'readEnvPositiveIntegerBudget',
             'readMutationAppliedState',
             'resolveIoSearchBudget',
             'resolveProcessExecutionBudget',
@@ -611,6 +650,35 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'resetValidatedMutableWorkspacePathStatsForTest',
             'resetValidatedReadWorkspacePathStatsForTest',
         ],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/testing/database/sqlite',
+        target: './src/copilot/infra/public/testing/database/sqlite/index.js',
+        audience: 'test',
+        privilege: 'lifecycle',
+        stability: 'experimental',
+        lifecycle: 'none',
+        costTier: 'standard',
+        exports: [
+            'COPILOT_MIGRATIONS',
+            'adaptBetterSqliteDatabase',
+            'adaptNodeSqliteDatabase',
+            'createBetterSqliteApplicationRuntime',
+            'createBetterSqliteProvider',
+            'createNodeSqliteApplicationRuntime',
+            'createNodeSqliteInfraRuntime',
+            'migrateCopilotSqliteDatabase',
+        ],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/testing/indexing/sqlite',
+        target: './src/copilot/infra/public/testing/indexing/sqlite/index.js',
+        audience: 'test',
+        privilege: 'mutate',
+        stability: 'experimental',
+        lifecycle: 'none',
+        costTier: 'standard',
+        exports: ['IO_INDEX_SCHEMA_VERSION', 'ensureIoIndexSchema'],
     }),
 ]);
 

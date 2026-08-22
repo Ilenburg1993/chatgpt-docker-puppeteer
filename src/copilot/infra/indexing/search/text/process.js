@@ -22,6 +22,7 @@ import { buildGrepArgs } from './grep.js';
  * @param {{ timeoutMs: number; maxBufferBytes: number }} ioSearchBudget
  * @param {ReturnType<typeof import('../shared/index.js').normalizeSearchWindow>} searchWindow
  * @param {boolean} ripgrepAvailable
+ * @param {Readonly<Record<string,string>>} subprocessEnvironment
  * @param {boolean} indexFallback
  * @param {string | null} indexFallbackReason
  * @param {BuildSearchIo} buildSearchIo
@@ -33,6 +34,7 @@ export async function searchTextViaSubprocess(
     ioSearchBudget,
     searchWindow,
     ripgrepAvailable,
+    subprocessEnvironment,
     indexFallback,
     indexFallbackReason,
     buildSearchIo,
@@ -65,6 +67,7 @@ export async function searchTextViaSubprocess(
                     cwd: options.workspaceRoot,
                     timeout: ioSearchBudget.timeoutMs,
                     maxBuffer: ioSearchBudget.maxBufferBytes,
+                    env: subprocessEnvironment,
                     collectStdout: false,
                     onStdoutLine: (line) => streamingCollector.accept(line),
                 },
@@ -144,6 +147,7 @@ export async function searchTextViaSubprocess(
             cwd: options.workspaceRoot,
             timeout: ioSearchBudget.timeoutMs,
             maxBuffer: ioSearchBudget.maxBufferBytes,
+            env: subprocessEnvironment,
             collectStdout: false,
             onStdoutLine: (line) => streamingCollector.accept(line),
         });

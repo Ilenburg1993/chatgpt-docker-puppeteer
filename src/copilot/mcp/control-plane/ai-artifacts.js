@@ -9,10 +9,8 @@
  * @module copilot/mcp/control-plane/ai-artifacts
  */
 
-import { getApplicationInfraRuntime } from '#copilot/boot';
+import { getApplicationInfraRuntime, getApplicationWorkspaceInfra } from '#copilot/boot';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { removePathLocked } from '#copilot/infra/public/filesystem/mutation';
-import { cleanupRollbackSidecars } from '#copilot/infra/public/operations';
 import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
 
@@ -38,7 +36,8 @@ const REPORT_CACHE_TTL_MS = 5 * 1000;
 /** @typedef {{ name: string; stats: import('node:fs').Stats }} AiArtifactDirEntry */
 /** @typedef {ReturnType<typeof createConfiguredFsIo>} AiArtifactsReadIo */
 /** @typedef {ReturnType<typeof getApplicationInfraRuntime>['config']['rollback']} AiArtifactsRollbackPolicy */
-/** @typedef {{ workspaceRoot:string; aiDir:string; jobsDir:string; cloudflareDir:string; mcpDir:string; rollbackDir:string; rollbackPolicy:AiArtifactsRollbackPolicy; io:AiArtifactsReadIo }} AiArtifactsContext */
+/** @typedef {{ cleanupSidecars:(options?:{nowMs?:number;scanLimit?:number;maxEntries?:number;maxBytes?:number;purgeAll?:boolean;enforceBudget?:boolean})=>Promise<Record<string,unknown>> }} AiArtifactsRollbackMaintenance */
+/** @typedef {{ workspaceRoot:string; aiDir:string; jobsDir:string; cloudflareDir:string; mcpDir:string; rollbackDir:string; rollbackPolicy:AiArtifactsRollbackPolicy; rollbackMaintenance:AiArtifactsRollbackMaintenance|null; io:AiArtifactsReadIo }} AiArtifactsContext */
 /** @typedef {{ cachedReport: { key:string; expiresAt:number; report:Record<string,unknown> } | null }} AiArtifactsCacheState */
 
 /** @param {AiArtifactsContext} context @param {string} directory @returns {Promise<AiArtifactDirEntry[]>} */
@@ -73,7 +72,7 @@ async function statSafe(context, filePath) {
  * Build one AI-artifact runtime around already-authorized metadata IO. The factory cannot mint or widen filesystem
  * authority: workspace identity, rollback policy and cache lifetime are fixed once by the composition root.
  *
- * @param {{ workspaceRoot:string; rollbackPolicy:AiArtifactsRollbackPolicy; io:AiArtifactsReadIo }} binding
+ * @param {{ workspaceRoot:string; rollbackPolicy:AiArtifactsRollbackPolicy; rollbackMaintenance?:AiArtifactsRollbackMaintenance|null; io:AiArtifactsReadIo }} binding
  */
 export function createAiArtifactsRuntime(binding) {
     const workspaceRoot = path.resolve(binding.workspaceRoot);
@@ -87,6 +86,7 @@ export function createAiArtifactsRuntime(binding) {
         mcpDir: path.join(aiDir, 'mcp'),
         rollbackDir: path.resolve(binding.rollbackPolicy.directory),
         rollbackPolicy: binding.rollbackPolicy,
+        rollbackMaintenance: binding.rollbackMaintenance ?? null,
         io: binding.io,
     });
     /** @type {AiArtifactsCacheState} */
@@ -331,7 +331,7 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
         for (const artifact of selected) {
             if (!STRICT_UUID_JOB_ARTIFACT_RE.test(artifact.name)) continue;
             try {
-                await removePathLocked(path.join(jobsDir, artifact.name), { force: false });
+                await context.io.deleteFile(path.join(jobsDir, artifact.name));
                 deleted.push(artifact);
             } catch (error) {
                 failures.push({
@@ -341,18 +341,23 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
             }
         }
         if (purgeDisabledRollback && !rollbackPolicy.enabled && selectedRollback.length > 0) {
-            rollbackCleanup = await cleanupRollbackSidecars({
-                policy: rollbackPolicy,
-                directory: rollbackDir,
-                purgeAll: true,
-                enforceBudget: false,
-                scanLimit: maxDeleteCount,
-            });
-            if (rollbackCleanup.failed > 0) {
+            if (!context.rollbackMaintenance) {
                 failures.push({
                     name: 'rollback',
-                    error: `Falha ao remover ${rollbackCleanup.failed} sidecar(s) de rollback.`,
+                    error: 'Rollback maintenance capability não foi vinculada a este runtime de artifacts.',
                 });
+            } else {
+                rollbackCleanup = await context.rollbackMaintenance.cleanupSidecars({
+                    purgeAll: true,
+                    enforceBudget: false,
+                    scanLimit: maxDeleteCount,
+                });
+                if (Number(rollbackCleanup['failed'] ?? 0) > 0) {
+                    failures.push({
+                        name: 'rollback',
+                        error: `Falha ao remover ${String(rollbackCleanup['failed'])} sidecar(s) de rollback.`,
+                    });
+                }
             }
         }
     }
@@ -411,12 +416,18 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
 
 const DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT = getMcpWorkspaceRoot();
 const DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY = getApplicationInfraRuntime().config.rollback;
+const DEFAULT_AI_ARTIFACTS_ROLLBACK_MAINTENANCE = getApplicationWorkspaceInfra(
+    DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT,
+).rollback;
+if (!DEFAULT_AI_ARTIFACTS_ROLLBACK_MAINTENANCE) {
+    throw new Error('Default MCP workspace is missing its rollback maintenance capability.');
+}
 const DEFAULT_AI_ARTIFACTS_DIR = path.join(DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT, 'src/copilot/.ai');
 const DEFAULT_AI_ARTIFACTS_IO = createConfiguredFsIo(
     createConfiguredFsGrant({
         id: 'mcp.control-plane.ai-artifacts',
         roots: [DEFAULT_AI_ARTIFACTS_DIR, path.resolve(DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY.directory)],
-        operations: ['list', 'stat'],
+        operations: ['delete', 'list', 'stat'],
         symlinkPolicy: 'deny',
         durability: ['file-and-directory'],
     }),
@@ -424,6 +435,7 @@ const DEFAULT_AI_ARTIFACTS_IO = createConfiguredFsIo(
 const DEFAULT_AI_ARTIFACTS_RUNTIME = createAiArtifactsRuntime({
     workspaceRoot: DEFAULT_AI_ARTIFACTS_WORKSPACE_ROOT,
     rollbackPolicy: DEFAULT_AI_ARTIFACTS_ROLLBACK_POLICY,
+    rollbackMaintenance: DEFAULT_AI_ARTIFACTS_ROLLBACK_MAINTENANCE,
     io: DEFAULT_AI_ARTIFACTS_IO,
 });
 

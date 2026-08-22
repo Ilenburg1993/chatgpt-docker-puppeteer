@@ -1,11 +1,10 @@
 // @ts-check
 /** Configuration/admission/path policy for the SQLite L2 cache. */
-import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import path from 'node:path';
 
-const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
-const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
-const DEFAULT_MIN_BYTES = readEnvNonNegativeInt('IO_L2_CACHE_MIN_BYTES', 0);
+const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_MAX_ENTRIES = 100_000;
+const DEFAULT_MIN_BYTES = 0;
 const MIN_TOUCH_INTERVAL_MS = 1_000;
 const MAX_TOUCH_INTERVAL_MS = 30_000;
 const DEFAULT_SET_BATCH_WINDOW_MS = 25;

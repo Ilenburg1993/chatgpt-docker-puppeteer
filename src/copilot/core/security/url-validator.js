@@ -9,7 +9,7 @@
  *
  * Prevenção de SSRF alinhada com OWASP A10 (Server-Side Request Forgery).
  *
- * L0 (core) — não importa camadas superiores. Lê WEBHOOK_ALLOW_PRIVATE_HOSTS de process.env.
+ * L0 (core) — não importa camadas superiores. O default de segurança vem da policy process-owned do próprio Core.
  *
  * @module copilot/core/security/url-validator
  * @see EventBus
@@ -17,6 +17,7 @@
 
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { ConfigError } from '../errors.js';
+import { getCoreProcessPolicyConfig } from '../process-policy.js';
 
 /**
  * Seletor injetável para testes da resolução DNS usada por `checkResolvedIp`.
@@ -26,13 +27,6 @@ import { ConfigError } from '../errors.js';
 export const dnsResolver = {
     lookup: dnsLookup,
 };
-
-/**
- * Leitura direta de env para evitar import de config (L2) em core (L0).
- *
- * @type {boolean}
- */
-const WEBHOOK_ALLOW_PRIVATE_HOSTS = process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] === 'true';
 
 // ─── Patterns de IP privado/loopback ────────────────────────────────────────
 
@@ -181,7 +175,7 @@ export function validateWebhookUrl(url, opts) {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         throw new ConfigError(`[URLValidator] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
     }
-    const allowPrivate = opts?.allowPrivate ?? WEBHOOK_ALLOW_PRIVATE_HOSTS;
+    const allowPrivate = opts?.allowPrivate ?? getCoreProcessPolicyConfig().urlSecurity.allowPrivateWebhookHosts;
     if (!allowPrivate) {
         const result = validateUrl(parsed);
         if (!result.safe) {
@@ -206,7 +200,7 @@ export function validateWebhookUrl(url, opts) {
  * @throws {ConfigError} Se o IP resolvido for privado/loopback
  */
 export async function checkResolvedIp(hostname, opts) {
-    const allowPrivate = opts?.allowPrivate ?? WEBHOOK_ALLOW_PRIVATE_HOSTS;
+    const allowPrivate = opts?.allowPrivate ?? getCoreProcessPolicyConfig().urlSecurity.allowPrivateWebhookHosts;
     if (allowPrivate) return;
 
     /** @type {{ address: string; family: number }[]} */

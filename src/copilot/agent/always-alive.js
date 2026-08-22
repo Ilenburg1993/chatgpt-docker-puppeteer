@@ -7,7 +7,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { EventEmitter } from 'node:events';
 

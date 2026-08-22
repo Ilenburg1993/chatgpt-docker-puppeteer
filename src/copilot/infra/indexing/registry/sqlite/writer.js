@@ -8,8 +8,9 @@
  * @module copilot/infra/indexing/registry/sqlite/writer
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
+import { runSqliteTransactionOrDirect } from '#copilot/infra/internal/database/transaction/optional';
 import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser/parse';
 import { sha256 } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
@@ -21,7 +22,7 @@ import { buildIndexPathTreeRange, normalizeIndexPath, normalizeRelativePath } fr
 
 /**
  * @param {{
- *     db: { transaction?: Function };
+ *     db: import('#copilot/infra/internal/database/port').SqliteDatabasePort;
  *     statements: IoIndexStatements;
  *     stats: import('./types.js').IoIndexRuntimeStats;
  *     now: () => number;
@@ -87,8 +88,7 @@ export function createIoIndexWriter({
                 pruned += 1;
             }
         };
-        if (typeof db.transaction === 'function') db.transaction(prune)();
-        else prune();
+        runSqliteTransactionOrDirect(db, prune);
         return pruned;
     }
 
@@ -211,8 +211,7 @@ export function createIoIndexWriter({
                 );
             }
         };
-        if (typeof db.transaction === 'function') db.transaction(commit)();
-        else commit();
+        runSqliteTransactionOrDirect(db, commit);
 
         stats.indexed += 1;
         publishIoLifecycleEvent('index', 'file.indexed', {

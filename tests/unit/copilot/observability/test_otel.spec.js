@@ -14,7 +14,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 /** @type {Record<string, any>} */
 let envOverrides = {};
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,

@@ -1,23 +1,35 @@
 // @ts-check
 /**
- * Snapshot operacional de I/O local: cache tiers, parser e scopes ativos.
+ * Runtime-owned IO health projection.
  *
- * Este módulo só projeta estado; não executa leitura/escrita e não altera o funcionamento dos caches.
+ * Process-global policies, locks and aggregate authority counters intentionally do not appear here. They belong to
+ * `readIoProcessHealthSnapshot()`. This function reads only state owned by the supplied InfraRuntime and its workspaces.
  *
  * @module copilot/infra/observability/health
  */
 
-import { getIoPathPolicyCacheStats } from '#copilot/core';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from '#copilot/infra/internal/cache';
-import { getIoLockStats } from '#copilot/infra/internal/concurrency/locks';
-import {
-    getValidatedMutableWorkspacePathStats,
-    getValidatedReadWorkspacePathStats,
-} from '#copilot/infra/internal/filesystem/workspace';
 import { readScopeRuntimeRegistrySnapshot } from '#copilot/infra/internal/indexing/context';
 import { buildIoRuntimeAlerts } from './alerts.js';
 import { readCoherenceHealthStats } from './coherence-health.js';
 import { safeHealthCall } from './safe-call.js';
+
+const MAX_WORKSPACE_AUTHORITY_SAMPLE = 20;
+
+/** @param {ReturnType<typeof import('../composition/runtime/index.js').createInfraRuntime>['listWorkspaces'] extends () => infer T ? T : never} workspaces */
+function projectWorkspaceAuthorities(workspaces) {
+    const sample = workspaces.slice(0, MAX_WORKSPACE_AUTHORITY_SAMPLE).map((workspace) =>
+        Object.freeze({
+            workspaceId: workspace.workspaceId,
+            ...workspace.authorityStats(),
+        }),
+    );
+    return Object.freeze({
+        ownerCount: workspaces.length,
+        sample: Object.freeze(sample),
+        truncated: workspaces.length > sample.length,
+    });
+}
 
 /**
  * Read a side-effect-free health projection from an explicitly owned InfraRuntime.
@@ -37,12 +49,15 @@ export function readIoRuntimeHealthSnapshot(runtime) {
     const l2 = runtime.coherence.l2.snapshot();
     const l3 = { enabled: false, reason: 'reserved-for-multi-runtime-scale' };
     const aggregate = aggregateIoCacheTierStats({ l1, l2, l3 });
-    const workspaceScopeRegistry = safeHealthCall(readScopeRuntimeRegistrySnapshot, {
-        activeRuntimes: 0,
-        activeScopes: 0,
-        runtimes: [],
-        scopes: [],
-    });
+    const workspaceScopeRegistry = safeHealthCall(
+        () => readScopeRuntimeRegistrySnapshot({ runtimeOwnerId: runtime.runtimeId }),
+        {
+            activeProbes: 0,
+            activeScopes: 0,
+            probes: [],
+            scopes: [],
+        },
+    );
     const allScopeStats = [...workspaceScopeRegistry.scopes];
     const ids = allScopeStats.map((stats) => stats.sessionId);
     const recent = allScopeStats.slice(0, 10);
@@ -57,22 +72,23 @@ export function readIoRuntimeHealthSnapshot(runtime) {
     const parser = runtime.parserCache.snapshot();
     const index = runtime.indexRegistry.status();
     const telemetry = runtime.telemetry.snapshot();
-    const locks = getIoLockStats();
     const coherence = readCoherenceHealthStats(runtime);
     const { alerts, scopeStatusCounts } = buildIoRuntimeAlerts({
         scopes: allScopeStats,
         l2: /** @type {Record<string, unknown>} */ (l2),
         circuitOpen: l2State.circuitOpen,
+        indexAutoRefresh: /** @type {Record<string, unknown>} */ (index.autoRefresh ?? {}),
         mutationState: telemetry.mutationState,
         durability: telemetry.durability,
-        locks,
         coherence: /** @type {ReturnType<typeof readCoherenceHealthStats> & Record<string, unknown>} */ (coherence),
         advisoryBudget: telemetry.advisoryBudget,
     });
-    const externalWatchers = runtime.listWorkspaces().flatMap((workspace) => workspace.externalWatchStats());
+    const workspaces = runtime.listWorkspaces();
 
     return Object.freeze({
         generatedAt: Date.now(),
+        scope: /** @type {const} */ ('runtime'),
+        status: alerts.length > 0 ? /** @type {const} */ ('degraded') : /** @type {const} */ ('healthy'),
         runtimeId: runtime.runtimeId,
         cache: {
             l1,
@@ -82,23 +98,7 @@ export function readIoRuntimeHealthSnapshot(runtime) {
             lineOffsets: readSnapshot.lineOffsets,
             byteLineIndex: readSnapshot.byteLineIndex,
             readHashes: readSnapshot.hashes,
-            pathPolicy: safeHealthCall(getIoPathPolicyCacheStats, {
-                hits: 0,
-                misses: 0,
-                sets: 0,
-                expirations: 0,
-                evictions: 0,
-                bypasses: 0,
-                invalidationEvents: 0,
-                invalidatedEntries: 0,
-                size: 0,
-                ttlMs: 0,
-                maxEntries: 0,
-                policyVersion: 'unavailable',
-            }),
             coherence,
-            validatedReadPath: getValidatedReadWorkspacePathStats(),
-            validatedMutablePath: getValidatedMutableWorkspacePathStats(),
             aggregate,
             plan: buildIoCacheTierPlan({
                 l1Enabled: true,
@@ -113,7 +113,6 @@ export function readIoRuntimeHealthSnapshot(runtime) {
         durability: telemetry.durability,
         mutationState: telemetry.mutationState,
         advisoryBudget: telemetry.advisoryBudget,
-        locks,
         alerts,
         scopes: {
             active: ids.length,
@@ -122,8 +121,9 @@ export function readIoRuntimeHealthSnapshot(runtime) {
             recent,
         },
         workspaces: Object.freeze({
-            count: runtime.listWorkspaces().length,
-            externalWatchers: Object.freeze(externalWatchers),
+            count: workspaces.length,
+            authorities: projectWorkspaceAuthorities(workspaces),
+            externalWatch: coherence.externalWatch,
         }),
         coherenceRuntime: coherenceSnapshot,
     });

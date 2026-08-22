@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
-    applyModelGatewaySelectionTraceRetention,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
@@ -13,16 +12,17 @@ import {
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
+    createModelGatewaySelectionTraceStore,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
-    persistModelGatewaySelectionDecisionTrace,
     renderModelGatewayLocalProviderOptInGuidance,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
@@ -104,17 +104,22 @@ const pruneTraces =
     argSet.has('--prune-traces') || argSet.has('--trace-retention-preview') || argSet.has('--trace-retention-apply');
 const traceRetentionApply = argSet.has('--trace-retention-apply');
 const traceRetentionMax = Number.parseInt(readArg('--trace-retention-max', '100'), 10);
+const traceStore = createModelGatewaySelectionTraceStore({
+    directory: traceDir,
+    io: createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'scripts.model-gateway.effective-selection.trace-store',
+            roots: [traceDir],
+            operations: ['delete', 'list', 'stat', 'write'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    ),
+});
 const runtimeProofWeights = readRuntimeProofWeights();
 const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
     ? readArg('--runtime-source')
     : 'merged';
-if (json) {
-    setDbLogger((level, message) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${message}\n`);
-        }
-    });
-}
 const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
@@ -194,7 +199,7 @@ const decisionTrace = buildModelGatewaySelectionDecisionTrace({
     source: 'model-gateway-effective-selection',
 });
 const tracePersistence = writeTrace
-    ? await persistModelGatewaySelectionDecisionTrace(decisionTrace, { directory: traceDir })
+    ? await traceStore.persist(decisionTrace)
     : {
           schema: 'model-gateway-selection-decision-trace-persistence',
           ok: true,
@@ -205,8 +210,7 @@ const tracePersistence = writeTrace
           error: null,
       };
 const traceRetention = pruneTraces
-    ? await applyModelGatewaySelectionTraceRetention({
-          directory: traceDir,
+    ? await traceStore.applyRetention({
           maxFiles: traceRetentionMax,
           dryRun: !traceRetentionApply,
       })

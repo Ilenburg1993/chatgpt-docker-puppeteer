@@ -49,8 +49,11 @@ const warmFromDirectory = (directory, options = {}) =>
     warmFromDirectoryRaw(directory, options, { cacheRuntime: infraRuntime.coherence });
 const getParserCacheStats = () => getParserCacheStatsRaw(infraRuntime.parserCache);
 
-const startSessionScope = (...args) => sessionRegistry.start(...args);
+/** @param {string} sessionId @param {string[]} paths @param {Parameters<typeof sessionRegistry.start>[2]} [options] */
+const startSessionScope = (sessionId, paths, options = {}) => sessionRegistry.start(sessionId, paths, options);
+/** @param {string} sessionId */
 const getSessionScopeStats = (sessionId) => sessionRegistry.getStats(sessionId);
+/** @param {string} sessionId */
 const endSessionScope = (sessionId) => sessionRegistry.end(sessionId);
 const listSessionScopes = () => sessionRegistry.list();
 

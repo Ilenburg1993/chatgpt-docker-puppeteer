@@ -16,7 +16,6 @@ import {
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
-    DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     flushAndMirrorByokProviderHealthToSqlite,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
@@ -288,7 +287,7 @@ async function readTerminalSdkSessionInventoryForAutomation() {
  * @param {string[]} rest
  * @param {{
  *     allowEffects?: boolean;
- *     catalogPath?: string;
+ *     catalogStore?: JsonModelGatewayCatalogStore;
  *     env?: NodeJS.ProcessEnv;
  *     persistAutomationDecision?: boolean;
  *     turnFailure?: Record<string, unknown> | null;
@@ -308,9 +307,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
     const envOptions = options.env ? { env: options.env } : {};
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     const args = parseTerminalByokGatewayAutoArgs(rest, { ...envOptions, policy });
-    const store = new JsonModelGatewayCatalogStore({
-        filePath: options.catalogPath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
-    });
+    const store = options.catalogStore ?? new JsonModelGatewayCatalogStore();
     const snapshot = await store.readSnapshot();
     const secretRegistry = createEnvSecretRegistry(options.env);
     const healthRecords = listByokProviderModelHealth();
@@ -596,7 +593,7 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
 }
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; catalogStore?: JsonModelGatewayCatalogStore }} [options]
  * @returns {Promise<{
  *     ran: boolean;
  *     policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
@@ -611,7 +608,7 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
     const envOptions = options.env ? { env: options.env } : {};
-    const catalogOptions = typeof options.catalogPath === 'string' ? { catalogPath: options.catalogPath } : {};
+    const catalogOptions = options.catalogStore ? { catalogStore: options.catalogStore } : {};
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     if (policy.enabled !== true) {
         return {
@@ -654,7 +651,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  *     retryAfterSeconds?: number | string | null;
  *     resetAt?: string | number | Date | null;
  * }} [turnFailure]
- * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; catalogStore?: JsonModelGatewayCatalogStore }} [options]
  * @returns {Promise<{
  *     ran: boolean;
  *     policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
@@ -678,7 +675,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  */
 export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {
     const envOptions = options.env ? { env: options.env } : {};
-    const catalogOptions = typeof options.catalogPath === 'string' ? { catalogPath: options.catalogPath } : {};
+    const catalogOptions = options.catalogStore ? { catalogStore: options.catalogStore } : {};
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     if (policy.enabled !== true) {
         return {

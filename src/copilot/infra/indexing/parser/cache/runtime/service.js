@@ -4,7 +4,7 @@
 import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import { LRUCache } from 'lru-cache';
 import * as nodePath from 'node:path';
-import { normalizeParserPath } from '../../foundation/index.js';
+import { DEFAULT_PARSER_PROCESS_CONFIG, normalizeParserPath } from '../../foundation/index.js';
 
 /** @typedef {import('../../foundation/index.js').FileSymbols} FileSymbols */
 /** @typedef {import('../../foundation/index.js').FileContext} FileContext */
@@ -12,20 +12,42 @@ import { normalizeParserPath } from '../../foundation/index.js';
 
 const FILE_CONTEXT_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readParserCacheRuntimeConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env */
+export function readParserCacheRuntimeConfig(env) {
     const enabledValue = String(env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] ?? '1')
         .trim()
         .toLowerCase();
     return Object.freeze({
-        symbolMaxEntries: readEnvPositiveInt('IO_PARSER_SYMBOL_CACHE_MAX_ENTRIES', 500, env),
-        symbolMaxBytes: readEnvPositiveInt('IO_PARSER_SYMBOL_CACHE_MAX_BYTES', 64 * 1024 * 1024, env),
+        symbolMaxEntries: readEnvPositiveInt(
+            'IO_PARSER_SYMBOL_CACHE_MAX_ENTRIES',
+            500,
+            /** @type {NodeJS.ProcessEnv} */ (env),
+        ),
+        symbolMaxBytes: readEnvPositiveInt(
+            'IO_PARSER_SYMBOL_CACHE_MAX_BYTES',
+            64 * 1024 * 1024,
+            /** @type {NodeJS.ProcessEnv} */ (env),
+        ),
         fileContextEnabled: !FILE_CONTEXT_DISABLED_VALUES.has(enabledValue),
-        fileContextMaxEntries: readEnvPositiveInt('IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES', 256, env),
-        fileContextMaxBytes: readEnvPositiveInt('IO_PARSER_FILE_CONTEXT_CACHE_MAX_BYTES', 64 * 1024 * 1024, env),
-        fileContextTtlMs: readEnvPositiveInt('IO_PARSER_FILE_CONTEXT_CACHE_TTL_MS', 5 * 60_000, env),
+        fileContextMaxEntries: readEnvPositiveInt(
+            'IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES',
+            256,
+            /** @type {NodeJS.ProcessEnv} */ (env),
+        ),
+        fileContextMaxBytes: readEnvPositiveInt(
+            'IO_PARSER_FILE_CONTEXT_CACHE_MAX_BYTES',
+            64 * 1024 * 1024,
+            /** @type {NodeJS.ProcessEnv} */ (env),
+        ),
+        fileContextTtlMs: readEnvPositiveInt(
+            'IO_PARSER_FILE_CONTEXT_CACHE_TTL_MS',
+            5 * 60_000,
+            /** @type {NodeJS.ProcessEnv} */ (env),
+        ),
     });
 }
+
+const DEFAULT_PARSER_CACHE_RUNTIME_CONFIG = readParserCacheRuntimeConfig(Object.freeze({}));
 
 /** @param {FileSymbols} value */
 function estimateFileSymbolsSize(value) {
@@ -56,14 +78,16 @@ function estimateFileContextCacheSize(value) {
  *   invalidationBus:{registerHook:(hook:(filePath:string,event:{recursive:boolean;source:string})=>void)=>()=>void};
  *   runtimeId?:string;
  *   config?:ReturnType<typeof readParserCacheRuntimeConfig>;
+ *   parserConfig?:ReturnType<typeof import('../../foundation/index.js').readParserProcessConfig>;
  *   workerRuntime?:ReturnType<typeof import('../../worker/index.js').createParserWorkerRuntime>;
  * }} options
  */
 export function createParserCacheRuntime(options) {
     if (!options?.invalidationBus) throw new TypeError('createParserCacheRuntime requires { invalidationBus }.');
     const runtimeId = options.runtimeId ?? 'parser-cache-runtime';
-    const config = options.config ?? readParserCacheRuntimeConfig();
+    const config = options.config ?? DEFAULT_PARSER_CACHE_RUNTIME_CONFIG;
     const workerRuntime = options.workerRuntime ?? null;
+    const parserConfig = options.parserConfig ?? workerRuntime?.config ?? DEFAULT_PARSER_PROCESS_CONFIG;
     const symbolCache = new LRUCache({
         max: config.symbolMaxEntries,
         maxSize: config.symbolMaxBytes,
@@ -140,6 +164,7 @@ export function createParserCacheRuntime(options) {
         return Object.freeze({
             runtimeId,
             disposed,
+            parserConfig,
             symbol: Object.freeze({
                 size: symbolCache.size,
                 maxSize: config.symbolMaxEntries,
@@ -168,6 +193,7 @@ export function createParserCacheRuntime(options) {
     }
     return Object.freeze({
         runtimeId,
+        parserConfig,
         workerRuntime,
         symbolCache,
         fileContextCache,

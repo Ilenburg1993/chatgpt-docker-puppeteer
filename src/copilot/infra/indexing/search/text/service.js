@@ -1,11 +1,11 @@
 // @ts-check
 /** Completeness-oriented text/regex search orchestration. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { hasNullByte } from '#copilot/infra/internal/policy';
 import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
 import { assertValidTargetPath, getIoSearchBudget, normalizeSearchWindow } from '../shared/index.js';
-import { isRipgrepAvailable } from '../subprocess/index.js';
+import { acquireSearchSubprocessCapability } from '../subprocess/index.js';
 import { trySearchTextViaIndex } from './indexed.js';
 import { searchTextViaSubprocess } from './process.js';
 
@@ -70,7 +70,8 @@ export async function searchText(targetPath, options, context = {}) {
         });
 
     try {
-        const ripgrepAvailable = await isRipgrepAvailable();
+        const searchExec = acquireSearchSubprocessCapability();
+        const ripgrepAvailable = await searchExec.isRipgrepAvailable();
         const indexAttempt = trySearchTextViaIndex(
             targetPath,
             options,
@@ -86,6 +87,7 @@ export async function searchText(targetPath, options, context = {}) {
             ioSearchBudget,
             searchWindow,
             ripgrepAvailable,
+            searchExec.environment,
             indexAttempt.indexFallback,
             indexAttempt.indexFallbackReason,
             buildSearchIo,

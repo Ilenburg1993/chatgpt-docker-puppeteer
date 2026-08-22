@@ -7,7 +7,7 @@
  * Este módulo é **L0** (sem dependências internas além de `core/`). Qualquer módulo do sistema pode importar tipos
  * daqui sem violar a hierarquia de camadas.
  *
- * Consumers: `import('#copilot/types')` ou `import('#copilot/types/events')`.
+ * Consumers usam o entrypoint canônico `#copilot/types`.
  *
  * @module copilot/types
  */

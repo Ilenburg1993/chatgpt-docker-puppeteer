@@ -55,10 +55,10 @@ vi.mock('#copilot/core', async (importOriginal) => {
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
 const { registerDialogListeners, startDialogMode, dialogTurn, stopDialogMode } =
-    await import('#copilot/channel/client-dialog');
+    await import('#copilot/testing/channel/client-dialog');
 const { LLM_B_TURN_TIMEOUT_MS } = await import('#copilot/config');
 
-const { getLastNPairs } = await import('#copilot/channel/client-history');
+const { getLastNPairs } = await import('#copilot/testing/channel/client-history');
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -71,7 +71,7 @@ beforeEach(() => {
 /**
  * Cria mock de BridgeAgentLike com listeners.
  *
- * @returns {import('#copilot/channel/client').BridgeAgentLike & { _emit: (evt: string, data?: unknown) => void }}
+ * @returns {import('#copilot/testing/channel/client').BridgeAgentLike & { _emit: (evt: string, data?: unknown) => void }}
  */
 function createMockAgent() {
     /** @type {Map<string, Set<Function>>} */
@@ -247,7 +247,7 @@ describe('F40 — stopDialogMode', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F40 — getLastNPairs', () => {
-    /** @type {import('#copilot/channel/client').ConversationTurn[]} */
+    /** @type {import('#copilot/testing/channel/client').ConversationTurn[]} */
     const history = [
         { role: 'user', content: 'msg1', timestamp: 1000 },
         { role: 'assistant', content: 'reply1', timestamp: 1001 },
@@ -293,7 +293,7 @@ describe('F40 — getLastNPairs', () => {
 // client-structured.js
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const { chatStructured } = await import('#copilot/channel/client-structured');
+const { chatStructured } = await import('#copilot/testing/channel/client-structured');
 
 describe('F40 — chatStructured', () => {
     it('envia mensagem estruturada e retorna resultado parseado', async () => {

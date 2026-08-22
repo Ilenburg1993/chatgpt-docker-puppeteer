@@ -28,14 +28,15 @@ const DEFAULT_CONTEXT_BYTES = 16 * 1024;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_MCP_WORKING_SETS = 8;
 const MCP_SCOPE_CONTEXT = getMcpWorkspaceIndexing().context;
-const { closeScope, declareScope, findSymbol, getScopeContext, getScopeStats, refreshScope } = MCP_SCOPE_CONTEXT;
+const { declareScope, findSymbol, getScopeContext } = MCP_SCOPE_CONTEXT;
 
-/** @type {Map<string, { scopeId: string; createdAtMs: number; lastAccessAtMs: number }>} */
+/** @typedef {ReturnType<typeof MCP_SCOPE_CONTEXT.declareScope>} McpScopeHandle */
+/** @type {Map<string, { handle: McpScopeHandle; createdAtMs: number; lastAccessAtMs: number }>} */
 const mcpWorkingSets = new Map();
 
 function pruneStaleOwnedWorkingSets() {
     for (const [workingSetId, entry] of mcpWorkingSets) {
-        if (getScopeStats(entry.scopeId)) continue;
+        if (entry.handle.snapshot()) continue;
         mcpWorkingSets.delete(workingSetId);
     }
 }
@@ -45,7 +46,7 @@ function evictOldestOwnedWorkingSetIfNeeded() {
     if (mcpWorkingSets.size < MAX_MCP_WORKING_SETS) return;
     const oldest = [...mcpWorkingSets.entries()].sort((a, b) => a[1].lastAccessAtMs - b[1].lastAccessAtMs)[0];
     if (!oldest) return;
-    closeScope(oldest[1].scopeId);
+    oldest[1].handle.close();
     mcpWorkingSets.delete(oldest[0]);
 }
 
@@ -54,7 +55,7 @@ function getOwnedWorkingSet(workingSetId) {
     if (!workingSetId) return null;
     const entry = mcpWorkingSets.get(workingSetId);
     if (!entry) return null;
-    if (!getScopeStats(entry.scopeId)) {
+    if (!entry.handle.snapshot()) {
         mcpWorkingSets.delete(workingSetId);
         return null;
     }
@@ -210,9 +211,9 @@ export const repoWorkingSetTool = {
                 recursive: true,
                 silent: true,
             });
-            mcpWorkingSets.set(id, { scopeId: id, createdAtMs: now, lastAccessAtMs: now });
+            mcpWorkingSets.set(id, { handle, createdAtMs: now, lastAccessAtMs: now });
             const stats = await handle.awaitReady();
-            if (!getScopeStats(id)) {
+            if (!handle.snapshot()) {
                 mcpWorkingSets.delete(id);
                 return errorResult('Working set closed or evicted before becoming ready.', {
                     code: 'ERR_WORKING_SET_EVICTED',
@@ -221,7 +222,7 @@ export const repoWorkingSetTool = {
             const effectiveContextMode = contextMode ?? 'auto';
             const contextIncluded = effectiveContextMode !== 'omit';
             const context = contextIncluded
-                ? getScopeContext(id, {
+                ? getScopeContext(handle.sessionId, {
                       maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                       maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
                   })
@@ -253,7 +254,7 @@ export const repoWorkingSetTool = {
         }
 
         if (action === 'context') {
-            const context = getScopeContext(owned.scopeId, {
+            const context = getScopeContext(owned.handle.sessionId, {
                 maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                 maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
             });
@@ -270,7 +271,7 @@ export const repoWorkingSetTool = {
         }
 
         if (action === 'status') {
-            const stats = getScopeStats(owned.scopeId);
+            const stats = owned.handle.snapshot();
             return okResult(
                 { workingSetId, stats },
                 `Working set ${workingSetId}: status=${stats?.status ?? 'unknown'}, selected=${stats?.selectedFiles ?? 0}, parsed=${stats?.parsed ?? 0}, invalidated=${stats?.invalidated ?? 0}.`,
@@ -281,7 +282,7 @@ export const repoWorkingSetTool = {
             if (!symbol)
                 return errorResult('action=find requires symbol.', { code: 'ERR_WORKING_SET_SYMBOL_REQUIRED' });
             const limit = maxResults ?? 50;
-            const matches = findSymbol(owned.scopeId, symbol, { exactMatch })
+            const matches = findSymbol(owned.handle.sessionId, symbol, { exactMatch })
                 .slice(0, limit)
                 .map((entry) => ({
                     path: toRepoPath(entry.filePath),
@@ -304,13 +305,13 @@ export const repoWorkingSetTool = {
                     resolvedPaths.push(resolved.resolved);
                 }
             }
-            const result = await refreshScope(owned.scopeId, resolvedPaths);
+            const result = await owned.handle.refresh(resolvedPaths);
             const effectiveContextMode = contextMode ?? 'auto';
             const contextIncluded =
                 effectiveContextMode === 'include' ||
                 (effectiveContextMode === 'auto' && (result.refreshed > 0 || result.removed > 0 || result.failed > 0));
             const context = contextIncluded
-                ? getScopeContext(owned.scopeId, {
+                ? getScopeContext(owned.handle.sessionId, {
                       maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                       maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
                   })
@@ -321,7 +322,7 @@ export const repoWorkingSetTool = {
                 contextMode: effectiveContextMode,
                 contextIncluded,
                 contextAvailable: true,
-                stats: getScopeStats(owned.scopeId),
+                stats: owned.handle.snapshot(),
                 ...(context ? { context } : {}),
             };
             return okResult(
@@ -330,7 +331,7 @@ export const repoWorkingSetTool = {
             );
         }
 
-        const stats = closeScope(owned.scopeId);
+        const stats = owned.handle.close();
         mcpWorkingSets.delete(workingSetId ?? '');
         const structured = { workingSetId, closed: true, stats, activeOwnedWorkingSets: mcpWorkingSets.size };
         return okResult(
@@ -341,6 +342,6 @@ export const repoWorkingSetTool = {
 };
 
 export function resetMcpWorkingSetsForTest() {
-    for (const entry of mcpWorkingSets.values()) closeScope(entry.scopeId);
+    for (const entry of mcpWorkingSets.values()) entry.handle.close();
     mcpWorkingSets.clear();
 }

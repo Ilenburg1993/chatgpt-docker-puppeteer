@@ -11,13 +11,23 @@ const IO_WRITE_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/wr
 const IO_MUTATION_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/mutation/index.js', import.meta.url)
     .href;
 const IO_LOCKS_MODULE_URL = new URL('../../../../src/copilot/infra/concurrency/locks/index.js', import.meta.url).href;
+const IO_PROCESS_COMPOSITION_MODULE_URL = new URL(
+    '../../../../src/copilot/infra/composition/process/index.js',
+    import.meta.url,
+).href;
 const CHILD_SCRIPT = `
 const { operation, args } = JSON.parse(process.env['COPILOT_IO_MULTIPROCESS_CASE']);
-const [write, mutation, locks] = await Promise.all([
+const [write, mutation, locks, composition] = await Promise.all([
     import(process.env['COPILOT_IO_WRITE_MODULE_URL']),
     import(process.env['COPILOT_IO_MUTATION_MODULE_URL']),
     import(process.env['COPILOT_IO_LOCKS_MODULE_URL']),
+    import(process.env['COPILOT_IO_PROCESS_COMPOSITION_MODULE_URL']),
 ]);
+const processInfra = composition.createProcessInfra({
+    processId: 'io-multiprocess-' + process.pid,
+    env: process.env,
+    activateProcessPolicies: true,
+});
 const io = { ...write, ...mutation, ...locks };
 try {
     if (operation === 'create') {
@@ -45,6 +55,8 @@ try {
         code: error?.code ?? null,
         message: error instanceof Error ? error.message : String(error),
     }) + '\\n');
+} finally {
+    await processInfra.dispose();
 }
 `;
 
@@ -70,6 +82,7 @@ function runChild(lockDir, operation, args) {
                 COPILOT_IO_WRITE_MODULE_URL: IO_WRITE_MODULE_URL,
                 COPILOT_IO_MUTATION_MODULE_URL: IO_MUTATION_MODULE_URL,
                 COPILOT_IO_LOCKS_MODULE_URL: IO_LOCKS_MODULE_URL,
+                COPILOT_IO_PROCESS_COMPOSITION_MODULE_URL: IO_PROCESS_COMPOSITION_MODULE_URL,
                 COPILOT_IO_FILE_LOCKS_ENABLED: '1',
                 COPILOT_IO_FILE_LOCK_DIR: lockDir,
                 COPILOT_IO_MULTIPROCESS_CASE: JSON.stringify({ operation, args }),
@@ -119,6 +132,7 @@ function startHoldingChild(lockDir, target) {
                 COPILOT_IO_WRITE_MODULE_URL: IO_WRITE_MODULE_URL,
                 COPILOT_IO_MUTATION_MODULE_URL: IO_MUTATION_MODULE_URL,
                 COPILOT_IO_LOCKS_MODULE_URL: IO_LOCKS_MODULE_URL,
+                COPILOT_IO_PROCESS_COMPOSITION_MODULE_URL: IO_PROCESS_COMPOSITION_MODULE_URL,
                 COPILOT_IO_FILE_LOCKS_ENABLED: '1',
                 COPILOT_IO_FILE_LOCK_DIR: lockDir,
                 COPILOT_IO_MULTIPROCESS_CASE: JSON.stringify({ operation: 'lock-hold', args: { target } }),

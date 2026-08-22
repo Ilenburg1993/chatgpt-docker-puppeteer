@@ -10,9 +10,12 @@
 
 import { createHash } from 'node:crypto';
 
-import Database from 'better-sqlite3';
-
-import { getCopilotDb } from '../../db/sqlite.js';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
+import {
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
+} from '#copilot/infra/public/database/sqlite/model-gateway-schema';
 import { normalizeModelGatewayAccountLimitState } from '../account-access/limits.js';
 import {
     auditModelGatewayValueRedaction,
@@ -24,11 +27,6 @@ import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { parseModelGatewayRefreshLogText, summarizeModelGatewayRefreshLogEvents } from './refresh-logs.js';
-import {
-    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
-    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
-    MODEL_GATEWAY_SQLITE_TABLES,
-} from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
 const DEFAULT_ROUTE_PROFILE = 'default';
@@ -44,8 +42,18 @@ let _sdkSessionHandoffSequence = 0;
 let _sdkSessionConfirmationSequence = 0;
 let _standbyPlanSequence = 0;
 let _liveScenarioRunSequence = 0;
-/** @type {WeakSet<import('better-sqlite3').Database>} */
+/** @typedef {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} SqliteDatabasePort */
+/** @typedef {SqliteDatabasePort & { transaction: (operation: () => unknown) => () => unknown }} SqliteCatalogDatabase */
+/** @type {WeakSet<SqliteCatalogDatabase>} */
 const initializedSqliteCatalogDatabases = new WeakSet();
+
+/** @param {SqliteDatabasePort} db @returns {SqliteCatalogDatabase} */
+function requireCatalogDatabase(db) {
+    if (typeof db.transaction !== 'function') {
+        throw new TypeError('Model Gateway SQLite store requires a transactional database capability.');
+    }
+    return /** @type {SqliteCatalogDatabase} */ (db);
+}
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -120,15 +128,16 @@ function retentionLimit(value, fallback) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @returns {number}
  */
 function sqliteUserVersion(db) {
-    return optionalInteger(db.pragma('user_version', { simple: true })) ?? 0;
+    const row = /** @type {Record<string, unknown> | undefined} */ (db.prepare('PRAGMA user_version').get());
+    return optionalInteger(row?.['user_version']) ?? 0;
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @returns {void}
  */
 function ensureCompatibleSqliteSchemaVersion(db) {
@@ -141,18 +150,18 @@ function ensureCompatibleSqliteSchemaVersion(db) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @param {string} table
  * @param {string} column
  * @returns {boolean}
  */
 function sqliteTableHasColumn(db, table, column) {
-    const rows = /** @type {unknown[]} */ (db.pragma(`table_info(${table})`));
+    const rows = db.prepare(`PRAGMA table_info(${table})`).all();
     return rows.some((row) => isRecord(row) && optionalString(row['name']) === column);
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @returns {void}
  */
 function migrateModelGatewaySqliteSchema(db) {
@@ -464,7 +473,7 @@ function parsePayload(raw) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @param {string} table
  * @param {string} orderBy
  * @returns {Record<string, unknown>[]}
@@ -916,7 +925,7 @@ function refreshLogRunId(events, fallback) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {SqliteCatalogDatabase} db
  * @param {object} input
  * @param {string} input.table
  * @param {string} input.keyColumn
@@ -934,24 +943,24 @@ function deleteRowsKeepingLatest(db, input) {
             LIMIT -1 OFFSET ?
         )
     `);
-    return statement.run(input.maxRows).changes;
+    return Number(statement.run(input.maxRows).changes ?? 0);
 }
 
 export class SqliteModelGatewayCatalogStore {
-    /** @type {import('better-sqlite3').Database} */
+    /** @type {SqliteCatalogDatabase} */
     #db;
 
     /**
-     * @param {{ db?: import('better-sqlite3').Database; dbPath?: string }} [options]
+     * @param {{ db?: SqliteDatabasePort }} [options]
      */
     constructor(options = {}) {
-        this.#db = options.db ?? (options.dbPath ? new Database(options.dbPath) : getCopilotDb());
+        this.#db = requireCatalogDatabase(options.db ?? getApplicationSqliteDatabase());
         if (initializedSqliteCatalogDatabases.has(this.#db)) return;
-        this.#db.pragma('foreign_keys = ON');
+        this.#db.exec('PRAGMA foreign_keys = ON');
         ensureCompatibleSqliteSchemaVersion(this.#db);
         this.#db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
         migrateModelGatewaySqliteSchema(this.#db);
-        this.#db.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
+        this.#db.exec(`PRAGMA user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
         initializedSqliteCatalogDatabases.add(this.#db);
     }
 
@@ -2007,16 +2016,18 @@ export class SqliteModelGatewayCatalogStore {
                 maxRows: sdkSessionHandoffMaxRows,
             };
             const sdkSessionHandoffTransitionMaxRows = Math.max(1, sdkSessionHandoffMaxRows * 5);
-            const orphanTransitionRows = this.#db
-                .prepare(
-                    `
+            const orphanTransitionRows = Number(
+                this.#db
+                    .prepare(
+                        `
                     DELETE FROM copilot_model_gateway_sdk_session_handoff_transitions
                     WHERE handoff_id NOT IN (
                         SELECT handoff_id FROM copilot_model_gateway_sdk_session_handoffs
                     )
                 `,
-                )
-                .run().changes;
+                    )
+                    .run().changes ?? 0,
+            );
             tables['copilot_model_gateway_sdk_session_handoff_transitions'] = {
                 deletedRows:
                     orphanTransitionRows +

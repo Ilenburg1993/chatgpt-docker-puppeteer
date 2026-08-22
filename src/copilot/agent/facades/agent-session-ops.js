@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { logSessionTimeline, sendSession } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/logging/index.js';
 

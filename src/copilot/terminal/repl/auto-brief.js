@@ -9,7 +9,7 @@
  * @module copilot/terminal/repl/auto-brief
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability';
 import { printlnBlock } from '../dialog/index.js';
 import { readTerminalByokProjection, readTerminalStatusProjection } from '../frontend/index.js';

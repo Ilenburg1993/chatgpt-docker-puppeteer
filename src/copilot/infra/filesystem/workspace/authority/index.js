@@ -8,6 +8,7 @@ export {
     createWorkspacePathAuthority,
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
+    getWorkspacePathAuthorityStats,
     resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
     resolveWorkspacePathAuthority,

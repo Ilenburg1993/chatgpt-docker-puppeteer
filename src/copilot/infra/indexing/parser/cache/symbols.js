@@ -135,6 +135,7 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
         symbolStats.symbolCacheMisses += 1;
         const symbols = await parseFileSymbols(filePath, snapshot.content, {
             ...(options.signal ? { signal: options.signal } : {}),
+            parserConfig: parserCacheRuntime.parserConfig,
             ...(parserCacheRuntime.workerRuntime ? { workerRuntime: parserCacheRuntime.workerRuntime } : {}),
         });
         options.signal?.throwIfAborted();

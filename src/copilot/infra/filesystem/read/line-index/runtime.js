@@ -17,7 +17,7 @@ import { estimateByteLineIndexEntryBytes, readByteLineIndexConfig } from './poli
 export function createByteLineIndexRuntime(options) {
     if (!options?.invalidationBus) throw new TypeError('createByteLineIndexRuntime requires { invalidationBus }.');
     const invalidationBus = options.invalidationBus;
-    const config = options.config ?? readByteLineIndexConfig();
+    const config = options.config ?? readByteLineIndexConfig({});
     /** @type {Map<string, ByteLineIndexEntry>} */
     const byteLineIndexCache = new Map();
     const byteLineIndexStats = {

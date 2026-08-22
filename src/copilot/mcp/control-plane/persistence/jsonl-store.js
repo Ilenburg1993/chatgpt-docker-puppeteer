@@ -9,6 +9,7 @@
  * @module copilot/mcp/control-plane/persistence/jsonl-store
  */
 
+import { parseJsonlTextRecords, trimJsonlTextEntries } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 
 /** @typedef {ReturnType<typeof import('#copilot/infra/public/composition/filesystem/configured').createConfiguredFsIo>} ConfiguredFsIo */
@@ -43,13 +44,12 @@ export function createBoundConfiguredJsonlStore(options) {
             async () => {
                 await io.appendText(filePath, line, { mode, durability });
                 const snapshot = await io.readTextFresh(filePath);
-                const lines = nonEmptyLines(snapshot.content);
-                if (lines.length <= maxEntries) {
-                    return { retainedEntries: lines.length, trimmed: false };
+                const retentionPlan = trimJsonlTextEntries(snapshot.content, maxEntries);
+                if (!retentionPlan.trimmed) {
+                    return { retainedEntries: retentionPlan.retainedEntries, trimmed: false };
                 }
-                const retained = lines.slice(-maxEntries);
-                await io.writeFileAtomic(filePath, `${retained.join('\n')}\n`, { mode, durability });
-                return { retainedEntries: retained.length, trimmed: true };
+                await io.writeFileAtomic(filePath, retentionPlan.content, { mode, durability });
+                return { retainedEntries: retentionPlan.retainedEntries, trimmed: true };
             },
             { riskClass: 'low' },
         );
@@ -73,10 +73,10 @@ export function createBoundConfiguredJsonlStore(options) {
             const firstNewline = text.indexOf('\n');
             text = firstNewline >= 0 ? text.slice(firstNewline + 1) : '';
         }
-        const { records, invalidLines } = parseJsonl(text);
+        const parsed = parseJsonlTextRecords(text);
         return {
-            records: records.slice(-maxLines),
-            invalidLines,
+            records: [...parsed.records].slice(-maxLines),
+            invalidLines: parsed.invalidLines,
             truncatedByByteLimit: snapshot.truncatedBefore,
             fileBytes: snapshot.sizeBytes,
             bytesRead: snapshot.bytesRead,
@@ -88,26 +88,6 @@ export function createBoundConfiguredJsonlStore(options) {
         appendRecord,
         readTail,
     });
-}
-
-/** @param {string} text */
-function nonEmptyLines(text) {
-    return text.split(/\r?\n/u).filter((line) => line.trim());
-}
-
-/** @param {string} text */
-function parseJsonl(text) {
-    /** @type {unknown[]} */
-    const records = [];
-    let invalidLines = 0;
-    for (const line of nonEmptyLines(text)) {
-        try {
-            records.push(JSON.parse(line));
-        } catch {
-            invalidLines += 1;
-        }
-    }
-    return { records, invalidLines };
 }
 
 /** @param {unknown} value @param {string} name */

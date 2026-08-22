@@ -18,8 +18,8 @@ const DEFAULT_MAX_TEXT_CHARS = 2_000_000;
 const DEFAULT_MAX_CACHE_BYTES = 16 * 1024 * 1024;
 const LINE_OFFSET_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readLineOffsetCacheConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readLineOffsetCacheConfig(env = {}) {
     const enabledValue = String(env['IO_LINE_OFFSET_CACHE_ENABLED'] ?? '1')
         .trim()
         .toLowerCase();
@@ -58,7 +58,7 @@ export function readLineOffsetCacheConfig(env = process.env) {
 export function createLineOffsetCacheRuntime(options) {
     if (!options?.invalidationBus) throw new TypeError('createLineOffsetCacheRuntime requires { invalidationBus }.');
     const invalidationBus = options.invalidationBus;
-    const config = options.config ?? readLineOffsetCacheConfig();
+    const config = options.config ?? readLineOffsetCacheConfig({});
     /** @type {Map<string, LineOffsetEntry>} */
     const lineOffsetCache = new Map();
     let lineOffsetCacheBytes = 0;

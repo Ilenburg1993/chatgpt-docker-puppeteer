@@ -14,13 +14,14 @@
  * - sendToLlmB(): turn LLM-A persistido, resposta LLM-B persistida, evento turn:complete
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
-import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
 
 /**
  * Aplica as migrations copilot a um banco in-memory de teste.
@@ -37,7 +38,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -84,7 +85,7 @@ beforeAll(() => {
     applyCopilotMigrations(testDb);
 
     store = new ConversationStore();
-    store.init(testDb);
+    store.init(adaptBetterSqliteDatabase(testDb));
 
     // Injetar bridge e agent mocks via parâmetros do construtor e init()
     orchestrator = new HubOrchestrator(store, mockAgent);
@@ -290,7 +291,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         const db2 = new Database(':memory:');
         applyCopilotMigrations(db2);
         const store2 = new ConversationStore();
-        store2.init(db2);
+        store2.init(adaptBetterSqliteDatabase(db2));
         const orch2 = new HubOrchestrator(store2, mockAgent);
         orch2.init(orderedBridge);
         const sid = orch2.createSession({ title: 'Serialized' });
@@ -317,7 +318,7 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         const db3 = new Database(':memory:');
         applyCopilotMigrations(db3);
         const store3 = new ConversationStore();
-        store3.init(db3);
+        store3.init(adaptBetterSqliteDatabase(db3));
 
         // Bridge com delay para simular turn em andamento
         let resolveBridge = /** @type {((value?: any) => void) | null} */ (null);

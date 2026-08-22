@@ -9,8 +9,10 @@ import {
     buildInfraModuleScorecard,
     buildInfraMutableStateReport,
     buildInfraPublicApiCostReport,
+    buildInfraPublicAuthorityReport,
     INFRA_MODULE_LAYOUT,
     INFRA_PUBLIC_API_MANIFEST,
+    inspectPublicApiAuthoritySource,
     listMutableModuleBindings,
 } from '#copilot/infra/internal/governance';
 
@@ -20,34 +22,11 @@ const PACKAGE_JSON = resolve(REPO_ROOT, 'package.json');
 
 // Ambient environment access is architectural authority. Runtime-owned configuration is captured by composition;
 // only explicit config resolvers/factories and genuinely process-scoped bootstrap capabilities may touch process.env.
-const INFRA_ENV_TOUCHPOINTS = Object.freeze([
-    'cache/l2/config.js',
-    'cache/memory/runtime/service.js',
-    'composition/runtime/service.js',
-    'concurrency/locks/file/policy.js',
-    'filesystem/invalidation/bus/bus-runtime.js',
-    'filesystem/invalidation/cross-process/config.js',
-    'filesystem/invalidation/external-watch/config.js',
-    'filesystem/read/cache/line-offset-runtime.js',
-    'filesystem/read/line-index/policy.js',
-    'filesystem/read/runtime/service.js',
-    'indexing/parser/cache/runtime/service.js',
-    'indexing/parser/foundation/config.js',
-    'indexing/registry/instance/service.js',
-    'platform/env.js',
-    'platform/node/compile-cache.js',
-    'telemetry/advisory-budget.js',
-]);
-
-const INFRA_DIRECT_ENV_BOOTSTRAP_TOUCHPOINTS = Object.freeze([
-    'composition/runtime/service.js',
-    'concurrency/locks/file/policy.js',
-    'filesystem/invalidation/bus/bus-runtime.js',
-    'indexing/parser/foundation/config.js',
-    'platform/node/compile-cache.js',
-]);
+const INFRA_ENV_TOUCHPOINTS = Object.freeze(['composition/process/service.js']);
+const INFRA_DIRECT_ENV_BOOTSTRAP_TOUCHPOINTS = INFRA_ENV_TOUCHPOINTS;
 
 /** Remove comments before architecture-text checks so documentation cannot create false ambient-authority positives. */
+/** @param {string} source */
 function stripJavaScriptComments(source) {
     return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/.*$/gmu, '$1');
 }
@@ -158,20 +137,31 @@ describe('infra barrel governance', () => {
         expect(existsSync(join(INFRA_ROOT, 'public', 'index.js'))).toBe(false);
     });
 
-    it('cada diretório sob public/ possui barrel e public/ não recria um mega-barrel raiz', () => {
+    it('public/ contém apenas barrels que são entrypoints declarados e não recria mega/marker barrels', async () => {
         const publicRoot = join(INFRA_ROOT, 'public');
-        const missing = [];
+        const packageJson = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'));
+        const expectedEntrypoints = Object.entries(packageJson.imports ?? {})
+            .filter(
+                ([key, target]) =>
+                    key.startsWith('#copilot/infra/public/') &&
+                    typeof target === 'string' &&
+                    target.startsWith('./src/copilot/infra/public/') &&
+                    target.endsWith('/index.js'),
+            )
+            .map(([, target]) => resolve(REPO_ROOT, /** @type {string} */ (target)))
+            .sort();
+        /** @type {string[]} */
+        const actualEntrypoints = [];
         /** @param {string} directory */
         function visit(directory) {
             for (const entry of readdirSync(directory, { withFileTypes: true })) {
-                if (!entry.isDirectory()) continue;
                 const child = join(directory, entry.name);
-                if (!existsSync(join(child, 'index.js'))) missing.push(relative(publicRoot, child));
-                visit(child);
+                if (entry.isDirectory()) visit(child);
+                else if (entry.isFile() && entry.name === 'index.js') actualEntrypoints.push(child);
             }
         }
         visit(publicRoot);
-        expect(missing).toEqual([]);
+        expect(actualEntrypoints.sort()).toEqual(expectedEntrypoints);
         expect(existsSync(join(publicRoot, 'index.js'))).toBe(false);
     });
 
@@ -212,16 +202,12 @@ describe('infra barrel governance', () => {
                 '#copilot/infra/public/platform/buffer',
                 '#copilot/infra/public/platform/http-response',
                 '#copilot/infra/public/platform/process-output',
-                '#copilot/infra/public/concurrency/locks',
                 '#copilot/infra/public/filesystem/invalidation/replay',
-                '#copilot/infra/public/filesystem/read',
-                '#copilot/infra/public/filesystem/write',
                 '#copilot/infra/public/composition/workspace/authority',
                 '#copilot/infra/public/composition/workspace/io',
                 '#copilot/infra/public/composition/workspace/read-io',
                 '#copilot/infra/public/composition/workspace/mutation-io',
                 '#copilot/infra/public/composition/workspace/indexing',
-                '#copilot/infra/public/composition/workspace/instance',
                 '#copilot/infra/public/composition/runtime',
                 '#copilot/infra/public/composition/process',
                 '#copilot/infra/public/cache/keys',
@@ -310,7 +296,7 @@ describe('infra barrel governance', () => {
         expect(report.success).toBe(true);
     });
 
-    it('public/** usa somente exports nominais e runtime não expõe minting/raw write primitives', async () => {
+    it('public/** usa somente exports nominais e authority/raw-path é governada semanticamente', async () => {
         const publicRoot = join(INFRA_ROOT, 'public');
         const starViolations = [];
         for (const file of listJavaScriptFiles(publicRoot)) {
@@ -319,19 +305,99 @@ describe('infra barrel governance', () => {
         }
         expect(starViolations).toEqual([]);
 
-        const runtimeAuthorityViolations = INFRA_PUBLIC_API_MANIFEST.filter(
-            (entry) => entry.audience === 'runtime',
-        ).flatMap((entry) =>
-            entry.exports
-                .filter(
-                    (name) =>
-                        /^createValidated/u.test(name) ||
-                        /^createWorkspacePathAuthority$/u.test(name) ||
-                        /(?:Unlocked|Portable)$/u.test(name),
-                )
-                .map((name) => `${entry.alias}:${name}`),
+        const report = buildInfraPublicAuthorityReport();
+        expect(report.metadataViolations).toEqual([]);
+        expect(report.signatureViolations).toEqual([]);
+        expect(report.success).toBe(true);
+        expect(
+            INFRA_PUBLIC_API_MANIFEST.every(
+                (entry) =>
+                    typeof entry.pathAuthority === 'string' &&
+                    typeof entry.acceptsOperationalRawPath === 'boolean' &&
+                    typeof entry.issuer === 'boolean',
+            ),
+        ).toBe(true);
+    });
+
+    it('checker AST rejeita primitiva privilegiada raw-path por assinatura, independentemente do nome', () => {
+        const descriptor = {
+            alias: '#synthetic/runtime-write',
+            target: './synthetic.js',
+            audience: /** @type {const} */ ('runtime'),
+            privilege: /** @type {const} */ ('mutate'),
+            stability: /** @type {const} */ ('stable'),
+            lifecycle: /** @type {const} */ ('none'),
+            costTier: /** @type {const} */ ('micro'),
+            pathAuthority: /** @type {const} */ ('none'),
+            acceptsOperationalRawPath: false,
+            issuer: false,
+            exports: ['persistAnything'],
+        };
+        const report = inspectPublicApiAuthoritySource(
+            `export async function persistAnything(path, content) { return [path, content]; }`,
+            descriptor,
         );
-        expect(runtimeAuthorityViolations).toEqual([]);
+        expect(report.findings).toEqual([{ exportName: 'persistAnything', pathParameters: ['path'] }]);
+        expect(report.violations).toHaveLength(1);
+        expect(report.violations[0]).toContain('without an operational path-authority classification');
+
+        const authorized = inspectPublicApiAuthoritySource(
+            `export async function persistAnything(path, content) { return [path, content]; }`,
+            { ...descriptor, pathAuthority: 'workspace-bound', acceptsOperationalRawPath: true },
+        );
+        expect(authorized.violations).toEqual([]);
+    });
+
+    it('authority test-only é exclusiva da audiência de teste e não mascara runtime/diagnostic', () => {
+        const base = {
+            alias: '#synthetic/test-resource',
+            target: './synthetic.js',
+            audience: /** @type {const} */ ('test'),
+            privilege: /** @type {const} */ ('lifecycle'),
+            stability: /** @type {const} */ ('experimental'),
+            lifecycle: /** @type {const} */ ('none'),
+            costTier: /** @type {const} */ ('micro'),
+            pathAuthority: /** @type {const} */ ('test-only'),
+            acceptsOperationalRawPath: true,
+            issuer: true,
+            exports: ['openFixture'],
+        };
+        expect(
+            inspectPublicApiAuthoritySource('export function openFixture(path) { return path; }', base).violations,
+        ).toEqual([]);
+        expect(
+            inspectPublicApiAuthoritySource('export function openFixture(path) { return path; }', {
+                ...base,
+                audience: /** @type {const} */ ('runtime'),
+            }).violations,
+        ).toEqual(expect.arrayContaining([expect.stringContaining('test-only authority requires test audience')]));
+        expect(
+            inspectPublicApiAuthoritySource('export function openFixture(path) { return path; }', {
+                ...base,
+                pathAuthority: /** @type {const} */ ('diagnostic-only'),
+            }).violations,
+        ).toEqual(expect.arrayContaining([expect.stringContaining('test raw-path API must be test-only')]));
+    });
+
+    it('checker trata metadata de authority ausente como violação explícita', () => {
+        const incomplete = /** @type {Parameters<typeof inspectPublicApiAuthoritySource>[1]} */ ({
+            alias: '#synthetic/incomplete',
+            target: './synthetic.js',
+            audience: 'runtime',
+            privilege: 'read',
+            stability: 'stable',
+            lifecycle: 'none',
+            costTier: 'micro',
+            exports: [],
+        });
+        const report = inspectPublicApiAuthoritySource('export function probe() { return true; }', incomplete);
+        expect(report.violations).toEqual(
+            expect.arrayContaining([
+                expect.stringContaining('pathAuthority must be explicitly classified'),
+                expect.stringContaining('acceptsOperationalRawPath must be boolean'),
+                expect.stringContaining('issuer must be boolean'),
+            ]),
+        );
     });
 
     it('production não pode importar surfaces diagnostic ou test-only', async () => {

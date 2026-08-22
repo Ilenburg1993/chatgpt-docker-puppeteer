@@ -21,8 +21,8 @@ import { createIoIndexSqlite } from '../sqlite/index.js';
 
 /** @typedef {ReturnType<typeof createIoIndexSqlite>} IoIndexStore */
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readIoIndexRuntimeConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readIoIndexRuntimeConfig(env = {}) {
     const enabledRaw = String(env['IO_INDEX_AUTO_REFRESH_ENABLED'] ?? '1')
         .trim()
         .toLowerCase();
@@ -35,6 +35,17 @@ export function readIoIndexRuntimeConfig(env = process.env) {
             retryBaseMs: readEnvNonNegativeInt('IO_INDEX_AUTO_REFRESH_RETRY_BASE_MS', 250, env),
             retryMaxMs: Math.min(60_000, readEnvPositiveInt('IO_INDEX_AUTO_REFRESH_RETRY_MAX_MS', 10_000, env)),
             retryMaxAttempts: Math.min(20, readEnvPositiveInt('IO_INDEX_AUTO_REFRESH_RETRY_MAX_ATTEMPTS', 5, env)),
+        }),
+        scanner: Object.freeze({
+            batchSize: readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512, env),
+            hardMaxEntries: readEnvPositiveInt('IO_SCAN_HARD_MAX_ENTRIES', 20_000, env),
+        }),
+        build: Object.freeze({
+            concurrency: 8,
+            maxFiles: readEnvPositiveInt('IO_INDEX_BUILD_MAX_FILES', 10_000, env),
+        }),
+        refresh: Object.freeze({
+            concurrency: Math.min(32, readEnvPositiveInt('IO_INDEX_REFRESH_CONCURRENCY', 8, env)),
         }),
         sqlite: Object.freeze({
             hashVerifyMaxBytes: readEnvPositiveInt('IO_INDEX_HASH_VERIFY_MAX_BYTES', 1024 * 1024, env),
@@ -57,10 +68,7 @@ export function readIoIndexRuntimeConfig(env = process.env) {
  *   configured:boolean;
  *   revision:number;
  * }} DatabaseBindingStatus
- * @typedef {{
- *   get:()=>import('better-sqlite3').Database;
- *   status:()=>DatabaseBindingStatus;
- * }} DatabaseBinding
+ * @typedef {import('#copilot/infra/internal/database/port').InfraSqliteProviderReader} DatabaseBinding
  */
 
 /** @returns {{
@@ -117,6 +125,18 @@ function retryDelayMs(filePath, attempt, config) {
     if (config.retryBaseMs <= 0) return 0;
     const exponential = Math.min(config.retryMaxMs, config.retryBaseMs * 2 ** Math.max(0, attempt - 1));
     return Math.max(0, Math.round(exponential * (1 + deterministicRetryJitter(filePath))));
+}
+
+/** @param {{debounceMs:number;retryBaseMs:number;retryMaxMs:number;retryMaxAttempts:number}} config */
+function autoRefreshStaleAfterMs(config) {
+    let retryBudgetMs = 0;
+    // retryMaxAttempts counts the initial attempt, so only N-1 delays can occur while an item remains pending.
+    for (let attempt = 1; attempt < config.retryMaxAttempts; attempt += 1) {
+        const nominal =
+            config.retryBaseMs <= 0 ? 0 : Math.min(config.retryMaxMs, config.retryBaseMs * 2 ** (attempt - 1));
+        retryBudgetMs += Math.ceil(nominal * 1.2); // deterministic jitter is bounded to +20%.
+    }
+    return Math.max(10_000, Math.ceil((config.debounceMs + retryBudgetMs) * 1.5));
 }
 
 /** @param {DatabaseBinding} database @param {ReturnType<typeof createLifecycleSnapshot>} lifecycle @param {number} queries @param {{enabled:boolean;autoRefresh:ReturnType<typeof readIoIndexRuntimeConfig>['autoRefresh']}} runtimeConfig */
@@ -214,7 +234,7 @@ function createLifecycleSnapshot(state) {
 }
 
 /**
- * @param {{ database:DatabaseBinding; runtimeId?:string; invalidationBus?:ReturnType<typeof import('../../../filesystem/invalidation/bus/index.js').createIoInvalidationBusRuntime>; telemetryRuntime?:ReturnType<typeof import('#copilot/infra/internal/telemetry').createIoTelemetryRuntime>; parserWorkerRuntime?:ReturnType<typeof import('../../parser/worker/index.js').createParserWorkerRuntime>; config?:ReturnType<typeof readIoIndexRuntimeConfig> }} options
+ * @param {{ database:DatabaseBinding; runtimeId?:string; invalidationBus?:{registerHook:(hook:(filePath:string,event:{recursive:boolean;source:string})=>void)=>()=>void}; telemetryRuntime?:ReturnType<typeof import('#copilot/infra/internal/telemetry').createIoTelemetryRuntime>; parserWorkerRuntime?:ReturnType<typeof import('../../parser/worker/index.js').createParserWorkerRuntime>; config?:ReturnType<typeof readIoIndexRuntimeConfig> }} options
  */
 export function createIoIndexRegistryRuntime(options) {
     if (
@@ -226,7 +246,7 @@ export function createIoIndexRegistryRuntime(options) {
     }
     const runtimeId = options.runtimeId?.trim() || 'io-index-runtime';
     const database = options.database;
-    const runtimeConfig = options.config ?? readIoIndexRuntimeConfig();
+    const runtimeConfig = options.config ?? readIoIndexRuntimeConfig({});
     const autoRefreshConfig = runtimeConfig.autoRefresh;
     /** @type {IoIndexStore | null} */
     let index = null;
@@ -281,6 +301,8 @@ export function createIoIndexRegistryRuntime(options) {
             index = createIoIndexSqlite({
                 db: database.get(),
                 ...runtimeConfig.sqlite,
+                buildConfig: runtimeConfig.build,
+                scannerConfig: runtimeConfig.scanner,
                 ...(options.parserWorkerRuntime ? { parserWorkerRuntime: options.parserWorkerRuntime } : {}),
             });
             indexRevision = database.status().revision;
@@ -307,19 +329,31 @@ export function createIoIndexRegistryRuntime(options) {
         return domain;
     }
 
+    /** @param {{queuedAt:number}} entry @param {number} [now] */
+    function observePendingAge(entry, now = Date.now()) {
+        const ageMs = Math.max(0, now - entry.queuedAt);
+        auto.stats.maxPendingAgeMs = Math.max(auto.stats.maxPendingAgeMs, ageMs);
+        return ageMs;
+    }
+
     function autoRefreshSnapshot() {
         const config = autoRefreshConfig;
         const now = Date.now();
-        const oldestPendingAgeMs = auto.pendingPaths.size
-            ? Math.max(0, now - Math.min(...[...auto.pendingPaths.values()].map((entry) => entry.queuedAt)))
-            : 0;
+        const staleAfterMs = autoRefreshStaleAfterMs(config);
+        const pendingAges = [...auto.pendingPaths.values()].map((entry) => Math.max(0, now - entry.queuedAt));
+        const oldestPendingAgeMs = pendingAges.length > 0 ? Math.max(...pendingAges) : 0;
+        const stalePending = pendingAges.filter((ageMs) => ageMs > staleAfterMs).length;
         return Object.freeze({
             ...auto.stats,
             maxPendingAgeMs: Math.max(auto.stats.maxPendingAgeMs, oldestPendingAgeMs),
             enabled: config.enabled,
             pending: auto.pendingPaths.size,
+            stalePending,
+            staleAfterMs,
             oldestPendingAgeMs,
             running: auto.running,
+            timerPending: auto.timer !== null,
+            materialized: index !== null,
             workspaceRootKnown: Boolean(auto.workspaceRoot),
             debounceMs: config.debounceMs,
             maxBatch: config.maxBatch,
@@ -332,7 +366,10 @@ export function createIoIndexRegistryRuntime(options) {
     /** @param {string} filePath @param {boolean} [explicitConvergence] */
     function settlePending(filePath, explicitConvergence = true) {
         const normalized = resolve(filePath);
-        if (!auto.pendingPaths.delete(normalized)) return false;
+        const entry = auto.pendingPaths.get(normalized);
+        if (!entry) return false;
+        observePendingAge(entry);
+        auto.pendingPaths.delete(normalized);
         if (explicitConvergence) auto.stats.explicitConvergences += 1;
         if (auto.pendingPaths.size === 0 && auto.timer && !auto.running) {
             clearTimeout(auto.timer);
@@ -410,6 +447,7 @@ export function createIoIndexRegistryRuntime(options) {
         for (const filePath of new Set(paths)) {
             const entry = auto.pendingPaths.get(filePath);
             if (!entry) continue;
+            observePendingAge(entry, now);
             entry.attempt += 1;
             entry.lastFailureAt = now;
             auto.stats.transientFailed += 1;
@@ -532,10 +570,18 @@ export function createIoIndexRegistryRuntime(options) {
         const store = ensureIndex();
         if (refreshOptions.scopeRoot) configureDomain(refreshOptions.scopeRoot, refreshOptions);
         else auto.workspaceRoot = resolve(refreshOptions.workspaceRoot);
-        return executeIoIndexPathRefresh(store, filePaths, refreshOptions, {
-            domain: refreshOptions.scopeRoot ? auto.domain : null,
-            settlePending: (filePath) => settlePending(filePath, explicitConvergence),
-        });
+        return executeIoIndexPathRefresh(
+            store,
+            filePaths,
+            {
+                ...refreshOptions,
+                concurrency: refreshOptions.concurrency ?? runtimeConfig.refresh.concurrency,
+            },
+            {
+                domain: refreshOptions.scopeRoot ? auto.domain : null,
+                settlePending: (filePath) => settlePending(filePath, explicitConvergence),
+            },
+        );
     }
 
     const api = Object.freeze({
@@ -547,12 +593,17 @@ export function createIoIndexRegistryRuntime(options) {
         status() {
             resetMaterializationForDatabaseRevision();
             const status = readDatabaseStatus(database, createLifecycleSnapshot(lifecycle), queryCount, runtimeConfig);
-            return Object.freeze({ ...status, autoRefresh: autoRefreshSnapshot() });
+            return Object.freeze({ ...status, config: runtimeConfig, autoRefresh: autoRefreshSnapshot() });
         },
         stats() {
             const store = ensureIndex();
             if (!store) return api.status();
-            return Object.freeze({ ...store.getStats(), searches: queryCount, autoRefresh: autoRefreshSnapshot() });
+            return Object.freeze({
+                ...store.getStats(),
+                searches: queryCount,
+                config: runtimeConfig,
+                autoRefresh: autoRefreshSnapshot(),
+            });
         },
         /** @param {string} query @param {Parameters<IoIndexStore['search']>[1]} [queryOptions] */
         search(query, queryOptions = {}) {

@@ -1,5 +1,6 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -49,13 +50,13 @@ describe('cross-process IO invalidation journal', () => {
             cleanupIntervalMs: 60_000,
         };
         const producer = createCrossProcessInvalidationJournal({
-            db: dbA,
+            db: adaptBetterSqliteDatabase(dbA),
             processInstance: 'producer-A',
             now: () => now,
             config,
         });
         const consumer = createCrossProcessInvalidationJournal({
-            db: dbB,
+            db: adaptBetterSqliteDatabase(dbB),
             processInstance: 'consumer-B',
             now: () => now,
             config,
@@ -84,7 +85,7 @@ describe('cross-process IO invalidation journal', () => {
         const db = new Database(':memory:');
         let now = 1_000;
         const journal = createCrossProcessInvalidationJournal({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             processInstance: 'startup-replay-producer',
             now: () => now,
             config: {
@@ -102,7 +103,11 @@ describe('cross-process IO invalidation journal', () => {
         now += 1;
         const seq3 = journal.publish('/workspace/src/copilot/c.js', { source: 'c' });
 
-        const replay = readCrossProcessInvalidationReplay({ afterSequence: seq1, maxRows: 16, db });
+        const replay = readCrossProcessInvalidationReplay({
+            afterSequence: seq1,
+            maxRows: 16,
+            db: adaptBetterSqliteDatabase(db),
+        });
         assert.equal(replay.available, true);
         assert.equal(replay.afterSequence, seq1);
         assert.equal(replay.highWatermark, seq3);
@@ -114,19 +119,35 @@ describe('cross-process IO invalidation journal', () => {
         );
         assert.equal(journal.getStats().lastSeenSequence, 0);
 
-        const truncated = readCrossProcessInvalidationReplay({ afterSequence: 0, maxRows: 1, db });
+        const truncated = readCrossProcessInvalidationReplay({
+            afterSequence: 0,
+            maxRows: 1,
+            db: adaptBetterSqliteDatabase(db),
+        });
         assert.equal(truncated.truncated, true);
         assert.equal(truncated.rowCount, 1);
 
         db.prepare('DELETE FROM copilot_io_invalidation_journal WHERE sequence = ?').run(seq2);
-        const gap = readCrossProcessInvalidationReplay({ afterSequence: seq1, maxRows: 16, db });
+        const gap = readCrossProcessInvalidationReplay({
+            afterSequence: seq1,
+            maxRows: 16,
+            db: adaptBetterSqliteDatabase(db),
+        });
         assert.equal(gap.gapDetected, true);
 
-        const reset = readCrossProcessInvalidationReplay({ afterSequence: seq3 + 50, maxRows: 16, db });
+        const reset = readCrossProcessInvalidationReplay({
+            afterSequence: seq3 + 50,
+            maxRows: 16,
+            db: adaptBetterSqliteDatabase(db),
+        });
         assert.equal(reset.gapDetected, true);
 
         db.prepare('DELETE FROM copilot_io_invalidation_journal').run();
-        const cleanedThroughCheckpoint = readCrossProcessInvalidationReplay({ afterSequence: seq3, maxRows: 16, db });
+        const cleanedThroughCheckpoint = readCrossProcessInvalidationReplay({
+            afterSequence: seq3,
+            maxRows: 16,
+            db: adaptBetterSqliteDatabase(db),
+        });
         assert.equal(cleanedThroughCheckpoint.highWatermark, seq3);
         assert.equal(cleanedThroughCheckpoint.rowCount, 0);
         assert.equal(cleanedThroughCheckpoint.gapDetected, false);
@@ -177,7 +198,7 @@ describe('cross-process IO invalidation journal', () => {
         const db = new Database(dbPath);
         db.pragma('journal_mode = WAL');
         const producer = createCrossProcessInvalidationJournal({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             processInstance: `parent-${process.pid}`,
             config: {
                 enabled: true,

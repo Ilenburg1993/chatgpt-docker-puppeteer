@@ -7,7 +7,7 @@ import { afterEach, describe, it } from 'vitest';
 import {
     buildCloudflareTransportBenchmarkPlan,
     summarizePersistedBenchmarkState,
-} from '#copilot/mcp/tools/cloudflare-transport-benchmark.js';
+} from '#copilot/testing/mcp/tools/cloudflare-transport-benchmark';
 
 const previousProtocol = process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'];
 const previousTunnelProtocol = process.env['TUNNEL_TRANSPORT_PROTOCOL'];

@@ -13,14 +13,14 @@ import { createHistogram } from './metrics-histogram.js';
 
 // ─── Persistência SQLite (opcional, L2) ──────────────────────────────────────
 
-/** @type {import('better-sqlite3').Database | null} */
+/** @type {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} */
 let _persistenceDb = null;
 
 /**
  * Inicializa a persistência SQLite do trace-store de convergência. Deve ser chamado uma vez no bootstrap (após
  * `ensureCopilotDbDir` + `getCopilotDb`). Idempotente — chamadas extras com o mesmo banco são ignoradas.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function initConvergenceTracePersistence(db) {

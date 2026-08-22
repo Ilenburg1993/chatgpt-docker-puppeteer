@@ -5,11 +5,16 @@
  * @module copilot/mcp/scripts/run-safe-validation-suite
  */
 
+import {
+    enableCopilotNodeCompileCache,
+    readCopilotNodeCompileCacheConfig,
+    withCopilotNodeCompileCacheEnv,
+} from '#copilot/infra/public/platform/node';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { enableCopilotNodeCompileCache, withCopilotNodeCompileCacheEnv } from '../runtime/node-compile-cache.js';
 
-const nodeCompileCache = enableCopilotNodeCompileCache();
+const nodeCompileCacheConfig = readCopilotNodeCompileCacheConfig(process.env);
+const nodeCompileCache = enableCopilotNodeCompileCache(nodeCompileCacheConfig);
 
 /**
  * @typedef {'mcp-fast' | 'mcp-full' | 'copilot-fast'} SafeValidationSuiteName
@@ -160,7 +165,7 @@ async function runStep(step) {
     const result = await new Promise((resolve) => {
         const child = spawn(step.command, step.args, {
             cwd: process.cwd(),
-            env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' }),
+            env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' }, nodeCompileCacheConfig),
             stdio: ['ignore', 'inherit', 'inherit'],
         });
         child.on('error', (error) => {

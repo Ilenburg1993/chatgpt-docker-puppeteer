@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "policy": "copilot-core-exact-semantic-import-boundaries",
+  "rootAlias": "#copilot/core",
+  "rootTarget": "./src/copilot/core/index.js",
+  "aliases": [
+    {
+      "alias": "#copilot/core/circuit-breaker",
+      "target": "./src/copilot/core/circuit-breaker.js",
+      "semantic": "resilience"
+    },
+    {
+      "alias": "#copilot/core/di",
+      "target": "./src/copilot/core/di.js",
+      "semantic": "dependency-injection"
+    },
+    {
+      "alias": "#copilot/core/di-tokens",
+      "target": "./src/copilot/core/di-tokens.js",
+      "semantic": "dependency-injection-contracts"
+    },
+    {
+      "alias": "#copilot/core/elicitation-schema",
+      "target": "./src/copilot/core/elicitation-schema.js",
+      "semantic": "protocol-schema"
+    },
+    {
+      "alias": "#copilot/core/error-codes",
+      "target": "./src/copilot/core/error-codes.js",
+      "semantic": "errors"
+    },
+    {
+      "alias": "#copilot/core/error-handlers",
+      "target": "./src/copilot/core/error-handlers.js",
+      "semantic": "errors"
+    },
+    {
+      "alias": "#copilot/core/errors",
+      "target": "./src/copilot/core/errors.js",
+      "semantic": "errors"
+    },
+    {
+      "alias": "#copilot/core/event-bus",
+      "target": "./src/copilot/core/event-bus.js",
+      "semantic": "events"
+    },
+    {
+      "alias": "#copilot/core/interfaces",
+      "target": "./src/copilot/core/interfaces.js",
+      "semantic": "contracts"
+    },
+    {
+      "alias": "#copilot/core/io-contracts",
+      "target": "./src/copilot/core/io-contracts.js",
+      "semantic": "io-contracts"
+    },
+    {
+      "alias": "#copilot/core/io-policy",
+      "target": "./src/copilot/core/io-policy.js",
+      "semantic": "io-policy"
+    },
+    {
+      "alias": "#copilot/core/process-policy",
+      "target": "./src/copilot/core/process-policy.js",
+      "semantic": "process-policy"
+    },
+    {
+      "alias": "#copilot/core/safe-json",
+      "target": "./src/copilot/core/safe-json.js",
+      "semantic": "serialization"
+    },
+    {
+      "alias": "#copilot/core/schemas",
+      "target": "./src/copilot/core/schemas.js",
+      "semantic": "validation"
+    },
+    {
+      "alias": "#copilot/core/security/url-validator",
+      "target": "./src/copilot/core/security/url-validator.js",
+      "semantic": "security"
+    },
+    {
+      "alias": "#copilot/core/shutdown",
+      "target": "./src/copilot/core/shutdown.js",
+      "semantic": "lifecycle"
+    },
+    {
+      "alias": "#copilot/core/structured-message",
+      "target": "./src/copilot/core/structured-message.js",
+      "semantic": "protocol"
+    },
+    {
+      "alias": "#copilot/core/tool-contracts",
+      "target": "./src/copilot/core/tool-contracts.js",
+      "semantic": "tool-contracts"
+    }
+  ],
+  "description": "Closed allowlist for semantic Core subpath imports. Wildcard and file-by-file arbitrary deep imports are forbidden; additions require an explicit architecture-manifest change and a real source consumer."
+}

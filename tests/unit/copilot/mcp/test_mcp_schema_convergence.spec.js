@@ -15,7 +15,7 @@ import {
     createCopilotMcpServer,
     getCopilotMcpServerFactoryStatus,
     resetCopilotMcpServerFactoryRuntimeForTests,
-} from '#copilot/mcp/server';
+} from '#copilot/testing/mcp/server';
 
 beforeEach(() => {
     resetMcpSchemaConvergenceStateForTests();

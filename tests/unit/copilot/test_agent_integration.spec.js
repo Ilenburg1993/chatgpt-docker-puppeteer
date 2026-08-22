@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks de camada I/O ── */
-vi.mock('#copilot/config/env', () => ({
+vi.mock('#copilot/testing/config/env', () => ({
     getCopilotFallbackModel: vi.fn(() => 'auto'),
     COPILOT_MODEL: 'gpt-4o',
     AGENT_HOOK_CONTEXT_MAX_BYTES: 4096,

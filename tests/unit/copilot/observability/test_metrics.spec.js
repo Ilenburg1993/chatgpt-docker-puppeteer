@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
@@ -25,7 +25,7 @@ vi.mock('#copilot/config/env', async (importOriginal) => {
 });
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('node:fs/promises')} */ (await importOriginal());
     return {
         ...actual,
         appendFile: vi.fn(async () => {}),
@@ -34,7 +34,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../src/copilot/core/error-handlers.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('../../../../src/copilot/core/error-handlers.js')} */ (
+        await importOriginal()
+    );
     return {
         ...actual,
         logSwallowed: vi.fn(),

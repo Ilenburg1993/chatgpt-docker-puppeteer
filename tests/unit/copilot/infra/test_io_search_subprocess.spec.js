@@ -81,6 +81,15 @@ describe('infra/indexing/search/subprocess', () => {
         ).rejects.toMatchObject({ code: 'EUTF8SEARCHOUTPUT' });
     });
 
+    it('rejeita executável nominal sem ambiente process-owned explícito', async () => {
+        await expect(execSearchFile('rg', ['--version'])).rejects.toMatchObject({
+            code: 'ERR_SEARCH_SUBPROCESS_ENV_REQUIRED',
+        });
+        await expect(streamSearchFile('grep', ['--version'])).rejects.toMatchObject({
+            code: 'ERR_SEARCH_SUBPROCESS_ENV_REQUIRED',
+        });
+    });
+
     it('rejeita executável ou argumentos com byte nulo', async () => {
         await expect(execSearchFile('node\u0000bad', [])).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
         await expect(execSearchFile(process.execPath, ['ok\u0000bad'])).rejects.toMatchObject({

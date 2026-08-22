@@ -11,13 +11,13 @@ LATEST_CHANGED_TS=0
 LATEST_CHANGED_KIND="unknown"
 
 has_command() {
-    command -v "$1" >/dev/null 2>&1
+    command -v "$1" > /dev/null 2>&1
 }
 
 classify_asset_kind() {
     local path="$1"
     case "$path" in
-        */Dockerfile|*/nss-gatekeeper.sh)
+        */Dockerfile | */nss-gatekeeper.sh)
             printf '%s\n' "rebuild"
             ;;
         */devcontainer.json)
@@ -43,7 +43,7 @@ classify_asset_kind() {
 
 resolve_workspace() {
     if has_command git; then
-        git rev-parse --show-toplevel 2>/dev/null && return 0
+        git rev-parse --show-toplevel 2> /dev/null && return 0
     fi
 
     if [ -n "${DEVCONTAINER_WORKSPACE_FOLDER:-}" ] && [ -d "${DEVCONTAINER_WORKSPACE_FOLDER}" ]; then
@@ -59,10 +59,10 @@ track_latest_asset() {
     local ts=""
 
     [ -f "$path" ] || return 0
-    ts="$(stat -c '%Y' "$path" 2>/dev/null || true)"
+    ts="$(stat -c '%Y' "$path" 2> /dev/null || true)"
     [[ "$ts" =~ ^[0-9]+$ ]] || return 0
 
-    if (( ts > LATEST_CHANGED_TS )); then
+    if ((ts > LATEST_CHANGED_TS)); then
         LATEST_CHANGED_TS="$ts"
         LATEST_CHANGED_FILE="$path"
         LATEST_CHANGED_KIND="$(classify_asset_kind "$path")"
@@ -72,7 +72,7 @@ track_latest_asset() {
 print_ports_from_jsonc() {
     local file_path="$1"
 
-    node - "$file_path" <<'EOF'
+    node - "$file_path" << 'EOF'
 const fs = require('node:fs');
 const path = process.argv[2];
 const candidates = [];
@@ -110,11 +110,11 @@ print_ports_with_fallback() {
     local file_path="$1"
     local port
 
-    if print_ports_from_jsonc "$file_path" 2>/dev/null; then
+    if print_ports_from_jsonc "$file_path" 2> /dev/null; then
         return 0
     fi
 
-    sed -n '/"forwardPorts"[[:space:]]*:[[:space:]]*\[/,/\][[:space:]]*,\?[[:space:]]*$/p' "$file_path" 2>/dev/null \
+    sed -n '/"forwardPorts"[[:space:]]*:[[:space:]]*\[/,/\][[:space:]]*,\?[[:space:]]*$/p' "$file_path" 2> /dev/null \
         | grep -oE "[0-9]{4,5}" | while read -r port; do
         [ -n "$port" ] && printf '%s\n' "$port"
     done || true
@@ -136,15 +136,15 @@ track_latest_asset "${NSS_GATEKEEPER_PATH}"
 
 while IFS= read -r asset; do
     track_latest_asset "${asset}"
-done < <(find "${WORKSPACE_ROOT}/.devcontainer/scripts" -maxdepth 1 -type f 2>/dev/null | sort)
+done < <(find "${WORKSPACE_ROOT}/.devcontainer/scripts" -maxdepth 1 -type f 2> /dev/null | sort)
 
 # Get VS Code server start time
 VSCODE_PID="$(
-    pgrep -f '(.vscode-server|code-server|server-main)' 2>/dev/null \
+    pgrep -f '(.vscode-server|code-server|server-main)' 2> /dev/null \
         | head -1 || true
 )"
 if [ -n "$VSCODE_PID" ]; then
-    VSCODE_UPTIME="$(ps -p "$VSCODE_PID" -o etime= 2>/dev/null | tr -d ' ' || true)"
+    VSCODE_UPTIME="$(ps -p "$VSCODE_PID" -o etime= 2> /dev/null | tr -d ' ' || true)"
     if [ -n "$VSCODE_UPTIME" ]; then
         echo "VS Code Server uptime: $VSCODE_UPTIME"
     else
@@ -155,7 +155,7 @@ else
 fi
 
 if has_command devcontainer; then
-    DEVCONTAINER_VERSION="$(devcontainer --version 2>/dev/null | head -1 || true)"
+    DEVCONTAINER_VERSION="$(devcontainer --version 2> /dev/null | head -1 || true)"
     [ -n "$DEVCONTAINER_VERSION" ] && echo "devcontainer CLI: $DEVCONTAINER_VERSION"
 fi
 
@@ -169,21 +169,21 @@ else
 fi
 
 if [ -n "${LATEST_CHANGED_FILE}" ] && [ "${LATEST_CHANGED_FILE}" != "${DEVCONTAINER_FILE}" ]; then
-    LATEST_CHANGED_HUMAN="$(stat -c '%y' "${LATEST_CHANGED_FILE}" 2>/dev/null | cut -d. -f1 || true)"
+    LATEST_CHANGED_HUMAN="$(stat -c '%y' "${LATEST_CHANGED_FILE}" 2> /dev/null | cut -d. -f1 || true)"
     echo "latest watched asset: ${LATEST_CHANGED_FILE#"${WORKSPACE_ROOT}"/}"
     [ -n "${LATEST_CHANGED_HUMAN}" ] && echo "latest watched mtime: $LATEST_CHANGED_HUMAN"
 fi
 
 if has_command jsonc-validate; then
-    if jsonc-validate "$DEVCONTAINER_FILE" >/dev/null 2>&1; then
+    if jsonc-validate "$DEVCONTAINER_FILE" > /dev/null 2>&1; then
         echo "JSONC validation: OK"
     else
         rc=$?
         case "$rc" in
-            2|69)
+            2 | 69)
                 echo "JSONC validation: fallback mode (jsonc-validate present but parser module missing)"
                 ;;
-            3|65)
+            3 | 65)
                 echo "Error: devcontainer.json is not valid JSONC"
                 exit 1
                 ;;
@@ -223,7 +223,7 @@ echo "=========================================="
 echo ""
 
 if [ -n "$VSCODE_PID" ]; then
-    UPTIME_SECONDS="$(ps -p "$VSCODE_PID" -o etimes= 2>/dev/null | tr -d ' ' || true)"
+    UPTIME_SECONDS="$(ps -p "$VSCODE_PID" -o etimes= 2> /dev/null | tr -d ' ' || true)"
     if [ -z "$UPTIME_SECONDS" ]; then
         echo "Warning: could not determine VS Code uptime precisely"
         echo "Reload the window if you changed devcontainer.json after startup."

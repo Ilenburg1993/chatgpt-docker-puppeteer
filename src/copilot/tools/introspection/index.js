@@ -2,7 +2,7 @@
 /**
  * Barrel do subdomínio `tools/introspection`.
  *
- * Mantém compatibilidade durante migração física incremental dos arquivos de introspecção.
+ * Boundary físico estável do subdomínio; consumidores externos usam a surface canônica de `tools/`.
  *
  * @module copilot/tools/introspection
  */

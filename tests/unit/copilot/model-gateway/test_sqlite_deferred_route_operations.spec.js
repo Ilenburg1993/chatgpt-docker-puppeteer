@@ -1,5 +1,7 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
+
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteModelGatewayCatalogStore } from '../../../../src/copilot/model-gateway/catalog/sqlite-catalog-store.js';
@@ -57,7 +59,7 @@ describe('SqliteModelGatewayCatalogStore deferred route operations', () => {
     it('consulta operação diferida por sessão e materializa ledger relacional de transições', async () => {
         const db = new Database(':memory:');
         databases.push(db);
-        const store = new SqliteModelGatewayCatalogStore({ db });
+        const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
 
         await store.writeSdkSessionHandoffRecords([deferredHandoff()]);
 
@@ -104,7 +106,7 @@ describe('SqliteModelGatewayCatalogStore deferred route operations', () => {
     it('filtra operações expiradas quando solicitado sem desserializar todo o ledger', async () => {
         const db = new Database(':memory:');
         databases.push(db);
-        const store = new SqliteModelGatewayCatalogStore({ db });
+        const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
         await store.writeSdkSessionHandoffRecords([deferredHandoff()]);
 
         const rows = await store.readDeferredSdkSessionHandoffRecords({

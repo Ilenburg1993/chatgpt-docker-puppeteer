@@ -9,8 +9,8 @@ import {
     appendIoChangeSetEntry,
     applyIoChangeSet,
     beginIoChangeSet,
-    createIoRollbackToken,
-    executeIoRollbackToken,
+    createIoRollbackCapabilityRuntime,
+    decodeIoRollbackToken,
     serializeIoRollbackToken,
 } from '#copilot/infra/internal/operations';
 import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
@@ -18,8 +18,14 @@ import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 /** @type {string[]} */
 const temporaryPaths = [];
+/** @type {ReturnType<typeof createIoRollbackCapabilityRuntime>[]} */
+const rollbackRuntimes = [];
+/** @type {Map<string, ReturnType<ReturnType<typeof createIoRollbackCapabilityRuntime>['bindWorkspace']>>} */
+const tokenCapabilities = new Map();
 
 afterEach(async () => {
+    for (const runtime of rollbackRuntimes.splice(0)) runtime.dispose();
+    tokenCapabilities.clear();
     await Promise.all(temporaryPaths.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
 });
 
@@ -41,7 +47,41 @@ function tokenFromHints(hints) {
             rollback: hint,
         });
     }
-    return createIoRollbackToken(applyIoChangeSet(changeSet));
+    const sidecarDirectory = hints.find((hint) => hint.snapshotSidecar)?.snapshotSidecar?.path
+        ? join(/** @type {string} */ (hints.find((hint) => hint.snapshotSidecar)?.snapshotSidecar?.path), '..')
+        : join(WORKSPACE, 'tmp', '.rollback-sidecars-default');
+    const runtime = createIoRollbackCapabilityRuntime({
+        runtimeId: `rollback-executor-${rollbackRuntimes.length + 1}`,
+        ttlMs: 60_000,
+        secret: Buffer.alloc(32, rollbackRuntimes.length + 1),
+    });
+    rollbackRuntimes.push(runtime);
+    const capability = runtime.bindWorkspace({
+        workspaceId: `rollback-executor-workspace-${rollbackRuntimes.length}`,
+        workspaceRoot: WORKSPACE,
+        policy: {
+            enabled: true,
+            directory: sidecarDirectory,
+            ttlMs: 60_000,
+            maxEntries: 32,
+            maxBytes: 32 * 1024 * 1024,
+        },
+    });
+    const { token } = capability.issue(applyIoChangeSet(changeSet));
+    tokenCapabilities.set(token.tokenId, capability);
+    return token;
+}
+
+/**
+ * Compatibility-shaped test helper over the real authenticated capability. Production exposes no stateless executor.
+ * @param {string|ReturnType<typeof tokenFromHints>} tokenOrSerialized
+ * @param {{dryRun?:boolean;allowedPaths?:ReadonlySet<string>;onPhase?:(phase:string,details:Record<string,unknown>)=>void|Promise<void>}} [options]
+ */
+async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
+    const token = typeof tokenOrSerialized === 'string' ? decodeIoRollbackToken(tokenOrSerialized) : tokenOrSerialized;
+    const capability = tokenCapabilities.get(token.tokenId);
+    if (!capability) throw new Error(`Missing test rollback capability for ${token.tokenId}.`);
+    return capability.execute(token, options);
 }
 
 describe('infra/operations/rollback-executor', () => {
@@ -73,6 +113,9 @@ describe('infra/operations/rollback-executor', () => {
         const applied = await executeIoRollbackToken(token, { dryRun: false, allowedPaths });
         expect(applied).toMatchObject({ success: true, status: 'applied', appliedCount: 1 });
         expect(await readFile(filePath, 'utf8')).toBe('before');
+        await expect(executeIoRollbackToken(token, { dryRun: false, allowedPaths })).rejects.toMatchObject({
+            code: 'EROLLBACKREPLAY',
+        });
     });
 
     it('restaura corretamente um arquivo anteriormente vazio', async () => {
@@ -126,7 +169,6 @@ describe('infra/operations/rollback-executor', () => {
         const applied = await executeIoRollbackToken(token, {
             dryRun: false,
             allowedPaths: new Set([filePath]),
-            sidecarDirectory,
         });
 
         expect(applied).toMatchObject({ success: true, appliedCount: 1 });

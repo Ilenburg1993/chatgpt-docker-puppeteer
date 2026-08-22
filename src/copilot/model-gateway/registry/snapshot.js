@@ -39,7 +39,10 @@ import { ModelGatewayRegistry } from './model-registry.js';
  * Builds the current env compat snapshot and persists it into the JSON registry store.
  *
  * @param {Record<string, string | undefined>} [env]
- * @param {{ filePath?: string }} [options]
+ * @param {{
+ *   filePath?: string;
+ *   io?: ReturnType<typeof import('#copilot/infra/public/composition/filesystem/configured').createConfiguredFsIo>;
+ * }} [options]
  * @returns {Promise<ReturnType<typeof buildEnvByokModelGatewaySnapshot> & { registryPath: string }>}
  */
 export async function persistEnvByokModelGatewaySnapshot(env = process.env, options = {}) {

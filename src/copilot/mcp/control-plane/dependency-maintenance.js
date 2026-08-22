@@ -17,7 +17,6 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import { writeFileAtomic } from '#copilot/infra/public/filesystem/write';
 import { getMcpWorkspaceIo, getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_DEPENDENCY_MAINTENANCE_VERSION = 2;
@@ -42,7 +41,7 @@ export const MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES = Object.freeze([
     'vue-demi',
 ]);
 const TRUSTED_INSTALL_SCRIPT_PACKAGE_SET = new Set(MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES);
-const { readTextFresh: readWorkspaceTextFresh } = getMcpWorkspaceIo();
+const { readTextFresh: readWorkspaceTextFresh, writeFileAtomic: writeWorkspaceFileAtomic } = getMcpWorkspaceIo();
 
 /**
  * @typedef {{
@@ -469,7 +468,7 @@ async function pruneStaleTrustedAllowScripts() {
         }
     }
     if (removed.length === 0) return { changed: false, removed: [] };
-    await writeFileAtomic(packagePath, `${JSON.stringify(parsedPackage, null, 2)}\n`, {
+    await writeWorkspaceFileAtomic(packagePath, `${JSON.stringify(parsedPackage, null, 2)}\n`, {
         encoding: 'utf8',
         riskClass: 'high',
         advisoryLimits: { domain: 'dependency-maintenance-allow-scripts-prune', file: PACKAGE_JSON },
@@ -480,12 +479,12 @@ async function pruneStaleTrustedAllowScripts() {
 /** @param {{ packageJson: string; packageLock: string }} snapshot */
 async function restoreRootManifests(snapshot) {
     const workspaceRoot = getMcpWorkspaceRoot();
-    await writeFileAtomic(path.join(workspaceRoot, PACKAGE_JSON), snapshot.packageJson, {
+    await writeWorkspaceFileAtomic(path.join(workspaceRoot, PACKAGE_JSON), snapshot.packageJson, {
         encoding: 'utf8',
         riskClass: 'high',
         advisoryLimits: { domain: 'dependency-maintenance-rollback', file: PACKAGE_JSON },
     });
-    await writeFileAtomic(path.join(workspaceRoot, PACKAGE_LOCK), snapshot.packageLock, {
+    await writeWorkspaceFileAtomic(path.join(workspaceRoot, PACKAGE_LOCK), snapshot.packageLock, {
         encoding: 'utf8',
         riskClass: 'high',
         advisoryLimits: { domain: 'dependency-maintenance-rollback', file: PACKAGE_LOCK },

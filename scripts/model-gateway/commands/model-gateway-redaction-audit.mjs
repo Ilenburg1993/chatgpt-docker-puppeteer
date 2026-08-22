@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
@@ -8,19 +7,12 @@ import {
     collectModelGatewaySecretAuditEnvValues,
     summarizeModelGatewayRedactionAudits,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 const args = new Set(process.argv.slice(2));
 const json = args.has('--json');
 const fail = args.has('--fail');
 const repair = args.has('--repair');
-
-if (json) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (args.has('--help') || args.has('-h')) {
     process.stdout

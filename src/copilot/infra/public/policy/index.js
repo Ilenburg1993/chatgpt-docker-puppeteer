@@ -1,12 +1,18 @@
 // @ts-check
 /** @module copilot/infra/public/policy */
 
+/** @typedef {'file-and-directory'|'file'|'none'} IoDurabilityMode */
+
 export {
+    DEFAULT_BLOCKED_PATH_SEGMENTS,
+    DEFAULT_BLOCKED_READ_PATH_PATTERNS,
+    DEFAULT_BLOCKED_WRITE_PATH_PATTERNS,
     DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES,
     DEFAULT_IO_SEARCH_TIMEOUT_MS,
     DEFAULT_PROCESS_MAX_BUFFER_BYTES,
     DEFAULT_PROCESS_TIMEOUT_MS,
     IO_CAPABILITY,
+    IO_PATH_POLICY_VERSION,
     IO_RISK,
     MIN_BUFFER_BYTES,
     MIN_TIMEOUT_MS,
@@ -26,7 +32,6 @@ export {
     normalizePathResourceKey,
     normalizePositiveIntegerBudget,
     normalizeWorkspaceRoot,
-    readEnvPositiveIntegerBudget,
     readMutationAppliedState,
     resolveIoSearchBudget,
     resolveProcessExecutionBudget,

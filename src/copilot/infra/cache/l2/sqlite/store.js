@@ -1,6 +1,7 @@
 // @ts-check
 /** SQLite L2 cache state machine: read/admit/batch/invalidate/prune over prepared storage. */
 
+import { runSqliteTransactionOrDirect } from '#copilot/infra/internal/database/transaction/optional';
 import { isBufferValue, toOwnedBuffer } from '#copilot/infra/internal/platform';
 import { performance } from 'node:perf_hooks';
 import { createIoL2CacheMetrics } from './metrics.js';
@@ -12,7 +13,7 @@ import { createIoL2Statements } from './statements.js';
 
 /**
  * @param {{
- *     db: { exec: Function; prepare: Function; transaction?: Function };
+ *     db: import('#copilot/infra/internal/database/port').SqliteDatabasePort;
  *     ttlMs?: number;
  *     maxEntries?: number;
  *     minBytes?: number;
@@ -60,7 +61,8 @@ export function createIoL2SqliteCache(options) {
     };
 
     function capSizeIfNeeded() {
-        const count = Number(stmtCount.get()?.total || 0);
+        const countRow = /** @type {{ total?: unknown } | undefined} */ (stmtCount.get());
+        const count = Number(countRow?.total ?? 0);
         if (count <= maxEntries) {
             return;
         }
@@ -91,7 +93,8 @@ export function createIoL2SqliteCache(options) {
         }
     }
 
-    const persistRowsBatch = typeof db.transaction === 'function' ? db.transaction(persistRows) : persistRows;
+    /** @param {IoL2CacheRow[]} rows */
+    const persistRowsBatch = (rows) => runSqliteTransactionOrDirect(db, () => persistRows(rows));
 
     function cancelSetBatchTimer() {
         if (setBatchTimer) clearTimeout(setBatchTimer);
@@ -291,7 +294,7 @@ export function createIoL2SqliteCache(options) {
 
         getStats() {
             flushPendingSets();
-            const snapshot = stmtCount.get() || { total: 0, bytes: 0 };
+            const snapshot = /** @type {{ total?: unknown; bytes?: unknown } | undefined} */ (stmtCount.get()) ?? {};
             return {
                 ...stats,
                 size: Number(snapshot.total || 0),

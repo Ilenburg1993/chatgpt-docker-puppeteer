@@ -1,4 +1,6 @@
 // @ts-check
+
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 /**
  * Tests for bounded MCP Streamable HTTP event stores.
  */
@@ -60,9 +62,10 @@ describe('MCP HTTP event stores', () => {
     it('persists events in SQLite and replays them in sequence', async () => {
         const db = new Database(':memory:');
         try {
-            ensureMcpEventStoreSchema(db);
+            const port = adaptBetterSqliteDatabase(db);
+            ensureMcpEventStoreSchema(port);
             const store = createSqliteMcpEventStore({
-                db,
+                db: port,
                 eventTtlMs: 10_000,
                 maxEventsPerStream: 10,
                 now: () => 1_000,

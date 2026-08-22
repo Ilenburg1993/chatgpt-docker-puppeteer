@@ -5,7 +5,8 @@
  * @module copilot/mcp/control-plane/oauth-replay-store
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
+import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_MAX_ENTRIES_PER_NAMESPACE = 10_000;
@@ -28,7 +29,7 @@ export const OAUTH_REPLAY_NAMESPACES = /** @type {const} */ ({
  */
 
 /**
- * @param {{ exec: Function; prepare: Function; transaction: Function }} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {{ maxEntriesPerNamespace?: number; now?: () => number }} [options]
  */
 export function createOAuthReplayStore(db, options = {}) {
@@ -80,14 +81,14 @@ export function createOAuthReplayStore(db, options = {}) {
         FROM copilot_mcp_oauth_replay
     `);
 
-    const rememberTransaction = db.transaction(
-        /**
-         * @param {string} namespace
-         * @param {string} replayKeyHash
-         * @param {number} expiresAtMs
-         * @param {number} nowMs
-         */
-        (namespace, replayKeyHash, expiresAtMs, nowMs) => {
+    /**
+     * @param {string} namespace
+     * @param {string} replayKeyHash
+     * @param {number} expiresAtMs
+     * @param {number} nowMs
+     */
+    const rememberTransaction = (namespace, replayKeyHash, expiresAtMs, nowMs) =>
+        runSqliteTransaction(db, () => {
             const pruned = Number(deleteExpired.run(namespace, nowMs).changes ?? 0);
             const stored = Number(insertReplay.run(namespace, replayKeyHash, expiresAtMs, nowMs).changes ?? 0) === 1;
             let evicted = 0;
@@ -97,8 +98,7 @@ export function createOAuthReplayStore(db, options = {}) {
                 if (excess > 0) evicted = Number(evictOldest.run(namespace, excess).changes ?? 0);
             }
             return { replay: !stored, stored, available: true, pruned, evicted };
-        },
-    );
+        });
 
     return {
         /**
@@ -181,7 +181,7 @@ export function readPersistentOAuthReplayStatus() {
 
 function getPersistentStore() {
     if (persistentStore) return persistentStore;
-    persistentStore = createOAuthReplayStore(getCopilotDb(), {
+    persistentStore = createOAuthReplayStore(getApplicationSqliteDatabase(), {
         maxEntriesPerNamespace: readConfiguredMaxEntries(),
     });
     return persistentStore;

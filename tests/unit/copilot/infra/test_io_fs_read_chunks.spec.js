@@ -29,6 +29,7 @@ const TEMP_DIRS = [];
 let runtime;
 const getByteLineIndexStats = () => runtime.coherence.read.byteLineIndex.stats();
 const resetByteLineIndex = () => runtime.coherence.read.byteLineIndex.reset();
+/** @param {string} filePath */
 const invalidatePath = (filePath) => runtime.coherence.invalidation.invalidatePath(filePath, { source: 'test' });
 /** @param {string} filePath @param {Parameters<typeof readTextLineChunksRaw>[1]} [options] */
 const readTextLineChunks = (filePath, options = {}) =>
@@ -273,7 +274,10 @@ describe('infra/io/fs read line ports', () => {
     it('byte-line index respeita orçamento agregado de memória e não retém entrada oversized', async () => {
         vi.stubEnv('COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES', '4096');
         await runtime.dispose();
-        runtime = createInfraRuntime({ runtimeId: `fs-read-budget-${Date.now()}-${Math.random()}` });
+        runtime = createInfraRuntime({
+            runtimeId: `fs-read-budget-${Date.now()}-${Math.random()}`,
+            env: process.env,
+        });
         const dir = await createTempDir();
         const file = join(dir, 'byte-index-memory-budget.txt');
         await writeFile(file, 'x\n'.repeat(20_000), 'utf8');

@@ -15,9 +15,10 @@
  * @module scripts/check-copilot-global-architecture
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import process from 'node:process';
+import { listSourceFilesSync } from './lib/source-tree.mjs';
 
 const COPILOT_ROOT = 'src/copilot';
 
@@ -25,7 +26,6 @@ const COPILOT_ROOT = 'src/copilot';
 const LAYER_MAP = {
     core: 0,
     types: 0,
-    db: 0,
     infra: 0,
     boot: 1,
     sdk: 1,
@@ -165,24 +165,9 @@ const CONTENT_RULES = [
     },
 ];
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function walkJs(dir) {
-    /** @type {string[]} */
-    const results = [];
-    for (const entry of readdirSync(dir)) {
-        if (entry === 'node_modules' || entry === 'logs') continue;
-        const full = join(dir, entry);
-        const st = statSync(full);
-        if (st.isDirectory()) {
-            results.push(...walkJs(full));
-        } else if (entry.endsWith('.js') || entry.endsWith('.mjs') || entry.endsWith('.cjs')) {
-            results.push(full);
-        }
-    }
-    return results;
+    return listSourceFilesSync(dir, { extensions: ['.js', '.mjs', '.cjs'] });
 }
 
 /**
@@ -256,10 +241,6 @@ function lineForIndex(src, matchIndex) {
 function isDocumentedCompositionImport(relFile, to, spec) {
     if (relFile === 'boot/runtime-bootstrap.js') {
         return ['agent', 'config', 'sdk', 'server', 'terminal', 'tools'].includes(to);
-    }
-
-    if (relFile === 'db/sqlite.js') {
-        return to === 'boot';
     }
 
     if (relFile.startsWith('infra/') && to === 'config') {

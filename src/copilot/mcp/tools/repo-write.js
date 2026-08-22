@@ -151,7 +151,7 @@ const durabilitySchema = z
         'Crash-durability profile. Default file-and-directory. file skips parent-directory fsync; none also skips file flush. Atomic publish, locks, path policy and hash preconditions remain enforced.',
     );
 
-/** @param {unknown} value @returns {{ durability: import('#copilot/infra/public/platform/node/filesystem').IoDurabilityMode } | {}} */
+/** @param {unknown} value @returns {{ durability: import('#copilot/infra/public/policy').IoDurabilityMode } | {}} */
 function durabilityOption(value) {
     return value === 'file-and-directory' || value === 'file' || value === 'none' ? { durability: value } : {};
 }

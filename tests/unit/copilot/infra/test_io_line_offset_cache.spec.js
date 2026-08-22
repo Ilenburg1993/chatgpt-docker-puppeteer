@@ -19,8 +19,15 @@ afterEach(async () => {
 });
 
 const stats = () => runtime.coherence.read.lineOffsets.stats();
+/**
+ * @param {string} filePath
+ * @param {string} text
+ * @param {{sizeBytes:number;mtimeMs:number|null}} fingerprint
+ * @param {{startLine?:number;endLine?:number}} [window]
+ */
 const slice = (filePath, text, fingerprint, window = {}) =>
     runtime.coherence.read.lineOffsets.slice(filePath, text, fingerprint, window);
+/** @param {string} filePath */
 const invalidate = (filePath) => runtime.coherence.invalidation.invalidatePath(filePath, { source: 'test' });
 
 describe('infra/io/fs line-offset cache', () => {
@@ -99,7 +106,10 @@ describe('infra/io/fs line-offset cache', () => {
     it('uses the same physical-line semantics without allocating a split array on bypass', async () => {
         process.env['IO_LINE_OFFSET_CACHE_ENABLED'] = '0';
         await runtime.dispose();
-        runtime = createInfraRuntime({ runtimeId: `line-offset-disabled-${Date.now()}-${Math.random()}` });
+        runtime = createInfraRuntime({
+            runtimeId: `line-offset-disabled-${Date.now()}-${Math.random()}`,
+            env: process.env,
+        });
         const text = 'one\r\ntwo\rthree\n';
         const result = slice(
             FILE,

@@ -80,7 +80,7 @@ import { toError } from '../core/error-handlers.js';
  * Popula a tabela FTS5 de turns caso ela esteja vazia mas a tabela de conteúdo não. Executado após migrations para
  * bancos pré-existentes que migraram do maestro.sqlite.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function initTurnsFts(db) {
@@ -114,7 +114,7 @@ export function initTurnsFts(db) {
  * A tabela FTS5 não suporta ALTER TABLE, então a migração recria a estrutura completa caso o tokenizer atual seja
  * diferente. É idempotente: não faz nada se o tokenizer já estiver correto.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}
  */
 export function migrateFts5Tokenizer(db) {

@@ -21,12 +21,8 @@ import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import {
     classifyParserExtension,
+    DEFAULT_PARSER_PROCESS_CONFIG,
     incrementParserRuntimeCounter,
-    MAX_PARSE_BYTES,
-    MAX_PARSE_DURATION_MS,
-    MAX_PARSE_LINE_GUARD,
-    PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
-    PARSER_WORKER_ENABLED,
     recordParserRuntimeDuration,
 } from '../foundation/index.js';
 import { getParserWorkerRuntimeErrorCode } from '../worker/index.js';
@@ -65,7 +61,7 @@ function tryBabelParse(code, parserOptions) {
  *
  * @param {string} filePath
  * @param {string} content
- * @param {{ signal?: AbortSignal; workerRuntime?: ReturnType<typeof import('../worker/index.js').createParserWorkerRuntime> }} [options]
+ * @param {{ signal?: AbortSignal; workerRuntime?: ReturnType<typeof import('../worker/index.js').createParserWorkerRuntime>; parserConfig?: ReturnType<typeof import('../foundation/index.js').readParserProcessConfig> }} [options]
  * @returns {Promise<FileSymbols>}
  */
 export async function parseFileSymbols(filePath, content, options = {}) {
@@ -74,9 +70,10 @@ export async function parseFileSymbols(filePath, content, options = {}) {
     const lang = classifyParserExtension(ext);
     const parserOptions =
         lang === 'js' || lang === 'ts' ? resolveBabelParserOptions(filePath, lang, { profile: 'symbols' }) : null;
+    const parserConfig = options.parserConfig ?? options.workerRuntime?.config ?? DEFAULT_PARSER_PROCESS_CONFIG;
     const bytes = utf8ByteLength(content, 'parser content');
-    const truncated = bytes > MAX_PARSE_BYTES;
-    const source = truncated ? truncateUtf8String(content, MAX_PARSE_BYTES).text : content;
+    const truncated = bytes > parserConfig.maxParseBytes;
+    const source = truncated ? truncateUtf8String(content, parserConfig.maxParseBytes).text : content;
     const parsedBytes = truncated ? utf8ByteLength(source, 'parser truncated content') : bytes;
     const lines = countPhysicalTextLines(content);
 
@@ -98,19 +95,19 @@ export async function parseFileSymbols(filePath, content, options = {}) {
 
     if (lang === 'js' || lang === 'ts') {
         if (!parserOptions) throw new Error(`Babel parser options unavailable for ${lang}: ${filePath}`);
-        if (lines > MAX_PARSE_LINE_GUARD) {
+        if (lines > parserConfig.maxParseLines) {
             incrementParserRuntimeCounter('skippedByLineGuard');
-            base.parseError = `parser skipped: line guard exceeded (${lines} > ${MAX_PARSE_LINE_GUARD})`;
+            base.parseError = `parser skipped: line guard exceeded (${lines} > ${parserConfig.maxParseLines})`;
             return base;
         }
 
-        if (PARSER_WORKER_ENABLED && options.workerRuntime) {
+        if (parserConfig.workerEnabled && options.workerRuntime) {
             try {
                 const workerResult = await options.workerRuntime.parseSymbols(
                     {
                         source,
                         parserOptions,
-                        maxParseDurationMs: MAX_PARSE_DURATION_MS,
+                        maxParseDurationMs: parserConfig.maxParseDurationMs,
                     },
                     options.signal,
                 );
@@ -136,7 +133,7 @@ export async function parseFileSymbols(filePath, content, options = {}) {
                     errorCode === 'ERR_IO_PARSER_WORKER_QUEUE_TIMEOUT' ||
                     errorCode === 'ERR_IO_PARSER_WORKER_TIMEOUT'
                 ) {
-                    if (parsedBytes > PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES) {
+                    if (parsedBytes > parserConfig.mainThreadFallbackMaxBytes) {
                         base.parseError = error instanceof Error ? error.message : 'parser worker overloaded';
                         return base;
                     }
@@ -157,9 +154,9 @@ export async function parseFileSymbols(filePath, content, options = {}) {
             base.parseError = parsed.parseError ?? 'babel parse returned null';
             return base;
         }
-        if (parseDurationMs > MAX_PARSE_DURATION_MS) {
+        if (parseDurationMs > parserConfig.maxParseDurationMs) {
             incrementParserRuntimeCounter('budgetExceeded');
-            base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${MAX_PARSE_DURATION_MS}ms)`;
+            base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${parserConfig.maxParseDurationMs}ms)`;
         }
         if (parsed.ast.errors?.length) {
             const astError = parsed.ast.errors.map((error) => formatBabelParserError(error)).join('; ');

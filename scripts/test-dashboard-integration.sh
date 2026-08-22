@@ -45,7 +45,7 @@ fi
 
 echo ""
 echo "4️⃣  Testing PM2 Services..."
-PM2_STATUS=$(npx pm2 jlist 2>/dev/null | jq -r '.[] | select(.pm2_env.status=="online") | .name')
+PM2_STATUS=$(npx pm2 jlist 2> /dev/null | jq -r '.[] | select(.pm2_env.status=="online") | .name')
 EXPECTED_SERVICES=("agente-gpt" "dashboard-web" "chrome-proxy")
 
 for service in "${EXPECTED_SERVICES[@]}"; do

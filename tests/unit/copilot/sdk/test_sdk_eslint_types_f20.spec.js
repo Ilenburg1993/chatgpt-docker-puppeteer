@@ -9,9 +9,10 @@
  *   - `config/index.js` marca re-exports de sdk/ como deprecated
  *   - Zero imports diretos residuais em toda a codebase copilot
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { listSourceFilesSync } from '../../../../scripts/lib/source-tree.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,22 +61,22 @@ describe('F20 — hooks/types.js alinhamento', () => {
 
     it('hooks/types.js importa PermissionHandler de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionHandler");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionHandler");
     });
 
     it('hooks/types.js importa PermissionRequest de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionRequest");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionRequest");
     });
 
     it('hooks/types.js importa PermissionRequestResult de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionRequestResult");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionRequestResult");
     });
 
     it('hooks/types.js referencia o SessionHooks canônico do SDK', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("@typedef {import('#copilot/sdk/types.js').SessionHooks} SessionHooks");
+        expect(src).toContain("@typedef {import('#copilot/sdk/types').SessionHooks} SessionHooks");
     });
 });
 
@@ -120,17 +121,7 @@ describe('F20 — Cleanup: zero runtime imports de @github/copilot-sdk fora de s
          * @returns {string[]}
          */
         function collectJsFiles(dir) {
-            /** @type {string[]} */
-            const results = [];
-            for (const entry of readdirSync(dir, { withFileTypes: true })) {
-                const full = join(dir, entry.name);
-                if (entry.isDirectory()) {
-                    results.push(...collectJsFiles(full));
-                } else if (entry.name.endsWith('.js')) {
-                    results.push(relative(SRC_COPILOT, full));
-                }
-            }
-            return results;
+            return listSourceFilesSync(dir, { extensions: ['.js'] }).map((full) => relative(SRC_COPILOT, full));
         }
 
         const allNonSdk = collectJsFiles(SRC_COPILOT).filter((f) => !f.startsWith('sdk/'));

@@ -1,5 +1,6 @@
 // @ts-check
 
+import { createBetterSqliteProvider } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ const runtimes = [];
 function createTestRuntime(options = {}) {
     const runtime = createInfraRuntime({
         runtimeId: `invalidation-test-${Date.now()}-${Math.random()}`,
+        env: process.env,
         ...options,
     });
     runtimes.push(runtime);
@@ -72,7 +74,7 @@ describe('infra/filesystem/invalidation bus runtime ownership', () => {
         runtime.coherence.read.byteLineIndex.ensureInvalidationHook();
         const beforeComposition = runtime.coherence.invalidation.snapshot();
         const db = new Database(':memory:');
-        runtime.database.configure(() => db);
+        runtime.database.configure(createBetterSqliteProvider(() => db));
         runtime.coherence.invalidation.publish('/tmp/retry-after-composition.js', { source: 'retry-proof' });
         const afterComposition = runtime.coherence.invalidation.snapshot();
 

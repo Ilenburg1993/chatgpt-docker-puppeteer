@@ -1,5 +1,7 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
+
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
@@ -242,7 +244,7 @@ describe('MCP index startup checkpoint', () => {
                 (scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms)
             VALUES ('src/copilot', 'abc', 2, 1000, 1000);
         `);
-        const checkpoint = readIndexStartupCheckpoint('src/copilot', db);
+        const checkpoint = readIndexStartupCheckpoint('src/copilot', adaptBetterSqliteDatabase(db));
         assert.equal(checkpoint?.journalSequence, 0);
         const columns = /** @type {{ name: string }[]} */ (
             db.prepare('PRAGMA table_info(copilot_mcp_index_startup_checkpoint)').all()
@@ -265,7 +267,7 @@ describe('MCP index startup checkpoint', () => {
                 nowMs: 1_000,
                 journalSequence: 7,
             },
-            db,
+            adaptBetterSqliteDatabase(db),
         );
         writeIndexStartupCheckpoint(
             {
@@ -276,9 +278,9 @@ describe('MCP index startup checkpoint', () => {
                 nowMs: 2_000,
                 journalSequence: 9,
             },
-            db,
+            adaptBetterSqliteDatabase(db),
         );
-        const checkpoint = readIndexStartupCheckpoint('src/copilot', db);
+        const checkpoint = readIndexStartupCheckpoint('src/copilot', adaptBetterSqliteDatabase(db));
         assert.equal(checkpoint?.head, 'def');
         assert.equal(checkpoint?.completedAtMs, 2_000);
         assert.equal(checkpoint?.lastFullReconcileAtMs, 1_000);

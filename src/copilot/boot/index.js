@@ -7,6 +7,7 @@
  * @module copilot/boot
  */
 
+export * from './application-infra-host.js';
 export * from './application-infra.js';
 export * from './config.js';
 export * from './contract.js';

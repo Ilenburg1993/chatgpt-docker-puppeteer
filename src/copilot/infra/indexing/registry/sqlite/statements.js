@@ -9,7 +9,7 @@
  */
 
 /**
- * @param {{ prepare: Function }} db
+ * @param {import('#copilot/infra/internal/database/port').SqliteDatabasePort} db
  */
 export function createIoIndexStatements(db) {
     const stmtDeleteFile = db.prepare(`

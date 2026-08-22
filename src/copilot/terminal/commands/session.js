@@ -14,7 +14,7 @@ import {
     getEffectiveSdkAgentSelection,
     listTerminalSdkCommandSpecs,
 } from '#copilot/config';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import {
     classifyTerminalByokSdkBinding,
     renderTerminalByokBindingMachineAlias,

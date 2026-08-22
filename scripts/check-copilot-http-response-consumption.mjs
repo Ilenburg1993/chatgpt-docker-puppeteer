@@ -7,6 +7,7 @@ import traverseModule from '@babel/traverse';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { listSourceFilesSync } from './lib/source-tree.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const TARGET = path.join(ROOT, 'src', 'copilot');
@@ -18,22 +19,9 @@ const traverse = traverseModule;
 
 /** @typedef {{ file: string; line: number; method: string; text: string }} Finding */
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function walk(dir) {
-    /** @type {string[]} */
-    const files = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-            files.push(...walk(fullPath));
-        } else if (entry.isFile() && /\.(?:c|m)?js$/u.test(entry.name)) {
-            files.push(fullPath);
-        }
-    }
-    return files;
+    return listSourceFilesSync(dir, { extensions: ['.js', '.mjs', '.cjs'] });
 }
 
 /**

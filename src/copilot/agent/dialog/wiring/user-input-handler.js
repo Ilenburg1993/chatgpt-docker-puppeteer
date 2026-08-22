@@ -10,12 +10,12 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
-import { resolveEffectiveUserInputAllowFreeform } from '#copilot/sdk';
 import { persistAgentRuntimePendingQuestionState } from '../../facades/agent-runtime-state.js';
 import { log } from '../../ports/logging/index.js';
+import { resolveAgentUserInputAllowFreeform } from '../../ports/user-input-policy-port.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';
@@ -127,7 +127,7 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
  */
 function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
     const answer = rawAnswer.trim();
-    resolveEffectiveUserInputAllowFreeform(allowFreeform);
+    resolveAgentUserInputAllowFreeform(allowFreeform);
     if (Array.isArray(choices) && choices.length > 0) {
         const numericIndex = Number(answer);
         if (Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= choices.length) {
@@ -214,7 +214,7 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
     ctx.setStatus('waiting_for_input');
     const askedAt = Date.now();
     const questionKind = kind;
-    const effectiveAllowFreeform = resolveEffectiveUserInputAllowFreeform(allowFreeform);
+    const effectiveAllowFreeform = resolveAgentUserInputAllowFreeform(allowFreeform);
 
     return new Promise((resolve) => {
         /** @type {PendingQuestion} */

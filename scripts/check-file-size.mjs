@@ -13,8 +13,9 @@
  * @module scripts/check-file-size
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { basename, relative } from 'node:path';
+import { listSourceFilesSync } from './lib/source-tree.mjs';
 
 const COPILOT_ROOT = 'src/copilot';
 const WARN_LIMIT = 300;
@@ -23,24 +24,9 @@ const ERROR_LIMIT = 400;
 /** Arquivos isentos do limite hard (tipos e barrels). */
 const EXEMPT_NAMES = new Set(['types.js', 'index.js']);
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function walkJs(dir) {
-    /** @type {string[]} */
-    const results = [];
-    for (const entry of readdirSync(dir)) {
-        const full = join(dir, entry);
-        const st = statSync(full);
-        if (st.isDirectory()) {
-            if (entry === 'node_modules' || entry === 'logs') continue;
-            results.push(...walkJs(full));
-        } else if (entry.endsWith('.js')) {
-            results.push(full);
-        }
-    }
-    return results;
+    return listSourceFilesSync(dir, { extensions: ['.js'] });
 }
 
 /**

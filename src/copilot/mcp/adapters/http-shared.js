@@ -42,8 +42,8 @@ import {
     readMcpHttpStatefulSessionPolicy,
     readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
 } from '../control-plane/session-runtime.js';
-import { readMcpStartupMaintenanceState, scheduleMcpStartupMaintenance } from '../control-plane/startup-maintenance.js';
 import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
+import { readMcpStartupMaintenanceState, scheduleMcpStartupMaintenance } from '../runtime/startup-maintenance.js';
 import { createCopilotMcpServer } from '../server.js';
 import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';

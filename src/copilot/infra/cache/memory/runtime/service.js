@@ -9,8 +9,8 @@ import { verifyIoL1EntrySnapshot } from './verifier.js';
 /** @typedef {import('../contracts/index.js').IoCacheStats} IoCacheStats */
 /** @typedef {import('../contracts/index.js').IoL1Cache} IoL1Cache */
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readIoL1CacheConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readIoL1CacheConfig(env = {}) {
     return Object.freeze({
         ttlMs: readEnvPositiveInt('IO_L1_CACHE_TTL_MS', 60_000, env),
         maxEntries: readEnvPositiveInt('IO_L1_CACHE_MAX_ENTRIES', 2_000, env),
@@ -22,7 +22,7 @@ export function readIoL1CacheConfig(env = process.env) {
 
 /** @param {{ maxEntries?:number; maxBytes?:number; ttlMs?:number; staleProbeIntervalMs?:number; hashRevalidateMaxBytes?:number; config?:ReturnType<typeof readIoL1CacheConfig> }} [options] */
 export function createIoL1CacheRuntime(options = {}) {
-    const defaults = options.config ?? readIoL1CacheConfig();
+    const defaults = options.config ?? readIoL1CacheConfig({});
     const maxEntries = Math.max(1, Math.floor(options.maxEntries ?? defaults.maxEntries));
     const maxBytes = Math.max(1, Math.floor(options.maxBytes ?? defaults.maxBytes));
     const ttlMs = Math.max(0, Math.floor(options.ttlMs ?? defaults.ttlMs));

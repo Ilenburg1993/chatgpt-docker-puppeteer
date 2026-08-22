@@ -3,7 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../../src/copilot/tools/file/shared.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {typeof import('../../../../../src/copilot/tools/file/shared.js')} */ (
+        await importOriginal()
+    );
     return {
         ...actual,
         WORKSPACE_INDEXING: {

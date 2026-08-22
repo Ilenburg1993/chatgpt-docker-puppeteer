@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 // @ts-check
 
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
+import {
+    createBetterSqliteApplicationRuntime,
+    createBetterSqliteProvider,
+} from '#copilot/infra/public/diagnostic/database/sqlite';
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,10 +19,7 @@ const PAYLOAD_BYTES = 4 * 1024;
 const MAX_ENTRIES = 500;
 const TTL_MS = 250;
 
-/**
- * @param {string} name
- * @returns {string | null}
- */
+/** @param {string} name @returns {string | null} */
 function optionValue(name) {
     const prefix = `${name}=`;
     const inline = process.argv.find((arg) => arg.startsWith(prefix));
@@ -25,16 +28,12 @@ function optionValue(name) {
     return index >= 0 ? (process.argv[index + 1] ?? null) : null;
 }
 
-/**
- * @param {number} ms
- */
+/** @param {number} ms */
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * @param {string} filePath
- */
+/** @param {string} filePath */
 async function sizeIfPresent(filePath) {
     try {
         return (await stat(filePath)).size;
@@ -48,42 +47,35 @@ function rounded(value) {
     return Number(value.toFixed(3));
 }
 
+/** @param {'experimental'|'on'|'off'} profile */
+function l2Environment(profile) {
+    return Object.freeze({
+        IO_L2_CACHE_PROFILE: profile,
+        IO_L2_CACHE_TTL_MS: String(TTL_MS),
+        IO_L2_CACHE_MAX_ENTRIES: String(MAX_ENTRIES),
+        IO_L2_CACHE_PRUNE_MS: '60000',
+        IO_L2_CACHE_MIN_BYTES: '0',
+    });
+}
+
 async function main() {
     const outputPath = optionValue('--output');
     const directory = await mkdtemp(path.join(tmpdir(), 'copilot-io-l2-soak-'));
     const dbPath = path.join(directory, 'copilot-l2-soak.sqlite');
     const walPath = `${dbPath}-wal`;
-    const previousEnv = {
-        dbPath: process.env['COPILOT_DB_PATH'],
-        profile: process.env['IO_L2_CACHE_PROFILE'],
-        ttlMs: process.env['IO_L2_CACHE_TTL_MS'],
-        maxEntries: process.env['IO_L2_CACHE_MAX_ENTRIES'],
-        pruneMs: process.env['IO_L2_CACHE_PRUNE_MS'],
-        minBytes: process.env['IO_L2_CACHE_MIN_BYTES'],
-    };
-
-    process.env['COPILOT_DB_PATH'] = dbPath;
-    process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
-    process.env['IO_L2_CACHE_TTL_MS'] = String(TTL_MS);
-    process.env['IO_L2_CACHE_MAX_ENTRIES'] = String(MAX_ENTRIES);
-    process.env['IO_L2_CACHE_PRUNE_MS'] = '60000';
-    process.env['IO_L2_CACHE_MIN_BYTES'] = '0';
-
+    const sqliteRuntime = createBetterSqliteApplicationRuntime({ dbPath });
+    const sqliteProvider = createBetterSqliteProvider(sqliteRuntime.getDatabase);
     const startedAt = performance.now();
     let summary;
-    /** @type {ReturnType<(await import('#copilot/infra/public/composition/runtime')).createInfraRuntime> | null} */
+    /** @type {ReturnType<typeof createInfraRuntime> | null} */
     let runtime = null;
-    let databaseModule = null;
-    try {
-        const [{ default: Database }, { createInfraRuntime }, database] = await Promise.all([
-            import('better-sqlite3'),
-            import('#copilot/infra/public/composition/runtime'),
-            import('../../src/copilot/db/sqlite.js'),
-        ]);
-        databaseModule = database;
-        await database.ensureCopilotDbDir();
-        runtime = createInfraRuntime({ runtimeId: 'l2-soak', sqliteProvider: database.getCopilotDb });
 
+    try {
+        runtime = createInfraRuntime({
+            runtimeId: 'l2-soak:experimental',
+            sqliteProvider,
+            env: l2Environment('experimental'),
+        });
         const cache = runtime.coherence.l2.get();
         assert.ok(cache, 'experimental profile must initialize L2');
         cache.clearAll();
@@ -115,16 +107,10 @@ async function main() {
             }
 
             await sleep(30);
-            /**
-             * @type {{
-             *     batchFailures: number;
-             *     pendingSets: number;
-             *     size: number;
-             *     batchFlushes: number;
-             *     averageBatchSize: number;
-             * }}
-             */
-            const stats = cache.getStats();
+            const stats =
+                /** @type {{batchFailures:number;pendingSets:number;size:number;batchFlushes:number;averageBatchSize:number}} */ (
+                    cache.getStats()
+                );
             assert.equal(stats.batchFailures, 0);
             assert.equal(stats.pendingSets, 0);
             assert.ok(stats.size <= MAX_ENTRIES, `L2 size exceeded cap: ${stats.size}`);
@@ -151,18 +137,40 @@ async function main() {
         assert.equal(postExpiryStats.size, 0);
 
         cache.set({ key: 'transition:experimental-on', path: '/l2/transition-on', payload: 'transition-on' });
-        process.env['IO_L2_CACHE_PROFILE'] = 'on';
+        cache.flushPending();
+        await runtime.dispose();
+        const experimentalDisposedLifecycle = runtime.lifecycleSnapshot();
+        runtime = null;
+
+        runtime = createInfraRuntime({
+            runtimeId: 'l2-soak:on',
+            sqliteProvider,
+            env: l2Environment('on'),
+        });
         const onCache = runtime.coherence.l2.get();
-        assert.ok(onCache && onCache !== cache);
+        assert.ok(onCache);
         assert.equal(onCache.get('transition:experimental-on')?.payload.toString('utf8'), 'transition-on');
-
         onCache.set({ key: 'transition:on-off', path: '/l2/transition-off', payload: 'transition-off' });
-        process.env['IO_L2_CACHE_PROFILE'] = 'off';
-        assert.equal(runtime.coherence.l2.get(), null);
+        onCache.flushPending();
+        await runtime.dispose();
+        runtime = null;
 
-        process.env['IO_L2_CACHE_PROFILE'] = 'on';
+        runtime = createInfraRuntime({
+            runtimeId: 'l2-soak:off',
+            sqliteProvider,
+            env: l2Environment('off'),
+        });
+        assert.equal(runtime.coherence.l2.get(), null);
+        await runtime.dispose();
+        runtime = null;
+
+        runtime = createInfraRuntime({
+            runtimeId: 'l2-soak:resumed',
+            sqliteProvider,
+            env: l2Environment('on'),
+        });
         const resumedCache = runtime.coherence.l2.get();
-        assert.ok(resumedCache && resumedCache !== onCache);
+        assert.ok(resumedCache);
         assert.equal(resumedCache.get('transition:on-off')?.payload.toString('utf8'), 'transition-off');
 
         for (let entry = 0; entry < 100; entry += 1) {
@@ -177,7 +185,7 @@ async function main() {
         assert.equal(finalStats.batchFailures, 0);
         assert.equal(finalStats.pendingSets, 0);
 
-        const db = database.getCopilotDb();
+        const db = sqliteRuntime.getDatabase();
         const passiveCheckpoint = db.pragma('wal_checkpoint(PASSIVE)');
         const walBytesBeforeTruncate = await sizeIfPresent(walPath);
         const truncateCheckpoint = db.pragma('wal_checkpoint(TRUNCATE)');
@@ -185,9 +193,9 @@ async function main() {
         assert.ok(walBytesAfterTruncate <= walBytesBeforeTruncate);
 
         await runtime.dispose();
-        const disposedLifecycle = runtime.lifecycleSnapshot();
+        const resumedDisposedLifecycle = runtime.lifecycleSnapshot();
         runtime = null;
-        database.closeCopilotDb();
+        sqliteRuntime.close();
 
         const reopened = new Database(dbPath);
         const integrity = reopened.pragma('integrity_check', { simple: true });
@@ -230,6 +238,7 @@ async function main() {
                 cycleSamples,
             },
             reconfiguration: {
+                model: 'new-runtime-generation-per-profile',
                 transitionsPersisted: transitions.total,
                 finalPersistedEntries: persisted.total,
                 finalBatchFlushes: finalStats.batchFlushes,
@@ -248,28 +257,17 @@ async function main() {
                 peakGrowthBytes: Math.max(0, heapPeak - heapStart),
             },
             lifecycle: {
-                disposed: disposedLifecycle.state === 'disposed',
-                state: disposedLifecycle.state,
-                registered: disposedLifecycle.registered.length,
+                experimentalDisposed: experimentalDisposedLifecycle.state === 'disposed',
+                resumedDisposed: resumedDisposedLifecycle.state === 'disposed',
+                experimentalRegistered: experimentalDisposedLifecycle.registered.length,
+                resumedRegistered: resumedDisposedLifecycle.registered.length,
             },
             integrity,
             durationMs: rounded(performance.now() - startedAt),
         };
     } finally {
         if (runtime) await runtime.dispose().catch(() => {});
-        if (databaseModule && typeof databaseModule.closeCopilotDb === 'function') databaseModule.closeCopilotDb();
-        if (previousEnv.dbPath === undefined) delete process.env['COPILOT_DB_PATH'];
-        else process.env['COPILOT_DB_PATH'] = previousEnv.dbPath;
-        if (previousEnv.profile === undefined) delete process.env['IO_L2_CACHE_PROFILE'];
-        else process.env['IO_L2_CACHE_PROFILE'] = previousEnv.profile;
-        if (previousEnv.ttlMs === undefined) delete process.env['IO_L2_CACHE_TTL_MS'];
-        else process.env['IO_L2_CACHE_TTL_MS'] = previousEnv.ttlMs;
-        if (previousEnv.maxEntries === undefined) delete process.env['IO_L2_CACHE_MAX_ENTRIES'];
-        else process.env['IO_L2_CACHE_MAX_ENTRIES'] = previousEnv.maxEntries;
-        if (previousEnv.pruneMs === undefined) delete process.env['IO_L2_CACHE_PRUNE_MS'];
-        else process.env['IO_L2_CACHE_PRUNE_MS'] = previousEnv.pruneMs;
-        if (previousEnv.minBytes === undefined) delete process.env['IO_L2_CACHE_MIN_BYTES'];
-        else process.env['IO_L2_CACHE_MIN_BYTES'] = previousEnv.minBytes;
+        sqliteRuntime.close();
         await rm(directory, { recursive: true, force: true });
     }
 

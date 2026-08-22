@@ -1,16 +1,16 @@
 // @ts-check
 /** Directory scan/limit/prune/concurrency orchestration for the persistent index registry. */
-import { createIoTraceId } from '#copilot/core';
+import { createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { scanDirectory } from '#copilot/infra/internal/indexing/scanner';
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import pLimit from 'p-limit';
 import { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';
 import { createIoIndexFileReconciler } from './file-reconciler.js';
 import { flattenScanEntries, normalizeIndexExtensions, normalizeIndexPath, shouldIndexFile } from './path/index.js';
 
-const DEFAULT_INDEX_BUILD_MAX_FILES = readEnvPositiveInt('IO_INDEX_BUILD_MAX_FILES', 10_000);
+const DEFAULT_INDEX_BUILD_CONFIG = Object.freeze({ concurrency: 8, maxFiles: 10_000 });
+const DEFAULT_INDEX_SCANNER_CONFIG = Object.freeze({ batchSize: 512, hardMaxEntries: 20_000 });
 
 /**
  * @param {{
@@ -28,10 +28,14 @@ const DEFAULT_INDEX_BUILD_MAX_FILES = readEnvPositiveInt('IO_INDEX_BUILD_MAX_FIL
  *   buildIndexMetadataJson: (filePath:string, metadata:Record<string,unknown>|undefined, fingerprint:Record<string,unknown>)=>string;
  *   pruneMissingRows: ReturnType<typeof import('./writer.js').createIoIndexWriter>['pruneMissingRows'];
  *   indexTextFile: ReturnType<typeof import('./writer.js').createIoIndexWriter>['indexTextFile'];
+ *   buildConfig?: {concurrency:number;maxFiles:number};
+ *   scannerConfig?: {batchSize:number;hardMaxEntries:number};
  * }} context
  */
 export function createIoIndexDirectoryBuilder(context) {
     const { stats, freshnessPolicy, pruneMissingRows } = context;
+    const buildConfig = context.buildConfig ?? DEFAULT_INDEX_BUILD_CONFIG;
+    const scannerConfig = context.scannerConfig ?? DEFAULT_INDEX_SCANNER_CONFIG;
     const reconcileIndexFile = createIoIndexFileReconciler(context);
 
     /**
@@ -56,11 +60,11 @@ export function createIoIndexDirectoryBuilder(context) {
                 const concurrency =
                     Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
                         ? Math.floor(Number(options.concurrency))
-                        : 8;
+                        : buildConfig.concurrency;
                 const effectiveMaxFiles =
                     Number.isFinite(options.maxFiles) && Number(options.maxFiles) > 0
                         ? Math.floor(Number(options.maxFiles))
-                        : DEFAULT_INDEX_BUILD_MAX_FILES;
+                        : buildConfig.maxFiles;
                 const limit = pLimit(concurrency);
 
                 publishIoLifecycleEvent('index', 'build.start', {
@@ -78,6 +82,8 @@ export function createIoIndexDirectoryBuilder(context) {
                     depth: options.depth ?? 20,
                     respectGitignore: options.respectGitignore ?? true,
                     concurrency,
+                    batchSize: scannerConfig.batchSize,
+                    hardMaxEntries: scannerConfig.hardMaxEntries,
                     fingerprint: true,
                     ...(options.signal ? { signal: options.signal } : {}),
                 };

@@ -10,8 +10,8 @@ const PROFILE_DEFAULTS = Object.freeze({
 /**
  * @typedef {{enabled:boolean;profile:IoL2CacheProfile;profileSource:'default'|'IO_L2_CACHE_PROFILE';configurationValid:boolean;ttlMs:number;maxEntries:number;pruneMs:number;minBytes:number;rawProfile?:string}} IoL2CacheConfiguration
  */
-/** @param {NodeJS.ProcessEnv} [env] @returns {IoL2CacheConfiguration} */
-export function getIoL2CacheConfiguration(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] @returns {IoL2CacheConfiguration} */
+export function getIoL2CacheConfiguration(env = {}) {
     const rawProfile = String(env['IO_L2_CACHE_PROFILE'] ?? '')
         .trim()
         .toLowerCase();

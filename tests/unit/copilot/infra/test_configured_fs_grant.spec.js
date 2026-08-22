@@ -220,7 +220,7 @@ describe('configured filesystem grants', () => {
     });
 
     it('não aceita objeto forjado como grant', () => {
-        const fake = /** @type {Parameters<typeof createConfiguredFsIo>[0]} */ ({
+        const fake = {
             id: 'fake',
             roots: ['/'],
             exactPaths: [],
@@ -228,8 +228,8 @@ describe('configured filesystem grants', () => {
             symlinkPolicy: 'deny',
             durability: ['file-and-directory'],
             policyVersion: 1,
-        });
-        expect(() => createConfiguredFsIo(fake)).toThrow(
+        };
+        expect(() => Reflect.apply(createConfiguredFsIo, undefined, [fake])).toThrow(
             expect.objectContaining({ code: 'ERR_CONFIGURED_FS_GRANT_REQUIRED' }),
         );
     });

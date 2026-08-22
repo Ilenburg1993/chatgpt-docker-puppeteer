@@ -9,8 +9,10 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync, redactSecretText, toError } from '#copilot/core';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
+import { redactSecretText, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { IO_PATH_POLICY_VERSION } from '#copilot/infra/public/policy';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withSessionRuntimeMeta } from './session-route-helpers.js';
@@ -21,6 +23,9 @@ import {
     WorkspacePromoteBodySchema,
 } from './session-schemas.js';
 import { validateWorkspacePath } from './session-workspace-helpers.js';
+
+const LOCAL_WORKSPACE_INFRA = getApplicationWorkspaceInfra();
+const LOCAL_WORKSPACE_ROOT = LOCAL_WORKSPACE_INFRA.workspaceRoot;
 
 const SDK_CONVERGENCE_STATUS = Object.freeze({
     started: 'started',
@@ -127,17 +132,23 @@ function resolveMirrorPagination(cursor, pageSize, total) {
  * @returns {Promise<{ normalizedPath: string; policyDecision: 'allow'; policyReason: null }>}
  */
 async function resolveLocalPathOrThrow(localPath, workspaceRoot, mode = 'write') {
-    const decision = await evaluateIoPathPolicyAsync(localPath, { workspaceRoot, mode });
-    if (!decision.ok) {
-        const error = new Error(decision.reason);
-        Object.assign(error, { code: 'ERR_LOCAL_PATH_POLICY' });
-        throw error;
+    try {
+        const workspaceInfra =
+            workspaceRoot === LOCAL_WORKSPACE_ROOT
+                ? LOCAL_WORKSPACE_INFRA
+                : getApplicationWorkspaceInfra(workspaceRoot);
+        const realPath = await workspaceInfra.authority.resolvePath(localPath, mode);
+        const relativePath = path.relative(workspaceInfra.workspaceRoot, realPath).replace(/\\/gu, '/');
+        return {
+            normalizedPath: relativePath || '.',
+            policyDecision: 'allow',
+            policyReason: null,
+        };
+    } catch (error) {
+        const policyError = new Error(error instanceof Error ? error.message : String(error));
+        Object.assign(policyError, { code: 'ERR_LOCAL_PATH_POLICY' });
+        throw policyError;
     }
-    return {
-        normalizedPath: decision.relativePath || '.',
-        policyDecision: 'allow',
-        policyReason: null,
-    };
 }
 
 /**
@@ -350,7 +361,7 @@ export function registerSessionWorkspaceRoutes(router) {
 
             const traceId = randomUUID();
             const overwrite = req.body?.overwrite === true;
-            const workspaceRoot = process.cwd();
+            const workspaceRoot = LOCAL_WORKSPACE_ROOT;
             const desiredLocalPath = normalizeOptionalPath(req.body?.destinationPath) ?? sdkPath;
             let localPath;
             try {
@@ -468,7 +479,7 @@ export function registerSessionWorkspaceRoutes(router) {
             if (!entry) return;
 
             const overwrite = req.body?.overwrite === true;
-            const workspaceRoot = process.cwd();
+            const workspaceRoot = LOCAL_WORKSPACE_ROOT;
             let destinationRoot;
             try {
                 destinationRoot = await resolveLocalPathOrThrow(
@@ -668,7 +679,7 @@ export function registerSessionWorkspaceRoutes(router) {
 
             const traceId = randomUUID();
             const overwrite = req.body?.overwrite === true;
-            const workspaceRoot = process.cwd();
+            const workspaceRoot = LOCAL_WORKSPACE_ROOT;
             let localPath;
             try {
                 localPath = await resolveLocalPathOrThrow(String(req.body?.sourcePath ?? ''), workspaceRoot, 'read');

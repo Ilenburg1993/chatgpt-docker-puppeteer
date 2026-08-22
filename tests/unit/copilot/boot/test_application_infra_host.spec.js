@@ -1,0 +1,213 @@
+// @ts-check
+
+import { createApplicationInfraHost } from '#copilot/boot';
+import { createBetterSqliteProvider } from '#copilot/infra/public/testing/database/sqlite';
+import Database from 'better-sqlite3';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+/** @type {string[]} */
+const tempRoots = [];
+/** @type {Array<ReturnType<typeof createApplicationInfraHost>>} */
+const hosts = [];
+/** @typedef {{ensureDirectory:()=>Promise<unknown>;getDatabase:ReturnType<typeof createBetterSqliteProvider>}} TestSqliteProvider */
+/** @type {Array<import('better-sqlite3').Database>} */
+const databases = [];
+
+async function createTempRoot() {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'application-infra-host-'));
+    tempRoots.push(root);
+    return root;
+}
+
+afterEach(async () => {
+    await Promise.allSettled(hosts.splice(0).map((host) => host.dispose()));
+    for (const database of databases.splice(0)) {
+        if (database.open) database.close();
+    }
+    await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+describe('ApplicationInfraHost', () => {
+    it('owns the full ProcessInfra → InfraRuntime → WorkspaceInfra hierarchy with explicit identities', async () => {
+        const root = await createTempRoot();
+        const host = createApplicationInfraHost({
+            hostId: 'unit-application-host',
+            processId: 'unit-application-process',
+            runtimeId: 'unit-application-runtime',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+        });
+        hosts.push(host);
+
+        const first = host.workspace();
+        const second = host.workspace(root);
+        expect(second).toBe(first);
+        expect(first.workspaceId).toBe('unit-application-runtime:workspace:1');
+        expect(host.processInfra.listRuntimes()).toEqual([host.runtime]);
+        expect(host.runtime.listWorkspaces()).toEqual([first]);
+        expect(host.snapshot()).toMatchObject({
+            hostId: 'unit-application-host',
+            state: 'active',
+            processId: 'unit-application-process',
+            runtimeId: 'unit-application-runtime',
+            defaultWorkspaceRoot: path.resolve(root),
+            shutdownRegistered: false,
+            sqliteBootstrapInFlight: false,
+            process: {
+                state: 'active',
+                runtimes: 1,
+                runtimeGeneration: 1,
+                runtimeIds: ['unit-application-runtime'],
+            },
+            runtime: {
+                state: 'active',
+                generation: 1,
+                workspaces: 1,
+                workspaceGeneration: 1,
+                workspaceIdentities: [
+                    {
+                        workspaceId: 'unit-application-runtime:workspace:1',
+                        workspaceRoot: path.resolve(root),
+                        generation: 1,
+                    },
+                ],
+            },
+        });
+
+        const firstDispose = host.dispose();
+        const secondDispose = host.dispose();
+        expect(secondDispose).toBe(firstDispose);
+        await firstDispose;
+        expect(host.snapshot()).toMatchObject({
+            state: 'disposed',
+            process: { state: 'disposed', runtimes: 0 },
+            runtime: { state: 'disposed', workspaces: 0 },
+        });
+        expect(() => host.workspace(root)).toThrow(/disposed/iu);
+    });
+
+    it('exposes async disposal as the same idempotent host-owned teardown', async () => {
+        const root = await createTempRoot();
+        const host = createApplicationInfraHost({
+            hostId: 'async-dispose-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+        });
+        hosts.push(host);
+        host.workspace();
+
+        expect(typeof host[Symbol.asyncDispose]).toBe('function');
+        const viaAsyncDispose = host[Symbol.asyncDispose]();
+        const viaDispose = host.dispose();
+        expect(viaAsyncDispose).toBe(viaDispose);
+        await viaAsyncDispose;
+        expect(host.snapshot()).toMatchObject({
+            state: 'disposed',
+            process: { state: 'disposed' },
+            runtime: { state: 'disposed' },
+        });
+    });
+
+    it('registers exactly one host-owned graceful-shutdown handler when explicitly enabled', async () => {
+        const root = await createTempRoot();
+        /** @type {Array<{name:string;fn:()=>Promise<void>;priority:number|undefined;options:{timeoutMs?:number}|undefined}>} */
+        const registrations = [];
+        /** @type {typeof import('#copilot/core').registerShutdownHandler} */
+        const registerShutdownHandlerFn = vi.fn((name, fn, priority, options) => {
+            registrations.push({ name, fn, priority, options });
+        });
+        const host = createApplicationInfraHost({
+            hostId: 'shutdown-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: true,
+            shutdownHandlerName: 'test.application-infra.dispose',
+            shutdownTimeoutMs: 12_345,
+            registerShutdownHandlerFn,
+        });
+        hosts.push(host);
+
+        host.workspace();
+        host.snapshot();
+        expect(registerShutdownHandlerFn).toHaveBeenCalledTimes(1);
+        expect(registrations[0]?.name).toBe('test.application-infra.dispose');
+        expect(registrations[0]?.priority).toBe(13);
+        expect(registrations[0]?.options).toEqual({ timeoutMs: 12_345 });
+        expect(host.snapshot().shutdownRegistered).toBe(true);
+
+        const shutdown = registrations[0]?.fn;
+        expect(typeof shutdown).toBe('function');
+        if (!shutdown) throw new Error('shutdown handler was not registered');
+        await shutdown();
+        expect(host.snapshot().state).toBe('disposed');
+    });
+
+    it('coalesces concurrent SQLite bootstrap and allows an explicit provider reset/rebind', async () => {
+        const root = await createTempRoot();
+        let loads = 0;
+        const database = new Database(':memory:');
+        databases.push(database);
+        const host = createApplicationInfraHost({
+            hostId: 'sqlite-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+            loadSqliteProvider: async () => {
+                loads += 1;
+                return {
+                    ensureDirectory: async () => undefined,
+                    getDatabase: createBetterSqliteProvider(() => database),
+                };
+            },
+        });
+        hosts.push(host);
+
+        const results = await Promise.all(Array.from({ length: 16 }, () => host.bootstrapSqliteProvider()));
+        expect(loads).toBe(1);
+        expect(new Set(results.map((result) => result.revision)).size).toBe(1);
+        expect(results.every((result) => result.configured)).toBe(true);
+
+        const firstRevision = results[0]?.revision ?? -1;
+        host.runtime.database.reset();
+        const rebound = await host.bootstrapSqliteProvider();
+        expect(loads).toBe(2);
+        expect(rebound).toMatchObject({ configured: true });
+        expect(rebound.revision).toBeGreaterThan(firstRevision);
+    });
+
+    it('blocks late SQLite activation when dispose wins the race against an in-flight bootstrap', async () => {
+        const root = await createTempRoot();
+        const database = new Database(':memory:');
+        databases.push(database);
+        /** @type {(value:TestSqliteProvider)=>void} */
+        let releaseProvider = () => {
+            throw new Error('provider loader was not started');
+        };
+        const providerReady = new Promise((/** @type {(value:TestSqliteProvider)=>void} */ resolve) => {
+            releaseProvider = /** @type {typeof releaseProvider} */ (resolve);
+        });
+        const host = createApplicationInfraHost({
+            hostId: 'bootstrap-dispose-race-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+            loadSqliteProvider: async () => providerReady,
+        });
+        hosts.push(host);
+
+        const bootstrap = host.bootstrapSqliteProvider();
+        await Promise.resolve();
+        expect(host.snapshot()).toMatchObject({ state: 'active', sqliteBootstrapInFlight: true });
+        const dispose = host.dispose();
+        expect(host.snapshot().state).toBe('disposing');
+
+        releaseProvider({
+            ensureDirectory: async () => undefined,
+            getDatabase: createBetterSqliteProvider(() => database),
+        });
+        await expect(bootstrap).rejects.toThrow(/disposing/iu);
+        await dispose;
+        expect(host.runtime.database.status().configured).toBe(false);
+        expect(host.snapshot()).toMatchObject({ state: 'disposed', sqliteBootstrapInFlight: false });
+    });
+});

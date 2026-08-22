@@ -159,7 +159,7 @@ CRITICAL_ERRORS=0
 
 for process in "${EXPECTED_PROCESSES[@]}"; do
     if "${PM2_CMD[@]}" list | grep -q "$process"; then
-        errors=$("${PM2_CMD[@]}" logs "$process" --lines 50 --nostream --err 2>/dev/null | grep -c "\[FATAL\]\|\[ERROR\]" || true)
+        errors=$("${PM2_CMD[@]}" logs "$process" --lines 50 --nostream --err 2> /dev/null | grep -c "\[FATAL\]\|\[ERROR\]" || true)
 
         if [ "$errors" -eq 0 ]; then
             echo -e "${GREEN}✅ $process (sem erros críticos)${NC}"

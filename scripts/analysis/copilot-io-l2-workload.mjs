@@ -17,6 +17,7 @@ const DEFAULT_INCLUDE = '**/*.{js,ts,mjs,cjs}';
 
 /**
  * @typedef {{ path: string; relativePath: string; sizeBytes: number }} WorkloadFile
+ * @typedef {{ type:string; absolutePath:string; path:string; size?:number; children?:ScanEntry[] }} ScanEntry
  *
  * @typedef {{
  *     phase: string;
@@ -116,7 +117,7 @@ function summarizePayloads(files) {
 }
 
 /**
- * @param {import('#copilot/infra/public/diagnostic/indexing/scanner').IoScanEntry[]} entries
+ * @param {ScanEntry[]} entries
  * @param {WorkloadFile[]} output
  */
 function collectFiles(entries, output) {
@@ -164,7 +165,6 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
     /** @type {NodeJS.ProcessEnv} */
     const env = {
         ...process.env,
-        COPILOT_DB_PATH: dbPath,
         IO_L1_CACHE_MAX_ENTRIES: '5000',
         IO_L1_CACHE_MAX_BYTES: String(256 * 1024 * 1024),
     };
@@ -203,19 +203,21 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
 /**
  * @param {'seed' | 'baseline' | 'read'} phase
  * @param {string} manifestPath
+ * @param {string} dbPath
  * @param {number} concurrency
  */
-async function executePhase(phase, manifestPath, concurrency) {
+async function executePhase(phase, manifestPath, dbPath, concurrency) {
     const files = /** @type {WorkloadFile[]} */ (JSON.parse(await readFile(manifestPath, 'utf8')));
-    const [{ readBytes }, { createInfraRuntime }, db] = await Promise.all([
-        import('#copilot/infra/public/filesystem/read'),
+    const [{ readBytes }, { createInfraRuntime }, database] = await Promise.all([
+        import('#copilot/infra/internal/filesystem/read'),
         import('#copilot/infra/public/composition/runtime'),
-        import('../../src/copilot/db/sqlite.js'),
+        import('#copilot/infra/public/composition/database/sqlite'),
     ]);
-    await db.ensureCopilotDbDir();
+    const sqliteRuntime = await database.createApplicationSqliteRuntime({ dbPath });
     const runtime = createInfraRuntime({
         runtimeId: `l2-workload-${phase}`,
-        sqliteProvider: db.getCopilotDb,
+        sqliteProvider: sqliteRuntime.getStructuralDatabase,
+        env: process.env,
     });
     const l2Cache = runtime.coherence.l2.get();
     if (phase === 'seed') {
@@ -281,7 +283,7 @@ async function executePhase(phase, manifestPath, concurrency) {
         process.stdout.write(`${JSON.stringify(result)}\n`);
     } finally {
         await runtime.dispose();
-        db.closeCopilotDb();
+        sqliteRuntime.close();
     }
 }
 
@@ -306,7 +308,7 @@ async function discoverFiles(rootPath, include, maxFiles) {
     });
     /** @type {WorkloadFile[]} */
     const files = [];
-    collectFiles(scan.entries, files);
+    collectFiles(/** @type {ScanEntry[]} */ (scan.entries), files);
     files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
     return {
         discoveredFiles: files.length,
@@ -324,7 +326,7 @@ async function main() {
         assert.ok(phase === 'seed' || phase === 'baseline' || phase === 'read', `invalid phase: ${phase}`);
         assert.ok(manifestPath, '--manifest is required for workload phases');
         assert.ok(dbPath, '--db is required for workload phases');
-        await executePhase(phase, manifestPath, concurrency);
+        await executePhase(phase, manifestPath, dbPath, concurrency);
         return;
     }
 

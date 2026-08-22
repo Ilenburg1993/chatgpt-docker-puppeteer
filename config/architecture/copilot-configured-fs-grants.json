@@ -49,6 +49,34 @@
       "reason": "Binds provider-health persistence once to a bootstrap configuration snapshot. The process-global health ledger remains storage-neutral; tests may inject an already-authorized persistence store without changing env/path authority per hydrate or flush."
     },
     {
+      "file": "src/copilot/model-gateway/registry/json-registry-store.js",
+      "classification": "model-gateway-state",
+      "grants": [
+        {
+          "id": "model-gateway.registry.json-store",
+          "pathMode": "exact",
+          "operations": ["read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds the default model-gateway registry JSON snapshot to one exact configured path. Alternate test/composition paths must inject already-authorized IO and cannot be converted into grants by the store."
+    },
+    {
+      "file": "src/copilot/model-gateway/catalog/json-catalog-store.js",
+      "classification": "model-gateway-state",
+      "grants": [
+        {
+          "id": "model-gateway.catalog.json-store",
+          "pathMode": "exact",
+          "operations": ["read", "stat", "write"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds the default model-gateway catalog JSON snapshot to one exact configured path. Alternate test/composition paths must inject already-authorized IO and cannot be converted into grants by the store."
+    },
+    {
       "file": "src/copilot/model-gateway/routing/selection-trace.js",
       "classification": "model-gateway-state",
       "grants": [
@@ -154,6 +182,20 @@
       "reason": "Resolves the explicit config source first, then binds exact append-file authority to the resolver-produced configuration object through an unforgeable WeakMap; caller-crafted config objects cannot acquire filesystem authority by naming paths."
     },
     {
+      "file": "src/copilot/boot/application-infra-host.js",
+      "classification": "infra-owner",
+      "grants": [
+        {
+          "id": "boot.application-infra.sqlite-directory",
+          "pathMode": "exact",
+          "operations": ["mkdir"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Application composition owns the exact parent directory of the resolved SQLite database path and mints only mkdir authority during bootstrap; connection semantics remain owned by the DB runtime."
+    },
+    {
       "file": "src/copilot/infra/filesystem/skills/catalog.js",
       "classification": "infra-owner",
       "grants": [
@@ -193,13 +235,6 @@
           "durability": ["file-and-directory"]
         },
         {
-          "id": "mcp.control-plane.jobs.cgroup",
-          "pathMode": "exact",
-          "operations": ["read"],
-          "symlinkPolicy": "deny",
-          "durability": ["file-and-directory"]
-        },
-        {
           "id": "mcp.control-plane.jobs.focused-tests",
           "pathMode": "roots",
           "operations": ["stat"],
@@ -207,7 +242,7 @@
           "durability": ["file-and-directory"]
         }
       ],
-      "reason": "Separates validator job artifacts, exact cgroup telemetry files and focused-test existence checks into independent bound capabilities; job UUID/path validation remains in the owner and exclusive log creation uses configured failIfExists atomic publish."
+      "reason": "Separates validator job artifacts and focused-test existence checks into independent bound capabilities; process/cgroup telemetry is owned by the pathless platform/process introspection capability, while job UUID/path validation and exclusive log creation remain here."
     },
     {
       "file": "src/copilot/mcp/control-plane/ai-artifacts.js",
@@ -216,12 +251,12 @@
         {
           "id": "mcp.control-plane.ai-artifacts",
           "pathMode": "roots",
-          "operations": ["list", "stat"],
+          "operations": ["delete", "list", "stat"],
           "symlinkPolicy": "deny",
           "durability": ["file-and-directory"]
         }
       ],
-      "reason": "Binds AI-artifact diagnostics to canonical .ai and rollback roots once; the runtime factory receives already-authorized metadata IO and cannot mint or retarget authority. Cleanup mutations remain owned by their dedicated mutation/rollback capabilities."
+      "reason": "Binds AI-artifact diagnostics and strict UUID job-file deletion to canonical .ai and rollback roots once; the runtime factory receives already-authorized IO and cannot mint or retarget authority. Rollback cleanup remains owned by the dedicated rollback capability."
     },
     {
       "file": "src/copilot/mcp/adapters/http2.js",
@@ -413,18 +448,102 @@
       "reason": "Binds stateful-session env IO to one validated repo-relative file inside src/copilot/.ai/mcp and separates parent mkdir authority from file read/write/stat/chmod authority."
     },
     {
+      "file": "src/copilot/audit/pipeline-audit-log.js",
+      "classification": "observability-state",
+      "grants": [
+        {
+          "id": "audit.pipeline.jsonl",
+          "pathMode": "exact",
+          "operations": ["append", "move", "read", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["none"]
+        }
+      ],
+      "reason": "Binds the default audit and tool-execution JSONL files plus the single rotation target to exact configured authority. Alternate paths require already-authorized IO and cannot be converted into grants by createAuditLog."
+    },
+    {
+      "file": "src/copilot/audit/pipeline-permission.js",
+      "classification": "observability-state",
+      "grants": [
+        {
+          "id": "audit.permission.jsonl",
+          "pathMode": "exact",
+          "operations": ["append", "move", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["file"]
+        }
+      ],
+      "reason": "Binds permission-audit persistence to the exact active file and its single rotation target; the writer receives authority rather than deriving it from each append operation."
+    },
+    {
+      "file": "src/copilot/terminal/state/sse-event-archive.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.sse-event.archive",
+          "pathMode": "roots",
+          "operations": ["append", "read"],
+          "symlinkPolicy": "deny",
+          "durability": ["none"]
+        }
+      ],
+      "reason": "Captures the configured daily SSE archive root lazily on first use, then keeps one stable root-bound append/read capability for the runtime cycle. Test reset may discard the binding; event payloads and per-read filters cannot retarget authority."
+    },
+    {
+      "file": "src/copilot/terminal/state/transcript-archive.js",
+      "classification": "terminal-operator",
+      "grants": [
+        {
+          "id": "terminal.transcript.archive",
+          "pathMode": "roots",
+          "operations": ["append"],
+          "symlinkPolicy": "deny",
+          "durability": ["none"]
+        }
+      ],
+      "reason": "Binds the daily terminal transcript archive once to its bootstrap-resolved archive root; the append-only writer cannot retarget authority from transcript data."
+    },
+    {
+      "file": "src/copilot/observability/metrics.js",
+      "classification": "observability-state",
+      "grants": [
+        {
+          "id": "observability.metrics.snapshot",
+          "pathMode": "exact",
+          "operations": ["append"],
+          "symlinkPolicy": "deny",
+          "durability": ["none"]
+        }
+      ],
+      "reason": "Binds periodic metrics snapshots to one exact bootstrap-resolved metrics.jsonl file. createMetricsStore may accept an already-authorized snapshot binding, but startPeriodicSnapshot no longer accepts a path or directory."
+    },
+    {
+      "file": "src/copilot/observability/event-collector.js",
+      "classification": "observability-state",
+      "grants": [
+        {
+          "id": "observability.event-collector.archive",
+          "pathMode": "exact",
+          "operations": ["append", "move", "stat"],
+          "symlinkPolicy": "deny",
+          "durability": ["none"]
+        }
+      ],
+      "reason": "Binds the event collector to its active events.jsonl file and single rotation target; the bound writer cannot mint authority from runtime event data."
+    },
+    {
       "file": "src/copilot/observability/logger.js",
       "classification": "observability-state",
       "grants": [
         {
           "id": "observability.logger.retention",
           "pathMode": "roots",
-          "operations": ["delete", "list", "stat"],
+          "operations": ["append", "delete", "list", "move", "stat"],
           "symlinkPolicy": "deny",
-          "durability": ["file-and-directory"]
+          "durability": ["file-and-directory", "none"]
         }
       ],
-      "reason": "Binds archive retention once to the bootstrap-resolved LOG_DIR, including env override; dynamic archive names come only from the authorized directory listing and remain root-contained."
+      "reason": "Binds logger append, rotation and archive retention once to the bootstrap-resolved LOG_DIR, including env override; active and rotated filenames remain root-contained and the JSONL writer cannot mint or retarget authority. Durability is limited to the logger's existing none/file-and-directory modes."
     },
     {
       "file": "src/copilot/mcp/tools/devcontainer-network-posture.js",

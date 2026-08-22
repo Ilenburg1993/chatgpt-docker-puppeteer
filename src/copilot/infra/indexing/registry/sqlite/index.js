@@ -23,4 +23,5 @@ export {
     shouldIndexFile,
 } from './path/index.js';
 export { normalizeIndexMaxResults, sanitizeFtsQuery } from './query-api.js';
+export { IO_INDEX_SCHEMA_VERSION, ensureIoIndexSchema } from './schema/index.js';
 export { createIoIndexSqlite, isIoIndex } from './store.js';

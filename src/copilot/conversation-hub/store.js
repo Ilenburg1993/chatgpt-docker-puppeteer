@@ -4,8 +4,8 @@
  *
  * ConversationStore — persistência SQLite para o ambiente permanente LLM-A ↔ LLM-B ↔ Usuário.
  *
- * F7.5: migrado para o banco isolado copilot.sqlite via `getCopilotDb()`. As tabelas são criadas pelas migrations
- * formais em `src/copilot/db/migrations.js`, não mais por DDL inline neste arquivo.
+ * F7.5: migrado para o banco isolado copilot.sqlite via a projeção estrutural do runtime DB. As tabelas são criadas pelas migrations
+ * formais em `src/copilot/infra/database/sqlite/application/migrations.js`, não mais por DDL inline neste arquivo.
  *
  * Tipos e helpers FTS5 vivem em `store-helpers.js` para manter este módulo focado na classe.
  *
@@ -13,11 +13,12 @@
  * @see EventBus
  * @see module:copilot/conversation-hub/store-helpers
  * @see module:copilot/conversation-hub/orchestrator
- * @see module:copilot/db/sqlite
+ * @see module:copilot/infra/database/sqlite/better-sqlite3/runtime
  */
 
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 import { SessionError, cancelTimer, logSwallowed, registerInterval, toError } from '#copilot/core';
-import { getCopilotDb } from '#copilot/db';
+import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
 import { log } from '#copilot/observability';
 import { v4 as uuidv4 } from 'uuid';
 import { initTurnsFts, migrateFts5Tokenizer } from './store-helpers.js';
@@ -47,11 +48,11 @@ import { syncFromSdkHistory as _syncFromSdkHistory } from './store-sync.js';
 /**
  * Persistência SQLite para o Conversation Hub.
  *
- * F7.5: usa o banco isolado copilot.sqlite via getCopilotDb(). As tabelas são criadas pelas migrations formais em
- * src/copilot/db/migrations.js (não mais por DDL inline).
+ * F7.5: usa o banco isolado copilot.sqlite pela projeção estrutural do runtime DB. As tabelas são criadas pelas migrations formais em
+ * src/copilot/infra/database/sqlite/application/migrations.js (não mais por DDL inline).
  */
 export class ConversationStore {
-    /** @type {import('better-sqlite3').Database | null} */
+    /** @type {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} */
     #db = null;
 
     /** @type {boolean} */
@@ -76,7 +77,7 @@ export class ConversationStore {
      * Inicializa as tabelas (idempotente — CREATE TABLE IF NOT EXISTS). Deve ser chamado uma vez antes de usar qualquer
      * outro método.
      *
-     * @param {import('better-sqlite3').Database} [dbOverride] - DB a usar em vez do padrão (útil em testes).
+     * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} [dbOverride] - DB a usar em vez do padrão (útil em testes).
      * @returns {void}
      */
     init(dbOverride) {
@@ -84,8 +85,8 @@ export class ConversationStore {
 
         try {
             // F7.5: usar banco isolado copilot.sqlite; em testes passa-se dbOverride (:memory:)
-            this.#db = dbOverride ?? getCopilotDb();
-            const db = this.#db;
+            const db = dbOverride ?? getApplicationSqliteDatabase();
+            this.#db = db;
             migrateFts5Tokenizer(db);
             initTurnsFts(db);
 
@@ -100,7 +101,7 @@ export class ConversationStore {
                 this.#checkpointTimerId,
                 () => {
                     try {
-                        db.pragma('wal_checkpoint(PASSIVE)');
+                        db.exec('PRAGMA wal_checkpoint(PASSIVE)');
                         _checkpointErrors = 0; // resetar contador em sucesso
                     } catch (err) {
                         _checkpointErrors++;
@@ -126,7 +127,7 @@ export class ConversationStore {
     /**
      * Garante que o store foi inicializado antes de qualquer operação.
      *
-     * @returns {import('better-sqlite3').Database}
+     * @returns {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort}
      * @throws {SessionError} Se init() não foi chamado
      */
     #getDb() {
@@ -162,7 +163,7 @@ export class ConversationStore {
      * Expõe o banco SQLite para health checks externos (somente leitura recomendada). Retorna `null` se `init()` ainda
      * não foi chamado.
      *
-     * @returns {import('better-sqlite3').Database | null}
+     * @returns {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null}
      */
     get db() {
         return this.#db;
@@ -344,51 +345,55 @@ export class ConversationStore {
             // BUG-01 (fix): UNIQUE constraint (hub_session_id, turn_number) protege contra insert duplicado.
             // Em cenário com SQLite WAL mode e dois writers simultâneos, o segundo recebe SQLITE_CONSTRAINT
             // e faz retry automaticamente, relendo o MAX(turn_number) para obter o valor correto.
-            const doWrite = db.transaction(() => {
-                // Calcular o próximo turn_number para esta sessão
-                const maxTurn = /** @type {{ max_turn: number | null }} */ (
-                    db
+            const doWrite = () =>
+                runSqliteTransaction(db, () => {
+                    // Calcular o próximo turn_number para esta sessão
+                    const maxTurn = /** @type {{ max_turn: number | null }} */ (
+                        db
+                            .prepare(
+                                `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
+                            )
+                            .get(hubSessionId)
+                    );
+                    const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
+
+                    // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
+                    const userRead = opts.role === 'user' ? 0 : 1;
+
+                    const result = db
                         .prepare(
-                            `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
-                        )
-                        .get(hubSessionId)
-                );
-                const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
-
-                // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
-                const userRead = opts.role === 'user' ? 0 : 1;
-
-                const result = db
-                    .prepare(
-                        `INSERT INTO copilot_conversation_turns
+                            `INSERT INTO copilot_conversation_turns
                          (hub_session_id, sdk_session_id, role, content, structured, tools_used,
                           turn_number, created_at, duration_ms, model, user_read, metadata)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    )
-                    .run(
-                        hubSessionId,
-                        opts.sdkSessionId ?? null,
-                        opts.role,
-                        opts.content,
-                        opts.structured
-                            ? typeof opts.structured === 'string'
-                                ? opts.structured
-                                : JSON.stringify(opts.structured)
-                            : null,
-                        opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
-                        turnNumber,
+                        )
+                        .run(
+                            hubSessionId,
+                            opts.sdkSessionId ?? null,
+                            opts.role,
+                            opts.content,
+                            opts.structured
+                                ? typeof opts.structured === 'string'
+                                    ? opts.structured
+                                    : JSON.stringify(opts.structured)
+                                : null,
+                            opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
+                            turnNumber,
+                            Date.now(),
+                            opts.durationMs ?? null,
+                            opts.model ?? null,
+                            userRead,
+                            opts.metadata ? JSON.stringify(opts.metadata) : null,
+                        );
+
+                    // Atualizar updated_at da session
+                    db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(
                         Date.now(),
-                        opts.durationMs ?? null,
-                        opts.model ?? null,
-                        userRead,
-                        opts.metadata ? JSON.stringify(opts.metadata) : null,
+                        hubSessionId,
                     );
 
-                // Atualizar updated_at da session
-                db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(Date.now(), hubSessionId);
-
-                return Number(result.lastInsertRowid);
-            });
+                    return Number(result.lastInsertRowid);
+                });
 
             // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
             // BUG-C02 (fix): substituído Atomics.wait() (bloqueava event loop) por sleep async
@@ -545,7 +550,7 @@ export class ConversationStore {
                  WHERE hub_session_id = ? AND role = 'user' AND user_read = 0`,
             )
             .run(hubSessionId);
-        return result.changes;
+        return Number(result.changes ?? 0);
     }
 
     // ─── Memórias Semânticas (P5) ─────────────────────────────────────────────

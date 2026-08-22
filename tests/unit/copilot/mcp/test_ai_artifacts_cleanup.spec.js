@@ -1,6 +1,7 @@
 // @ts-check
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +11,8 @@ import { createAiArtifactsRuntime } from '../../../../src/copilot/mcp/control-pl
 
 /** @type {string[]} */
 const roots = [];
+/** @type {ReturnType<typeof createInfraRuntime>[]} */
+const infraRuntimes = [];
 let runtimeSequence = 0;
 
 /** @param {string} workspaceRoot @param {boolean} [enabled] */
@@ -30,16 +33,37 @@ function createTestAiArtifactsRuntime(workspaceRoot, rollbackPolicy = rollbackPo
         createConfiguredFsGrant({
             id: `test.mcp.ai-artifacts.${++runtimeSequence}`,
             roots: [aiDir, rollbackPolicy.directory],
-            operations: ['list', 'stat'],
+            operations: ['delete', 'list', 'stat'],
             symlinkPolicy: 'deny',
             durability: ['file-and-directory'],
         }),
     );
-    return createAiArtifactsRuntime({ workspaceRoot, rollbackPolicy, io });
+    const infraRuntime = createInfraRuntime({
+        runtimeId: `test.ai-artifacts.infra.${runtimeSequence}`,
+        env: {
+            ...process.env,
+            COPILOT_IO_ROLLBACK_ENABLED: rollbackPolicy.enabled ? '1' : '0',
+            COPILOT_IO_ROLLBACK_DIR: rollbackPolicy.directory,
+            COPILOT_IO_ROLLBACK_TTL_MS: String(rollbackPolicy.ttlMs),
+            COPILOT_IO_ROLLBACK_MAX_ENTRIES: String(rollbackPolicy.maxEntries),
+            COPILOT_IO_ROLLBACK_MAX_BYTES: String(rollbackPolicy.maxBytes),
+        },
+    });
+    infraRuntimes.push(infraRuntime);
+    const workspaceInfra = infraRuntime.workspace(workspaceRoot);
+    const rollbackMaintenance = workspaceInfra.rollback;
+    if (!rollbackMaintenance) throw new Error('test workspace must expose rollback maintenance capability');
+    return createAiArtifactsRuntime({
+        workspaceRoot,
+        rollbackPolicy: infraRuntime.config.rollback,
+        rollbackMaintenance,
+        io,
+    });
 }
 
 afterEach(async () => {
     vi.unstubAllEnvs();
+    await Promise.allSettled(infraRuntimes.splice(0).map((runtime) => runtime.dispose()));
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 

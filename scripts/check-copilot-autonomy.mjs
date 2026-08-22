@@ -29,6 +29,7 @@ import {
     COPILOT_CANONICAL_PM2_PROCESS,
     SDK_VANILLA_CAPABILITY_BASELINE,
 } from '../src/copilot/boot/index.js';
+import { buildCopilotBoundaryReport, buildCopilotExactImportReport } from './lib/copilot-package-imports.mjs';
 
 let errors = 0;
 
@@ -266,45 +267,43 @@ if (realRequires.length > 0) {
     console.log('✅ Check 12: zero require() em src/copilot/ (ESM completo).');
 }
 
-// ── Check 13: módulos copilot têm index.js ──────────────────────────────────
+// ── Check 13: módulos copilot possuem boundary deliberado ──────────────────
 
-const EXPECTED_MODULES = [
-    'agent',
-    'audit',
-    'boot',
-    'bridges',
-    'channel',
-    'config',
-    'conversation-hub',
-    'core',
-    'db',
-    'event-handlers',
-    'events',
-    'hooks',
-    'infra',
-    'observability',
-    'plugins',
-    'presentation',
-    'sdk',
-    'server',
-    'terminal',
-    'tools',
-    'types',
-];
-
-const missingBarrels = [];
-for (const mod of EXPECTED_MODULES) {
-    const indexPath = resolve(`src/copilot/${mod}/index.js`);
-    if (!existsSync(indexPath)) {
-        missingBarrels.push(mod);
-    }
-}
-
-if (missingBarrels.length > 0) {
-    console.error(`❌ Check 13 FALHOU — módulos sem index.js: ${missingBarrels.join(', ')}`);
+const boundaryReport = buildCopilotBoundaryReport({ copilotRoot: 'src/copilot' });
+if (boundaryReport.uncovered.length > 0) {
+    console.error(`❌ Check 13 FALHOU — módulos sem boundary declarado: ${boundaryReport.uncovered.join(', ')}`);
     errors++;
 } else {
-    console.log(`✅ Check 13: todos os ${EXPECTED_MODULES.length} módulos copilot têm index.js.`);
+    console.log(
+        `✅ Check 13: ${boundaryReport.covered}/${boundaryReport.total} módulos possuem root barrel ou exact package entrypoint.`,
+    );
+}
+
+// ── Check 13b: package imports #copilot são integralmente exatos ─────────────
+
+const exactImportReport = buildCopilotExactImportReport({
+    roots: ['src', 'scripts', 'tools'],
+    forbiddenPrefixes: ['#copilot/testing/'],
+});
+if (!exactImportReport.success) {
+    console.error('❌ Check 13b FALHOU — package-import governance não-exata.');
+    if (exactImportReport.wildcardAliases.length > 0) {
+        console.error(`   wildcards: ${exactImportReport.wildcardAliases.join(', ')}`);
+    }
+    for (const usage of exactImportReport.nonExactUsages.slice(0, 10)) {
+        console.error(`   ${usage.file}: ${usage.specifier} (${usage.kind})`);
+    }
+    for (const usage of exactImportReport.forbiddenUsages.slice(0, 10)) {
+        console.error(`   forbidden ${usage.file}: ${usage.specifier} (${usage.kind})`);
+    }
+    for (const parseError of exactImportReport.parseErrors.slice(0, 5)) {
+        console.error(`   parse-error ${parseError.file}: ${parseError.message}`);
+    }
+    errors++;
+} else {
+    console.log(
+        `✅ Check 13b: ${exactImportReport.usages.length} usos #copilot resolvem por ${exactImportReport.uniqueSpecifiers.length} aliases exatos; zero wildcard.`,
+    );
 }
 
 // ── Check 14: server/routes não importa bordas removidas ────────────────────

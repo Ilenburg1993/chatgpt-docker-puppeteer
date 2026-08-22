@@ -2,11 +2,9 @@
 /**
  * FI-7 — Contract tests round 2 — Barrel contracts para novos módulos.
  *
- * Valida que os barrels adicionados na Faixa I exportam os símbolos esperados e que nenhum deep import proibido existe
- * nos módulos migrados.
+ * Valida os contratos nominais dos barrels promovidos na Faixa I. Package-import exactness e audiences são
+ * governados pelo parser canônico em `scripts/lib/copilot-package-imports.mjs`.
  */
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks genéricos para dependências pesadas ──────────────────────────
@@ -151,61 +149,5 @@ describe('FI-7 — bridges barrel contract', () => {
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
-    });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// 6. deep-import guard — nenhum deep import proibido em src/copilot/
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
-    /** Padrão de deep import proibido (não é alias intencional) */
-    const DEEP_IMPORT_RE =
-        /#copilot\/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api)\/.+/;
-
-    /** Aliases intencionais permitidos */
-    const INTENTIONAL_ALIASES = new Set([
-        '#copilot/config/agent',
-        '#copilot/config/custom-tools-registry',
-        '#copilot/config/tools-state',
-        '#copilot/observability/logger',
-        '#copilot/tools/observability',
-    ]);
-
-    /** Arquivos com exceção explícita (usa alias intencional) */
-    const ALLOWED_FILES = new Set(['tools/bootstrap.js', 'sdk/models/helpers.js']);
-
-    it('no prohibited deep imports in src/copilot/ JS files', async () => {
-        const copilotDir = join(process.cwd(), 'src', 'copilot');
-        const allFiles = await readdir(copilotDir, { recursive: true });
-        const jsFiles = allFiles.filter((/** @type {string} */ f) => {
-            const file = String(f);
-            const hiddenSegment = file.split(/[\\/]/u).some((segment) => segment.startsWith('.'));
-            return file.endsWith('.js') && !file.includes('node_modules') && !hiddenSegment;
-        });
-
-        const violations = [];
-
-        for (const file of jsFiles) {
-            const fileStr = String(file);
-            if (ALLOWED_FILES.has(fileStr)) continue;
-            if (fileStr.startsWith('sdk/')) continue;
-
-            const content = await readFile(join(copilotDir, fileStr), 'utf-8');
-            const lines = content.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i] ?? '';
-                // Pular comentários
-                if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) continue;
-                // Checar deep imports em linhas de import
-                const match = line.match(/from\s+['"]([^'"]+)['"]/);
-                const importPath = match?.[1];
-                if (importPath && DEEP_IMPORT_RE.test(importPath) && !INTENTIONAL_ALIASES.has(importPath)) {
-                    violations.push(`${fileStr}:${i + 1} → ${importPath}`);
-                }
-            }
-        }
-
-        expect(violations, `Deep imports proibidos encontrados:\n${violations.join('\n')}`).toHaveLength(0);
     });
 });

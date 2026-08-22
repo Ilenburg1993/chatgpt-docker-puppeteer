@@ -8,10 +8,10 @@
  * @module copilot/model-gateway/catalog/json-catalog-store
  */
 
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonStore } from '#copilot/infra/public/persistence/json';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
-
-import { readJson, writeJson } from '#copilot/infra/public/persistence/json';
+import { join, resolve } from 'node:path';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(
@@ -20,6 +20,16 @@ export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(
     'copilot',
     'model-gateway',
     'catalog.json',
+);
+
+const DEFAULT_MODEL_GATEWAY_CATALOG_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'model-gateway.catalog.json-store',
+        exactPaths: [DEFAULT_MODEL_GATEWAY_CATALOG_PATH],
+        operations: ['read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
 );
 
 const CATALOG_ARRAY_FIELDS = Object.freeze([
@@ -206,12 +216,29 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
 export class JsonModelGatewayCatalogStore {
     /** @type {string} */
     #filePath;
+    /** @type {ReturnType<typeof createBoundJsonStore>} */
+    #storage;
 
     /**
-     * @param {{ filePath?: string }} [options]
+     * Alternate paths require an already-authorized IO capability; the store never mints authority from caller input.
+     * @param {{
+     *   filePath?: string;
+     *   io?: ReturnType<typeof createConfiguredFsIo>;
+     * }} [options]
      */
     constructor(options = {}) {
-        this.#filePath = options.filePath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH;
+        const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH);
+        const defaultPath = resolve(DEFAULT_MODEL_GATEWAY_CATALOG_PATH);
+        const io = options.io ?? (filePath === defaultPath ? DEFAULT_MODEL_GATEWAY_CATALOG_IO : null);
+        if (!io) {
+            throw new TypeError('Alternate model-gateway catalog paths require already-authorized IO.');
+        }
+        this.#filePath = filePath;
+        this.#storage = createBoundJsonStore({
+            filePath,
+            io,
+            writeOptions: { durability: 'file-and-directory' },
+        });
     }
 
     /** @returns {string} */
@@ -223,7 +250,7 @@ export class JsonModelGatewayCatalogStore {
      * @returns {Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>}
      */
     async readSnapshot() {
-        const raw = await readJson(this.#filePath, null);
+        const raw = await this.#storage.read(null);
         return normalizeStoredCatalogSnapshot(raw);
     }
 
@@ -244,6 +271,6 @@ export class JsonModelGatewayCatalogStore {
         next['snapshotId'] =
             optionalString(/** @type {Record<string, unknown>} */ (snapshot)['snapshotId']) ??
             createModelGatewayCatalogSnapshotId(next);
-        await writeJson(this.#filePath, next);
+        await this.#storage.write(next);
     }
 }

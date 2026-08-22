@@ -5,11 +5,16 @@
 /** @typedef {import('./token.js').IoRollbackToken} IoRollbackToken */
 /** @typedef {import('./types.js').RollbackExecutionResult} RollbackExecutionResult */
 
-export { executeIoRollbackToken } from './executor.js';
+export { createIoRollbackCapabilityRuntime } from './capability.js';
+export { executeAuthenticatedIoRollbackToken } from './executor.js';
 export {
+    ROLLBACK_TOKEN_AUDIENCE,
+    ROLLBACK_TOKEN_VERSION,
     buildIoRollbackPlan,
-    createIoRollbackToken,
-    parseIoRollbackToken,
+    buildIoRollbackTokenAuthPayload,
+    createIoRollbackTokenEnvelope,
+    decodeIoRollbackToken,
     serializeIoRollbackToken,
-    verifyIoRollbackToken,
+    validateIoRollbackTokenShape,
+    verifyIoRollbackTokenDigest,
 } from './token.js';

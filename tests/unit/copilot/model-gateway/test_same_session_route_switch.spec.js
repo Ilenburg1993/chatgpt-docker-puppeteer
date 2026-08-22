@@ -1,5 +1,7 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -23,7 +25,7 @@ describe('model gateway same-session route switch', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const idempotencyKey = 'route-switch-deferred-20260616';
             let reattachCalled = false;
 
@@ -81,7 +83,7 @@ describe('model gateway same-session route switch', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const idempotencyKey = 'route-switch-session-scoped-20260616';
             const targetRoute = {
                 providerId: 'ollama-cloud',
@@ -149,7 +151,7 @@ describe('model gateway same-session route switch', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const idempotencyKey = 'route-switch-force-deferred-20260616';
             const targetRoute = {
                 providerId: 'ollama-cloud',

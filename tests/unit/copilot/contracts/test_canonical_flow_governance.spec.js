@@ -1,32 +1,19 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
+import { listSourceFilesSync } from '../../../../scripts/lib/source-tree.mjs';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const TERMINAL_FRONTEND_ROOT = join(COPILOT_ROOT, 'terminal/frontend');
 const SDK_ROUTES_ROOT = join(COPILOT_ROOT, 'server/routes/sdk');
 const SERVER_ROUTES_ROOT = join(COPILOT_ROOT, 'server/routes');
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function listJsFilesRecursive(dir) {
-    /** @type {string[]} */
-    const files = [];
-    for (const entry of readdirSync(dir)) {
-        const abs = join(dir, entry);
-        const st = statSync(abs);
-        if (st.isDirectory()) {
-            files.push(...listJsFilesRecursive(abs));
-        } else if (st.isFile() && entry.endsWith('.js')) {
-            files.push(abs);
-        }
-    }
-    return files;
+    return listSourceFilesSync(dir, { extensions: ['.js'] });
 }
 
 /**

@@ -1,6 +1,6 @@
 // @ts-check
 /** Path-domain filtering for external filesystem watch hints. */
-import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
+import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/infra/internal/policy';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 const BLOCKED_SEGMENTS = new Set(DEFAULT_BLOCKED_PATH_SEGMENTS.map((segment) => String(segment).toLowerCase()));

@@ -5,10 +5,10 @@
  * @module copilot/mcp/tools/runtime-health
  */
 
-import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
+import { getApplicationInfraHost } from '#copilot/boot/application-infra';
 import { buildIoCacheTierPlan } from '#copilot/infra/public/cache/tiering';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
-import { getCopilotNodeCompileCacheHealth } from '#copilot/infra/public/platform/node';
+import { readIoProcessHealthSnapshot } from '#copilot/infra/public/observability/process';
 import {
     createCloudflareStateStore,
     readCloudflareTunnelConfig,
@@ -34,7 +34,7 @@ import {
 } from '#copilot/mcp/control-plane';
 import { z } from 'zod';
 import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
-import { readMcpStartupMaintenanceState } from '../control-plane/startup-maintenance.js';
+import { readMcpStartupMaintenanceState } from '../runtime/startup-maintenance.js';
 import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
@@ -372,7 +372,6 @@ function summarizeIoCache(cache) {
     const coherence = recordOrEmpty(cache['coherence']);
     const readHashes = recordOrEmpty(cache['readHashes']);
     const byteLineIndex = recordOrEmpty(cache['byteLineIndex']);
-    const pathPolicy = recordOrEmpty(cache['pathPolicy']);
     const crossProcess = recordOrEmpty(coherence['crossProcess']);
     const externalWatch = recordOrEmpty(coherence['externalWatch']);
     const aggregate = recordOrEmpty(cache['aggregate']);
@@ -414,14 +413,6 @@ function summarizeIoCache(cache) {
             sizeBytes: byteLineIndex['sizeBytes'] ?? 0,
             maxBytes: byteLineIndex['maxBytes'] ?? 0,
         },
-        pathPolicy: {
-            hits: pathPolicy['hits'] ?? 0,
-            misses: pathPolicy['misses'] ?? 0,
-            expirations: pathPolicy['expirations'] ?? 0,
-            invalidatedEntries: pathPolicy['invalidatedEntries'] ?? 0,
-            size: pathPolicy['size'] ?? 0,
-            ttlMs: pathPolicy['ttlMs'] ?? 0,
-        },
         coherence: {
             localDispatches: coherence['localDispatches'] ?? 0,
             pendingReplications: coherence['pendingReplications'] ?? coherence['pending'] ?? 0,
@@ -445,8 +436,6 @@ function summarizeIoCache(cache) {
                 lastEventAtMs: externalWatch['lastEventAtMs'] ?? null,
             },
         },
-        validatedReadPath: cache['validatedReadPath'] ?? null,
-        validatedMutablePath: cache['validatedMutablePath'] ?? null,
         aggregate: {
             hits: aggregate['hits'] ?? 0,
             misses: aggregate['misses'] ?? 0,
@@ -464,28 +453,12 @@ function summarizeIoCache(cache) {
  */
 function summarizeIoCacheCompact(cache) {
     const summary = summarizeIoCache(cache);
-    const validatedReadPath = recordOrEmpty(summary.validatedReadPath);
-    const validatedMutablePath = recordOrEmpty(summary.validatedMutablePath);
     return {
         l1: summary.l1,
         coherence: {
             gapDetections: summary.coherence.gapDetections,
             writeErrors: summary.coherence.writeErrors,
             readErrors: summary.coherence.readErrors,
-        },
-        validatedReadPath: {
-            issued: validatedReadPath['issued'] ?? 0,
-            accepted: validatedReadPath['accepted'] ?? 0,
-            rejectedUnbranded: validatedReadPath['rejectedUnbranded'] ?? 0,
-            rejectedWorkspace: validatedReadPath['rejectedWorkspace'] ?? 0,
-            rejectedMode: validatedReadPath['rejectedMode'] ?? 0,
-        },
-        validatedMutablePath: {
-            issued: validatedMutablePath['issued'] ?? 0,
-            accepted: validatedMutablePath['accepted'] ?? 0,
-            rejectedUnbranded: validatedMutablePath['rejectedUnbranded'] ?? 0,
-            rejectedWorkspace: validatedMutablePath['rejectedWorkspace'] ?? 0,
-            rejectedMode: validatedMutablePath['rejectedMode'] ?? 0,
         },
         aggregate: summary.aggregate,
     };
@@ -650,7 +623,9 @@ export const mcpRuntimeHealthTool = {
         const authConfigCache = readMcpAuthConfigCacheStats();
         const authDecisionCache = readMcpAuthDecisionCacheStats();
         const repoReadFileCache = readRepoReadFileResultCacheStats();
-        const ioRuntime = readIoRuntimeHealthSnapshot(getApplicationInfraRuntime());
+        const applicationInfra = getApplicationInfraHost();
+        const ioRuntime = readIoRuntimeHealthSnapshot(applicationInfra.runtime);
+        const ioProcess = readIoProcessHealthSnapshot(applicationInfra.processInfra);
         const ioCacheBenchmarkState = await readIoCacheBenchmarkState();
         const ioCacheBenchmark = summarizeIoCacheBenchmark(ioCacheBenchmarkState);
         const ioCachePlanWithBenchmark = buildEvidenceAwareIoCachePlan(ioRuntime, ioCacheBenchmarkState);
@@ -677,10 +652,15 @@ export const mcpRuntimeHealthTool = {
         const statefulRuntime = readMcpHttpSessionRuntimeState();
         const schemaConvergence = readMcpSchemaConvergenceState();
         const roundTripAnalyticsMonitor = readMcpRoundTripAnalyticsMonitorState();
-        const compileCache = getCopilotNodeCompileCacheHealth();
+        const compileCache = ioProcess.compileCache;
         const warnings = [];
         const critical = [];
         const informational = [];
+        for (const alert of [...ioProcess.alerts, ...ioRuntime.alerts]) {
+            const message = `[${alert.code}] ${alert.message}`;
+            if (alert.severity === 'high') critical.push(message);
+            else warnings.push(message);
+        }
         if (workspace.error) warnings.push(`Unable to read repository status: ${workspace.error}`);
         if (workspace.dirty === true) informational.push('Workspace has uncommitted or untracked changes.');
         if (!index.available) warnings.push('Shared IO index is unavailable; run or auto-run repo_index_build.');
@@ -794,6 +774,13 @@ export const mcpRuntimeHealthTool = {
                     authorizationCache: summarizeAuthorizationCache(recordOrEmpty(authDecisionCache)),
                     repoReadFileCache: summarizeRepoReadCache(repoReadFileCache),
                     ioCache: summarizeIoCacheCompact(ioRuntime.cache),
+                    ioProcess: {
+                        ownership: ioProcess.ownership,
+                        authority: ioProcess.authority,
+                        lockTimeouts:
+                            Number(ioProcess.locks?.timeouts ?? 0) + Number(ioProcess.locks?.fileLocks.timeouts ?? 0),
+                        alertCount: ioProcess.alerts.length,
+                    },
                     ioDurability: summarizeIoDurability(recordOrEmpty(ioRuntime.durability)),
                     ioMutationState: summarizeIoMutationState(recordOrEmpty(ioRuntime.mutationState)),
                     ioCachePlan: {
@@ -855,6 +842,7 @@ export const mcpRuntimeHealthTool = {
                 authorizationCache: authDecisionCache,
                 repoReadFileCache,
                 ioCache: ioRuntime.cache,
+                ioProcess,
                 ioDurability: ioRuntime.durability,
                 ioCacheBenchmark,
                 ioCachePlanWithBenchmark,

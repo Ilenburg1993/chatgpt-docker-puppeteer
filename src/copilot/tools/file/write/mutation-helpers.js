@@ -5,19 +5,17 @@
  * @module copilot/tools/file/write/mutation-helpers
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import {
     abortIoChangeSet,
     appendIoChangeSetEntry,
     applyIoChangeSet,
     beginIoChangeSet,
     completeIoOperationEnvelope,
-    createIoRollbackToken,
     failIoOperationEnvelope,
-    serializeIoRollbackToken,
 } from '#copilot/infra/public/operations';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
-import { WORKSPACE_MUTATION_AUDIT, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
+import { WORKSPACE_MUTATION_AUDIT, WORKSPACE_ROLLBACK, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
 import {
     buildPatchFailureTerminalSummary,
     patchFailureCategory,
@@ -189,27 +187,39 @@ export function buildMutationChangeSet(input) {
               evidence: { ...(input.evidence ?? {}) },
           });
 
-    const rollbackToken = rollbackPolicy.enabled ? createIoRollbackToken(changeSet) : null;
+    const hasRollbackSteps = changeSet.entries.some((entry) => entry.rollback !== null);
+    const rollbackCapability =
+        rollbackPolicy.enabled && changeSet.status === 'applied' && hasRollbackSteps
+            ? WORKSPACE_ROLLBACK.issue(changeSet)
+            : null;
+    const rollbackToken = rollbackCapability?.token ?? null;
     return {
         id: changeSet.changeSetId,
         status: changeSet.status,
         entryCount: changeSet.entries.length,
-        rollback: rollbackToken
-            ? {
-                  enabled: true,
-                  token: serializeIoRollbackToken(rollbackToken),
-                  stepCount: rollbackToken.stepCount,
-                  steps: rollbackToken.steps,
-                  policy: rollbackPolicySummary,
-              }
-            : {
-                  enabled: false,
-                  token: null,
-                  stepCount: 0,
-                  steps: [],
-                  reason: 'disabled_by_default',
-                  policy: rollbackPolicySummary,
-              },
+        rollback:
+            rollbackCapability && rollbackToken
+                ? {
+                      enabled: true,
+                      token: rollbackCapability.serialized,
+                      stepCount: rollbackToken.stepCount,
+                      steps: rollbackToken.steps,
+                      expiresAtMs: rollbackToken.expiresAtMs,
+                      audience: rollbackToken.audience,
+                      policy: rollbackPolicySummary,
+                  }
+                : {
+                      enabled: false,
+                      token: null,
+                      stepCount: 0,
+                      steps: [],
+                      reason: !rollbackPolicy.enabled
+                          ? 'disabled_by_default'
+                          : changeSet.status !== 'applied'
+                            ? 'no_applied_mutation'
+                            : 'no_rollback_steps',
+                      policy: rollbackPolicySummary,
+                  },
     };
 }
 

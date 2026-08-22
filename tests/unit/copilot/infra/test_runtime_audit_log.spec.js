@@ -66,7 +66,7 @@ describe('infra/operations/audit-log', () => {
             traceId: 'trace-1',
         });
 
-        const runtime = createInfraRuntime({ runtimeId: 'audit-env-enabled' });
+        const runtime = createInfraRuntime({ runtimeId: 'audit-env-enabled', env: process.env });
         RUNTIMES.push(runtime);
         const audit = await runtime.mutationAudit.record(envelope, {
             tool: 'patch_file',
@@ -91,7 +91,7 @@ describe('infra/operations/audit-log', () => {
         const laterPath = join(dir, 'later.jsonl');
         process.env['COPILOT_IO_MUTATION_AUDIT_LOG_PATH'] = firstPath;
 
-        const runtime = createInfraRuntime({ runtimeId: 'audit-config-capture' });
+        const runtime = createInfraRuntime({ runtimeId: 'audit-config-capture', env: process.env });
         RUNTIMES.push(runtime);
         process.env['COPILOT_IO_MUTATION_AUDIT_LOG_PATH'] = laterPath;
 

@@ -39,15 +39,24 @@ import { log } from '../logger.js';
  *     // Apenas em testes:
  *     const preset = createHooksAuditPreset({ allowAll: true });
  *
- * @param {{ allowAll?: boolean; permissionHandler?: import('#copilot/sdk/types').PermissionHandler }} [options]
+ * @param {{
+ *     allowAll?: boolean;
+ *     permissionHandler?: import('#copilot/sdk/types').PermissionHandler;
+ *     auditLog?: {
+ *         record: (entry: import('#copilot/audit').AuditEntry) => unknown;
+ *         getEntries: () => import('#copilot/audit').AuditEntry[];
+ *         clear: () => unknown;
+ *     };
+ * }} [options]
  * @returns {{
  *     hooks: SessionHooks;
  *     onPermissionRequest: import('#copilot/sdk/types').PermissionHandler;
- *     getAuditTrail: () => import('#copilot/audit/pipeline').AuditEntry[];
+ *     getAuditTrail: () => import('#copilot/audit').AuditEntry[];
  *     clearAuditTrail: () => void;
  * }}
  */
 export function createHooksAuditPreset(options = {}) {
+    const auditLog = options.auditLog ?? defaultAuditLog;
     // Fase BE: emitir warning explícito se allowAll=true em ambiente de produção
     if (options.allowAll === true && process.env['NODE_ENV'] !== 'test') {
         log(
@@ -61,14 +70,14 @@ export function createHooksAuditPreset(options = {}) {
      * @param {unknown} [summary]
      */
     function record(hookName, sessionId, summary) {
-        /** @type {import('#copilot/audit/pipeline').AuditEntry} */
+        /** @type {import('#copilot/audit').AuditEntry} */
         const entry = {
             type: 'hook.fired',
             ts: new Date().toISOString(),
             data: { hookName, summary },
         };
         if (sessionId !== undefined) entry.sessionId = sessionId;
-        defaultAuditLog.record(entry);
+        auditLog.record(entry);
         log('DEBUG', `[hooks-audit-preset] ${hookName}${sessionId ? ` [${sessionId}]` : ''}`);
     }
 
@@ -121,7 +130,7 @@ export function createHooksAuditPreset(options = {}) {
     return {
         hooks,
         onPermissionRequest,
-        getAuditTrail: () => defaultAuditLog.getEntries(),
-        clearAuditTrail: () => defaultAuditLog.clear(),
+        getAuditTrail: () => auditLog.getEntries(),
+        clearAuditTrail: () => auditLog.clear(),
     };
 }

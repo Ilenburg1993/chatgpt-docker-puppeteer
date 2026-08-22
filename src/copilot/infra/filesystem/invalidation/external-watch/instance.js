@@ -16,7 +16,7 @@ import { resolveExternalWatchCandidate } from './filter.js';
  */
 export function createIoExternalWatcher(rootPath, runtimeOptions = {}) {
     const root = resolve(rootPath);
-    const baseConfig = runtimeOptions.config ?? readIoExternalWatchConfig();
+    const baseConfig = runtimeOptions.config ?? readIoExternalWatchConfig({});
     /** @type {import('node:fs').FSWatcher | null} */
     let watcher = null;
     /** @type {NodeJS.Timeout | null} */

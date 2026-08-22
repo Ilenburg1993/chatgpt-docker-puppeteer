@@ -3,7 +3,10 @@
 
 import { resolve } from 'node:path';
 import { createIoExternalWatcher } from '../../filesystem/invalidation/index.js';
-import { createWorkspacePathAuthority } from '../../filesystem/workspace/authority/index.js';
+import {
+    createWorkspacePathAuthority,
+    getWorkspacePathAuthorityStats,
+} from '../../filesystem/workspace/authority/index.js';
 import { createWorkspaceIo } from '../../filesystem/workspace/index.js';
 import { createWorkspaceMutationIo } from '../../filesystem/workspace/mutation-io/index.js';
 import { createWorkspaceReadIo } from '../../filesystem/workspace/read-io/index.js';
@@ -13,26 +16,43 @@ import { createInfraLifecycle } from '../lifecycle/index.js';
 let workspaceSequence = 0;
 
 /** @param {{
- * workspaceRoot:string; blockedSegments?:readonly string[]; workspaceId?:string;
+ * workspaceRoot:string; blockedSegments?:readonly string[]; workspaceId?:string; runtimeOwnerId?:string; generation?:number;
  * indexRegistry?: ReturnType<typeof import('../../indexing/registry/instance/index.js').createIoIndexRegistryRuntime>;
  * coherenceRuntime?: ReturnType<typeof import('../../filesystem/invalidation/coherence-runtime/index.js').createIoCoherenceRuntime>;
  * parserCacheRuntime?: ReturnType<typeof import('../../indexing/parser/cache/runtime/index.js').createParserCacheRuntime>;
  * telemetryRuntime?: ReturnType<typeof import('#copilot/infra/internal/telemetry').createIoTelemetryRuntime>;
- * externalWatchConfig?: ReturnType<typeof import('../../filesystem/invalidation/external-watch/index.js').readIoExternalWatchConfig>;
+ * workspaceConfig?: ReturnType<typeof import('./config/index.js').readWorkspaceInfraConfig>;
+ * indexRuntimeConfig?: ReturnType<typeof import('../../indexing/registry/instance/index.js').readIoIndexRuntimeConfig>;
  * rollbackPolicy?: ReturnType<typeof import('../../filesystem/transaction/index.js').readIoRollbackPolicy>;
+ * rollbackCapabilityRuntime?: ReturnType<typeof import('../../operations/rollback/index.js').createIoRollbackCapabilityRuntime>;
  * capacityPreflight?: typeof import('../../filesystem/transaction/index.js').preflightIoCapacity;
+ * onDisposed?: (identity:{workspaceId:string;workspaceRoot:string})=>void|Promise<void>;
  * }} options */
 export function createWorkspaceInfra(options) {
     if (!options || typeof options.workspaceRoot !== 'string' || !options.workspaceRoot.trim()) {
         throw new TypeError('createWorkspaceInfra requires a non-empty workspaceRoot.');
     }
     const workspaceRoot = resolve(options.workspaceRoot);
-    const workspaceId = options.workspaceId?.trim() || `workspace-${++workspaceSequence}`;
+    const generation =
+        Number.isSafeInteger(options.generation) && Number(options.generation) > 0
+            ? Math.trunc(Number(options.generation))
+            : ++workspaceSequence;
+    const workspaceId = options.workspaceId?.trim() || `workspace-${generation}`;
     const lifecycle = createInfraLifecycle(`WorkspaceInfra(${workspaceId})`);
     const authority = createWorkspacePathAuthority({
         workspaceRoot,
         ...(options.blockedSegments ? { blockedSegments: options.blockedSegments } : {}),
     });
+    if (options.rollbackCapabilityRuntime && !options.rollbackPolicy) {
+        throw new Error('Workspace rollback capability requires rollbackPolicy.');
+    }
+    const rollback = options.rollbackCapabilityRuntime
+        ? options.rollbackCapabilityRuntime.bindWorkspace({
+              workspaceId,
+              workspaceRoot,
+              policy: /** @type {NonNullable<typeof options.rollbackPolicy>} */ (options.rollbackPolicy),
+          })
+        : null;
     /** @type {ReturnType<typeof createWorkspaceReadIo> | undefined} */
     let readIo;
     /** @type {ReturnType<typeof createWorkspaceMutationIo> | undefined} */
@@ -43,6 +63,8 @@ export function createWorkspaceInfra(options) {
     let indexing;
     /** @type {Map<string, ReturnType<typeof createIoExternalWatcher>>} */
     const externalWatchers = new Map();
+    /** @type {Promise<void> | null} */
+    let disposePromise = null;
 
     function assertActive() {
         if (lifecycle.state !== 'active') throw new Error(`WorkspaceInfra(${workspaceId}) is ${lifecycle.state}.`);
@@ -51,7 +73,12 @@ export function createWorkspaceInfra(options) {
     return Object.freeze({
         workspaceId,
         workspaceRoot,
+        generation,
         authority,
+        authorityStats() {
+            return getWorkspacePathAuthorityStats(authority);
+        },
+        rollback,
         get readIo() {
             assertActive();
             return (readIo ??= createWorkspaceReadIo(
@@ -108,7 +135,12 @@ export function createWorkspaceInfra(options) {
                           }
                         : {}),
                     ...(options.parserCacheRuntime ? { parserCacheRuntime: options.parserCacheRuntime } : {}),
-                    ...(options.telemetryRuntime ? { telemetryRuntime: options.telemetryRuntime } : {}),
+                    ...(options.workspaceConfig
+                        ? { maxActiveScopes: options.workspaceConfig.indexingContext.maxActiveScopes }
+                        : {}),
+                    ...(options.runtimeOwnerId ? { runtimeOwnerId: options.runtimeOwnerId } : {}),
+                    workspaceOwnerId: workspaceId,
+                    ...(options.indexRuntimeConfig ? { indexRuntimeConfig: options.indexRuntimeConfig } : {}),
                 });
                 const ownedIndexing = indexing;
                 lifecycle.register('indexing-context', () => ownedIndexing.dispose());
@@ -131,7 +163,7 @@ export function createWorkspaceInfra(options) {
             if (!watcher) {
                 watcher = createIoExternalWatcher(approvedRoot, {
                     invalidationBus: options.coherenceRuntime.invalidation,
-                    ...(options.externalWatchConfig ? { config: options.externalWatchConfig } : {}),
+                    ...(options.workspaceConfig ? { config: options.workspaceConfig.externalWatch } : {}),
                 });
                 externalWatchers.set(approvedRoot, watcher);
                 const ownedWatcher = watcher;
@@ -168,10 +200,40 @@ export function createWorkspaceInfra(options) {
             return lifecycle.register(name, dispose);
         },
         lifecycleSnapshot() {
-            return Object.freeze({ ...lifecycle.snapshot(), externalWatchers: externalWatchers.size });
+            return Object.freeze({
+                ...lifecycle.snapshot(),
+                workspaceId,
+                workspaceRoot,
+                generation,
+                config: options.workspaceConfig ?? null,
+                externalWatchers: externalWatchers.size,
+                materializedCapabilities: Object.freeze({
+                    readIo: readIo !== undefined,
+                    mutationIo: mutationIo !== undefined,
+                    io: io !== undefined,
+                    indexing: indexing !== undefined,
+                }),
+            });
         },
         dispose() {
-            return lifecycle.dispose();
+            if (disposePromise) return disposePromise;
+            disposePromise = (async () => {
+                const failures = [];
+                try {
+                    await lifecycle.dispose();
+                } catch (error) {
+                    failures.push(error);
+                }
+                try {
+                    await options.onDisposed?.({ workspaceId, workspaceRoot });
+                } catch (error) {
+                    failures.push(error);
+                }
+                if (failures.length > 0) {
+                    throw new AggregateError(failures, `WorkspaceInfra(${workspaceId}) teardown failed.`);
+                }
+            })();
+            return disposePromise;
         },
     });
 }

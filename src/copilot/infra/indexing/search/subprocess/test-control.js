@@ -1,3 +1,3 @@
 // @ts-check
 /** Private search-subprocess reset control. */
-export { resetRipgrepAvailabilityForTest } from './ripgrep.js';
+export { resetSearchSubprocessProcessStateForTest } from './process/test-control.js';

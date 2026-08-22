@@ -1,7 +1,7 @@
 // @ts-check
 /** Locked atomic write/create-replace orchestration with rollback evidence. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { readBinaryMutationSnapshot } from '#copilot/infra/internal/filesystem/transaction';

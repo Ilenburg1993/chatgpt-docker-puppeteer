@@ -1,24 +1,18 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
 import { checkGlobalArchitecture } from '../../../../scripts/check-copilot-global-architecture.mjs';
+import { listSourceFilesSync } from '../../../../scripts/lib/source-tree.mjs';
 
 const ROOT = process.cwd();
 const SRC_COPILOT = join(ROOT, 'src/copilot');
 
-/**
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function listJsFiles(dir) {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-        const abs = join(dir, entry.name);
-        if (entry.isDirectory()) return listJsFiles(abs);
-        return entry.isFile() && entry.name.endsWith('.js') ? [abs] : [];
-    });
+    return listSourceFilesSync(dir, { extensions: ['.js'] });
 }
 
 /**

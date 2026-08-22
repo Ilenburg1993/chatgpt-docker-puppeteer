@@ -65,10 +65,11 @@ describe('check-layer-violations — isInsideJsDoc', () => {
 });
 
 describe('check-layer-violations — LAYER_MAP', () => {
-    it('core, types e db são L0', () => {
+    it('core, types e infra são as fundações L0 atuais', () => {
         assert.equal(LAYER_MAP['core'], 0);
         assert.equal(LAYER_MAP['types'], 0);
-        assert.equal(LAYER_MAP['db'], 0);
+        assert.equal(LAYER_MAP['infra'], 0);
+        assert.equal(LAYER_MAP['db'], undefined);
     });
 
     it('infra é fundação de I/O compartilhado', () => {

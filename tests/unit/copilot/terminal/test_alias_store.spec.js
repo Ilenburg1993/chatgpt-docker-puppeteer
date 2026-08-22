@@ -9,15 +9,51 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readTextFreshConfigured, writeFileAtomicConfigured } = vi.hoisted(() => ({
+const {
+    appendTextConfigured,
+    deleteFileConfigured,
+    listDirectoryNamesFreshConfigured,
+    lstatPathConfigured,
+    mkdirPathConfigured,
+    moveFileConfigured,
+    readBytesFreshConfigured,
+    readBytesRangeFreshConfigured,
+    readTextFreshConfigured,
+    statPathConfigured,
+    watchPathConfigured,
+    withPathLockConfigured,
+    writeFileAtomicConfigured,
+} = vi.hoisted(() => ({
+    appendTextConfigured: vi.fn(() => Promise.resolve()),
+    deleteFileConfigured: vi.fn(() => Promise.resolve()),
+    listDirectoryNamesFreshConfigured: vi.fn(() => Promise.resolve({ entries: [] })),
+    lstatPathConfigured: vi.fn(() => Promise.resolve({ stats: { size: 0 } })),
+    mkdirPathConfigured: vi.fn(() => Promise.resolve()),
+    moveFileConfigured: vi.fn(() => Promise.resolve()),
+    readBytesFreshConfigured: vi.fn(() => Promise.resolve({ content: Buffer.alloc(0) })),
+    readBytesRangeFreshConfigured: vi.fn(() => Promise.resolve({ content: Buffer.alloc(0), startByte: 0, endByte: 0 })),
     readTextFreshConfigured: vi.fn(() => Promise.resolve({ content: '{}' })),
+    statPathConfigured: vi.fn(() => Promise.resolve({ stats: { size: 0 } })),
+    watchPathConfigured: vi.fn(() => ({ close: vi.fn() })),
+    withPathLockConfigured: vi.fn((_, __, callback) => callback()),
     writeFileAtomicConfigured: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
     createConfiguredFsGrant: vi.fn((declaration) => declaration),
     createConfiguredFsIo: vi.fn(() => ({
+        appendText: appendTextConfigured,
+        deleteFile: deleteFileConfigured,
+        listDirectoryNamesFresh: listDirectoryNamesFreshConfigured,
+        lstatPath: lstatPathConfigured,
+        mkdirPath: mkdirPathConfigured,
+        moveFile: moveFileConfigured,
+        readBytesFresh: readBytesFreshConfigured,
+        readBytesRangeFresh: readBytesRangeFreshConfigured,
         readTextFresh: readTextFreshConfigured,
+        statPath: statPathConfigured,
+        watchPath: watchPathConfigured,
+        withPathLock: withPathLockConfigured,
         writeFileAtomic: writeFileAtomicConfigured,
     })),
 }));

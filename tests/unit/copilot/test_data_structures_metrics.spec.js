@@ -18,31 +18,31 @@ import { describe, expect, it } from 'vitest';
 
 describe('F45 — metrics-histogram: percentile()', () => {
     it('retorna 0 para array vazio', async () => {
-        const { percentile } = await import('#copilot/observability/metrics-histogram');
+        const { percentile } = await import('#copilot/testing/observability/metrics-histogram');
         expect(percentile([], 50)).toBe(0);
     });
 
     it('retorna valor único para array com 1 elemento', async () => {
-        const { percentile } = await import('#copilot/observability/metrics-histogram');
+        const { percentile } = await import('#copilot/testing/observability/metrics-histogram');
         expect(percentile([42], 50)).toBe(42);
         expect(percentile([42], 99)).toBe(42);
     });
 
     it('calcula p50 corretamente para array par', async () => {
-        const { percentile } = await import('#copilot/observability/metrics-histogram');
+        const { percentile } = await import('#copilot/testing/observability/metrics-histogram');
         // sorted: [1, 2, 3, 4] — p50 = ceil(0.5*4)-1 = idx 1 → 2
         expect(percentile([1, 2, 3, 4], 50)).toBe(2);
     });
 
     it('calcula p95 para array com 100 elementos', async () => {
-        const { percentile } = await import('#copilot/observability/metrics-histogram');
+        const { percentile } = await import('#copilot/testing/observability/metrics-histogram');
         const sorted = Array.from({ length: 100 }, (_, i) => i + 1);
         const p95 = percentile(sorted, 95);
         expect(p95).toBe(95);
     });
 
     it('calcula p99 para array com 1000 elementos', async () => {
-        const { percentile } = await import('#copilot/observability/metrics-histogram');
+        const { percentile } = await import('#copilot/testing/observability/metrics-histogram');
         const sorted = Array.from({ length: 1000 }, (_, i) => i);
         const p99 = percentile(sorted, 99);
         expect(p99).toBe(989); // ceil(0.99*1000)-1 = 989
@@ -51,7 +51,7 @@ describe('F45 — metrics-histogram: percentile()', () => {
 
 describe('F45 — metrics-histogram: createHistogram()', () => {
     it('snapshot vazio retorna zeros', async () => {
-        const { createHistogram } = await import('#copilot/observability/metrics-histogram');
+        const { createHistogram } = await import('#copilot/testing/observability/metrics-histogram');
         const h = createHistogram(10);
         const snap = h.snapshot();
         expect(snap.count).toBe(0);
@@ -62,7 +62,7 @@ describe('F45 — metrics-histogram: createHistogram()', () => {
     });
 
     it('record + snapshot reflete valores corretamente', async () => {
-        const { createHistogram } = await import('#copilot/observability/metrics-histogram');
+        const { createHistogram } = await import('#copilot/testing/observability/metrics-histogram');
         const h = createHistogram(100);
         h.record(10);
         h.record(20);
@@ -75,7 +75,7 @@ describe('F45 — metrics-histogram: createHistogram()', () => {
     });
 
     it('ring buffer: descarta amostras mais antigas quando excede maxSamples', async () => {
-        const { createHistogram } = await import('#copilot/observability/metrics-histogram');
+        const { createHistogram } = await import('#copilot/testing/observability/metrics-histogram');
         const h = createHistogram(3);
         h.record(100);
         h.record(200);
@@ -88,7 +88,7 @@ describe('F45 — metrics-histogram: createHistogram()', () => {
     });
 
     it('sum se mantém correto após evicção (FINDING-P4-1)', async () => {
-        const { createHistogram } = await import('#copilot/observability/metrics-histogram');
+        const { createHistogram } = await import('#copilot/testing/observability/metrics-histogram');
         const h = createHistogram(2);
         h.record(10);
         h.record(20);
@@ -98,7 +98,7 @@ describe('F45 — metrics-histogram: createHistogram()', () => {
     });
 
     it('p50/p95/p99 corretos para amostra grande', async () => {
-        const { createHistogram } = await import('#copilot/observability/metrics-histogram');
+        const { createHistogram } = await import('#copilot/testing/observability/metrics-histogram');
         const h = createHistogram(500);
         for (let i = 1; i <= 100; i++) h.record(i);
         const snap = h.snapshot();
@@ -114,14 +114,14 @@ describe('F45 — metrics-histogram: createHistogram()', () => {
 
 describe('F45 — AuditRingBuffer', () => {
     it('inicia vazio com size=0 e total=0', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 5 });
         expect(buf.size).toBe(0);
         expect(buf.total).toBe(0);
     });
 
     it('push incrementa size e total', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 5 });
         buf.push('a');
         buf.push('b');
@@ -130,7 +130,7 @@ describe('F45 — AuditRingBuffer', () => {
     });
 
     it('tail() retorna entradas em ordem cronológica', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 10 });
         buf.push(1);
         buf.push(2);
@@ -139,14 +139,14 @@ describe('F45 — AuditRingBuffer', () => {
     });
 
     it('tail(n) limita a N entradas mais recentes', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 10 });
         for (let i = 1; i <= 5; i++) buf.push(i);
         expect(buf.tail(2)).toEqual([4, 5]);
     });
 
     it('sobrescreve entradas antigas quando excede capacity', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 3 });
         buf.push('a');
         buf.push('b');
@@ -158,7 +158,7 @@ describe('F45 — AuditRingBuffer', () => {
     });
 
     it('clear() reseta o buffer', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer({ capacity: 5 });
         buf.push(1);
         buf.push(2);
@@ -169,7 +169,7 @@ describe('F45 — AuditRingBuffer', () => {
     });
 
     it('capacity default é 500', async () => {
-        const { AuditRingBuffer } = await import('#copilot/audit/ring-buffer');
+        const { AuditRingBuffer } = await import('#copilot/testing/audit/ring-buffer');
         const buf = new AuditRingBuffer();
         // Push 501 to verify capacity
         for (let i = 0; i < 501; i++) buf.push(i);

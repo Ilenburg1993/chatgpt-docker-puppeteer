@@ -394,19 +394,19 @@ function isValidPolicyGrant(grant) {
     if (!grant || typeof grant !== 'object') return false;
     const candidate = /** @type {Record<string,unknown>} */ (grant);
     return (
-        typeof candidate.id === 'string' &&
-        candidate.id.trim().length > 0 &&
-        typeof candidate.pathMode === 'string' &&
-        VALID_PATH_MODES.has(candidate.pathMode) &&
-        Array.isArray(candidate.operations) &&
-        candidate.operations.length > 0 &&
-        candidate.operations.every((entry) => typeof entry === 'string' && VALID_OPERATIONS.has(entry)) &&
-        new Set(candidate.operations).size === candidate.operations.length &&
-        candidate.symlinkPolicy === 'deny' &&
-        Array.isArray(candidate.durability) &&
-        candidate.durability.length > 0 &&
-        candidate.durability.every((entry) => typeof entry === 'string' && VALID_DURABILITY.has(entry)) &&
-        new Set(candidate.durability).size === candidate.durability.length
+        typeof candidate['id'] === 'string' &&
+        candidate['id'].trim().length > 0 &&
+        typeof candidate['pathMode'] === 'string' &&
+        VALID_PATH_MODES.has(candidate['pathMode']) &&
+        Array.isArray(candidate['operations']) &&
+        candidate['operations'].length > 0 &&
+        candidate['operations'].every((entry) => typeof entry === 'string' && VALID_OPERATIONS.has(entry)) &&
+        new Set(candidate['operations']).size === candidate['operations'].length &&
+        candidate['symlinkPolicy'] === 'deny' &&
+        Array.isArray(candidate['durability']) &&
+        candidate['durability'].length > 0 &&
+        candidate['durability'].every((entry) => typeof entry === 'string' && VALID_DURABILITY.has(entry)) &&
+        new Set(candidate['durability']).size === candidate['durability'].length
     );
 }
 

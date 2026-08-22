@@ -5,7 +5,7 @@ import {
     OPERATIONAL_PROFILES,
     loadOperationalProfile,
     resolveOperationalAgentSelection,
-} from '#copilot/config/operational-profiles';
+} from '#copilot/testing/config/operational-profiles';
 
 describe('operational profiles', () => {
     it('production habilita agent-full como primeiro agente', () => {

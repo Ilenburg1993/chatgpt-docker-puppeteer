@@ -8,11 +8,27 @@
  * @module copilot/terminal/state/transcript-archive
  */
 
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
-import { join } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 
 const DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
+const TERMINAL_TRANSCRIPT_ARCHIVE_DIR = resolve(
+    typeof process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR'] === 'string' &&
+        process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR']?.trim()
+        ? String(process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR'])
+        : DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR,
+);
+const TERMINAL_TRANSCRIPT_ARCHIVE_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'terminal.transcript.archive',
+        roots: [TERMINAL_TRANSCRIPT_ARCHIVE_DIR],
+        operations: ['append'],
+        symlinkPolicy: 'deny',
+        durability: ['none'],
+    }),
+);
 const TERMINAL_TRANSCRIPT_ARCHIVE_SOFT_QUEUE = 10_000;
 const TERMINAL_TRANSCRIPT_ARCHIVE_CATASTROPHIC_QUEUE = 100_000;
 
@@ -21,8 +37,9 @@ let _terminalTranscriptArchivePath = null;
 /** @type {string | null} */
 let _terminalTranscriptArchiveError = null;
 
-const terminalTranscriptArchiveWriter = createJsonlFileWriter({
+const terminalTranscriptArchiveWriter = createBoundJsonlFileWriter({
     filePath: resolveTranscriptArchivePath,
+    io: TERMINAL_TRANSCRIPT_ARCHIVE_IO,
     batchLines: 256,
     maxQueueLines: TERMINAL_TRANSCRIPT_ARCHIVE_CATASTROPHIC_QUEUE,
     softQueueLines: TERMINAL_TRANSCRIPT_ARCHIVE_SOFT_QUEUE,
@@ -40,12 +57,7 @@ const terminalTranscriptArchiveWriter = createJsonlFileWriter({
 function resolveTranscriptArchivePath() {
     if (_terminalTranscriptArchivePath) return _terminalTranscriptArchivePath;
     const day = new Date().toISOString().slice(0, 10);
-    const configuredDir = process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR'];
-    const archiveDir =
-        typeof configuredDir === 'string' && configuredDir.trim()
-            ? configuredDir
-            : DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR;
-    _terminalTranscriptArchivePath = join(archiveDir, `terminal-transcript-${day}.jsonl`);
+    _terminalTranscriptArchivePath = join(TERMINAL_TRANSCRIPT_ARCHIVE_DIR, `terminal-transcript-${day}.jsonl`);
     return _terminalTranscriptArchivePath;
 }
 

@@ -41,26 +41,32 @@ function listJavaScriptFiles(directory) {
     return out;
 }
 
-/** @param {import('@babel/traverse').NodePath} referencePath */
+/** @typedef {{node:import('@babel/types').Node;parentPath:BabelPathLike|null}} BabelPathLike */
+/** @typedef {{kind:string;constantViolations:readonly unknown[];referencePaths:readonly BabelPathLike[];path:{node:import('@babel/types').Node}}} BabelBindingLike */
+/** @typedef {{scope:{bindings:Record<string,BabelBindingLike>};stop:()=>void}} BabelProgramPathLike */
+
+/** @param {BabelPathLike} referencePath */
 function referenceMutatesBinding(referencePath) {
     let member = referencePath.parentPath;
-    if (!member?.isMemberExpression()) return false;
-    while (member.parentPath?.isMemberExpression() && member.parentPath.node.object === member.node) {
+    if (member?.node.type !== 'MemberExpression') return false;
+    while (member.parentPath?.node.type === 'MemberExpression' && member.parentPath.node.object === member.node) {
         member = member.parentPath;
     }
+    const memberNode = member.node;
+    if (memberNode.type !== 'MemberExpression') return false;
     const parent = member.parentPath;
-    if (parent?.isAssignmentExpression() && parent.node.left === member.node) return true;
-    if (parent?.isUpdateExpression()) return true;
+    if (parent?.node.type === 'AssignmentExpression' && parent.node.left === memberNode) return true;
+    if (parent?.node.type === 'UpdateExpression') return true;
     return Boolean(
-        parent?.isCallExpression() &&
-        parent.node.callee === member.node &&
-        !member.node.computed &&
-        member.node.property.type === 'Identifier' &&
-        MUTATING_METHODS.has(member.node.property.name),
+        parent?.node.type === 'CallExpression' &&
+        parent.node.callee === memberNode &&
+        !memberNode.computed &&
+        memberNode.property.type === 'Identifier' &&
+        MUTATING_METHODS.has(memberNode.property.name),
     );
 }
 
-/** @param {import('@babel/traverse').NodePath<import('@babel/types').VariableDeclarator>} declaratorPath */
+/** @param {{node:import('@babel/types').VariableDeclarator}} declaratorPath */
 function initializerOwnsStatefulResource(declaratorPath) {
     const initializer = declaratorPath.node.init;
     if (!initializer || initializer.type !== 'CallExpression') return false;
@@ -77,13 +83,15 @@ export function listMutableModuleBindings(source) {
     /** @type {string[]} */
     const mutable = [];
     traverse(ast, {
-        Program(programPath) {
+        Program(/** @type {BabelProgramPathLike} */ programPath) {
             for (const [name, binding] of Object.entries(programPath.scope.bindings)) {
-                if (!binding.path.isVariableDeclarator()) continue;
+                if (binding.path.node.type !== 'VariableDeclarator') continue;
                 const changesBinding =
                     binding.kind === 'let' || binding.kind === 'var' || binding.constantViolations.length > 0;
                 const mutatesContainer = binding.referencePaths.some(referenceMutatesBinding);
-                const ownsStatefulResource = initializerOwnsStatefulResource(binding.path);
+                const ownsStatefulResource = initializerOwnsStatefulResource(
+                    /** @type {{node:import('@babel/types').VariableDeclarator}} */ (binding.path),
+                );
                 if (changesBinding || mutatesContainer || ownsStatefulResource) mutable.push(name);
             }
             programPath.stop();

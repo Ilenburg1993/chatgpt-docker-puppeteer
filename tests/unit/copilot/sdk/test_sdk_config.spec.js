@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SessionConfigBuilder } from '#copilot/config/session-config';
 import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS } from '#copilot/sdk/constants';
+import { SessionConfigBuilder } from '#copilot/testing/config/session-config';
 
 describe('Config constants', () => {
     it('DEFAULT_MODEL é auto', () => {

@@ -10,7 +10,7 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability';
 import {
     isTerminalHubReady,

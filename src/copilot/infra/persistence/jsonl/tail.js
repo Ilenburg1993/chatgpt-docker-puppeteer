@@ -1,7 +1,8 @@
 // @ts-check
 /** Bounded reverse tail reader for JSONL, optionally repairing one trailing partial record first. */
 import { open } from 'node:fs/promises';
-import { decodeJsonlChunks, normalizeJsonlLimit } from './codec.js';
+import { normalizeJsonlLimit } from './codec/index.js';
+import { parseJsonlTailChunks } from './kernel/index.js';
 import { repairJsonlTrailingPartial } from './repair.js';
 
 const DEFAULT_BLOCK_SIZE = 65_536;
@@ -80,30 +81,15 @@ export async function readJsonlTail(filePath, options = {}) {
         const truncatedByByteLimit = remaining > 0 && collectedBytes >= maxBytes && newlineCount <= maxLines;
         const newestChunk = chunks[0];
         const hasTrailingNewline = newestChunk?.[newestChunk.length - 1] === 0x0a;
-        const chronologicalChunks = chunks.reverse();
-        const completeChunks =
-            remaining > 0 ? discardLeadingPartialJsonlLine(chronologicalChunks) : chronologicalChunks;
-        const text = decodeJsonlChunks(completeChunks);
-        const lines = collectJsonlTailLines(text, maxLines);
-
-        /** @type {unknown[]} */
-        const records = [];
-        let invalidLines = 0;
-        let trailingPartialIgnored = false;
-        for (let index = 0; index < lines.length; index += 1) {
-            const line = lines[index];
-            if (!line) continue;
-            try {
-                records.push(JSON.parse(line));
-            } catch {
-                invalidLines += 1;
-                if (!hasTrailingNewline && index === lines.length - 1) trailingPartialIgnored = true;
-            }
-        }
+        const parsed = parseJsonlTailChunks(chunks.reverse(), {
+            maxLines,
+            truncatedBefore: remaining > 0,
+            hasTrailingNewline,
+        });
         return {
-            records,
-            invalidLines,
-            trailingPartialIgnored,
+            records: [...parsed.records],
+            invalidLines: parsed.invalidLines,
+            trailingPartialIgnored: parsed.trailingPartialIgnored,
             trailingRepair,
             bytesRead: collectedBytes,
             maxBytes,
@@ -126,41 +112,4 @@ export async function readJsonlTail(filePath, options = {}) {
     } finally {
         await handle?.close();
     }
-}
-
-/**
- * @param {Buffer[]} chunks
- * @returns {Buffer[]}
- */
-function discardLeadingPartialJsonlLine(chunks) {
-    for (let index = 0; index < chunks.length; index += 1) {
-        const newlineIndex = chunks[index]?.indexOf(0x0a) ?? -1;
-        if (newlineIndex < 0) continue;
-        const remainder = chunks[index]?.subarray(newlineIndex + 1);
-        return [...(remainder && remainder.byteLength > 0 ? [remainder] : []), ...chunks.slice(index + 1)];
-    }
-    return [];
-}
-
-/**
- * @param {string} text
- * @param {number} maxLines
- * @returns {string[]}
- */
-function collectJsonlTailLines(text, maxLines) {
-    const ring = new Array(maxLines);
-    let count = 0;
-    let next = 0;
-    let start = 0;
-    for (let index = 0; index <= text.length; index += 1) {
-        if (index < text.length && text.charCodeAt(index) !== 10) continue;
-        const line = text.slice(start, index);
-        start = index + 1;
-        if (!line.trim()) continue;
-        ring[next] = line;
-        next = (next + 1) % maxLines;
-        count = Math.min(maxLines, count + 1);
-    }
-    const first = count === maxLines ? next : 0;
-    return Array.from({ length: count }, (_, index) => /** @type {string} */ (ring[(first + index) % maxLines]));
 }

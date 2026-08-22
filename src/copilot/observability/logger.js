@@ -15,7 +15,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '../config/env.js';
@@ -48,13 +48,13 @@ export const LOG_DIR = COPILOT_LOG_DIR
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');
 const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
-const LOGGER_RETENTION_IO = createConfiguredFsIo(
+const LOGGER_IO = createConfiguredFsIo(
     createConfiguredFsGrant({
         id: 'observability.logger.retention',
         roots: [LOG_DIR],
-        operations: ['delete', 'list', 'stat'],
+        operations: ['append', 'delete', 'list', 'move', 'stat'],
         symlinkPolicy: 'deny',
-        durability: ['file-and-directory'],
+        durability: ['file-and-directory', 'none'],
     }),
 );
 
@@ -87,7 +87,7 @@ function isMissingPathError(error) {
  */
 async function cleanOldFiles(prefix) {
     try {
-        const entries = (await LOGGER_RETENTION_IO.listDirectoryNamesFresh(LOG_DIR)).entries;
+        const entries = (await LOGGER_IO.listDirectoryNamesFresh(LOG_DIR)).entries;
         const candidates = entries.filter(
             (entryName) => entryName.startsWith(prefix) && (entryName.endsWith('.log') || entryName.includes('.bak.')),
         );
@@ -95,7 +95,7 @@ async function cleanOldFiles(prefix) {
             await Promise.all(
                 candidates.map(async (entryName) => {
                     const filePath = path.join(LOG_DIR, entryName);
-                    const stats = await LOGGER_RETENTION_IO.lstatPath(filePath)
+                    const stats = await LOGGER_IO.lstatPath(filePath)
                         .then((result) => result.stats)
                         .catch(() => null);
                     return stats?.isFile() && !stats.isSymbolicLink() ? { name: entryName, time: stats.mtimeMs } : null;
@@ -105,7 +105,7 @@ async function cleanOldFiles(prefix) {
             .filter((entry) => entry !== null)
             .sort((left, right) => right.time - left.time);
         for (const entry of files.slice(MAX_ARCHIVES)) {
-            await LOGGER_RETENTION_IO.deleteFile(path.join(LOG_DIR, entry.name), { ignoreMissing: true });
+            await LOGGER_IO.deleteFile(path.join(LOG_DIR, entry.name), { ignoreMissing: true });
         }
     } catch (error) {
         if (isMissingPathError(error)) return;
@@ -127,11 +127,12 @@ function archivePath(prefix, filePath) {
  * @param {string} filePath
  * @param {string} prefix
  * @param {number} maxBytes
- * @param {import('#copilot/infra/public/platform/node/filesystem').IoDurabilityMode} durability
+ * @param {import('#copilot/infra/public/policy').IoDurabilityMode} durability
  */
 function createLogWriter(filePath, prefix, maxBytes, durability) {
-    return createJsonlFileWriter({
+    return createBoundJsonlFileWriter({
         filePath,
+        io: LOGGER_IO,
         maxBytes,
         batchLines: 256,
         maxQueueLines: 50_000,

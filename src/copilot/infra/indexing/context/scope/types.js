@@ -83,6 +83,19 @@
  */
 
 /**
+ * In-process lease bound to one concrete scope generation. `sessionId` is logical identity only; a redeclaration with
+ * the same id invalidates older handles rather than transferring their authority to the new generation.
+ *
+ * @typedef {object} ScopeHandle
+ * @property {string} sessionId
+ * @property {boolean} ready
+ * @property {() => Promise<ScopeStats>} awaitReady
+ * @property {(modifiedPaths?: string[]) => Promise<{ refreshed:number; removed:number; failed:number; skipped:number }>} refresh
+ * @property {() => ScopeStats | null} snapshot
+ * @property {() => ScopeStats | null} close
+ */
+
+/**
  * @typedef {object} SymbolSearchResult
  * @property {string} filePath
  * @property {import('#copilot/infra/internal/indexing/parser').SymbolEntry} symbol

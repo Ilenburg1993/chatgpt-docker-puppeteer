@@ -1,18 +1,14 @@
 // @ts-check
 /**
- * @file Faixa 49 — error-alerting, jsonl-writer, engine-persistence
+ * @file Faixa 49 — error-alerting e engine-persistence
  *
  *   Cobre:
  *
  *   - observability/error-alerting.js (239L) — createErrorAlerter
- *   - audit/jsonl-writer.js (79L) — createJsonlWriter
  *   - terminal/dialog/engine-persistence.js (148L) — persistTurnToHub, failure count
  */
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const timerMocks = vi.hoisted(() => ({
     registerInterval: vi.fn((id, _fn) => ({ id, unref: vi.fn() })),
@@ -42,7 +38,7 @@ vi.mock('#copilot/core/error-handlers', () => ({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F49 — createErrorAlerter', () => {
-    /** @type {import('#copilot/observability/error-alerting').ErrorAlerter} */
+    /** @type {import('#copilot/testing/observability/error-alerting').ErrorAlerter} */
     let alerter;
     /** @type {{ getErrors: ReturnType<typeof vi.fn> }} */
     let tracker;
@@ -52,7 +48,7 @@ describe('F49 — createErrorAlerter', () => {
         timerMocks.registerInterval.mockClear();
         timerMocks.cancelTimer.mockClear();
         tracker = { getErrors: vi.fn(() => []) };
-        const { createErrorAlerter } = await import('#copilot/observability/error-alerting');
+        const { createErrorAlerter } = await import('#copilot/testing/observability/error-alerting');
         alerter = createErrorAlerter(/** @type {any} */ (tracker), {
             windowMs: 60_000,
             warningThreshold: 3,
@@ -112,7 +108,7 @@ describe('F49 — createErrorAlerter', () => {
 
     it('nervEmit é chamado quando configurado', async () => {
         const nervEmit = vi.fn();
-        const { createErrorAlerter } = await import('#copilot/observability/error-alerting');
+        const { createErrorAlerter } = await import('#copilot/testing/observability/error-alerting');
         const a = createErrorAlerter(/** @type {any} */ (tracker), {
             windowMs: 60_000,
             warningThreshold: 1,
@@ -127,7 +123,7 @@ describe('F49 — createErrorAlerter', () => {
 
     it('terminalPrint é chamado com banner colorido', async () => {
         const terminalPrint = vi.fn();
-        const { createErrorAlerter } = await import('#copilot/observability/error-alerting');
+        const { createErrorAlerter } = await import('#copilot/testing/observability/error-alerting');
         const a = createErrorAlerter(/** @type {any} */ (tracker), {
             windowMs: 60_000,
             warningThreshold: 1,
@@ -162,66 +158,5 @@ describe('F49 — createErrorAlerter', () => {
         alerter.destroy();
         expect(timerMocks.cancelTimer).toHaveBeenCalledWith(expect.stringMatching(/^observability\.errorAlerting:/u));
         expect(alerter.getLastAlert()).toBeNull();
-    });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2. audit/jsonl-writer.js — createJsonlWriter
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('F49 — createJsonlWriter', () => {
-    /** @type {typeof import('#copilot/audit/jsonl-writer')} */
-    let jsonlMod;
-    /** @type {string[]} */
-    const tempDirs = [];
-
-    beforeAll(async () => {
-        jsonlMod = await import('#copilot/audit/jsonl-writer');
-    });
-
-    afterEach(async () => {
-        while (tempDirs.length > 0) {
-            const dir = tempDirs.pop();
-            if (dir) await rm(dir, { recursive: true, force: true });
-        }
-    });
-
-    async function tempPath(/** @type {string} */ name) {
-        const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-jsonl-'));
-        tempDirs.push(dir);
-        return join(dir, name);
-    }
-
-    it('write + flush publica uma linha JSONL e getState observa a fila drenada', async () => {
-        const filePath = await tempPath('audit.jsonl');
-        const writer = jsonlMod.createJsonlWriter({ filePath });
-
-        writer.write({ event: 'test', ts: 123 });
-        await writer.flush();
-
-        const persisted = await readFile(filePath, 'utf8');
-        expect(persisted).toContain('"event":"test"');
-        expect(persisted).toContain('"ts":123');
-        expect(writer.getState()).toMatchObject({ queueDepth: 0, persistedLines: 1 });
-    });
-
-    it('redige segredos antes da persistência observável', async () => {
-        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
-        const byokToken = 'sk-testsecret1234567890';
-        const filePath = await tempPath('redacted.jsonl');
-        const writer = jsonlMod.createJsonlWriter({ filePath });
-
-        writer.write({
-            gitHubToken: githubToken,
-            headers: { Authorization: `Bearer ${byokToken}` },
-            tokens: 42,
-        });
-        await writer.flush();
-
-        const persisted = await readFile(filePath, 'utf8');
-        expect(persisted).not.toContain(githubToken);
-        expect(persisted).not.toContain(byokToken);
-        expect(persisted).toContain('[redacted]');
-        expect(persisted).toContain('"tokens":42');
     });
 });

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import '../bootstrap-sqlite.mjs';
 import { REPO_ROOT } from '../index.mjs';
 
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     SqliteModelGatewayCatalogStore,
     comparableModelGatewayRuntimeHealthRecord,
@@ -100,14 +100,6 @@ const baselinePath = readArg('--baseline');
 const outDir = readArg('--out-dir', DEFAULT_OUT_DIR);
 const write = argSet.has('--write-snapshot') || argSet.has('--write');
 const failOnRegression = argSet.has('--fail-on-regression');
-
-if (json) {
-    setDbLogger((level, message) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${message}\n`);
-        }
-    });
-}
 
 const current = await readCurrentHealth();
 const baseline = await readBaseline(baselinePath);

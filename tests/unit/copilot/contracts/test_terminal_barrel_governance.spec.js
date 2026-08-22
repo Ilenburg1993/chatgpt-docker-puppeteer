@@ -10,16 +10,6 @@ import { describe, it } from 'vitest';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const TERMINAL_ROOT = join(COPILOT_ROOT, 'terminal');
-const ALLOWED_TERMINAL_PUBLIC_IMPORTS = new Set([
-    '#copilot/terminal',
-    '#copilot/terminal/commands',
-    '#copilot/terminal/dialog',
-    '#copilot/terminal/frontend',
-    '#copilot/terminal/handlers',
-    '#copilot/terminal/state/repl-runtime',
-    '#copilot/terminal/stores',
-]);
-const PACKAGE_JSON_PATH = join(new URL('../../../../', import.meta.url).pathname, 'package.json');
 
 /**
  * @param {string} dir
@@ -107,17 +97,6 @@ function topLevelSegment(relPath) {
 }
 
 describe('W114.5 — terminal barrel governance', () => {
-    it('package.json expõe apenas superfícies públicas explícitas do terminal', () => {
-        const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf8'));
-        const imports = pkg['imports'] ?? {};
-        const terminalKeys = Object.keys(imports)
-            .filter((key) => key === '#copilot/terminal' || key.startsWith('#copilot/terminal/'))
-            .sort();
-
-        assert.deepEqual(terminalKeys, [...ALLOWED_TERMINAL_PUBLIC_IMPORTS].sort());
-        assert.equal('#copilot/terminal/*' in imports, false);
-    });
-
     it('todo index.js do terminal é barrel puro', () => {
         const indexFiles = listJsFilesRecursive(TERMINAL_ROOT).filter((abs) => basename(abs) === 'index.js');
         /** @type {string[]} */

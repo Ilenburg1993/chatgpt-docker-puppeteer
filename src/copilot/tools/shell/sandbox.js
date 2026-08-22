@@ -10,12 +10,13 @@
  */
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
+import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';
-import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import * as path from 'node:path';
 
 /** Raiz canonica do workspace definida pelo boot. */
 export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
+const SHELL_WORKSPACE_INFRA = getApplicationWorkspaceInfra(WORKSPACE_ROOT);
 
 /**
  * BUG-07 (fix): Detecta metacaracteres shell perigosos fora de aspas simples ou duplas. Evita falsos positivos em
@@ -161,12 +162,15 @@ export const ALLOWED_EXECUTABLES = (() => {
  */
 export async function validateCwd(cwd) {
     const resolved = cwd ? (path.isAbsolute(cwd) ? cwd : path.resolve(WORKSPACE_ROOT, cwd)) : WORKSPACE_ROOT;
-    const policy = await evaluateIoPathPolicyAsync(resolved, {
-        workspaceRoot: WORKSPACE_ROOT,
-        mode: 'read',
-    });
-    if (!policy.ok) return { ok: false, reason: `Cwd fora do workspace ou bloqueado: ${policy.reason}`, resolved };
-    return { ok: true, resolved: policy.realPath };
+    try {
+        return { ok: true, resolved: await SHELL_WORKSPACE_INFRA.authority.resolvePath(resolved, 'read') };
+    } catch (error) {
+        return {
+            ok: false,
+            reason: `Cwd fora do workspace ou bloqueado: ${error instanceof Error ? error.message : String(error)}`,
+            resolved,
+        };
+    }
 }
 
 /**

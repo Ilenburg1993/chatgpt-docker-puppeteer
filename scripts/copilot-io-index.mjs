@@ -7,9 +7,7 @@
  * local e diagnóstico sem abrir o terminal permanente da LLM-B.
  */
 
-import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
-import { shutdownParserWorkerPool } from '#copilot/infra/public/diagnostic/indexing/parser';
-import { closeCopilotDb, ensureCopilotDbDir, getCopilotDb } from '../src/copilot/db/sqlite.js';
+import { createApplicationInfraHost } from '#copilot/boot';
 
 /**
  * @typedef {object} BuildCliArgs
@@ -133,6 +131,7 @@ function print(value, json) {
     console.log(value);
 }
 
+/** @param {ReturnType<typeof createApplicationInfraHost>['runtime']['indexRegistry']} indexRegistry */
 async function main(indexRegistry) {
     const buildIoIndexForDirectory = indexRegistry.buildDirectory;
     const clearIoIndex = indexRegistry.clear;
@@ -148,14 +147,10 @@ async function main(indexRegistry) {
         const stats = readIoIndexStatus();
         if (json) print(stats, true);
         else {
-            if ('files' in stats) {
-                print(
-                    `index: available=${stats.available} files=${stats.files} fresh=${stats.freshFiles} failed=${stats.failedFiles} symbols=${stats.symbols} imports=${stats.imports} chunks=${stats.chunks}`,
-                    false,
-                );
-            } else {
-                print(`index: available=${stats.available} reason=${stats.reason} indexed=0 failed=0`, false);
-            }
+            print(
+                `index: available=${stats.available} files=${stats.files} fresh=${stats.freshFiles} failed=${stats.failedFiles} symbols=${stats.symbols} imports=${stats.imports} chunks=${stats.chunks}`,
+                false,
+            );
         }
         return;
     }
@@ -219,21 +214,22 @@ async function main(indexRegistry) {
 }
 
 async function run() {
-    await ensureCopilotDbDir();
-    const runtime = createInfraRuntime({ runtimeId: 'copilot-index-cli', sqliteProvider: getCopilotDb });
+    const host = createApplicationInfraHost({
+        hostId: 'copilot-index-cli',
+        runtimeId: 'copilot-index-cli:runtime',
+        defaultWorkspaceRoot: process.cwd(),
+        registerProcessShutdown: false,
+        env: process.env,
+    });
     try {
-        await main(runtime.indexRegistry);
+        await host.bootstrapSqliteProvider();
+        await main(host.runtime.indexRegistry);
     } finally {
-        await runtime.dispose();
-        closeCopilotDb();
+        await host.dispose();
     }
 }
 
-run()
-    .catch((error) => {
-        console.error(error instanceof Error ? error.message : String(error));
-        process.exitCode = 1;
-    })
-    .finally(async () => {
-        await shutdownParserWorkerPool();
-    });
+run().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+});

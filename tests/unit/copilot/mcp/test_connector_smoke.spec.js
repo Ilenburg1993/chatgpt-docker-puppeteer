@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
-import { runCanonicalConnectorSmoke } from '#copilot/mcp/cloudflare/connector-smoke.js';
+import { readCloudflareTunnelConfig } from '#copilot/testing/mcp/cloudflare/config';
+import { runCanonicalConnectorSmoke } from '#copilot/testing/mcp/cloudflare/connector-smoke';
 
 /** @returns {Awaited<
     ReturnType<typeof import('../../../../src/copilot/mcp/cloudflare/cli-smoke.js').runCloudflareSmoke>

@@ -115,18 +115,18 @@ CHROME_FOUND=false
 
 # Check if Chrome (or proxy) is running on PROXY_PORT (container-facing)
 if curl -s "http://localhost:${PROXY_PORT}/json/version" &> /dev/null; then
-  echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta ${PROXY_PORT}${NC}"
-  CHROME_INFO=$(curl -s "http://localhost:${PROXY_PORT}/json/version")
-  CHROME_VERSION=$(echo "$CHROME_INFO" | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p')
+    echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta ${PROXY_PORT}${NC}"
+    CHROME_INFO=$(curl -s "http://localhost:${PROXY_PORT}/json/version")
+    CHROME_VERSION=$(echo "$CHROME_INFO" | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p')
     echo "   Versão: $CHROME_VERSION"
     CHROME_FOUND=true
 else
-  echo -e "${YELLOW}⚠️  Chrome/Proxy não detectado na porta ${PROXY_PORT}${NC}"
+    echo -e "${YELLOW}⚠️  Chrome/Proxy não detectado na porta ${PROXY_PORT}${NC}"
     echo ""
     echo "Para iniciar o Chrome com remote debugging:"
     echo ""
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "  google-chrome --remote-debugging-port=${PROXY_PORT} --user-data-dir=\"\$HOME/chrome-automation-profile\""
+        echo "  google-chrome --remote-debugging-port=${PROXY_PORT} --user-data-dir=\"\$HOME/chrome-automation-profile\""
 
     fi
     echo ""

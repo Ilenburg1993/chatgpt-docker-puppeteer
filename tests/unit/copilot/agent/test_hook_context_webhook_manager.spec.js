@@ -58,7 +58,7 @@ vi.mock('#copilot/core/error-handlers', () => ({
     toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
 }));
 vi.mock(
-    '#copilot/config/env',
+    '#copilot/testing/config/env',
     () =>
         new Proxy(
             {
@@ -329,13 +329,13 @@ describe('F44 — buildHookSystemContextSafe', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F44 — WebhookManager', () => {
-    /** @type {import('#copilot/agent/infra/webhook-manager').WebhookManager} */
+    /** @type {import('#copilot/testing/agent/infra/webhook-manager').WebhookManager} */
     let wm;
 
     beforeEach(async () => {
         vi.clearAllMocks();
         mocks.validateWebhookUrl.mockImplementation(() => {});
-        const mod = await import('#copilot/agent/infra/webhook-manager');
+        const mod = await import('#copilot/testing/agent/infra/webhook-manager');
         wm = new mod.WebhookManager();
     });
 
@@ -457,7 +457,7 @@ describe('F44 — WebhookManager', () => {
 
 describe('F44 — wireModeAndToolEvents', () => {
     it('retorna array com 2 unsubscribe functions', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/testing/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireModeAndToolEvents(/** @type {any} */ (session), { emit });
@@ -467,7 +467,7 @@ describe('F44 — wireModeAndToolEvents', () => {
     });
 
     it('emite session.mode_changed com previousMode/newMode', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/testing/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         wireModeAndToolEvents(/** @type {any} */ (session), { emit });
@@ -482,7 +482,7 @@ describe('F44 — wireModeAndToolEvents', () => {
     });
 
     it('loga mudança de modo com INFO', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/testing/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();

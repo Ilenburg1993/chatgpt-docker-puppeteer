@@ -73,6 +73,7 @@ describe('infra/io-cache — get/set/hit/miss', () => {
         localCache.set(key, { content: Buffer.from('x'), bytes: 1, cachedAt: Date.now() });
         localCache.get(key); // hit
         const stats = localCache.stats();
+        assert.ok(stats !== null);
         assert.ok(stats.hits >= 1);
         assert.ok(stats.misses >= 1);
         assert.ok(stats.bytesStored >= 1);
@@ -100,6 +101,7 @@ describe('infra/io-cache — get/set/hit/miss', () => {
         const stats = localCache.stats();
 
         assert.ok(result !== null);
+        assert.ok(stats !== null);
         assert.equal(result?.fingerprintStrategy, 'mtime-size-ctime-dev-ino-hash');
         assert.equal(stats.hashRevalidations, 1);
         assert.equal(stats.hashRevalidationHits, 1);
@@ -140,7 +142,9 @@ describe('infra/io-cache — get/set/hit/miss', () => {
         const result = await cache.getVerified(key, filePath);
 
         assert.equal(result, null);
-        assert.equal(localCache.stats().staleHits, 1);
+        const stats = localCache.stats();
+        assert.ok(stats !== null);
+        assert.equal(stats.staleHits, 1);
         await rm(filePath, { force: true });
     });
 });
@@ -204,9 +208,13 @@ describe('infra/io-cache — invalidation', () => {
         const key = makeBytesKey(normalizeIoCacheKey(filePath));
         localCache.set(key, { content: Buffer.from('x'), bytes: 1, cachedAt: Date.now() });
 
-        const before = localCache.stats().invalidations;
+        const beforeStats = localCache.stats();
+        assert.ok(beforeStats !== null);
+        const before = beforeStats.invalidations;
         cache.invalidate(filePath);
-        const after = localCache.stats().invalidations;
+        const afterStats = localCache.stats();
+        assert.ok(afterStats !== null);
+        const after = afterStats.invalidations;
 
         assert.ok(after > before);
     });

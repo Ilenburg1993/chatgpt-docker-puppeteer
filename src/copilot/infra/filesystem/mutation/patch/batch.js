@@ -1,7 +1,7 @@
 // @ts-check
 /** Atomic same-file exact-text patch batches under one lock/read/write cycle. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core';
+import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { buildSimpleTextDiffAroundLineRange, computeTextPatch } from '#copilot/infra/internal/filesystem/patch';

@@ -4,8 +4,7 @@ import {
     getApplicationInfraRuntime,
     getApplicationWorkspaceInfra,
 } from '#copilot/boot';
-import { DEFAULT_BLOCKED_READ_PATH_PATTERNS } from '#copilot/core';
-import { hasNullByte } from '#copilot/infra/public/policy';
+import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, hasNullByte } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../infra/logger.js';
@@ -40,8 +39,11 @@ export const WORKSPACE_IO = WORKSPACE_INFRA.io;
 export const WORKSPACE_INDEXING = WORKSPACE_INFRA.indexing;
 /** Runtime-owned mutation audit used by all file-tool mutation envelopes. */
 export const WORKSPACE_MUTATION_AUDIT = getApplicationInfraRuntime().mutationAudit;
-/** Immutable rollback policy captured by the canonical application InfraRuntime. */
-export const WORKSPACE_ROLLBACK_POLICY = getApplicationInfraRuntime().config.rollback;
+if (!WORKSPACE_INFRA.rollback) throw new Error('Application workspace is missing its rollback capability binding.');
+/** Authenticated, runtime/workspace-bound rollback capability for all file tools. */
+export const WORKSPACE_ROLLBACK = WORKSPACE_INFRA.rollback;
+/** Immutable policy owned by the same rollback capability binding. */
+export const WORKSPACE_ROLLBACK_POLICY = WORKSPACE_ROLLBACK.policy;
 
 const FILE_TOOL_LIMIT_ENV_KEYS = /** @type {const} */ ({
     maxContentBytes: 'COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES',

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { isFatalError, toError } from '#copilot/core';
+import { isFatalError, toError } from '#copilot/core/error-handlers';
 import { getAgentSdkRecoveryPolicy } from './facades/sdk/quota.js';
 
 /**

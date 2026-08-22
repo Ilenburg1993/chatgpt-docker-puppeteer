@@ -6,10 +6,12 @@
  * copilot.
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import {
     initTurnsFts,
     migrateFts5Tokenizer,
@@ -17,7 +19,6 @@ import {
 } from '../../../../src/copilot/conversation-hub/store-helpers.js';
 import { deleteMemory, recallMemories, storeMemory } from '../../../../src/copilot/conversation-hub/store-memories.js';
 import { countTurns, getTurn, readTurns, searchTurns } from '../../../../src/copilot/conversation-hub/store-queries.js';
-import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -43,11 +44,14 @@ function applyCopilotMigrations(db) {
 
 /** @type {import('better-sqlite3').Database} */
 let db;
+/** @type {ReturnType<typeof adaptBetterSqliteDatabase>} */
+let port;
 
 const HUB_SESSION = 'test-hub-session-001';
 
 beforeAll(() => {
     db = new Database(':memory:');
+    port = adaptBetterSqliteDatabase(db);
     applyCopilotMigrations(db);
     // Criar sessão de teste
     db.prepare(
@@ -101,7 +105,7 @@ describe('initTurnsFts', () => {
         // Limpar FTS
         db.exec('DELETE FROM copilot_turns_fts');
 
-        initTurnsFts(db);
+        initTurnsFts(port);
 
         const count = /** @type {{ count: number }} */ (
             db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get()
@@ -114,7 +118,7 @@ describe('initTurnsFts', () => {
         const before = /** @type {{ count: number }} */ (
             db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get()
         );
-        initTurnsFts(db);
+        initTurnsFts(port);
         const after = /** @type {{ count: number }} */ (
             db.prepare('SELECT COUNT(*) AS count FROM copilot_turns_fts').get()
         );
@@ -124,7 +128,7 @@ describe('initTurnsFts', () => {
 
 describe('migrateFts5Tokenizer', () => {
     it('não lança quando tokenizer já está correto', () => {
-        assert.doesNotThrow(() => migrateFts5Tokenizer(db));
+        assert.doesNotThrow(() => migrateFts5Tokenizer(port));
     });
 });
 
@@ -158,7 +162,7 @@ describe('store-queries', () => {
 
     describe('readTurns', () => {
         it('retorna turns ordenados por turn_number ASC', () => {
-            const turns = readTurns(db, SESSION);
+            const turns = readTurns(port, SESSION);
             assert.ok(turns.length >= 5);
             for (let i = 1; i < turns.length; i++) {
                 const current = turns[i];
@@ -169,74 +173,74 @@ describe('store-queries', () => {
         });
 
         it('respeita limit', () => {
-            const turns = readTurns(db, SESSION, { limit: 2 });
+            const turns = readTurns(port, SESSION, { limit: 2 });
             assert.strictEqual(turns.length, 2);
         });
 
         it('filtra por after (id)', () => {
-            const all = readTurns(db, SESSION);
+            const all = readTurns(port, SESSION);
             const second = all[1];
             assert.ok(second, 'deve haver pelo menos dois turns para testar after');
             const afterId = second.id;
-            const filtered = readTurns(db, SESSION, { after: afterId });
+            const filtered = readTurns(port, SESSION, { after: afterId });
             for (const t of filtered) {
                 assert.ok(t.id > afterId);
             }
         });
 
         it('retorna array vazio para sessão inexistente', () => {
-            const turns = readTurns(db, 'inexistente');
+            const turns = readTurns(port, 'inexistente');
             assert.strictEqual(turns.length, 0);
         });
     });
 
     describe('searchTurns', () => {
         it('encontra turns por conteúdo FTS', () => {
-            const results = searchTurns(db, { query: 'turn content' });
+            const results = searchTurns(port, { query: 'turn content' });
             assert.ok(results.length > 0);
         });
 
         it('filtra por hubSessionId', () => {
-            const results = searchTurns(db, { query: 'turn content', hubSessionId: SESSION });
+            const results = searchTurns(port, { query: 'turn content', hubSessionId: SESSION });
             for (const r of results) {
                 assert.strictEqual(r.hub_session_id, SESSION);
             }
         });
 
         it('retorna vazio para query sem matches', () => {
-            const results = searchTurns(db, { query: 'xyznonexistent99' });
+            const results = searchTurns(port, { query: 'xyznonexistent99' });
             assert.strictEqual(results.length, 0);
         });
 
         it('retorna vazio para query que sanitiza para null', () => {
-            const results = searchTurns(db, { query: '***' });
+            const results = searchTurns(port, { query: '***' });
             assert.strictEqual(results.length, 0);
         });
     });
 
     describe('getTurn', () => {
         it('retorna turn por id', () => {
-            const all = readTurns(db, SESSION);
+            const all = readTurns(port, SESSION);
             const first = all[0];
             assert.ok(first, 'deve haver ao menos um turn');
-            const turn = getTurn(db, first.id);
+            const turn = getTurn(port, first.id);
             assert.ok(turn);
             assert.strictEqual(turn.hub_session_id, SESSION);
         });
 
         it('retorna null para id inexistente', () => {
-            assert.strictEqual(getTurn(db, 999999), null);
+            assert.strictEqual(getTurn(port, 999999), null);
         });
     });
 
     describe('countTurns', () => {
         it('conta turns da sessão', () => {
-            const count = countTurns(db, SESSION);
+            const count = countTurns(port, SESSION);
             assert.ok(count >= 5);
         });
 
         it('retorna 0 para sessão sem turns', () => {
-            assert.strictEqual(countTurns(db, 'no-turns-session'), 0);
+            assert.strictEqual(countTurns(port, 'no-turns-session'), 0);
         });
     });
 });
@@ -247,14 +251,14 @@ describe('store-queries', () => {
 
 describe('store-memories', () => {
     it('storeMemory persiste e retorna id', () => {
-        const id = storeMemory(db, { content: 'Memória de teste', tag: 'unit-test' });
+        const id = storeMemory(port, { content: 'Memória de teste', tag: 'unit-test' });
         assert.ok(typeof id === 'string');
         assert.ok(id.length > 0);
     });
 
     it('recallMemories retorna memórias por tag', () => {
-        storeMemory(db, { content: 'Memória tagged', tag: 'recall-test' });
-        const memories = recallMemories(db, { tag: 'recall-test' });
+        storeMemory(port, { content: 'Memória tagged', tag: 'recall-test' });
+        const memories = recallMemories(port, { tag: 'recall-test' });
         assert.ok(memories.length >= 1);
         const first = memories[0];
         assert.ok(first, 'deve haver ao menos uma memória');
@@ -262,39 +266,39 @@ describe('store-memories', () => {
     });
 
     it('recallMemories retorna todas quando sem filtro', () => {
-        const memories = recallMemories(db);
+        const memories = recallMemories(port);
         assert.ok(memories.length >= 1);
     });
 
     it('recallMemories filtra por hubSessionId', () => {
-        storeMemory(db, { content: 'Session memory', tag: 'session-test', hubSessionId: HUB_SESSION });
-        const memories = recallMemories(db, { hubSessionId: HUB_SESSION });
+        storeMemory(port, { content: 'Session memory', tag: 'session-test', hubSessionId: HUB_SESSION });
+        const memories = recallMemories(port, { hubSessionId: HUB_SESSION });
         for (const m of memories) {
             assert.strictEqual(m.hub_session_id, HUB_SESSION);
         }
     });
 
     it('recallMemories busca por FTS (search)', () => {
-        storeMemory(db, { content: 'Unicorn rainbow sparkles', tag: 'fts-test' });
-        const memories = recallMemories(db, { search: 'unicorn rainbow' });
+        storeMemory(port, { content: 'Unicorn rainbow sparkles', tag: 'fts-test' });
+        const memories = recallMemories(port, { search: 'unicorn rainbow' });
         assert.ok(memories.length >= 1);
     });
 
     it('deleteMemory remove memória existente', () => {
-        const id = storeMemory(db, { content: 'Para deletar', tag: 'delete-test' });
-        assert.ok(deleteMemory(db, id));
-        const after = recallMemories(db, { tag: 'delete-test' });
+        const id = storeMemory(port, { content: 'Para deletar', tag: 'delete-test' });
+        assert.ok(deleteMemory(port, id));
+        const after = recallMemories(port, { tag: 'delete-test' });
         const found = after.find((m) => m.id === id);
         assert.ok(!found);
     });
 
     it('deleteMemory retorna false para id inexistente', () => {
-        assert.strictEqual(deleteMemory(db, 'non-existent-id'), false);
+        assert.strictEqual(deleteMemory(port, 'non-existent-id'), false);
     });
 
     it('recallMemories com search e tag combinados', () => {
-        storeMemory(db, { content: 'Special content for combo test', tag: 'combo-tag' });
-        const results = recallMemories(db, { search: 'special content', tag: 'combo-tag' });
+        storeMemory(port, { content: 'Special content for combo test', tag: 'combo-tag' });
+        const results = recallMemories(port, { search: 'special content', tag: 'combo-tag' });
         assert.ok(results.length >= 1);
         const first = results[0];
         assert.ok(first, 'deve haver pelo menos um resultado');

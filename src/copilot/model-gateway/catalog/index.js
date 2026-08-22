@@ -6,6 +6,11 @@
  */
 
 export {
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
+} from '#copilot/infra/public/database/sqlite/model-gateway-schema';
+export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     createCanonicalModelProjection,
@@ -198,8 +203,3 @@ export {
     mirrorModelGatewayCatalogSnapshotToSqlite,
     summarizeModelGatewayCatalogSnapshot,
 } from './sqlite-migration.js';
-export {
-    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
-    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
-    MODEL_GATEWAY_SQLITE_TABLES,
-} from './sqlite-schema.js';

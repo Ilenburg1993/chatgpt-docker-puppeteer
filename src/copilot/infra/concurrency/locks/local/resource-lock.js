@@ -338,7 +338,10 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
     }
 }
 
-/** Snapshot leve para health/tests. */
+/**
+ * Snapshot leve para health/tests. `emitStaleEvents:false` makes the projection observational only.
+ * @param {{nowMs?:number;emitStaleEvents?:boolean}} [options]
+ */
 export function getIoLockStats(options = {}) {
     return getIoLockStatsSnapshot(tails.size, options);
 }

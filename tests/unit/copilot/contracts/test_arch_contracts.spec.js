@@ -10,7 +10,7 @@
  * 2. Barrels essenciais exportam símbolos mínimos esperados
  * 3. Não há violações de camada em imports críticos (bridges não importa agent)
  * 4. DI tokens existem para todos os 13 serviços registrados
- * 5. arch-health deep-import refinado ≤ 10 (sem imports proibidos ativos)
+ * 5. Fronteiras sensíveis agent/SDK/event-handlers permanecem owner-governed; package imports globais são exatos.
  */
 
 import assert from 'node:assert/strict';
@@ -77,7 +77,6 @@ const EXPECTED_MODULES = [
     'config',
     'conversation-hub',
     'core',
-    'db',
     'event-handlers',
     'events',
     'hooks',
@@ -888,10 +887,10 @@ describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () =
     });
 });
 
-describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
-    it('calls diretos de mkdir/rm/unlink fora de infra correspondem exatamente às exceções classificadas', () => {
+describe('IO-006 — cleanup e mkdir diretos ficam eliminados fora de infra', () => {
+    it('não há calls diretos de mkdir/rm/unlink fora de infra', () => {
         /** @type {string[]} */
-        const allowed = ['db/sqlite.js:mkdir'];
+        const allowed = [];
         const mutators = ['mkdir', 'rm', 'unlink'];
         /** @type {string[]} */
         const actual = [];

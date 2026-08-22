@@ -8,9 +8,9 @@
  * @module copilot/model-gateway/registry/json-registry-store
  */
 
-import { join } from 'node:path';
-
-import { readJson, writeJson } from '#copilot/infra/public/persistence/json';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonStore } from '#copilot/infra/public/persistence/json';
+import { join, resolve } from 'node:path';
 import { MODEL_GATEWAY_SCHEMA_VERSION } from '../contracts/records.js';
 import { ModelGatewayRegistry } from './model-registry.js';
 
@@ -20,6 +20,16 @@ export const DEFAULT_MODEL_GATEWAY_REGISTRY_PATH = join(
     'copilot',
     'model-gateway',
     'registry.json',
+);
+
+const DEFAULT_MODEL_GATEWAY_REGISTRY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'model-gateway.registry.json-store',
+        exactPaths: [DEFAULT_MODEL_GATEWAY_REGISTRY_PATH],
+        operations: ['read', 'stat', 'write'],
+        symlinkPolicy: 'deny',
+        durability: ['file-and-directory'],
+    }),
 );
 
 /**
@@ -70,12 +80,29 @@ export function normalizeStoredRegistrySnapshot(snapshot) {
 export class JsonModelGatewayRegistryStore {
     /** @type {string} */
     #filePath;
+    /** @type {ReturnType<typeof createBoundJsonStore>} */
+    #storage;
 
     /**
-     * @param {{ filePath?: string }} [options]
+     * Alternate paths require an already-authorized IO capability; the store never mints authority from caller input.
+     * @param {{
+     *   filePath?: string;
+     *   io?: ReturnType<typeof createConfiguredFsIo>;
+     * }} [options]
      */
     constructor(options = {}) {
-        this.#filePath = options.filePath ?? DEFAULT_MODEL_GATEWAY_REGISTRY_PATH;
+        const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_REGISTRY_PATH);
+        const defaultPath = resolve(DEFAULT_MODEL_GATEWAY_REGISTRY_PATH);
+        const io = options.io ?? (filePath === defaultPath ? DEFAULT_MODEL_GATEWAY_REGISTRY_IO : null);
+        if (!io) {
+            throw new TypeError('Alternate model-gateway registry paths require already-authorized IO.');
+        }
+        this.#filePath = filePath;
+        this.#storage = createBoundJsonStore({
+            filePath,
+            io,
+            writeOptions: { durability: 'file-and-directory' },
+        });
     }
 
     /** @returns {string} */
@@ -93,7 +120,7 @@ export class JsonModelGatewayRegistryStore {
      * }>}
      */
     async readSnapshot() {
-        const raw = await readJson(this.#filePath, null);
+        const raw = await this.#storage.read(null);
         return normalizeStoredRegistrySnapshot(raw);
     }
 
@@ -113,7 +140,7 @@ export class JsonModelGatewayRegistryStore {
      * @returns {Promise<void>}
      */
     async writeSnapshot(snapshot) {
-        await writeJson(this.#filePath, {
+        await this.#storage.write({
             schemaVersion: MODEL_GATEWAY_SCHEMA_VERSION,
             generatedAt: new Date().toISOString(),
             source: snapshot.source ?? 'registry',

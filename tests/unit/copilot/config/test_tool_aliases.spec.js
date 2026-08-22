@@ -1,7 +1,7 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
 
-import { getAllToolNames, normalizeAgentToolList, resolveToolName } from '#copilot/config/tool-aliases';
+import { getAllToolNames, normalizeAgentToolList, resolveToolName } from '#copilot/testing/config/tool-aliases';
 
 describe('tool aliases', () => {
     it('resolve legacy filesystem aliases to canonical tools', () => {

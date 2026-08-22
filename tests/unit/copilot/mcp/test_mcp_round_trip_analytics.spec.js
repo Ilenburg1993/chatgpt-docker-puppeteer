@@ -1,5 +1,6 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
@@ -155,7 +156,11 @@ describe('MCP incremental round-trip analytics', () => {
     it('keeps the dashboard snapshot read-only when the derived schema is absent', () => {
         const db = createDb();
         const before = db.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type='table'").get();
-        const snapshot = readMcpRoundTripAnalyticsSnapshot({ db, now: () => 100_000, windowMs: 20_000 });
+        const snapshot = readMcpRoundTripAnalyticsSnapshot({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => 100_000,
+            windowMs: 20_000,
+        });
         const after = db.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type='table'").get();
         assert.equal(snapshot.available, false);
         assert.equal(snapshot.indexedRows, 0);
@@ -166,7 +171,7 @@ describe('MCP incremental round-trip analytics', () => {
         const db = createDb();
         const nowMs = 100_000;
         const bootstrap = createMcpRoundTripAnalytics({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             readSlice: async () => ({
                 ok: true,
                 fileIdentity: 'dev:ino-a',
@@ -200,7 +205,7 @@ describe('MCP incremental round-trip analytics', () => {
         /** @type {number[]} */
         const requestedOffsets = [];
         const analytics = createMcpRoundTripAnalytics({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             now: () => nowMs,
             readSlice: async ({ offset = 0 } = {}) => {
                 requestedOffsets.push(offset);
@@ -301,7 +306,12 @@ describe('MCP incremental round-trip analytics', () => {
                 error: null,
             };
         };
-        const analytics = createMcpRoundTripAnalytics({ db, readSlice, now: () => nowMs, maxChunks: 2 });
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            maxChunks: 2,
+        });
         const first = await analytics.summarize({ windowMs: 20_000 });
         assert.equal(first.ingestion?.indexedEvents, 3);
         assert.equal(first.indexedRows, 2);
@@ -382,7 +392,12 @@ describe('MCP incremental round-trip analytics', () => {
                 error: null,
             };
         };
-        const analytics = createMcpRoundTripAnalytics({ db, readSlice, now: () => nowMs, maxChunks: 3 });
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            maxChunks: 3,
+        });
         const first = await analytics.summarize({ windowMs: 20_000 });
         assert.equal(first.indexedRows, 1);
         generation = 'b';

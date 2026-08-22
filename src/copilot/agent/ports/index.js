@@ -31,3 +31,4 @@ export * from './snapshot-port.js';
 export * from './todo-port.js';
 export * from './tool-port.js';
 export * from './tracing-port.js';
+export * from './user-input-policy-port.js';

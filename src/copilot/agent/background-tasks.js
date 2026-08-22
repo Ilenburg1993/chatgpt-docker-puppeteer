@@ -6,7 +6,7 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { log } from './ports/logging/index.js';
 
 const DEFAULT_MAX_PENDING_BACKGROUND_TASKS = 1000;

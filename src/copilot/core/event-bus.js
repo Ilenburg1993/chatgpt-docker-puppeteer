@@ -16,10 +16,7 @@
  * @module copilot/core/event-bus
  */
 
-const configuredMaxEventCounters = Number(process.env['COPILOT_EVENT_BUS_MAX_COUNTERS'] ?? 1_000);
-const MAX_EVENT_COUNTERS = Number.isFinite(configuredMaxEventCounters)
-    ? Math.max(1, Math.trunc(configuredMaxEventCounters))
-    : 1_000;
+import { getCoreProcessPolicyConfig } from './process-policy.js';
 
 /**
  * @typedef {import('../events/base-events.js').BaseEvent} BaseEvent
@@ -49,6 +46,17 @@ const MAX_EVENT_COUNTERS = Number.isFinite(configuredMaxEventCounters)
  * @see module:copilot/core/interfaces
  */
 export class EventBus {
+    /** @type {number} */
+    #maxCounters;
+
+    /** @param {{maxCounters?:number}} [options] */
+    constructor(options = {}) {
+        const processDefault = getCoreProcessPolicyConfig().eventBus.maxCounters;
+        const requested = Number(options.maxCounters ?? processDefault);
+        this.#maxCounters =
+            Number.isFinite(requested) && requested > 0 ? Math.max(1, Math.trunc(requested)) : processDefault;
+    }
+
     /** @type {Map<string, Set<EventHandler>>} */
     #listeners = new Map();
 
@@ -191,7 +199,7 @@ export class EventBus {
         const event = /** @type {BaseEvent} */ (/** @type {unknown} */ (rawEvent));
 
         // Counters are diagnostic, so bound cardinality without affecting event delivery.
-        if (!this.#counters.has(event.type) && this.#counters.size >= MAX_EVENT_COUNTERS) {
+        if (!this.#counters.has(event.type) && this.#counters.size >= this.#maxCounters) {
             const oldest = this.#counters.keys().next().value;
             if (typeof oldest === 'string') this.#counters.delete(oldest);
         }
@@ -343,10 +351,11 @@ export class EventBus {
 /**
  * Cria uma nova instância de EventBus.
  *
+ * @param {{maxCounters?:number}} [options]
  * @returns {EventBus}
  */
-export function createEventBus() {
-    return new EventBus();
+export function createEventBus(options = {}) {
+    return new EventBus(options);
 }
 
 // ─── M-3: Bridge EventEmitter ad-hoc → EventBus ─────────────────────────────

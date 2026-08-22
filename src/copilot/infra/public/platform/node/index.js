@@ -5,5 +5,6 @@ export {
     enableCopilotNodeCompileCache,
     flushCopilotNodeCompileCache,
     getCopilotNodeCompileCacheHealth,
+    readCopilotNodeCompileCacheConfig,
     withCopilotNodeCompileCacheEnv,
 } from '../../../platform/node/index.js';

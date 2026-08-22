@@ -4,7 +4,7 @@
  * @file Registro dos shutdown handlers do terminal.
  */
 
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
+import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
 import { log } from '#copilot/observability';
 import { flushTerminalSseEventArchive, flushTerminalTranscriptArchive } from '../state/index.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';

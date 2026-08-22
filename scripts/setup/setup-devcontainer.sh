@@ -109,10 +109,10 @@ readonly BLUE='\033[0;34m'
 readonly CYAN='\033[0;36m'
 readonly NC='\033[0m'
 
-log_info()    { echo -e "${BLUE}ℹ${NC}  $*"; }
+log_info() { echo -e "${BLUE}ℹ${NC}  $*"; }
 log_success() { echo -e "${GREEN}✓${NC}  $*"; }
 log_warning() { echo -e "${YELLOW}⚠${NC}  $*"; }
-log_error()   { echo -e "${RED}✗${NC}  $*"; }
+log_error() { echo -e "${RED}✗${NC}  $*"; }
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -131,9 +131,9 @@ safe_chown() {
         return 1
     fi
 
-    if $SUDO_CMD chown -R node:node "$target" 2>/dev/null; then
+    if $SUDO_CMD chown -R node:node "$target" 2> /dev/null; then
         local owner
-        owner=$(stat -c '%U:%G' "$target" 2>/dev/null || echo 'unknown')
+        owner=$(stat -c '%U:%G' "$target" 2> /dev/null || echo 'unknown')
         log_success "chown executado: $target → $owner"
         return 0
     else
@@ -143,7 +143,7 @@ safe_chown() {
 }
 
 has_command() {
-    command -v "$1" >/dev/null 2>&1
+    command -v "$1" > /dev/null 2>&1
 }
 
 # ============================================================================
@@ -174,7 +174,7 @@ WORKSPACE_DETECTED_BY="env:DEVCONTAINER_WORKSPACE_FOLDER"
 
 if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
     if has_command git; then
-        if git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+        if git_root=$(git rev-parse --show-toplevel 2> /dev/null); then
             WORKSPACE="$git_root"
             WORKSPACE_DETECTED_BY="git:rev-parse"
         fi
@@ -200,7 +200,7 @@ SUDO_CMD=""
 
 if [ "$(id -u)" -eq 0 ]; then
     RUN_MODE="root"
-elif has_command sudo && sudo -n true 2>/dev/null; then
+elif has_command sudo && sudo -n true 2> /dev/null; then
     RUN_MODE="user-with-sudo"
     SUDO_CMD="sudo"
 else
@@ -235,16 +235,16 @@ fi
 
 echo -e "${BLUE}[1/6]${NC} Configurando Git..."
 
-git config --global init.defaultBranch main 2>/dev/null || true
-git config --global pull.rebase false 2>/dev/null || true
-git config --global core.autocrlf input 2>/dev/null || true
+git config --global init.defaultBranch main 2> /dev/null || true
+git config --global pull.rebase false 2> /dev/null || true
+git config --global core.autocrlf input 2> /dev/null || true
 
 if [ "$HOST_OS" = "wsl2" ]; then
-    git config --global core.eol lf 2>/dev/null || true
+    git config --global core.eol lf 2> /dev/null || true
     log_info "core.eol=lf configurado (WSL2)"
 fi
 
-if ! git config --global user.name >/dev/null 2>&1; then
+if ! git config --global user.name > /dev/null 2>&1; then
     git config --global user.name "DevContainer User"
     log_info "user.name definido (padrão)"
 else
@@ -252,7 +252,7 @@ else
     log_info "user.name preservado: ${CYAN}${existing_name}${NC}"
 fi
 
-if ! git config --global user.email >/dev/null 2>&1; then
+if ! git config --global user.email > /dev/null 2>&1; then
     git config --global user.email "devcontainer@example.com"
     log_info "user.email definido (padrão)"
 else
@@ -278,7 +278,7 @@ for dir in "${PROJECT_DIRS[@]}"; do
     if [ -d "$full_path" ]; then
         ((DIRS_EXISTED++))
     else
-        if mkdir -p "$full_path" 2>/dev/null; then
+        if mkdir -p "$full_path" 2> /dev/null; then
             log_success "Criado: $dir"
             ((DIRS_CREATED++))
         else
@@ -337,7 +337,7 @@ shopt -s nullglob
 for pattern in "${EXECUTABLE_SCRIPTS[@]}"; do
     for script in "$WORKSPACE"/$pattern; do
         if [ -f "$script" ]; then
-            if chmod +x "$script" 2>/dev/null; then
+            if chmod +x "$script" 2> /dev/null; then
                 log_success "Executável (projeto): $(basename "$script")"
                 ((SCRIPTS_FOUND++))
             else
@@ -351,7 +351,7 @@ done
 if [ -d "$WORKSPACE/.devcontainer/scripts" ]; then
     for script in "$WORKSPACE/.devcontainer/scripts"/*.sh; do
         if [ -f "$script" ]; then
-            if chmod +x "$script" 2>/dev/null; then
+            if chmod +x "$script" 2> /dev/null; then
                 log_success "Executável (.devcontainer): $(basename "$script")"
                 ((SCRIPTS_FOUND++))
             else
@@ -504,11 +504,11 @@ echo "  Diretórios criados:       ${DIRS_CREATED}"
 echo "  Diretórios existentes:    ${DIRS_EXISTED}"
 
 if [ "${DEVCONTAINER_APPLY_CHOWN:-false}" = "true" ]; then
-echo "  chown executados:         ${CHOWN_EXECUTED}"
-echo "  chown ignorados:          ${CHOWN_SKIPPED}"
-echo "  chown falhas:             ${CHOWN_FAILED}"
+    echo "  chown executados:         ${CHOWN_EXECUTED}"
+    echo "  chown ignorados:          ${CHOWN_SKIPPED}"
+    echo "  chown falhas:             ${CHOWN_FAILED}"
 else
-echo "  chown:                    desativado (opt-in)"
+    echo "  chown:                    desativado (opt-in)"
 fi
 
 echo "  Scripts executáveis:      ${SCRIPTS_FOUND}"
@@ -520,9 +520,9 @@ echo "  Ferramentas críticas:     ${TOOLS_CRITICAL_OK} OK | ${TOOLS_CRITICAL_MI
 echo "  Ferramentas opcionais:    ${TOOLS_OPTIONAL_OK} OK | ${TOOLS_OPTIONAL_MISSING} ausentes"
 
 if [ $TOOLS_CRITICAL_MISSING -gt 0 ]; then
-echo ""
-echo "  ⚠️  AMBIENTE INCONSISTENTE: Ferramentas críticas ausentes"
-echo "  Verifique o Dockerfile e reconstrua o container"
+    echo ""
+    echo "  ⚠️  AMBIENTE INCONSISTENTE: Ferramentas críticas ausentes"
+    echo "  Verifique o Dockerfile e reconstrua o container"
 fi
 
 echo ""

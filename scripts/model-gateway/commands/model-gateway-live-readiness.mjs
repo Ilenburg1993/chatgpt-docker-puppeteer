@@ -5,9 +5,9 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
+import '../bootstrap-sqlite.mjs';
 import { COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH, REPO_ROOT } from '../index.mjs';
 
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
@@ -73,7 +73,7 @@ function getReadinessStores() {
     if (readinessStoreContext) return readinessStoreContext;
     readinessStoreContext = {
         sourceStore: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
-        sqliteStore: new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH }),
+        sqliteStore: new SqliteModelGatewayCatalogStore(),
     };
     return readinessStoreContext;
 }
@@ -952,13 +952,6 @@ if (isDirectCli) {
     } else {
         const json = argSet.has('--json');
         const fail = argSet.has('--fail');
-        if (json) {
-            setDbLogger((level, message) => {
-                if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-                    process.stderr.write(`[db][${level}] ${message}\n`);
-                }
-            });
-        }
         const sqliteRedactionMaxRowsPerTable =
             argSet.has('--deep-redaction') || argSet.has('--full-redaction')
                 ? DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE

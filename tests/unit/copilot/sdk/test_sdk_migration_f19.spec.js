@@ -4,9 +4,10 @@
  *   Valida que todos os consumidores fora de `sdk/` importam exclusivamente via `#copilot/sdk` (barrel) ou
  *   `#copilot/sdk/*.js` (módulos individuais), nunca diretamente de `@github/copilot-sdk`.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { listSourceFilesSync } from '../../../../scripts/lib/source-tree.mjs';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,17 +32,7 @@ function readSource(relPath) {
  * @returns {string[]} Caminhos relativos a src/copilot
  */
 function collectJsFiles(dir) {
-    /** @type {string[]} */
-    const results = [];
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-            results.push(...collectJsFiles(full));
-        } else if (entry.name.endsWith('.js')) {
-            results.push(relative(SRC_COPILOT, full));
-        }
-    }
-    return results;
+    return listSourceFilesSync(dir, { extensions: ['.js'] }).map((full) => relative(SRC_COPILOT, full));
 }
 
 // Arquivos SDK (esses DEVEM importar de @github/copilot-sdk)

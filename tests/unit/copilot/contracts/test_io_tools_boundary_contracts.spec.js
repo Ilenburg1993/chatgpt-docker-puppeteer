@@ -6,9 +6,14 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = process.cwd();
 const COPILOT_ROOT = resolve(REPO_ROOT, 'src/copilot');
+const CORE_ROOT = join(COPILOT_ROOT, 'core');
 const TOOLS_ROOT = join(COPILOT_ROOT, 'tools');
 const COPILOT_INFRA_ROOT = join(COPILOT_ROOT, 'infra');
 const PACKAGE_JSON = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
+const ALLOWED_INFRA_CHILD_PROCESS_FILES = new Set([
+    'indexing/search/subprocess/exec.js',
+    'indexing/search/subprocess/stream.js',
+]);
 const ALLOWED_INFRA_CAPABILITY_IMPORTS = new Set(
     Object.keys(PACKAGE_JSON.imports ?? {}).filter((key) => key.startsWith('#copilot/infra/public/')),
 );
@@ -42,11 +47,17 @@ function listJsFiles(dir) {
 }
 
 /**
- * @param {string} filePath
- * @returns {string[]}
+ * @param {string} source
+ * @returns {string}
  */
+function stripJavaScriptComments(source) {
+    return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/.*$/gmu, '$1');
+}
+
+/** @param {string} filePath @returns {string[]} */
 function collectImportSpecifiers(filePath) {
     const source = readFileSync(filePath, 'utf8');
+    /** @type {string[]} */
     const specifiers = [];
     const importRe = /\b(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
     for (const match of source.matchAll(importRe)) {
@@ -57,6 +68,34 @@ function collectImportSpecifiers(filePath) {
 }
 
 describe('IO/tools boundary contracts', () => {
+    it('core L0 não possui autoridade ambiental implícita', () => {
+        const violations = [];
+        for (const filePath of listJsFiles(CORE_ROOT)) {
+            const source = stripJavaScriptComments(readFileSync(filePath, 'utf8'));
+            const rel = relative(REPO_ROOT, filePath).replace(/\\/g, '/');
+            if (/\bprocess\s*\.\s*env\b/u.test(source)) violations.push(`${rel}: process.env`);
+            if (/['"](?:node:)?process['"]/u.test(source)) violations.push(`${rel}: process module import`);
+        }
+        expect(violations).toEqual([]);
+    });
+
+    it('infra concentra child_process nos dois adapters de search com ambiente explícito', () => {
+        const owners = [];
+        const violations = [];
+        for (const filePath of listJsFiles(COPILOT_INFRA_ROOT)) {
+            const source = stripJavaScriptComments(readFileSync(filePath, 'utf8'));
+            if (!/['"]node:child_process['"]/u.test(source)) continue;
+            const rel = relative(COPILOT_INFRA_ROOT, filePath).replace(/\\/g, '/');
+            owners.push(rel);
+            if (!ALLOWED_INFRA_CHILD_PROCESS_FILES.has(rel)) violations.push(`${rel}: unexpected child_process owner`);
+            if (/\bspawn\s*\(/u.test(source) && !/\benv\s*:/u.test(source)) {
+                violations.push(`${rel}: spawn without explicit env`);
+            }
+        }
+        expect(owners.sort()).toEqual([...ALLOWED_INFRA_CHILD_PROCESS_FILES].sort());
+        expect(violations).toEqual([]);
+    });
+
     it('infra e tools usam prefixo node: para built-ins do Node 24+', () => {
         const violations = [];
         for (const filePath of [...listJsFiles(TOOLS_ROOT), ...listJsFiles(COPILOT_INFRA_ROOT)]) {
@@ -133,20 +172,30 @@ describe('IO/tools boundary contracts', () => {
         expect(existsSync(publicRoot)).toBe(true);
         expect(existsSync(join(publicRoot, 'index.js'))).toBe(false);
         for (const entrypoint of [
-            'cache/index.js',
-            'concurrency/locks/index.js',
-            'filesystem/read/index.js',
-            'filesystem/write/index.js',
+            'cache/keys/index.js',
+            'cache/tiering/index.js',
+            'concurrency/bulk/index.js',
+            'composition/filesystem/configured/index.js',
             'composition/workspace/authority/index.js',
             'composition/workspace/io/index.js',
             'composition/workspace/read-io/index.js',
             'composition/workspace/mutation-io/index.js',
-            'indexing/index.js',
+            'indexing/file-context/index.js',
+            'indexing/search/index.js',
             'operations/index.js',
-            'platform/index.js',
+            'platform/node/index.js',
             'policy/index.js',
         ]) {
             expect(existsSync(join(publicRoot, entrypoint))).toBe(true);
+        }
+        for (const aggregate of [
+            'cache/index.js',
+            'concurrency/locks/index.js',
+            'filesystem/read/index.js',
+            'indexing/index.js',
+            'platform/index.js',
+        ]) {
+            expect(existsSync(join(publicRoot, aggregate))).toBe(false);
         }
     });
 });

@@ -57,7 +57,7 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
  * @property {() => Record<string, { value: number; ts: number }>} getGauges
  * @property {() => MetricsSummary} getSummary
  * @property {() => void} reset
- * @property {(intervalMs?: number, logDir?: string) => void} startPeriodicSnapshot
+ * @property {(intervalMs?: number) => void} startPeriodicSnapshot
  * @property {() => void} stopPeriodicSnapshot
  * @property {() => Promise<void>} flushPeriodicSnapshot
  * @property {() => void} [recordQuotaPoll] - Registra uma sondagem de quota (opcional)
@@ -65,19 +65,39 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
 
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
-import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
-import { join as _join } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { join as _join, resolve as _resolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
 import { createHistogram } from './metrics-histogram.js';
+
+const DEFAULT_METRICS_SNAPSHOT_FILE = _resolve(_join(COPILOT_LOG_DIR || './var/logs/copilot', 'metrics.jsonl'));
+const DEFAULT_METRICS_SNAPSHOT_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'observability.metrics.snapshot',
+        exactPaths: [DEFAULT_METRICS_SNAPSHOT_FILE],
+        operations: ['append'],
+        symlinkPolicy: 'deny',
+        durability: ['none'],
+    }),
+);
+const DEFAULT_METRICS_SNAPSHOT_BINDING = Object.freeze({
+    filePath: DEFAULT_METRICS_SNAPSHOT_FILE,
+    io: DEFAULT_METRICS_SNAPSHOT_IO,
+});
 
 /**
  * Cria um MetricsStore.
  *
- * @param {{ toolTelemetry?: import('./tool-stats.js').ToolTelemetryStore }} [options]
+ * @param {{
+ *   toolTelemetry?: import('./tool-stats.js').ToolTelemetryStore;
+ *   snapshot?: { filePath:string; io:ReturnType<typeof createConfiguredFsIo> };
+ * }} [options]
  * @returns {MetricsStore}
  */
 export function createMetricsStore(options = {}) {
     const toolTelemetry = options.toolTelemetry ?? createToolTelemetryStore();
+    const snapshotBinding = options.snapshot ?? DEFAULT_METRICS_SNAPSHOT_BINDING;
     /** @type {TokenUsageMetrics} */
     const _tokens = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, byModel: {} };
 
@@ -380,27 +400,26 @@ export function createMetricsStore(options = {}) {
     let _snapshotTimer = null;
     /** @type {string | null} */
     let _snapshotTimerId = null;
-    /** @type {ReturnType<typeof createJsonlFileWriter> | null} */
+    /** @type {ReturnType<typeof createBoundJsonlFileWriter> | null} */
     let _snapshotWriter = null;
 
     /**
-     * Inicia snapshot periódico de métricas em arquivo.
+     * Inicia snapshot periódico de métricas no binding de storage autorizado do store.
      *
      * @param {number} [intervalMs] - Intervalo entre snapshots. Default: COPILOT_METRICS_SNAPSHOT_INTERVAL ou 5min.
-     * @param {string} [logDir] - Diretório de log. Default: var/logs/copilot/.
      * @returns {void}
      */
-    function startPeriodicSnapshot(intervalMs, logDir) {
+    function startPeriodicSnapshot(intervalMs) {
         stopPeriodicSnapshot();
         const ms = intervalMs ?? COPILOT_METRICS_SNAPSHOT_INTERVAL;
         if (ms <= 0) return;
-        const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './var/logs/copilot');
         const previousWriter = _snapshotWriter;
         if (previousWriter) {
             void previousWriter.flush().catch((error) => logSwallowed(error, 'metrics.snapshot.restart'));
         }
-        _snapshotWriter = createJsonlFileWriter({
-            filePath: _join(resolvedDir, 'metrics.jsonl'),
+        _snapshotWriter = createBoundJsonlFileWriter({
+            filePath: snapshotBinding.filePath,
+            io: snapshotBinding.io,
             batchLines: 32,
             maxQueueLines: 10_000,
             softQueueLines: 1_000,

@@ -21,7 +21,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../../facades/sdk-access.js';

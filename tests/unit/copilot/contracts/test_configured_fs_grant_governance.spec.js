@@ -70,11 +70,12 @@ describe('ConfiguredFsGrant governance', () => {
         assert.ok(widened);
         assert.deepEqual(narrow.issues, []);
         assert.deepEqual(widened.issues, []);
-        assert.equal(narrow.grants[0]?.id, widened.grants[0]?.id);
-        assert.notEqual(
-            configuredFsAuthorityShapeKey(narrow.grants[0]),
-            configuredFsAuthorityShapeKey(widened.grants[0]),
-        );
+        const narrowGrant = narrow.grants[0];
+        const widenedGrant = widened.grants[0];
+        assert.ok(narrowGrant);
+        assert.ok(widenedGrant);
+        assert.equal(narrowGrant.id, widenedGrant.id);
+        assert.notEqual(configuredFsAuthorityShapeKey(narrowGrant), configuredFsAuthorityShapeKey(widenedGrant));
     });
 
     it('covers the production repository exactly with the fail-closed owner-and-authority manifest', async () => {

@@ -13,8 +13,9 @@
  * @module scripts/check-layer-violations
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, sep } from 'node:path';
+import { listSourceFilesSync } from './lib/source-tree.mjs';
 
 const COPILOT_ROOT = 'src/copilot';
 
@@ -22,7 +23,6 @@ const COPILOT_ROOT = 'src/copilot';
 const LAYER_MAP = {
     core: 0,
     types: 0,
-    db: 0,
     infra: 0,
     boot: 0,
     sdk: 1,
@@ -89,10 +89,6 @@ function isAllowedBoundaryImport(relFile, targetModule, spec) {
         return ['audit', 'bridges', 'conversation-hub', 'events', 'sdk'].includes(targetModule);
     }
 
-    if (relFile === 'db/sqlite.js') {
-        return targetModule === 'boot';
-    }
-
     if (relFile.startsWith('infra/') && targetModule === 'config') {
         return true;
     }
@@ -116,26 +112,9 @@ function isAllowedBoundaryImport(relFile, targetModule, spec) {
     return false;
 }
 
-/**
- * Recursivamente lista todos os .js no diretório.
- *
- * @param {string} dir
- * @returns {string[]}
- */
+/** @param {string} dir */
 function walkJs(dir) {
-    /** @type {string[]} */
-    const results = [];
-    for (const entry of readdirSync(dir)) {
-        const full = join(dir, entry);
-        const st = statSync(full);
-        if (st.isDirectory()) {
-            if (entry === 'node_modules' || entry === 'logs') continue;
-            results.push(...walkJs(full));
-        } else if (entry.endsWith('.js')) {
-            results.push(full);
-        }
-    }
-    return results;
+    return listSourceFilesSync(dir, { extensions: ['.js'] });
 }
 
 /**
@@ -177,7 +156,7 @@ function resolveTarget(spec, fileModule) {
 
 // ─── Exports para testes ──────────────────────────────────────────────────────
 
-export { LAYER_MAP, extractModule, isInsideJsDoc, resolveTarget };
+export { extractModule, isInsideJsDoc, LAYER_MAP, resolveTarget };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 

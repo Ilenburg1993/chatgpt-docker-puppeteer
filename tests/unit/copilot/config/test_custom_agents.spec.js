@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock(
-    '#copilot/config/env',
+    '#copilot/testing/config/env',
     () =>
         new Proxy(
             { COPILOT_CUSTOM_AGENTS: 'task,explore,diagnostic', COPILOT_DISABLED_AGENTS: '' },
@@ -26,13 +26,13 @@ vi.mock(
         ),
 );
 
-vi.mock('#copilot/config/mcp-servers', () => ({
+vi.mock('#copilot/testing/config/mcp-servers', () => ({
     MCP_SERVERS: {},
     buildMcpConfig: vi.fn(() => ({})),
     listAvailableMcpServers: vi.fn(() => []),
 }));
 
-const mod = await import('#copilot/config/custom-agents');
+const mod = await import('#copilot/testing/config/custom-agents');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. BUILTIN_AGENTS — getCustomAgent / listCustomAgents

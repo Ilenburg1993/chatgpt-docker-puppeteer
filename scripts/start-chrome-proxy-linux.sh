@@ -119,7 +119,7 @@ detect_public_ip() {
     log_info "Detectando IP público..."
 
     # Tenta hostname -I (Linux)
-    if PUBLIC_IP=$(hostname -I 2>/dev/null | awk '{print $1}'); then
+    if PUBLIC_IP=$(hostname -I 2> /dev/null | awk '{print $1}'); then
         if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "127.0.0.1" ]; then
             log_success "IP detectado: $PUBLIC_IP"
             return 0
@@ -127,7 +127,7 @@ detect_public_ip() {
     fi
 
     # Tenta ip route
-    if PUBLIC_IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}'); then
+    if PUBLIC_IP=$(ip route get 1 2> /dev/null | awk '{print $7; exit}'); then
         if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "127.0.0.1" ]; then
             log_success "IP detectado: $PUBLIC_IP"
             return 0
@@ -143,7 +143,7 @@ start_chrome() {
     echo
     log_info "Verificando Chrome na porta $CHROME_DEBUG_PORT..."
 
-    if curl -s --connect-timeout 2 "http://localhost:$CHROME_DEBUG_PORT/json/version" &>/dev/null; then
+    if curl -s --connect-timeout 2 "http://localhost:$CHROME_DEBUG_PORT/json/version" &> /dev/null; then
         log_success "Chrome já está rodando"
         return 0
     fi
@@ -164,7 +164,7 @@ start_chrome() {
     # Aguarda Chrome iniciar
     local waited=0
     while [ $waited -lt $MAX_WAIT_SECONDS ]; do
-        if curl -s --connect-timeout 1 "http://localhost:$CHROME_DEBUG_PORT/json/version" &>/dev/null; then
+        if curl -s --connect-timeout 1 "http://localhost:$CHROME_DEBUG_PORT/json/version" &> /dev/null; then
             log_success "Chrome iniciado com sucesso!"
             return 0
         fi
@@ -180,7 +180,7 @@ start_proxy() {
     echo
     log_info "Verificando Proxy na porta $PROXY_PORT..."
 
-    if curl -s --connect-timeout 2 "http://localhost:$PROXY_PORT/json/version" &>/dev/null; then
+    if curl -s --connect-timeout 2 "http://localhost:$PROXY_PORT/json/version" &> /dev/null; then
         log_success "Proxy já está rodando"
         return 0
     fi
@@ -195,7 +195,7 @@ start_proxy() {
     # Aguarda proxy iniciar
     local waited=0
     while [ $waited -lt $MAX_WAIT_SECONDS ]; do
-        if curl -s --connect-timeout 1 "http://localhost:$PROXY_PORT/json/version" &>/dev/null; then
+        if curl -s --connect-timeout 1 "http://localhost:$PROXY_PORT/json/version" &> /dev/null; then
             log_success "Proxy iniciado com sucesso (PID: $PROXY_PID)"
             return 0
         fi
@@ -212,7 +212,7 @@ health_checks() {
     log_info "Executando health checks..."
 
     # Chrome direto
-    if curl -s "http://localhost:$CHROME_DEBUG_PORT/json/version" &>/dev/null; then
+    if curl -s "http://localhost:$CHROME_DEBUG_PORT/json/version" &> /dev/null; then
         log_success "Chrome respondendo em http://localhost:$CHROME_DEBUG_PORT"
     else
         log_error "Chrome não está respondendo!"
@@ -220,7 +220,7 @@ health_checks() {
     fi
 
     # Proxy local
-    if curl -s "http://localhost:$PROXY_PORT/json/version" &>/dev/null; then
+    if curl -s "http://localhost:$PROXY_PORT/json/version" &> /dev/null; then
         log_success "Proxy respondendo em http://localhost:$PROXY_PORT"
     else
         log_error "Proxy não está respondendo!"
@@ -228,7 +228,7 @@ health_checks() {
     fi
 
     # Proxy via IP público
-    if curl -s "http://$PUBLIC_IP:$PROXY_PORT/json/version" &>/dev/null; then
+    if curl -s "http://$PUBLIC_IP:$PROXY_PORT/json/version" &> /dev/null; then
         log_success "Proxy acessível via IP público: http://$PUBLIC_IP:$PROXY_PORT"
     else
         log_warning "Proxy não acessível via IP público (pode ser firewall)"
@@ -292,9 +292,9 @@ cleanup() {
 
     if [ -f /tmp/chrome-proxy.pid ]; then
         local pid
-        pid=$(cat /tmp/chrome-proxy.pid 2>/dev/null || echo '')
+        pid=$(cat /tmp/chrome-proxy.pid 2> /dev/null || echo '')
         if [ -n "$pid" ]; then
-            kill "$pid" 2>/dev/null || true
+            kill "$pid" 2> /dev/null || true
         fi
         rm -f /tmp/chrome-proxy.pid
     fi

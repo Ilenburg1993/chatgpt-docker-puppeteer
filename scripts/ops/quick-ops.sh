@@ -57,7 +57,10 @@ case "$COMMAND" in
             echo -e "${COLOR_GREEN}✓ PM2 processes started${COLOR_RESET}"
             echo -e "${COLOR_YELLOW}⏳ Waiting for services to be ready (5s)...${COLOR_RESET}"
             sleep 5
-            "$0" health || { echo -e "${COLOR_RED}⚠ Services started but health checks failed${COLOR_RESET}"; exit 1; }
+            "$0" health || {
+                echo -e "${COLOR_RED}⚠ Services started but health checks failed${COLOR_RESET}"
+                exit 1
+            }
         else
             echo -e "${COLOR_RED}✗ Failed to start PM2 processes${COLOR_RESET}"
             exit 1
@@ -81,13 +84,13 @@ case "$COMMAND" in
 
     health)
         echo -e "${COLOR_YELLOW}[QUICK-OPS] Health Check:${COLOR_RESET}"
-        response=$(curl -sS --max-time 3 http://localhost:2998/api/health 2>/dev/null || echo "")
+        response=$(curl -sS --max-time 3 http://localhost:2998/api/health 2> /dev/null || echo "")
         if [ -n "$response" ]; then
             # Use jq if available, fallback to node
-            if command -v jq >/dev/null 2>&1; then
-                status=$(echo "$response" | jq -r '.status // "unknown"' 2>/dev/null || echo "error")
+            if command -v jq > /dev/null 2>&1; then
+                status=$(echo "$response" | jq -r '.status // "unknown"' 2> /dev/null || echo "error")
                 echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} Status: $status"
-                echo "$response" | jq -r 'to_entries | .[] | select(.key != "status") | "  \(.key): \(.value.status // .value)"' 2>/dev/null || true
+                echo "$response" | jq -r 'to_entries | .[] | select(.key != "status") | "  \(.key): \(.value.status // .value)"' 2> /dev/null || true
             else
                 echo "$response" | node -e "
                     const s=require('fs').readFileSync(0,'utf8');
@@ -100,7 +103,7 @@ case "$COMMAND" in
                         console.log('  [ERROR] Invalid response');
                         process.exit(1);
                     }
-                " 2>/dev/null || echo -e "  ${COLOR_RED}✗ Failed to parse response${COLOR_RESET}"
+                " 2> /dev/null || echo -e "  ${COLOR_RED}✗ Failed to parse response${COLOR_RESET}"
             fi
         else
             echo -e "  ${COLOR_RED}✗ Health endpoint not responding${COLOR_RESET}"
@@ -121,12 +124,15 @@ case "$COMMAND" in
     backup)
         echo -e "${COLOR_YELLOW}[QUICK-OPS] Criando backup...${COLOR_RESET}"
         BACKUP_NAME="quickops-$(date +%Y%m%d-%H%M%S)-$$"
-        mkdir -p "backups/$BACKUP_NAME" || { echo -e "${COLOR_RED}✗ Failed to create backup directory${COLOR_RESET}"; exit 1; }
+        mkdir -p "backups/$BACKUP_NAME" || {
+            echo -e "${COLOR_RED}✗ Failed to create backup directory${COLOR_RESET}"
+            exit 1
+        }
 
         files_backed=0
         for file in config.json controle.json dynamic_rules.json ecosystem.config.js; do
             if [ -f "$file" ]; then
-                if cp -f "$file" "backups/$BACKUP_NAME/" 2>/dev/null; then
+                if cp -f "$file" "backups/$BACKUP_NAME/" 2> /dev/null; then
                     echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $file"
                     ((files_backed++))
                 fi

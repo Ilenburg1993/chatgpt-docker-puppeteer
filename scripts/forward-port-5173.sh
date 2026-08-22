@@ -35,7 +35,7 @@ echo ""
 
 # Test HTTP
 echo "3️⃣ Testando HTTP interno..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2> /dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then
     echo "   ✅ HTTP 200 OK - Vite respondendo"
 else

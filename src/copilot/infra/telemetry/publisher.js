@@ -1,6 +1,6 @@
 // @ts-check
 /** diagnostics_channel publication for IO operations and lifecycle events. */
-import { logSwallowed, toError } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { channel } from 'node:diagnostics_channel';
 
 /** @typedef {{ recordOperation(io:import('#copilot/core/io-contracts').IoMeta, opts:{success:boolean;error?:unknown}):void }} IoTelemetryRuntime */

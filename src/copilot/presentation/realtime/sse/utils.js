@@ -265,13 +265,13 @@ export class SseConnectionTracker {
     /** @type {number} */
     #count = 0;
 
-    /** @type {import('#copilot/observability/metrics.js').MetricsStore | null} */
+    /** @type {import('#copilot/observability/metrics').MetricsStore | null} */
     #metrics;
 
     /**
      * @param {string} name - Nome do endpoint (para logging)
      * @param {number} [max] - Limite máximo de conexões simultâneas
-     * @param {import('#copilot/observability/metrics.js').MetricsStore | null} [metrics]
+     * @param {import('#copilot/observability/metrics').MetricsStore | null} [metrics]
      */
     constructor(name, max = MAX_SSE_CLIENTS, metrics = defaultMetrics) {
         this.#name = String(name).replace(/[^a-zA-Z0-9_.-]/g, '_');

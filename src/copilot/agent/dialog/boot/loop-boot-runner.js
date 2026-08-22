@@ -5,7 +5,7 @@
  */
 
 import { BOOT_LATE_PROTOCOL_GRACE_MS, LONG_TASK_TIMEOUT_MS } from '#copilot/config/agent';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_LOOP_CHANGED, EMITTER_LOOP_READY, EMITTER_LOOP_TURN_TIMEOUT } from '#copilot/events';
 import { waitForAgentSdkEvent } from '../../facades/agent-sdk-runtime.js';

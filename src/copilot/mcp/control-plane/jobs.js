@@ -7,9 +7,9 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/platform/node';
+import { readProcessResourceSnapshot } from '#copilot/infra/public/platform/process/introspection';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { availableParallelism, freemem, loadavg, totalmem } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getMcpWorkspaceRoot, resolveReadPath } from './paths.js';
@@ -27,24 +27,12 @@ const MAX_FOCUSED_UNIT_TEST_FILES = 12;
 const MAX_ACTIVE_VALIDATOR_PROCESSES = 1;
 const DEFAULT_VALIDATOR_VITEST_MAX_WORKERS = 2;
 const VALIDATOR_RUNTIME_EPOCH = randomUUID();
-const CGROUP_V2_MEMORY_CURRENT = '/sys/fs/cgroup/memory.current';
-const CGROUP_V2_MEMORY_MAX = '/sys/fs/cgroup/memory.max';
-const CGROUP_V2_MEMORY_EVENTS = '/sys/fs/cgroup/memory.events';
 
 const JOB_ARTIFACT_IO = createConfiguredFsIo(
     createConfiguredFsGrant({
         id: 'mcp.control-plane.jobs.artifacts',
         roots: [MCP_JOBS_DIR],
         operations: ['append', 'list', 'mkdir', 'read', 'stat', 'write'],
-        symlinkPolicy: 'deny',
-        durability: ['file-and-directory'],
-    }),
-);
-const CGROUP_IO = createConfiguredFsIo(
-    createConfiguredFsGrant({
-        id: 'mcp.control-plane.jobs.cgroup',
-        exactPaths: [CGROUP_V2_MEMORY_CURRENT, CGROUP_V2_MEMORY_MAX, CGROUP_V2_MEMORY_EVENTS],
-        operations: ['read'],
         symlinkPolicy: 'deny',
         durability: ['file-and-directory'],
     }),
@@ -554,75 +542,24 @@ function buildValidatorChildEnv() {
     });
 }
 
-const CGROUP_MEMORY_EVENT_KEYS = Object.freeze(['low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill']);
-
-/** @param {string} text */
-export function parseCgroupMemoryEvents(text) {
-    /** @type {Record<string, number>} */
-    const events = {};
-    for (const line of String(text ?? '').split(/\r?\n/u)) {
-        const [key, rawValue, ...rest] = line.trim().split(/\s+/u);
-        if (!key || rawValue === undefined || rest.length > 0 || !CGROUP_MEMORY_EVENT_KEYS.includes(key)) continue;
-        const value = Number(rawValue);
-        if (Number.isSafeInteger(value) && value >= 0) events[key] = value;
-    }
-    return events;
-}
-
-/** @param {string} text */
-export function parseCgroupMemoryLimit(text) {
-    const normalized = String(text ?? '').trim();
-    if (!normalized || normalized === 'max') return null;
-    const value = Number(normalized);
-    return Number.isSafeInteger(value) && value >= 0 ? value : null;
-}
-
-/** @param {string} filePath */
-async function readOptionalCgroupText(filePath) {
-    try {
-        return (await CGROUP_IO.readTextFresh(filePath)).content;
-    } catch {
-        return null;
-    }
-}
-
 /** @returns {Promise<ValidatorResourceSnapshot>} */
 export async function readValidatorResourceSnapshot() {
-    const [currentText, maxText, eventsText] = await Promise.all([
-        readOptionalCgroupText(CGROUP_V2_MEMORY_CURRENT),
-        readOptionalCgroupText(CGROUP_V2_MEMORY_MAX),
-        readOptionalCgroupText(CGROUP_V2_MEMORY_EVENTS),
-    ]);
-    const memoryCurrentBytes = currentText === null ? null : parseCgroupMemoryLimit(currentText);
-    const memoryMaxBytes = maxText === null ? null : parseCgroupMemoryLimit(maxText);
-    const systemTotalBytes = totalmem();
-    const systemFreeBytes = freemem();
-    const systemFreeRatio = systemTotalBytes > 0 ? roundResourceRatio(systemFreeBytes / systemTotalBytes) : null;
-    const memoryUsageRatio =
-        memoryCurrentBytes !== null && memoryMaxBytes !== null && memoryMaxBytes > 0
-            ? roundResourceRatio(memoryCurrentBytes / memoryMaxBytes)
-            : null;
-    const loads = loadavg();
+    const snapshot = await readProcessResourceSnapshot();
     return {
-        observedAt: new Date().toISOString(),
-        mcpProcessRssBytes: process.memoryUsage().rss,
-        systemFreeBytes,
-        systemTotalBytes,
-        systemFreeRatio,
-        loadAverage: [loads[0] ?? 0, loads[1] ?? 0, loads[2] ?? 0],
-        availableParallelism: availableParallelism(),
+        observedAt: snapshot.observedAt,
+        mcpProcessRssBytes: snapshot.processRssBytes,
+        systemFreeBytes: snapshot.systemFreeBytes,
+        systemTotalBytes: snapshot.systemTotalBytes,
+        systemFreeRatio: snapshot.systemFreeRatio,
+        loadAverage: [snapshot.loadAverage[0], snapshot.loadAverage[1], snapshot.loadAverage[2]],
+        availableParallelism: snapshot.availableParallelism,
         cgroup: {
-            memoryCurrentBytes,
-            memoryMaxBytes,
-            memoryUsageRatio,
-            events: eventsText === null ? null : parseCgroupMemoryEvents(eventsText),
+            memoryCurrentBytes: snapshot.cgroup.memoryCurrentBytes,
+            memoryMaxBytes: snapshot.cgroup.memoryMaxBytes,
+            memoryUsageRatio: snapshot.cgroup.memoryUsageRatio,
+            events: snapshot.cgroup.events === null ? null : { ...snapshot.cgroup.events },
         },
     };
-}
-
-/** @param {number} value */
-function roundResourceRatio(value) {
-    return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 export function readCopilotValidatorCapacityState() {

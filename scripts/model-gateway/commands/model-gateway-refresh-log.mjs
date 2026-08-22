@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     SqliteModelGatewayCatalogStore,
     summarizeModelGatewayRefreshLogText,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 const args = process.argv.slice(2);
 /** @param {string} name */
@@ -16,13 +16,6 @@ const valueFor = (name) => {
     const found = args.find((arg) => arg.startsWith(prefix));
     return found ? found.slice(prefix.length).trim() : null;
 };
-if (hasFlag('--json')) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-refresh-log.mjs [options]

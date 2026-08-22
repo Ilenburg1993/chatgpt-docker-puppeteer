@@ -20,7 +20,7 @@ function estimateMessageTokens(message) {
 }
 
 /**
- * @param {ReturnType<typeof import('#copilot/sdk/session/provider').readConfiguredByokState>['summary']} byok
+ * @param {ReturnType<typeof import('#copilot/sdk/session').readConfiguredByokState>['summary']} byok
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  */

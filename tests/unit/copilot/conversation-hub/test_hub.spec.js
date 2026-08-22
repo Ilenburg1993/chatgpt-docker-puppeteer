@@ -6,13 +6,14 @@
  * facade methods, isReady, stop, close.
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
-import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 /** @param {import('better-sqlite3').Database} db */
 function applyCopilotMigrations(db) {
@@ -25,7 +26,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const migration of COPILOT_MIGRATIONS) {
         if (typeof migration.up === 'string') db.exec(migration.up);
-        else if (typeof migration.upFn === 'function') migration.upFn(db);
+        else if (typeof migration.upFn === 'function') migration.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             migration.version,
             migration.name,
@@ -41,7 +42,7 @@ async function createHub() {
     const db = new Database(':memory:');
     applyCopilotMigrations(db);
     const store = new ConversationStore();
-    store.init(db);
+    store.init(adaptBetterSqliteDatabase(db));
     const hub = new ConversationHub(store);
     await hub.init();
     /** @type {ConversationHub & { __testDb?: import('better-sqlite3').Database }} */

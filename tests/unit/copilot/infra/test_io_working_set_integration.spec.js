@@ -1,5 +1,9 @@
 // @ts-check
 
+import {
+    adaptBetterSqliteDatabase,
+    createBetterSqliteProvider,
+} from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -7,8 +11,8 @@ import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { createWorkspaceScopeRuntime } from '#copilot/infra/internal/indexing/context';
 import { getParserCacheStats } from '#copilot/infra/internal/indexing/parser';
+import { ensureIoIndexSchema } from '#copilot/infra/internal/indexing/registry/sqlite/schema';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
-import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
 const WORKSPACE_ROOT = process.cwd();
 const TOOLS_DIR = join(WORKSPACE_ROOT, 'src/copilot/mcp/tools');
@@ -19,18 +23,25 @@ let testInfraDb = null;
 let scopeRuntime;
 /** @type {ReturnType<typeof createInfraRuntime>} */
 let infraRuntime;
+/** @typedef {ReturnType<typeof createWorkspaceScopeRuntime>} ScopeRuntime */
+/** @param {string} sessionId */
 const closeScope = (sessionId) => scopeRuntime.closeScope(sessionId);
+/** @param {Parameters<ScopeRuntime['declareScope']>[0]} options */
 const declareScope = (options) => scopeRuntime.declareScope(options);
+/** @param {string} sessionId @param {string} name @param {Parameters<ScopeRuntime['findSymbol']>[2]} [options] */
 const findSymbol = (sessionId, name, options = {}) => scopeRuntime.findSymbol(sessionId, name, options);
+/** @param {string} sessionId @param {Parameters<ScopeRuntime['getScopeContext']>[1]} [options] */
 const getScopeContext = (sessionId, options = {}) => scopeRuntime.getScopeContext(sessionId, options);
+/** @param {string} sessionId @param {string[]} [paths] */
 const refreshScope = (sessionId, paths) => scopeRuntime.refreshScope(sessionId, paths);
 
 beforeEach(() => {
     testInfraDb = new Database(':memory:');
-    ensureIoIndexSchema(testInfraDb);
+    const db = /** @type {import('better-sqlite3').Database} */ (testInfraDb);
+    ensureIoIndexSchema(adaptBetterSqliteDatabase(db));
     infraRuntime = createInfraRuntime({
         runtimeId: `working-set-infra-${Date.now()}-${Math.random()}`,
-        sqliteProvider: () => /** @type {import('better-sqlite3').Database} */ (testInfraDb),
+        sqliteProvider: createBetterSqliteProvider(() => db),
     });
     scopeRuntime = createWorkspaceScopeRuntime({
         runtimeId: `working-set-test-${Date.now()}-${Math.random()}`,

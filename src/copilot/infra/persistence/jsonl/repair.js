@@ -8,14 +8,15 @@ import {
     syncFileHandleBestEffort,
 } from '#copilot/infra/internal/platform/node/filesystem';
 import { open } from 'node:fs/promises';
-import { decodeJsonlUtf8 } from './codec.js';
+import {
+    classifyJsonlTrailingCandidate,
+    createJsonlTrailingRepairResult,
+    lastJsonlNewlineOffset,
+    resolveJsonlRepairPolicy,
+} from './kernel/index.js';
 
 const DEFAULT_BLOCK_SIZE = 65_536;
-const DEFAULT_MAX_TRAILING_RECORD_BYTES = 4 * 1024 * 1024;
-const DEFAULT_MAX_REPAIR_SCAN_BYTES = 16 * 1024 * 1024;
-/**
- * @typedef {{ repaired:boolean; reason:'missing'|'empty'|'newline-terminated'|'valid-trailing-record'|'trailing-record-too-large'|'invalid-trailing-partial'; previousBytes:number; finalBytes:number; truncatedBytes:number }} JsonlTrailingRepairResult
- */
+/** @typedef {import('./kernel/repair.js').JsonlTrailingRepairResult} JsonlTrailingRepairResult */
 
 /**
  * Remove fisicamente apenas uma última linha JSONL inválida, sob o mesmo lock canônico usado pelos writers.
@@ -31,14 +32,7 @@ const DEFAULT_MAX_REPAIR_SCAN_BYTES = 16 * 1024 * 1024;
  * @returns {Promise<JsonlTrailingRepairResult>}
  */
 export async function repairJsonlTrailingPartial(filePath, options = {}) {
-    const maxTrailingRecordBytes = Math.max(
-        1_024,
-        Math.trunc(options.maxTrailingRecordBytes ?? DEFAULT_MAX_TRAILING_RECORD_BYTES),
-    );
-    const maxRepairScanBytes = Math.max(
-        maxTrailingRecordBytes,
-        Math.trunc(options.maxRepairScanBytes ?? DEFAULT_MAX_REPAIR_SCAN_BYTES),
-    );
+    const { maxTrailingRecordBytes, maxRepairScanBytes } = resolveJsonlRepairPolicy(options);
     const durability = options.durability ?? (options.flushToDisk === false ? 'none' : 'file');
     const fileFlushRequested = shouldFlushFile(durability);
     try {
@@ -51,56 +45,64 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
                     handle,
                     async () => {
                         const { size } = await handle.stat();
-                        if (size === 0) return repairResult('empty', size, size);
+                        if (size === 0) return createJsonlTrailingRepairResult('empty', size, size);
 
                         const trailingByte = Buffer.alloc(1);
                         await handle.read(trailingByte, 0, 1, size - 1);
-                        if (trailingByte[0] === 0x0a) return repairResult('newline-terminated', size, size);
+                        if (trailingByte[0] === 0x0a) {
+                            return createJsonlTrailingRepairResult('newline-terminated', size, size);
+                        }
 
                         const recordStart = await findTrailingRecordStart(handle, size, maxRepairScanBytes);
                         if (recordStart === null || (recordStart === 0 && size > maxTrailingRecordBytes)) {
-                            return repairResult('trailing-record-too-large', size, size);
+                            const classification = classifyJsonlTrailingCandidate({
+                                recordStart,
+                                size,
+                                maxTrailingRecordBytes,
+                                recordBuffer: null,
+                            });
+                            return createJsonlTrailingRepairResult(
+                                classification.reason,
+                                size,
+                                classification.finalBytes,
+                            );
                         }
                         const recordBytes = size - recordStart;
                         const recordBuffer = Buffer.alloc(recordBytes);
                         await handle.read(recordBuffer, 0, recordBytes, recordStart);
-                        const record = decodeJsonlUtf8(recordBuffer);
-                        try {
-                            JSON.parse(record);
-                            return repairResult('valid-trailing-record', size, size);
-                        } catch {
-                            await options.onPhase?.('before-truncate', {
-                                filePath,
-                                previousBytes: size,
-                                finalBytes: recordStart,
-                            });
-                            await handle.truncate(recordStart);
-                            truncateApplied = true;
-                            if (fileFlushRequested) {
-                                await options.onPhase?.('before-file-sync', {
-                                    filePath,
-                                    previousBytes: size,
-                                    finalBytes: recordStart,
-                                });
-                                const fileSync = await syncFileHandleBestEffort(handle);
-                                await options.onPhase?.('after-file-sync', {
-                                    filePath,
-                                    previousBytes: size,
-                                    finalBytes: recordStart,
-                                    ...fileSync,
-                                });
-                                assertSuccessfulSync(fileSync, {
-                                    code: 'EFILESYNC',
-                                    message: `Falha ao sincronizar repair JSONL: ${filePath}`,
-                                });
-                            }
-                            await options.onPhase?.('after-truncate', {
-                                filePath,
-                                previousBytes: size,
-                                finalBytes: recordStart,
-                            });
-                            return repairResult('invalid-trailing-partial', size, recordStart);
+                        const classification = classifyJsonlTrailingCandidate({
+                            recordStart,
+                            size,
+                            maxTrailingRecordBytes,
+                            recordBuffer,
+                        });
+                        if (classification.reason === 'valid-trailing-record') {
+                            return createJsonlTrailingRepairResult(
+                                classification.reason,
+                                size,
+                                classification.finalBytes,
+                            );
                         }
+                        const finalBytes = classification.finalBytes;
+                        await options.onPhase?.('before-truncate', { filePath, previousBytes: size, finalBytes });
+                        await handle.truncate(finalBytes);
+                        truncateApplied = true;
+                        if (fileFlushRequested) {
+                            await options.onPhase?.('before-file-sync', { filePath, previousBytes: size, finalBytes });
+                            const fileSync = await syncFileHandleBestEffort(handle);
+                            await options.onPhase?.('after-file-sync', {
+                                filePath,
+                                previousBytes: size,
+                                finalBytes,
+                                ...fileSync,
+                            });
+                            assertSuccessfulSync(fileSync, {
+                                code: 'EFILESYNC',
+                                message: `Falha ao sincronizar repair JSONL: ${filePath}`,
+                            });
+                        }
+                        await options.onPhase?.('after-truncate', { filePath, previousBytes: size, finalBytes });
+                        return createJsonlTrailingRepairResult(classification.reason, size, finalBytes);
                     },
                     {
                         mutationApplied: () => truncateApplied,
@@ -115,7 +117,7 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
         return value;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
-        if (code === 'ENOENT') return repairResult('missing', 0, 0);
+        if (code === 'ENOENT') return createJsonlTrailingRepairResult('missing', 0, 0);
         throw error;
     }
 }
@@ -138,26 +140,10 @@ async function findTrailingRecordStart(handle, size, maxScanBytes) {
         const buffer = Buffer.alloc(readSize);
         const { bytesRead } = await handle.read(buffer, 0, readSize, readStart);
         const chunk = bytesRead === readSize ? buffer : buffer.subarray(0, bytesRead);
-        const lastNewline = chunk.lastIndexOf(0x0a);
+        const lastNewline = lastJsonlNewlineOffset(chunk);
         if (lastNewline >= 0) return readStart + lastNewline + 1;
         scannedBytes += bytesRead;
         searchEnd = readStart;
     }
     return searchEnd === 0 ? 0 : null;
-}
-
-/**
- * @param {JsonlTrailingRepairResult['reason']} reason
- * @param {number} previousBytes
- * @param {number} finalBytes
- * @returns {JsonlTrailingRepairResult}
- */
-function repairResult(reason, previousBytes, finalBytes) {
-    return {
-        repaired: reason === 'invalid-trailing-partial',
-        reason,
-        previousBytes,
-        finalBytes,
-        truncatedBytes: Math.max(0, previousBytes - finalBytes),
-    };
 }

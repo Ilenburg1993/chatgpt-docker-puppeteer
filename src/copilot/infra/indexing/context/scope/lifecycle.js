@@ -14,7 +14,7 @@ import { markScopeReady, recordScopeFailure } from './state.js';
  * Declares a bounded session working set and starts warm/parse/index convergence in the background.
  * @param {ScopeDeclareOptions} opts
  * @param {import('./state.js').ScopeRuntimeState} runtime
- * @returns {{ sessionId: string; ready: boolean; awaitReady: () => Promise<ScopeStats> }}
+ * @returns {{ sessionId: string; scope: import('./types.js')._InternalScope; awaitReady: () => Promise<ScopeStats> }}
  */
 export function declareScope(opts, runtime) {
     const { scope, warmController, previousWarmPromise } = allocateScope(opts, runtime);
@@ -68,11 +68,13 @@ export function declareScope(opts, runtime) {
 
     return {
         sessionId,
-        ready: false,
+        scope,
         awaitReady: async () => {
-            await (runtime.warmPromises.get(sessionId) ?? Promise.resolve());
+            // Await the exact generation declared above. Looking the promise up again by sessionId would allow an old
+            // handle to observe a newer redeclaration that happens to reuse the same logical identity.
+            await warmPromise;
             return (
-                getScopeStats(sessionId, runtime) ?? {
+                (runtime.registry.get(sessionId) === scope ? getScopeStats(sessionId, runtime) : null) ?? {
                     sessionId,
                     pathCount: 0,
                     candidateFiles: 0,
@@ -91,9 +93,9 @@ export function declareScope(opts, runtime) {
                     status: /** @type {const} */ ('degraded'),
                     lastError: {
                         phase: /** @type {const} */ ('lifecycle'),
-                        code: 'ESCOPECLOSED',
+                        code: 'ESCOPEGENERATIONCLOSED',
                         name: 'ScopeLifecycleError',
-                        summary: 'escopo fechado antes do snapshot de prontidão',
+                        summary: 'geração do escopo fechada ou substituída antes do snapshot de prontidão',
                         atMs: Date.now(),
                     },
                     startedAt: scope.startedAt,

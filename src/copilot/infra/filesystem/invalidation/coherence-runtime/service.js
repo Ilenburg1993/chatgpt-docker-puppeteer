@@ -8,7 +8,7 @@ import { createCrossProcessInvalidationRuntime } from '../cross-process/index.js
 
 /**
  * @param {{
- *   database:{get:()=>import('better-sqlite3').Database;status:()=>{configured:boolean;revision:number}};
+ *   database:import('#copilot/infra/internal/database/port').InfraSqliteProviderReader;
  *   runtimeId?:string;
  *   config?:{l1:ReturnType<typeof import('../../../cache/memory/runtime/index.js').readIoL1CacheConfig>;l2:ReturnType<typeof import('../../../cache/l2/index.js').getIoL2CacheConfiguration>;debugIoL2:boolean;invalidation:{debounceMs:number;crossProcess:ReturnType<typeof import('../cross-process/index.js').readCrossProcessInvalidationConfig>};read:ReturnType<typeof import('../../read/runtime/index.js').readIoReadRuntimeConfig>};
  * }} options

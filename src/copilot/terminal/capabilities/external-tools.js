@@ -8,9 +8,8 @@
  * @module copilot/terminal/capabilities/external-tools
  */
 
+import { resolveExecutable } from '#copilot/infra/public/platform/process/executable';
 import { spawnSync } from 'node:child_process';
-import { accessSync, constants } from 'node:fs';
-import { delimiter, extname, join } from 'node:path';
 
 /** @typedef {'accepted' | 'accepted_guarded' | 'deferred'} TerminalExternalToolDecision */
 /** @typedef {'picker' | 'preview' | 'markdown' | 'diff' | 'structured' | 'history' | 'navigation'} TerminalExternalToolUse */
@@ -258,44 +257,6 @@ export function sanitizeTerminalExternalToolText(value, options = {}) {
 }
 
 /**
- * @param {string} filePath
- * @returns {boolean}
- */
-function isExecutable(filePath) {
-    try {
-        accessSync(filePath, constants.X_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * @param {string} command
- * @param {NodeJS.ProcessEnv} env
- * @returns {string | null}
- */
-function findExecutablePath(command, env) {
-    const pathValue = env['PATH'] ?? '';
-    const pathExt = process.platform === 'win32' ? (env['PATHEXT'] ?? '.EXE;.CMD;.BAT;.COM') : '';
-    const extensions =
-        process.platform === 'win32' && !extname(command)
-            ? pathExt
-                  .split(';')
-                  .map((ext) => ext.trim())
-                  .filter(Boolean)
-            : [''];
-    for (const dir of pathValue.split(delimiter)) {
-        if (!dir) continue;
-        for (const ext of extensions) {
-            const candidate = join(dir, `${command}${ext}`);
-            if (isExecutable(candidate)) return candidate;
-        }
-    }
-    return null;
-}
-
-/**
  * @param {string} command
  * @param {NodeJS.ProcessEnv} env
  * @returns {string | null}
@@ -318,14 +279,18 @@ function readToolVersion(command, env) {
  */
 function detectExternalTool(definition, env) {
     for (const command of definition.commands) {
-        const path = findExecutablePath(command, env);
-        if (!path) continue;
+        const resolution = resolveExecutable(command, {
+            env,
+            cwd: process.cwd(),
+            platform: process.platform,
+        });
+        if (!resolution.found) continue;
         return {
             ...definition,
             command,
-            path,
+            path: resolution.path,
             available: true,
-            version: readToolVersion(command, env),
+            version: readToolVersion(resolution.path, env),
         };
     }
     return {

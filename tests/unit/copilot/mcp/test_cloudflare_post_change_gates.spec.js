@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { evaluateGates } from '#copilot/mcp/tools/cloudflare-post-change-gates.js';
+import { evaluateGates } from '#copilot/testing/mcp/tools/cloudflare-post-change-gates';
 
 describe('Cloudflare post-change gates', () => {
     it('requires QUIC metrics when strict QUIC transport is active', () => {

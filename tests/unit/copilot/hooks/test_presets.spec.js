@@ -14,17 +14,12 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-vi.mock('#copilot/audit/pipeline', () => ({
+vi.mock('#copilot/audit', () => ({
     defaultAuditLog: {
         record: vi.fn(),
         getEntries: vi.fn(() => []),
         clear: vi.fn(),
     },
-}));
-
-vi.mock('#copilot/tools/introspection-tools', () => ({
-    isToolDisabled: vi.fn(() => false),
-    introspectionTools: [],
 }));
 
 vi.mock('../../../src/copilot/hooks/permission-handler.js', () => ({
@@ -264,20 +259,26 @@ describe('hooks/presets/audit', () => {
     });
 
     it('onPreToolUse permite e registra no audit', async () => {
-        const { defaultAuditLog } = await import('../../../../src/copilot/audit/pipeline.js');
-        vi.mocked(defaultAuditLog.record).mockClear();
-        const preset = /** @type {any} */ (createHooksAuditPreset());
+        const auditLog = {
+            record: vi.fn(),
+            getEntries: vi.fn(() => []),
+            clear: vi.fn(),
+        };
+        const preset = /** @type {any} */ (createHooksAuditPreset({ auditLog }));
         const r = await preset.hooks.onPreToolUse(makeInput('bash'), makeInvocation());
         expect(r.permissionDecision).toBe('allow');
-        expect(defaultAuditLog.record).toHaveBeenCalled();
+        expect(auditLog.record).toHaveBeenCalled();
     });
 
     it('onPostToolUse registra no audit', async () => {
-        const { defaultAuditLog } = await import('../../../../src/copilot/audit/pipeline.js');
-        vi.mocked(defaultAuditLog.record).mockClear();
-        const preset = /** @type {any} */ (createHooksAuditPreset());
+        const auditLog = {
+            record: vi.fn(),
+            getEntries: vi.fn(() => []),
+            clear: vi.fn(),
+        };
+        const preset = /** @type {any} */ (createHooksAuditPreset({ auditLog }));
         await preset.hooks.onPostToolUse(makePostToolInput(), makeInvocation());
-        expect(defaultAuditLog.record).toHaveBeenCalled();
+        expect(auditLog.record).toHaveBeenCalled();
     });
 
     it('onErrorOccurred retorna skip', async () => {
@@ -379,7 +380,7 @@ describe('hooks/presets/production', () => {
     });
 
     it('sem auditSink customizado, usa defaultAuditLog estruturado', async () => {
-        const { defaultAuditLog } = await import('../../../../src/copilot/audit/pipeline.js');
+        const { defaultAuditLog } = await import('#copilot/audit');
         vi.mocked(defaultAuditLog.record).mockClear();
 
         const { hooks } = /** @type {any} */ (createProductionHooks());

@@ -52,13 +52,13 @@ describe.skip('PermissionController › análise estrutural (G2-DX-12/13/15)', a
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
-    /** @type {import('#copilot/hooks/permission-controller').PermissionController} */
+    /** @type {import('#copilot/testing/hooks/permission-controller').PermissionController} */
     let ctrl;
-    /** @type {typeof import('#copilot/hooks/permission-controller')} */
+    /** @type {typeof import('#copilot/testing/hooks/permission-controller')} */
     let mod;
 
     beforeAll(async () => {
-        mod = await import('#copilot/hooks/permission-controller');
+        mod = await import('#copilot/testing/hooks/permission-controller');
         const { PermissionController } = mod;
         ctrl = new PermissionController();
     });

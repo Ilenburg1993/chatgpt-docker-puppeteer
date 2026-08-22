@@ -10,7 +10,7 @@ const writerMocks = vi.hoisted(() => {
     flush: import('vitest').Mock;
 }[]} */
     const instances = [];
-    const createJsonlFileWriter = vi.fn((options) => {
+    const createBoundJsonlFileWriter = vi.fn((options) => {
         const instance = {
             options,
             enqueueLine: vi.fn(),
@@ -20,11 +20,12 @@ const writerMocks = vi.hoisted(() => {
         instances.push(instance);
         return instance;
     });
-    return { createJsonlFileWriter, instances };
+    return { createBoundJsonlFileWriter, instances };
 });
 
-vi.mock('#copilot/infra/public/persistence/jsonl', () => ({
-    createJsonlFileWriter: writerMocks.createJsonlFileWriter,
+vi.mock('#copilot/infra/public/persistence/jsonl', async (importOriginal) => ({
+    .../** @type {Record<string, unknown>} */ (await importOriginal()),
+    createBoundJsonlFileWriter: writerMocks.createBoundJsonlFileWriter,
 }));
 
 vi.mock('#copilot/observability/logger', () => ({

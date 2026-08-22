@@ -1,8 +1,8 @@
 // @ts-check
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { SERVER_PORT } from '#copilot/config';
-import { toError } from '#copilot/core';
-import { httpRequest } from '#copilot/sdk';
+import { toError } from '#copilot/core/error-handlers';
+import { httpRequest } from '#copilot/sdk/http-request';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';

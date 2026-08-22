@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
     toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
 }));
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,

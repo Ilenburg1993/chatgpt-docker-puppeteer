@@ -9,7 +9,8 @@
  * @module copilot/mcp/tools/llm-b-live
  */
 
-import { getCopilotDb } from '#copilot/db';
+import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
+import { readLinuxProcessArgv } from '#copilot/infra/public/platform/process/introspection';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -18,7 +19,6 @@ import {
     getMcpWorkspaceIo,
     getMcpWorkspaceRoot,
     okResult,
-    readLinuxProcessArgv,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 import { execFile, spawn } from 'node:child_process';
@@ -477,7 +477,7 @@ async function readinessFileFingerprint(filePath) {
 
 function modelGatewaySqliteFingerprint() {
     try {
-        const db = getCopilotDb();
+        const db = getApplicationSqliteDatabase();
         const active = /** @type {{ generated_at_ms?: number | null; payload_bytes?: number | null } | undefined} */ (
             db
                 .prepare(

@@ -21,12 +21,13 @@
  * - markAllUserMessagesRead(): marca todas
  */
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { COPILOT_MIGRATIONS } from '#copilot/infra/public/testing/database/sqlite';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
-import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
 
 /**
  * Aplica as migrations copilot a um banco in-memory de teste.
@@ -43,7 +44,7 @@ function applyCopilotMigrations(db) {
     `);
     for (const m of COPILOT_MIGRATIONS) {
         if (typeof m.up === 'string') db.exec(m.up);
-        else if (typeof m.upFn === 'function') m.upFn(db);
+        else if (typeof m.upFn === 'function') m.upFn(adaptBetterSqliteDatabase(db));
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
             m.version,
             m.name,
@@ -66,7 +67,7 @@ beforeAll(() => {
     // F7: aplicar migrations copilot para criar tabelas no banco de teste
     applyCopilotMigrations(testDb);
     store = new ConversationStore();
-    store.init(testDb);
+    store.init(adaptBetterSqliteDatabase(testDb));
 });
 
 afterAll(() => {

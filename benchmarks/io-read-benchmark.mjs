@@ -21,9 +21,9 @@ import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Bench } from 'tinybench';
 // note: Readable imported for future stream-reads-to-buffer use
+import { readBytes as readBytesRaw } from '#copilot/infra/internal/filesystem/read';
 import { makeBytesKey, normalizeIoCacheKey } from '#copilot/infra/public/cache/keys';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
-import { readBytes as readBytesRaw } from '#copilot/infra/public/filesystem/read';
 
 // --- CLI args ---
 const args = process.argv.slice(2);

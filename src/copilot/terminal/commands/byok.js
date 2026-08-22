@@ -7384,6 +7384,7 @@ async function runByokProbe(mode, selection, eventBus = null) {
         ].join(':'),
         source: 'terminal.byok.probe',
         deps: {
+            sqliteStore: new SqliteModelGatewayCatalogStore(),
             runProbe: (options) =>
                 probeRunner({
                     ...options,

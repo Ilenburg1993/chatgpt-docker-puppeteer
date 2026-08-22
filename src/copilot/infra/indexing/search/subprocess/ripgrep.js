@@ -1,28 +1,28 @@
 // @ts-check
-/** Process-local ripgrep availability probe/cache. */
+/** Ripgrep capability acquisition bound to one process-generation subprocess owner. */
 
 import { execSearchFile } from './exec.js';
-
-/** @type {boolean | null} */
-let rgAvailable = null;
+import { acquireSearchSubprocessProcessLease } from './process/index.js';
 
 /**
- * Verifica e cacheia a disponibilidade de ripgrep no ambiente atual.
- *
- * @returns {Promise<boolean>}
+ * Acquire one stable capability for the whole search operation. The lease keeps probe and later execution on the same
+ * process-generation environment even if ProcessInfra is disposed or replaced while the async operation is in flight.
  */
-export async function isRipgrepAvailable() {
-    if (rgAvailable !== null) return rgAvailable;
-    try {
-        await execSearchFile('rg', ['--version'], { timeout: 3000 });
-        rgAvailable = true;
-    } catch {
-        rgAvailable = false;
-    }
-    return rgAvailable;
+export function acquireSearchSubprocessCapability() {
+    const lease = acquireSearchSubprocessProcessLease();
+    return Object.freeze({
+        processId: lease.processId,
+        environment: lease.environment,
+        async isRipgrepAvailable() {
+            return lease.resolveRipgrepAvailability(async (environment, timeoutMs) => {
+                await execSearchFile('rg', ['--version'], { timeout: timeoutMs, env: environment });
+                return true;
+            });
+        },
+    });
 }
 
-/** Test-control leaf; intentionally not exported by the search runtime barrel. */
-export function resetRipgrepAvailabilityForTest() {
-    rgAvailable = null;
+/** @returns {Promise<boolean>} */
+export async function isRipgrepAvailable() {
+    return acquireSearchSubprocessCapability().isRipgrepAvailable();
 }

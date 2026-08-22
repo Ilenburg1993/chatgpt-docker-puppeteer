@@ -14,22 +14,22 @@ import { booleanValueOr } from './config-values.js';
  *
  * @param {string} key
  * @param {boolean} fallback
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
  * @returns {boolean}
  */
-export function readEnvBoolean(key, fallback, env = process.env) {
+export function readEnvBoolean(key, fallback, env) {
     return booleanValueOr(env[key], fallback);
 }
 
 /**
- * Lê inteiro positivo de `process.env`, retornando fallback para valores ausentes ou inválidos.
+ * Lê inteiro positivo de um snapshot de ambiente explícito, retornando fallback para valores ausentes ou inválidos.
  *
  * @param {string} key
  * @param {number} fallback
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
  * @returns {number}
  */
-export function readEnvPositiveInt(key, fallback, env = process.env) {
+export function readEnvPositiveInt(key, fallback, env) {
     const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);
@@ -37,14 +37,14 @@ export function readEnvPositiveInt(key, fallback, env = process.env) {
 }
 
 /**
- * Lê inteiro não negativo de `process.env`, aceitando zero como override explícito.
+ * Lê inteiro não negativo de um snapshot de ambiente explícito, aceitando zero como override explícito.
  *
  * @param {string} key
  * @param {number} fallback
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
  * @returns {number}
  */
-export function readEnvNonNegativeInt(key, fallback, env = process.env) {
+export function readEnvNonNegativeInt(key, fallback, env) {
     const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);
@@ -57,10 +57,10 @@ export function readEnvNonNegativeInt(key, fallback, env = process.env) {
  * @param {string} key
  * @param {number} fallback
  * @param {number} minimum
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
  * @returns {number}
  */
-export function readEnvIntAtLeast(key, fallback, minimum, env = process.env) {
+export function readEnvIntAtLeast(key, fallback, minimum, env) {
     const raw = env[key];
     if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
     const parsed = Number(raw);

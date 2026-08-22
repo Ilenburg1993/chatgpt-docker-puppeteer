@@ -31,8 +31,8 @@ import { buildModelGatewayControllerSelectionPlan } from './controller-selection
 async function createDefaultInspectionSession() {
     // Keep metadata-only Model Gateway imports cheap. The SDK client is retained only when native inspection is invoked.
     const [clientModule, healthModule] = await Promise.all([
-        import('#copilot/sdk/session/client'),
-        import('#copilot/sdk/telemetry/health'),
+        import('#copilot/sdk/session'),
+        import('#copilot/sdk/telemetry'),
     ]);
     const manager = new clientModule.CopilotClientManager({ createClient: clientModule.createTerminalCopilotClient });
     /** @type {import('@github/copilot-sdk').CopilotClient | null} */

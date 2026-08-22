@@ -13,7 +13,7 @@ import { configureHookTools } from '#copilot/agent/ports';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
-import { configureDefaultUserInputContext } from '#copilot/sdk';
+import { configureDefaultUserInputContext } from '#copilot/sdk/session';
 import { setHub, setModelGatewayRuntimeControl, setPermissionAgent } from '#copilot/tools';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';

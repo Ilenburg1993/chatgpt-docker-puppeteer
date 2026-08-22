@@ -21,7 +21,7 @@ export const CROSS_PROCESS_INVALIDATION_TABLE = 'copilot_io_invalidation_journal
  * mutating the runtime singleton.
  *
  * @param {{
- *     db: import('better-sqlite3').Database;
+ *     db: import('#copilot/infra/internal/database/port').SqliteDatabasePort;
  *     processInstance?: string;
  *     now?: () => number;
  *     config?: Partial<CrossProcessInvalidationConfig>;
@@ -200,7 +200,7 @@ export function createCrossProcessInvalidationJournal(options) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/internal/database/port').SqliteDatabasePort} db
  */
 export function ensureJournalSchema(db) {
     db.exec(`

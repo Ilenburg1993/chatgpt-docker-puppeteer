@@ -60,7 +60,7 @@ export function sanitizeFtsQuery(query) {
 
 /**
  * @param {{
- *     db: { prepare: Function };
+ *     db: import('#copilot/infra/internal/database/port').SqliteDatabasePort;
  *     statements: IoIndexStatements;
  *     stats: { searches: number };
  *     queryPolicy?: {defaultMaxResults:number;hardMaxResults:number};

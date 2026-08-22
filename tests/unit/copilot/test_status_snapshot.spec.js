@@ -43,7 +43,7 @@ function makeTask(id, enqueuedAt) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildStatusSnapshot() › campos obrigatórios', () => {
-    /** @returns {import('#copilot/observability/snapshots').SnapshotParams} */
+    /** @returns {import('#copilot/testing/observability/snapshots').SnapshotParams} */
     const baseParams = () => ({
         status: 'idle',
         sessionId: null,

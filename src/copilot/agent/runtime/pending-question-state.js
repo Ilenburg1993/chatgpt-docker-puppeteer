@@ -4,7 +4,7 @@
  * @file Seams de governança da pending question/shadow do runtime.
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { persistStateWithPolicy } from '../lifecycle/state/index.js';
 
 /**

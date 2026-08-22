@@ -52,7 +52,6 @@ const EXACT_ALLOWLIST = new Map([
     ],
     ['src/copilot/infra/concurrency/locks/file/legacy.js', new Set(['unlink', 'unlinkSync'])],
     ['src/copilot/infra/concurrency/locks/file/metadata.js', new Set(['unlink'])],
-    ['src/copilot/db/sqlite.js', new Set(['mkdir'])],
 ]);
 
 /** @param {t.CallExpression} call */

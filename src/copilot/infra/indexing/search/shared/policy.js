@@ -1,16 +1,14 @@
 // @ts-check
 /** Search budget and validated target-path policy. */
 
-import { hasNullByte, resolveIoSearchBudget } from '#copilot/infra/internal/policy';
-
-/** @type {ReturnType<typeof resolveIoSearchBudget> | null} */
-let _ioSearchBudget = null;
+import { getActiveIoSearchBudget, hasNullByte } from '#copilot/infra/internal/policy';
 
 /**
- * @returns {ReturnType<typeof resolveIoSearchBudget>}
+ * Stateless search services consume the process generation's resolved default; no first search can capture env.
+ * @returns {ReturnType<typeof getActiveIoSearchBudget>}
  */
 export function getIoSearchBudget() {
-    return (_ioSearchBudget ??= resolveIoSearchBudget());
+    return getActiveIoSearchBudget();
 }
 
 /**

@@ -18,11 +18,14 @@
 export function createIoIndexStatsReader({ statements, stats, schemaVersion, freshnessPolicy }) {
     const { stmtCountFiles, stmtCountSymbols, stmtCountImports, stmtCountChunks, stmtLatest } = statements;
     return function getStats() {
-        const files = stmtCountFiles.get() ?? {};
-        const symbols = stmtCountSymbols.get() ?? {};
-        const imports = stmtCountImports.get() ?? {};
-        const chunks = stmtCountChunks.get() ?? {};
-        const latest = stmtLatest.get() ?? {};
+        const files =
+            /** @type {{ total?:unknown; fresh?:unknown; stale?:unknown; failed?:unknown; bytes?:unknown }} */ (
+                stmtCountFiles.get() ?? {}
+            );
+        const symbols = /** @type {{ total?:unknown }} */ (stmtCountSymbols.get() ?? {});
+        const imports = /** @type {{ total?:unknown }} */ (stmtCountImports.get() ?? {});
+        const chunks = /** @type {{ total?:unknown }} */ (stmtCountChunks.get() ?? {});
+        const latest = /** @type {{ latest?:unknown }} */ (stmtLatest.get() ?? {});
         const totalFiles = Number(files.total ?? 0);
         const latestIndexedAtMs = Number(latest.latest ?? 0) || null;
         return {

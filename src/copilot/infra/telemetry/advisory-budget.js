@@ -3,8 +3,8 @@
 
 import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 
-/** @param {NodeJS.ProcessEnv} [env] */
-export function readIoAdvisoryBudgetConfig(env = process.env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
+export function readIoAdvisoryBudgetConfig(env = {}) {
     return Object.freeze({
         windowMs: readEnvPositiveInt('IO_ADVISORY_BUDGET_WINDOW_MS', 60_000, env),
         maxOperations: readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_OPERATIONS', 120, env),
@@ -17,7 +17,7 @@ export function readIoAdvisoryBudgetConfig(env = process.env) {
 /** @param {{onPressure?:(operation:string,stats:ReturnType<ReturnType<typeof createIoAdvisoryBudgetRuntime>['stats']>)=>void;config?:ReturnType<typeof readIoAdvisoryBudgetConfig>}} [options] */
 export function createIoAdvisoryBudgetRuntime(options = {}) {
     const { windowMs, maxOperations, maxBytes, maxActive, eventCooldownMs } =
-        options.config ?? readIoAdvisoryBudgetConfig();
+        options.config ?? readIoAdvisoryBudgetConfig({});
     const maxSamples = 10_000;
     /** @type {{ id:number; at:number; operation:string; estimatedBytes:number }[]} */
     let samples = [];

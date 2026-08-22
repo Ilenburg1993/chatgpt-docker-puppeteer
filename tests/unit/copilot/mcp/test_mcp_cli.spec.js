@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { parseTransport } from '#copilot/mcp/cli';
+import { parseTransport } from '#copilot/testing/mcp/cli';
 
 describe('copilot MCP CLI', () => {
     it('defaults to HTTP/2+ transport for remote HTTP mode', () => {

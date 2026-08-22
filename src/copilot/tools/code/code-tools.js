@@ -1,9 +1,9 @@
 // @ts-check
 import { COPILOT_PACKAGE_ROOT, WORKSPACE_ROOT } from '#copilot/boot';
-import { toExecError } from '#copilot/core';
+import { toExecError } from '#copilot/core/error-handlers';
+import { resolveExecutable } from '#copilot/infra/public/platform/process/executable';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
-import { execFile, execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -27,19 +27,15 @@ import * as qualityGateOutput from './quality-gate-output.js';
  */
 
 const ROOT = WORKSPACE_ROOT;
-// BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes
-// onde o cwd não coincide com o ROOT do projeto
+// Prefer the package-local binary, then resolve PATH without spawning `which` or a shell.
 const _resolvedEslint = resolve(COPILOT_PACKAGE_ROOT, 'node_modules', '.bin', 'eslint');
-// BUG-P2-18: fallback para `which eslint` se o caminho resolvido não existir
-const ESLINT_BIN = existsSync(_resolvedEslint)
-    ? _resolvedEslint
-    : (() => {
-          try {
-              return execFileSync('which', ['eslint'], { encoding: 'utf8' }).trim();
-          } catch {
-              return _resolvedEslint;
-          }
-      })();
+const _eslintResolution = resolveExecutable('eslint', {
+    env: process.env,
+    cwd: ROOT,
+    candidates: [_resolvedEslint],
+    platform: process.platform,
+});
+const ESLINT_BIN = _eslintResolution.found ? _eslintResolution.path : _resolvedEslint;
 const execFileAsync = promisify(execFile);
 
 /**

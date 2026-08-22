@@ -66,7 +66,7 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk/tools';
 import { log as toolsLog } from './logger.js';
 import { withToolFailureFeedback } from './tool-feedback.js';

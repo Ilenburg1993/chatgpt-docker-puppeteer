@@ -46,7 +46,7 @@ const mocks = vi.hoisted(() => ({
     withSkipPermission: vi.fn((tool) => tool),
 }));
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,

@@ -3,7 +3,7 @@
  * src/copilot/conversation-hub/store-memories.js
  *
  * Queries de memórias semânticas (P5) extraídas de ConversationStore para reduzir o God Module. Cada função recebe `db`
- * (better-sqlite3 Database) como primeiro argumento.
+ * (driver-agnostic structural SQLite port) como primeiro argumento.
  *
  * @module copilot/conversation-hub/store-memories
  * @see EventBus
@@ -16,7 +16,7 @@ import { sanitizeFtsQuery } from './store-helpers.js';
 /**
  * Persiste uma memória semântica com tag livre.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {{ tag?: string; content: string; hubSessionId?: string; metadata?: object }} opts
  * @returns {string} ID da memória criada
  */
@@ -42,7 +42,7 @@ export function storeMemory(db, opts) {
 /**
  * Recupera memórias por tag e/ou busca textual (FTS5).
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {{ tag?: string; search?: string; limit?: number; hubSessionId?: string }} [opts]
  * @returns {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]}
  */
@@ -99,11 +99,11 @@ export function recallMemories(db, opts = {}) {
 /**
  * Remove uma memória pelo id.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {string} memoryId
  * @returns {boolean} true se removida
  */
 export function deleteMemory(db, memoryId) {
     const result = db.prepare('DELETE FROM copilot_memories WHERE id = ?').run(memoryId);
-    return result.changes > 0;
+    return Number(result.changes ?? 0) > 0;
 }

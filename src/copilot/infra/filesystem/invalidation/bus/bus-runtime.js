@@ -1,6 +1,7 @@
 // @ts-check
 /** Instance-owned synchronous local coherence bus plus debounced cross-process replication. */
-import { invalidateIoPathPolicyCache, registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
+import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
+import { invalidateWorkspacePathPolicyCache } from '../../workspace/path-policy/index.js';
 import { normalizeIoInvalidationEvent } from './events.js';
 /** @typedef {import('./events.js').IoInvalidationEvent} IoInvalidationEvent */
 
@@ -18,14 +19,9 @@ export function createIoInvalidationBusRuntime(options) {
     if (!options?.l1 || !options?.l2 || !options?.crossProcess)
         throw new TypeError('createIoInvalidationBusRuntime requires l1, l2 and crossProcess runtimes.');
     const runtimeId = options.runtimeId ?? 'io-invalidation-runtime';
-    const isTestRuntime =
-        process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test' || process.env['NODE_ENV'] === 'testing';
-    const debounceMs = Math.max(
-        0,
-        Number.isFinite(options.debounceMs)
-            ? Number(options.debounceMs)
-            : Number(process.env['IO_INVALIDATION_DEBOUNCE_MS'] ?? (isTestRuntime ? 0 : 50)),
-    );
+    // Standalone factories use a deterministic environment-independent default. Application/runtime composition always
+    // supplies the captured generation config explicitly, so a late process.env mutation cannot retarget this bus.
+    const debounceMs = Math.max(0, Number.isFinite(options.debounceMs) ? Number(options.debounceMs) : 50);
     /** @type {((filePath:string,event:ReturnType<typeof normalizeIoInvalidationEvent>)=>void)[]} */ const hooks = [];
     /** @type {Map<string,ReturnType<typeof normalizeIoInvalidationEvent>>} */ const pending = new Map();
     /** @type {Map<string,{source:string;atMs:number}>} */ const recent = new Map();
@@ -59,7 +55,7 @@ export function createIoInvalidationBusRuntime(options) {
             // Best-effort durable-cache invalidation.
         }
         try {
-            invalidateIoPathPolicyCache(filePath, { recursive: event.recursive });
+            invalidateWorkspacePathPolicyCache(filePath, { recursive: event.recursive });
         } catch {
             // Process policy cache is process coordination state and remains best effort.
         }
@@ -142,6 +138,9 @@ export function createIoInvalidationBusRuntime(options) {
             hooks: hooks.length,
             pending: pending.size,
             pendingReplications: pending.size,
+            timerPending: timer !== null,
+            consumerStarted: stopConsumer !== null,
+            shutdownRegistered,
             debounceMs,
             ...stats,
             crossProcess: options.crossProcess.stats(),

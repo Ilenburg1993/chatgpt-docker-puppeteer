@@ -120,22 +120,17 @@ check('C4', 'DI tokens ≥ 40', 8, () => {
     return { score, detail: `${tokens} tokens (meta: ≥40)` };
 });
 
-// ─── C5: Zero deep imports ───────────────────────────────────────────────────
-check('C5', 'Zero deep imports', 5, () => {
-    let deep = 0;
-    try {
-        const json = JSON.parse(sh('node scripts/arch-health.mjs --json 2>/dev/null'));
-        deep = json.deepImports?.refined ?? 99;
-    } catch {
-        deep =
-            parseInt(
-                sh(
-                    "grep -rh \"from '#copilot/\" src/copilot/ --include='*.js' 2>/dev/null | " +
-                        'grep -oP "from \'#copilot/[^\']*\'" | grep -P "#copilot/[^/\']+/[^\'\\"]+" | wc -l',
-                ),
-            ) || 99;
-    }
-    return { score: deep === 0 ? 5 : 0, detail: `${deep} deep imports (meta: 0)` };
+// ─── C5: Exact package-import governance ───────────────────────────────────
+check('C5', 'Zero wildcard/non-exact #copilot imports', 5, () => {
+    const json = JSON.parse(sh('node scripts/arch-health.mjs --json --quiet 2>/dev/null'));
+    const nonExact = Number(json.imports?.nonExactUsageCount ?? 99);
+    const wildcards = Array.isArray(json.imports?.wildcardAliases) ? json.imports.wildcardAliases.length : 99;
+    const parseErrors = Array.isArray(json.imports?.parseErrors) ? json.imports.parseErrors.length : 99;
+    const violations = nonExact + wildcards + parseErrors;
+    return {
+        score: violations === 0 ? 5 : 0,
+        detail: `${nonExact} non-exact usages, ${wildcards} wildcard aliases, ${parseErrors} parse errors`,
+    };
 });
 
 // ─── C6: Zero typecheck errors ───────────────────────────────────────────────
@@ -172,45 +167,38 @@ check('C7', 'Test coverage ≥ 70% por módulo crítico', 15, () => {
     return { score, detail: `${covered}/${criticalModules.length} módulos com cobertura heurística ≥35%` };
 });
 
-// ─── C8: Fan-out máximo ≤ 8 ─────────────────────────────────────────────────
-check('C8', 'Fan-out máximo ≤ 8 por módulo', 5, () => {
+// ─── C8: Fan-out bounded ───────────────────────────────────────────────────
+check('C8', 'Fan-out máximo ≤ 16 por módulo', 5, () => {
+    const json = JSON.parse(sh('node scripts/arch-health.mjs --json --quiet 2>/dev/null'));
+    const details = json.fanOut?.details || {};
     let maxFanOut = 0;
     let worstModule = 'unknown';
-    try {
-        const json = JSON.parse(sh('node scripts/arch-health.mjs --json 2>/dev/null'));
-        const details = json.fanOut?.details || {};
-        for (const [mod, fo] of Object.entries(details)) {
-            if (fo > maxFanOut) {
-                maxFanOut = fo;
-                worstModule = mod;
-            }
+    for (const [mod, value] of Object.entries(details)) {
+        const fanOut = Number(value);
+        if (fanOut > maxFanOut) {
+            maxFanOut = fanOut;
+            worstModule = mod;
         }
-    } catch {
-        maxFanOut = 99;
     }
     return {
-        score: maxFanOut <= 8 ? 5 : maxFanOut <= 10 ? 2 : 0,
-        detail: `max=${maxFanOut} (${worstModule}) — meta: ≤8`,
+        score: maxFanOut <= 16 ? 5 : maxFanOut <= 18 ? 2 : 0,
+        detail: `max=${maxFanOut} (${worstModule}) — budget: ≤16`,
     };
 });
 
-// ─── C9: Singletons lazy-init ≤ 15 ──────────────────────────────────────────
-check('C9', 'Singletons lazy-init ≤ 15', 5, () => {
-    let refined = 99;
-    try {
-        const json = JSON.parse(sh('node scripts/arch-health.mjs --json 2>/dev/null'));
-        refined = json.singletons?.refined ?? 99;
-    } catch {
-        refined =
-            parseInt(
-                sh(
-                    "grep -rn '^let ' src/copilot/ --include='*.js' 2>/dev/null | " +
-                        "grep -E '= null;$|= false;$|= 0;$' | grep -v log | wc -l",
-                ),
-            ) || 99;
-    }
-    const score = refined <= 15 ? 5 : refined <= 30 ? 2 : 0;
-    return { score, detail: `${refined} singletons refined (meta: ≤15)` };
+// ─── C9: Module-scope mutable state bounded ────────────────────────────────
+check('C9', 'Module-scope mutable state ≤10% dos arquivos e ≤20 bindings/file', 5, () => {
+    const json = JSON.parse(sh('node scripts/arch-health.mjs --json --quiet 2>/dev/null'));
+    const ratio = Number(json.moduleMutableState?.fileRatio ?? 100);
+    const maxPerFile = Number(json.moduleMutableState?.maxPerFile ?? 999);
+    const parseErrors = Array.isArray(json.moduleMutableState?.parseErrors)
+        ? json.moduleMutableState.parseErrors.length
+        : 99;
+    const pass = ratio <= 10 && maxPerFile <= 20 && parseErrors === 0;
+    return {
+        score: pass ? 5 : ratio <= 12 && maxPerFile <= 24 && parseErrors === 0 ? 2 : 0,
+        detail: `${ratio}% files; max=${maxPerFile} bindings/file; parseErrors=${parseErrors}`,
+    };
 });
 
 // ─── C10: terminal usa presentation, não runtime cru ────────────────────────

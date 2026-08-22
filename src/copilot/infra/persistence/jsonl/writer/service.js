@@ -3,8 +3,8 @@
 import { syncParentDirectoryBestEffort } from '#copilot/infra/internal/platform/node/filesystem';
 import path from 'node:path';
 import { createJsonlBatchQueue } from '../queue/index.js';
+import { createJsonlSizeTracker } from '../size-tracker/index.js';
 import { createJsonlBatchPersistence } from './persistence.js';
-import { createJsonlSizeTracker } from './size-tracker.js';
 /** @typedef {import('./types.js').JsonlFileWriterOptions} JsonlFileWriterOptions */
 
 const DEFAULT_SIZE_REVALIDATE_MS = 250;
@@ -37,7 +37,7 @@ export function createJsonlFileWriter(options) {
         return path.resolve(value);
     }
 
-    return createJsonlBatchQueue({
+    const queue = createJsonlBatchQueue({
         persistBatch: async (data) => {
             await persistence.persist(resolveFilePath(), data);
         },
@@ -51,7 +51,14 @@ export function createJsonlFileWriter(options) {
             sizeTracker.reset();
             persistence.reset();
         },
-        getExtraState: () => ({
+    });
+    return Object.freeze({
+        enqueueLine: queue.enqueueLine,
+        flush: queue.flush,
+        clearQueue: queue.clearQueue,
+        reset: queue.reset,
+        getState: () => ({
+            ...queue.getState(),
             durability,
             ...sizeTracker.stats(),
             ...persistence.stats(),

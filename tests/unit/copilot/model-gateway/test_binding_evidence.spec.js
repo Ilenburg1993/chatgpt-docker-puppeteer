@@ -1,5 +1,7 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
+
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -152,7 +154,7 @@ describe('model gateway direct rebind evidence', () => {
             }),
         );
 
-        const store = new SqliteModelGatewayCatalogStore({ db });
+        const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
         const columns = db
             .prepare(`PRAGMA table_info(copilot_model_gateway_sdk_session_confirmations)`)
             .all()
@@ -210,7 +212,7 @@ describe('model gateway direct rebind evidence', () => {
     it('materializa e consulta evidência por par de providers e wire API sem scan JSON em memória', async () => {
         const db = new Database(':memory:');
         databases.push(db);
-        const store = new SqliteModelGatewayCatalogStore({ db });
+        const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
 
         await store.writeSdkSessionConfirmationRecords([
             {

@@ -2,7 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('node:fs/promises', () => ({
+vi.mock('node:fs/promises', async (importOriginal) => ({
+    .../** @type {Record<string, unknown>} */ (await importOriginal()),
     appendFile: vi.fn(async () => {}),
     mkdir: vi.fn(async () => {}),
     rename: vi.fn(async () => {}),

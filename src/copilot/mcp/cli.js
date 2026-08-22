@@ -9,11 +9,15 @@
  * @module copilot/mcp/cli
  */
 
-import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/platform/node';
+import {
+    enableCopilotNodeCompileCache,
+    flushCopilotNodeCompileCache,
+    readCopilotNodeCompileCacheConfig,
+} from '#copilot/infra/public/platform/node';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-enableCopilotNodeCompileCache();
+enableCopilotNodeCompileCache(readCopilotNodeCompileCacheConfig(process.env));
 
 /** @typedef {typeof import('#copilot/mcp/control-plane').logMcp} McpLogger */
 /** @type {McpLogger | null} */

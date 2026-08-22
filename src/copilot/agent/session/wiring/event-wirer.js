@@ -11,7 +11,7 @@
  */
 
 import { log } from '#copilot/agent/ports';
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import {
     wireCatchAll,
     wireCompactionEvents,

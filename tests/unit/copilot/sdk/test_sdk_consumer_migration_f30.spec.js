@@ -5,7 +5,7 @@
  *   Verifica que consumidores de submodules do SDK foram migrados para as surfaces canônicas. Cobre:
  *
  *   - F146: tools/ usa #copilot/sdk/tools para createTool
- *   - F147: bridges/ usa barrel (não sdk/events.js nem sdk/tools.js)
+ *   - F147: bridges/ usa factory local e a surface SDK Tools apenas para conversão oficial MCP → ToolResult
  *   - F148: agent/lifecycle/ usa barrel (não sdk/event-helpers)
  *   - F149: agent/session/ usa barrel (não sdk/session, sdk/tools-state, sdk/utils)
  *   - F150: observability/ usa barrel (não sdk/events.js)
@@ -41,11 +41,13 @@ describe('F146 — tools/ usa #copilot/sdk/tools para createTool', () => {
     });
 });
 
-// ─── F147: bridges/ usa barrel ─────────────────────────────────────────────
+// ─── F147: bridge usa factory local + conversão SDK oficial ─────────────────
 
-describe('F147 — bridges/ converge para a factory canônica sem bypass de SDK', () => {
-    it('mcp-tool-bridge.js não importa de #copilot/sdk/tools', () => {
-        expect(src('bridges/mcp-tool-bridge.js')).not.toContain("from '#copilot/sdk/tools'");
+describe('F147 — bridge converge para factory local e conversão SDK oficial', () => {
+    it('mcp-tool-bridge.js usa #copilot/sdk/tools somente para o conversor MCP oficial', () => {
+        expect(src('bridges/mcp-tool-bridge.js')).toMatch(
+            /import\s*\{\s*convertMcpCallToolResult\s*\}\s*from\s*'#copilot\/sdk\/tools'/,
+        );
     });
 
     it('mcp-tool-bridge.js não importa createTool de #copilot/sdk', () => {

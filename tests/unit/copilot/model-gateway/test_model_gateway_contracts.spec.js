@@ -1,4 +1,6 @@
 // @ts-check
+
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 /**
  * Unit tests for the canonical model gateway foundation.
  */
@@ -13,6 +15,22 @@ import { afterEach, describe, it } from 'vitest';
 import { catalogRequestHeader } from '../../../../src/copilot/model-gateway/catalog/importers/http-port.js';
 
 /** @typedef {import('../../../../src/copilot/model-gateway/catalog/importers/http-port.js').CatalogFetch} CatalogFetch */
+
+let configuredJsonStoreSequence = 0;
+/** @param {string} filePath */
+function createTestJsonStoreIo(filePath) {
+    configuredJsonStoreSequence += 1;
+    return createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: `test.model-gateway.json-store.${configuredJsonStoreSequence}`,
+            exactPaths: [filePath],
+            operations: ['read', 'stat', 'write'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory'],
+        }),
+    );
+}
+
 import {
     COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH,
     MODEL_GATEWAY_SCRIPT_MANIFEST,
@@ -6542,7 +6560,7 @@ describe('model-gateway foundation', () => {
                 limits: { contextWindowTokens: 131072 },
                 pricing: { inputUsdPerMillion: 0 },
             });
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
 
             await store.writeSnapshot({
                 source: 'unit-test',
@@ -6837,12 +6855,12 @@ describe('model-gateway foundation', () => {
         const future = new Database(':memory:');
         try {
             assert.equal(fresh.pragma('user_version', { simple: true }), 0);
-            new SqliteModelGatewayCatalogStore({ db: fresh });
+            new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(fresh) });
             assert.equal(fresh.pragma('user_version', { simple: true }), MODEL_GATEWAY_SQLITE_SCHEMA_VERSION);
 
             future.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION + 100}`);
             assert.throws(
-                () => new SqliteModelGatewayCatalogStore({ db: future }),
+                () => new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(future) }),
                 /database schema version .* newer than supported version/u,
             );
         } finally {
@@ -6855,7 +6873,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            new SqliteModelGatewayCatalogStore({ db });
+            new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const indexes = db
                 .prepare(
                     `
@@ -6956,7 +6974,7 @@ describe('model-gateway foundation', () => {
                 reasons: ['account_model_visible'],
                 policyInputs: { apiKey: 'sk-secret-that-must-not-leak' },
             });
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
 
             const snapshot = {
                 source: 'sqlite-unit-test',
@@ -7046,7 +7064,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const duplicateEvidenceA = createModelMetadataEvidence({
                 evidenceId: 'duplicate-evidence',
                 providerId: 'openrouter',
@@ -7360,7 +7378,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const result = await store.writeRuntimeProbeRun({
                 runId: 'direct-runtime-probe-run',
                 probeProfile: 'repo_agent',
@@ -7455,7 +7473,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const model = createModelRecord({
                 providerId: 'openrouter',
                 providerModel: 'openai/gpt-oss-120b',
@@ -7502,7 +7520,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const text = [
                 JSON.stringify({
                     ts: '2026-05-26T12:00:00.000Z',
@@ -7569,7 +7587,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             await store.writeSnapshot({
                 source: 'retention-catalog',
                 projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'model-a' })],
@@ -7862,7 +7880,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             await store.writeSnapshot({
                 source: 'separate-account-retention',
                 projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'model-a' })],
@@ -7962,8 +7980,8 @@ describe('model-gateway foundation', () => {
         const db = new Database(':memory:');
         try {
             const filePath = join(dir, 'catalog.json');
-            const jsonStore = new JsonModelGatewayCatalogStore({ filePath });
-            const sqliteStore = new SqliteModelGatewayCatalogStore({ db });
+            const jsonStore = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
+            const sqliteStore = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const projection = createCanonicalModelProjection({
                 providerId: 'openrouter',
                 providerModel: 'openai/gpt-oss-120b',
@@ -8129,7 +8147,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const projection = createCanonicalModelProjection({
                 providerId: 'openrouter',
                 providerModel: 'openai/gpt-oss-120b',
@@ -8273,7 +8291,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             recordByokProviderModelCallFailure({
                 routeProfile: 'repo_agent',
                 providerId: 'openrouter',
@@ -8323,7 +8341,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const staleRecord = {
                 key: 'default|openrouter|openai/gpt-oss-120b',
                 routeProfile: 'default',
@@ -8401,7 +8419,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             await store.writeRuntimeHealthRecords(
                 [
                     {
@@ -8456,7 +8474,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             await store.writeRuntimeHealthRecords(
                 [
                     {
@@ -8498,7 +8516,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const first = await store.writeRuntimeHealthRecords(
                 [
                     {
@@ -8539,7 +8557,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const result = await store.writeRuntimeHealthRecords(
                 [
                     {
@@ -8612,7 +8630,7 @@ describe('model-gateway foundation', () => {
         const db = new Database(':memory:');
         const secret = 'sk-sqlite-audit-secret-that-must-not-leak';
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             await store.writeRouteDecisionEvents([
                 {
                     decisionId: 'route-redacted',
@@ -8657,7 +8675,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const projection = createCanonicalModelProjection({
                 providerId: 'openrouter',
                 providerModel: 'model-streaming',
@@ -8745,7 +8763,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const controller = installByokProviderHealthSqliteMirror({
                 sqliteStore: store,
                 debounceMs: 0,
@@ -8796,7 +8814,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const store = new SqliteModelGatewayCatalogStore({ db });
+            const store = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const controller = installByokProviderHealthSqliteMirror({
                 sqliteStore: store,
                 debounceMs: 0,
@@ -8995,7 +9013,7 @@ describe('model-gateway foundation', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-importers-'));
         try {
             const filePath = join(dir, 'catalog.json');
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             const dates = [
                 new Date('2026-05-25T12:00:00.000Z'),
                 new Date('2026-05-25T12:00:01.000Z'),
@@ -9111,7 +9129,7 @@ describe('model-gateway foundation', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-catalog-identifiers-'));
         try {
             const filePath = join(dir, 'catalog.json');
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             await store.writeSnapshot({
                 source: 'test',
                 evidences: [
@@ -14046,7 +14064,7 @@ describe('model-gateway foundation', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-'));
         try {
             const filePath = join(dir, 'catalog.json');
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             await store.writeSnapshot({
                 source: 'previous',
                 evidences: [
@@ -14165,7 +14183,8 @@ describe('model-gateway foundation', () => {
     it('materializes route-level eligibility during catalog refresh when enabled', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-eligibility-'));
         try {
-            const store = new JsonModelGatewayCatalogStore({ filePath: join(dir, 'catalog.json') });
+            const filePath = join(dir, 'catalog.json');
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             await store.writeSnapshot({ sources: [], projections: [] });
             /** @type {import('../../../../src/copilot/model-gateway/catalog/refresh.js').ModelGatewayCatalogRefreshProgressEvent[]} */
             const progressEvents = [];
@@ -14337,7 +14356,7 @@ describe('model-gateway foundation', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-preview-'));
         try {
             const filePath = join(dir, 'catalog.json');
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             await store.writeSnapshot({
                 source: 'previous',
                 evidences: [
@@ -14509,7 +14528,7 @@ describe('model-gateway foundation', () => {
         try {
             const calls = { fresh: 0, stale: 0 };
             const filePath = join(dir, 'catalog.json');
-            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const store = new JsonModelGatewayCatalogStore({ filePath, io: createTestJsonStoreIo(filePath) });
             await store.writeSnapshot({
                 source: 'previous',
                 sources: [
@@ -15058,14 +15077,14 @@ describe('model-gateway foundation', () => {
                     COPILOT_BYOK_MODEL: 'openai/gpt-oss-120b:fastest',
                     HUGGING_FACE_KEY: secret,
                 },
-                { filePath },
+                { filePath, io: createTestJsonStoreIo(filePath) },
             );
 
             assert.equal(snapshot.registryPath, filePath);
             const raw = await readFile(filePath, 'utf8');
             assert.equal(raw.includes(secret), false);
 
-            const store = new JsonModelGatewayRegistryStore({ filePath });
+            const store = new JsonModelGatewayRegistryStore({ filePath, io: createTestJsonStoreIo(filePath) });
             const loaded = await store.loadRegistry();
             assert.equal(loaded.listProviders().length, 1);
             assert.ok(loaded.getModel('huggingface:openai/gpt-oss-120b:fastest'));
@@ -15149,7 +15168,7 @@ describe('model-gateway foundation', () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
         try {
-            const sqliteStore = new SqliteModelGatewayCatalogStore({ db });
+            const sqliteStore = new SqliteModelGatewayCatalogStore({ db: adaptBetterSqliteDatabase(db) });
             const controlPlane = new ModelGatewayReadControlPlane({
                 sqliteStore,
                 catalogStore: sqliteStore,

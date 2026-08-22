@@ -5,23 +5,18 @@
  * @module copilot/tools/file/write/rollback-tools
  */
 
-import {
-    createIoOperationEnvelope,
-    executeIoRollbackToken,
-    listRollbackSidecars,
-    parseIoRollbackToken,
-} from '#copilot/infra/public/operations';
+import { createIoOperationEnvelope } from '#copilot/infra/public/operations';
 import path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
-import { validatePath, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
+import { validatePath, WORKSPACE_ROLLBACK } from '../shared.js';
 import { completeAndAuditMutation, failAndAuditMutation } from './mutation-helpers.js';
 
 const MAX_ROLLBACK_TOKEN_CHARS = 32 * 1024 * 1024;
 
 /**
- * @param {ReturnType<typeof parseIoRollbackToken>} token
+ * @param {ReturnType<typeof WORKSPACE_ROLLBACK.parse>} token
  */
 function tokenPaths(token) {
     return [
@@ -40,8 +35,8 @@ export const rollbackFileChangesTool = buildTool({
     description:
         'Valida ou aplica um token de rollback retornado por uma mutação local. Dry-run é o padrão; aplicação exige confirm=true.',
     instructions:
-        'Use primeiro com dryRun=true. Aplique somente o token exato retornado pela mutação correspondente e somente ' +
-        'quando todas as precondições estiverem ready. Não edite nem reconstrua tokens manualmente.',
+        'Use primeiro com dryRun=true. O token é uma capability HMAC efêmera, vinculada ao runtime/workspace e com expiração; ' +
+        'reiniciar o processo a invalida. Aplique somente o token exato retornado pela mutação correspondente.',
     parameters: z.object({
         token: z
             .string()
@@ -64,13 +59,13 @@ export const rollbackFileChangesTool = buildTool({
 
         let token;
         try {
-            token = parseIoRollbackToken(serialized);
+            token = WORKSPACE_ROLLBACK.parse(serialized);
         } catch (error) {
             return createToolFailureResult({
                 toolName: 'rollback_file_changes',
                 error,
                 category: 'invalid-parameters',
-                fix: 'Use o token original retornado por uma file tool, sem alterações.',
+                fix: 'Use uma capability de rollback original, não expirada, emitida neste mesmo runtime/workspace.',
                 receivedParameters: { dryRun, confirm },
             });
         }
@@ -98,10 +93,9 @@ export const rollbackFileChangesTool = buildTool({
             evidence: { tool: 'rollback_file_changes', tokenId: token.tokenId, dryRun },
         });
         try {
-            const result = await executeIoRollbackToken(token, {
+            const result = await WORKSPACE_ROLLBACK.execute(token, {
                 dryRun,
                 allowedPaths,
-                sidecarDirectory: WORKSPACE_ROLLBACK_POLICY.directory,
             });
             if (!result.success) {
                 const error = Object.assign(new Error(result.error ?? 'Rollback bloqueado.'), {
@@ -157,8 +151,7 @@ export const rollbackSidecarsStatusTool = buildTool({
         verifyContent: z.boolean().optional().default(false),
     }),
     handler: async ({ maxEntries, verifyContent }) =>
-        listRollbackSidecars({
-            policy: WORKSPACE_ROLLBACK_POLICY,
+        WORKSPACE_ROLLBACK.listSidecars({
             maxEntries,
             verifyContent,
         }),

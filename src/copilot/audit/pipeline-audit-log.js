@@ -17,8 +17,9 @@ import {
     registerShutdownHandler,
     toError,
 } from '#copilot/core';
-import { createJsonlFileWriter, readJsonlTail } from '#copilot/infra/public/persistence/jsonl';
-import { join } from 'node:path';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundJsonlFileWriter, createBoundJsonlTailReader } from '#copilot/infra/public/persistence/jsonl';
+import { join, resolve } from 'node:path';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
@@ -37,7 +38,17 @@ const AUDIT_FILE = join(getLogDir(), 'audit.jsonl');
 
 /** Path do arquivo JSONL de tool calls (execuções). */
 const TOOL_AUDIT_FILE = join(getLogDir(), 'tool-execution-audit.jsonl');
+const TOOL_AUDIT_ROTATED_FILE = `${TOOL_AUDIT_FILE}.1`;
 const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
+const DEFAULT_AUDIT_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'audit.pipeline.jsonl',
+        exactPaths: [AUDIT_FILE, TOOL_AUDIT_FILE, TOOL_AUDIT_ROTATED_FILE],
+        operations: ['append', 'move', 'read', 'stat'],
+        symlinkPolicy: 'deny',
+        durability: ['none'],
+    }),
+);
 
 /**
  * @typedef {object} AuditEntry
@@ -101,30 +112,43 @@ function redactAuditEntry(entry) {
 /**
  * Cria um AuditLog com ring buffer em memória e suporte a JSONL I/O de tool calls.
  *
- * @param {{ maxEntries?: number; auditFile?: string; toolAuditFile?: string }} [opts]
+ * @param {{
+ *   maxEntries?: number;
+ *   auditFile?: string;
+ *   toolAuditFile?: string;
+ *   io?: ReturnType<typeof createConfiguredFsIo>;
+ * }} [opts]
  * @returns {AuditLog}
  */
 export function createAuditLog(opts = {}) {
     const maxEntries = opts.maxEntries ?? MAX_AUDIT_ENTRIES;
-    const auditFile = opts.auditFile ?? AUDIT_FILE;
-    const toolAuditFile = opts.toolAuditFile ?? TOOL_AUDIT_FILE;
+    const auditFile = resolve(opts.auditFile ?? AUDIT_FILE);
+    const toolAuditFile = resolve(opts.toolAuditFile ?? TOOL_AUDIT_FILE);
+    const usesDefaultPaths = auditFile === resolve(AUDIT_FILE) && toolAuditFile === resolve(TOOL_AUDIT_FILE);
+    const io = opts.io ?? (usesDefaultPaths ? DEFAULT_AUDIT_IO : null);
+    if (!io) {
+        throw new TypeError('Alternate audit JSONL paths require already-authorized IO.');
+    }
 
     /** @type {AuditEntry[]} */
     const _buffer = [];
-    const auditWriter = createJsonlFileWriter({
+    const auditWriter = createBoundJsonlFileWriter({
         filePath: auditFile,
+        io,
         autoFlush: false,
         batchLines: maxEntries,
         maxQueueLines: maxEntries,
         softQueueLines: maxEntries,
     });
-    const toolAuditWriter = createJsonlFileWriter({
+    const toolAuditWriter = createBoundJsonlFileWriter({
         filePath: toolAuditFile,
+        io,
         maxBytes: MAX_TOOL_AUDIT_BYTES,
         maxQueueLines: 10_000,
         softQueueLines: 8_000,
         onError: (error) => logSwallowed(error, 'audit.pipeline.flushToolAudit'),
     });
+    const toolAuditTail = createBoundJsonlTailReader({ filePath: toolAuditFile, io });
 
     /** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
     const _pending = new Map();
@@ -251,7 +275,7 @@ export function createAuditLog(opts = {}) {
         try {
             const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 50;
             const fetchCount = sessionId ? safeLimit * 10 : safeLimit;
-            const { records, truncatedByByteLimit, bytesRead, maxBytes } = await readJsonlTail(toolAuditFile, {
+            const { records, truncatedByByteLimit, bytesRead, maxBytes } = await toolAuditTail.readTail({
                 maxLines: fetchCount,
             });
             if (truncatedByByteLimit) {

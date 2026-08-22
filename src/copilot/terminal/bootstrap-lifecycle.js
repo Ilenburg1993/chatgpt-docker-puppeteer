@@ -9,7 +9,7 @@
  * @internal
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { runShutdown } from '../core/shutdown.js';
 import { log } from '../observability/logger.js';
 

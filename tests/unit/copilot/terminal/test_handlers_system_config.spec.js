@@ -121,24 +121,24 @@ vi.mock('#copilot/agent/facades', () => ({
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     setRuntimeBackgroundCompactionThreshold: vi.fn(),
 }));
-vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
+vi.mock('#copilot/testing/bridges/mcp-tool-bridge', () => ({
     getMcpStatus: () => ({ available: false, toolCount: 0, circuitOpen: false }),
 }));
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         LLM_B_TERMINAL_PORT: 3009,
     };
 });
-vi.mock('#copilot/conversation-hub/hub', () => ({
+vi.mock('#copilot/conversation-hub', () => ({
     conversationHub: { isReady: false },
 
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
 }));
-vi.mock('#copilot/conversation-hub/store', () => ({
+vi.mock('#copilot/testing/conversation-hub/store', () => ({
     conversationStore: { countHubSessions: () => 0 },
 }));
 vi.mock('#copilot/observability/metrics', () => ({

@@ -1,3 +1,4 @@
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +11,7 @@ function createDb() {
 describe('createIoL2SqliteCache', () => {
     it('stores and retrieves a bytes payload', () => {
         const db = createDb();
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 60_000 });
 
         const ok = cache.set({
             key: 'k1',
@@ -28,7 +29,7 @@ describe('createIoL2SqliteCache', () => {
 
     it('preserva metaJson para fingerprints ricos', () => {
         const db = createDb();
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 60_000 });
 
         cache.set({
             key: 'k-meta',
@@ -46,7 +47,7 @@ describe('createIoL2SqliteCache', () => {
     it('expires entries by ttl', () => {
         const db = createDb();
         let nowMs = 1000;
-        const cache = createIoL2SqliteCache({ db, ttlMs: 100, now: () => nowMs });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 100, now: () => nowMs });
 
         cache.set({ key: 'k1', path: '/tmp/a.txt', payload: 'x' });
         expect(cache.get('k1')).toBeTruthy();
@@ -57,7 +58,7 @@ describe('createIoL2SqliteCache', () => {
 
     it('invalidates by path prefix', () => {
         const db = createDb();
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 60_000 });
 
         cache.set({ key: 'a', path: '/repo/src/a.ts', payload: 'A' });
         cache.set({ key: 'b', path: '/repo/src/b.ts', payload: 'B' });
@@ -73,7 +74,12 @@ describe('createIoL2SqliteCache', () => {
     it('evicts oldest when maxEntries is exceeded', () => {
         const db = createDb();
         let nowMs = 1000;
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000, maxEntries: 2, now: () => nowMs });
+        const cache = createIoL2SqliteCache({
+            db: adaptBetterSqliteDatabase(db),
+            ttlMs: 60_000,
+            maxEntries: 2,
+            now: () => nowMs,
+        });
 
         cache.set({ key: 'a', path: '/tmp/a', payload: 'a' });
         nowMs += 1;
@@ -88,7 +94,7 @@ describe('createIoL2SqliteCache', () => {
 
     it('exposes bounded latency metrics per synchronous operation', () => {
         const db = createDb();
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 60_000 });
 
         cache.set({ key: 'a', path: '/tmp/a', payload: 'a' });
         cache.get('a');
@@ -109,7 +115,7 @@ describe('createIoL2SqliteCache', () => {
         const db = createDb();
         let nowMs = 1_000;
         const cache = createIoL2SqliteCache({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             ttlMs: 60_000,
             touchIntervalMs: 10_000,
             now: () => nowMs,
@@ -142,7 +148,7 @@ describe('createIoL2SqliteCache', () => {
 
     it('skips payloads below the configured admission threshold', () => {
         const db = createDb();
-        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000, minBytes: 4 });
+        const cache = createIoL2SqliteCache({ db: adaptBetterSqliteDatabase(db), ttlMs: 60_000, minBytes: 4 });
 
         expect(cache.set({ key: 'small', path: '/tmp/small', payload: 'abc' })).toBe(false);
         expect(cache.set({ key: 'large', path: '/tmp/large', payload: 'abcd' })).toBe(true);
@@ -160,7 +166,7 @@ describe('createIoL2SqliteCache', () => {
     it('batches pending sets while preserving immediate reads and explicit flush', () => {
         const db = createDb();
         const cache = createIoL2SqliteCache({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             ttlMs: 60_000,
             setBatchWindowMs: 10_000,
             setBatchMaxEntries: 100,
@@ -201,7 +207,7 @@ describe('createIoL2SqliteCache', () => {
             });
         };
         const cache = createIoL2SqliteCache({
-            db,
+            db: adaptBetterSqliteDatabase(db),
             ttlMs: 60_000,
             setBatchWindowMs: 10_000,
         });

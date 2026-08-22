@@ -66,14 +66,14 @@ echo -e "${GREEN}  ✓ Estrutura de diretórios OK${NC}"
 # =============================================================================
 echo -e "${BLUE}[2/5]${NC} Limpeza: Verificando processos órfãos..."
 
-if "${PM2_CMD[@]}" list 2>/dev/null | grep -q "agente-gpt\|dashboard-web\|chrome-proxy"; then
+if "${PM2_CMD[@]}" list 2> /dev/null | grep -q "agente-gpt\|dashboard-web\|chrome-proxy"; then
     echo -e "${YELLOW}  ⚠ Processos PM2 já rodando${NC}"
     read -p "  Deseja parar e reiniciar? [y/N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "  → Parando processos..."
-        "${PM2_CMD[@]}" stop agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
-        "${PM2_CMD[@]}" delete agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
+        "${PM2_CMD[@]}" stop agente-gpt dashboard-web chrome-proxy 2> /dev/null || true
+        "${PM2_CMD[@]}" delete agente-gpt dashboard-web chrome-proxy 2> /dev/null || true
         echo -e "${GREEN}  ✓ Processos limpos${NC}"
     else
         echo -e "${YELLOW}  ⚠ Processos mantidos (pode causar conflitos)${NC}"

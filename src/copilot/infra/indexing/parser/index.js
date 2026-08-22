@@ -14,7 +14,11 @@ export {
 } from '#copilot/infra/internal/code-analysis';
 export { parseAndCacheSymbols } from './cache/index.js';
 export { parseFileForContext, windowFileContext } from './context/index.js';
-export { resolveParserWorkerPoolPolicy, resolveParserWorkerQueuePolicy } from './foundation/index.js';
+export {
+    readParserProcessConfig,
+    resolveParserWorkerPoolPolicy,
+    resolveParserWorkerQueuePolicy,
+} from './foundation/index.js';
 export { getParserCacheStats } from './health/index.js';
 export { parseFileSymbols } from './parse/index.js';
 export { createParserWorkerRuntime } from './worker/index.js';

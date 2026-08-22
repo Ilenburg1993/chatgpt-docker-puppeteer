@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     SqliteModelGatewayCatalogStore,
     flushAndMirrorByokProviderHealthToSqlite,
 } from '../../../src/copilot/model-gateway/index.js';
+import '../bootstrap-sqlite.mjs';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -18,13 +18,6 @@ This does not fetch providers, execute models, run probes or mutate canonical ca
 }
 
 const json = argSet.has('--json');
-if (json) {
-    setDbLogger((level, msg) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${msg}\n`);
-        }
-    });
-}
 const sqliteStore = new SqliteModelGatewayCatalogStore();
 const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
 const diagnostics = await sqliteStore.readStorageDiagnostics();

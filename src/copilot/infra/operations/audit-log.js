@@ -8,7 +8,7 @@
  * @module copilot/infra/operations/audit-log
  */
 
-import { toError } from '#copilot/core';
+import { toError } from '#copilot/core/error-handlers';
 import { createJsonlFileWriter } from '#copilot/infra/internal/persistence/jsonl';
 
 const IO_MUTATION_AUDIT_SCHEMA_VERSION = 1;

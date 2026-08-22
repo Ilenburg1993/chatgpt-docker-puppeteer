@@ -23,9 +23,9 @@ echo ""
 
 # 2. Check Port 5173
 echo "2️⃣ Checking Port 5173..."
-if netstat -tln 2>/dev/null | grep ":5173" > /dev/null || ss -tln 2>/dev/null | grep ":5173" > /dev/null; then
+if netstat -tln 2> /dev/null | grep ":5173" > /dev/null || ss -tln 2> /dev/null | grep ":5173" > /dev/null; then
     echo "   ✅ Port 5173 is LISTENING"
-    netstat -tln 2>/dev/null | grep ":5173" || ss -tln 2>/dev/null | grep ":5173"
+    netstat -tln 2> /dev/null | grep ":5173" || ss -tln 2> /dev/null | grep ":5173"
 else
     echo "   ❌ Port 5173 is NOT listening"
     exit 1
@@ -34,7 +34,7 @@ echo ""
 
 # 3. Test HTTP Response
 echo "3️⃣ Testing HTTP Response..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5173/dashboard/ 2> /dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then
     echo "   ✅ HTTP Response: 200 OK"
     curl -s http://127.0.0.1:5173/dashboard/ | grep -o "<title>.*</title>" || echo "   HTML loaded successfully"

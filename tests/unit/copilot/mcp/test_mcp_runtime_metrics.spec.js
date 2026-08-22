@@ -14,8 +14,8 @@ import {
     resetMcpMetricsForTests,
     resetMcpWorkspaceSmokeSummaryForTests,
 } from '#copilot/mcp/control-plane';
-import { resetMcpStartupMaintenanceForTests } from '#copilot/mcp/control-plane/startup-maintenance.js';
 import { mcpRuntimeHealthTool } from '#copilot/mcp/tools';
+import { resetMcpStartupMaintenanceForTests } from '#copilot/testing/mcp/runtime/startup-maintenance';
 
 describe('copilot MCP runtime metrics', () => {
     beforeEach(() => {
@@ -154,8 +154,12 @@ describe('copilot MCP runtime metrics', () => {
              *     ioCache?: {
              *         l1?: Record<string, unknown>;
              *         coherence?: Record<string, unknown>;
-             *         validatedReadPath?: Record<string, unknown>;
-             *         validatedMutablePath?: Record<string, unknown>;
+             *     };
+             *     ioProcess?: {
+             *         ownership?: { expected?: boolean; complete?: boolean };
+             *         authority?: { mutable?: Record<string, unknown> } | null;
+             *         lockTimeouts?: number;
+             *         alertCount?: number;
              *     };
              *     ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
              *     ioParser?: {
@@ -170,7 +174,10 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
         assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');
-        assert.equal(typeof metrics.ioCache?.validatedMutablePath?.['accepted'], 'number');
+        assert.equal(metrics.ioProcess?.ownership?.expected, true);
+        assert.equal(metrics.ioProcess?.ownership?.complete, true);
+        assert.equal(typeof metrics.ioProcess?.authority?.mutable?.['accepted'], 'number');
+        assert.equal(typeof metrics.ioProcess?.lockTimeouts, 'number');
         assert.ok(metrics.ioCachePlan);
         assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
         assert.equal(typeof metrics.ioCachePlan?.recommendationCount, 'number');

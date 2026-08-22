@@ -33,7 +33,7 @@ vi.mock('#copilot/boot', async (importOriginal) => {
 });
 
 vi.mock(
-    '#copilot/config/env',
+    '#copilot/testing/config/env',
     () =>
         new Proxy(
             {

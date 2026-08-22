@@ -16,7 +16,7 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-vi.mock('#copilot/audit/pipeline', () => ({
+vi.mock('#copilot/testing/audit/pipeline', () => ({
     defaultAuditLog: {
         record: vi.fn(),
         getEntries: vi.fn(() => []),
@@ -24,7 +24,7 @@ vi.mock('#copilot/audit/pipeline', () => ({
     },
 }));
 
-vi.mock('#copilot/config/env', async (importOriginal) => {
+vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return new Proxy(
         {

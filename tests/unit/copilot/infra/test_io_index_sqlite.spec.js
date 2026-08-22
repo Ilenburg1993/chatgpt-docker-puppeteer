@@ -1,5 +1,6 @@
 // @ts-check
 
+import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import Database from 'better-sqlite3';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -9,16 +10,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
 import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
-import { ensureIoIndexSchema, IO_INDEX_SCHEMA_VERSION } from '../../../../src/copilot/db/io-index-schema.js';
+import { ensureIoIndexSchema, IO_INDEX_SCHEMA_VERSION } from '#copilot/infra/internal/indexing/registry/sqlite/schema';
 import {
     buildIndexPathTreeRange,
     createIoIndexSqlite,
 } from '../../../../src/copilot/infra/indexing/registry/sqlite/index.js';
 
-/** @param {Parameters<typeof createIoIndexSqlite>[0]} options */
+/** @param {Omit<Parameters<typeof createIoIndexSqlite>[0], 'db'> & {db: import('better-sqlite3').Database}} options */
 function createPreparedIoIndex(options) {
-    ensureIoIndexSchema(options.db);
-    return createIoIndexSqlite(options);
+    const db = adaptBetterSqliteDatabase(options.db);
+    ensureIoIndexSchema(db);
+    return createIoIndexSqlite({ ...options, db });
 }
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
@@ -203,7 +205,7 @@ describe('createIoIndexSqlite', () => {
         ).join('\n');
         createLegacyIoIndex(db, content);
 
-        expect(ensureIoIndexSchema(db)).toBe(IO_INDEX_SCHEMA_VERSION);
+        expect(ensureIoIndexSchema(adaptBetterSqliteDatabase(db))).toBe(IO_INDEX_SCHEMA_VERSION);
 
         const chunks = db
             .prepare(
@@ -250,7 +252,7 @@ describe('createIoIndexSqlite', () => {
             END;
         `);
 
-        expect(() => ensureIoIndexSchema(db)).toThrow(/forced migration failure/u);
+        expect(() => ensureIoIndexSchema(adaptBetterSqliteDatabase(db))).toThrow(/forced migration failure/u);
 
         expect(
             db
