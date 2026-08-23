@@ -1969,9 +1969,10 @@ architecture sem workload.
 
 **Gate da Faixa M — FECHADO; REVALIDADO em 2026-08-23**
 
-A arquitetura 2.1 satisfaz o Definition of Done técnico. O único trabalho remanescente deste ciclo é
-puramente de publicação: registrar este snapshot validado em commits coerentes, enviar `main` ao
-upstream e provar `HEAD == origin/main` com working tree limpa.
+A arquitetura 2.1 satisfaz integralmente o Definition of Done técnico e o gate de publicação foi
+executado: commits coerentes foram enviados a `main`, `HEAD == origin/main == ls-remote` foi provado
+com divergência `0:0` e working tree limpa. O smoke MCP executado já sobre o snapshot publicado
+retornou `status=ok`, 13/13 checks, zero warnings e zero critical findings.
 
 ---
 

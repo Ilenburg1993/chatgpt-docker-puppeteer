@@ -1676,6 +1676,9 @@ horizontal.
 - **História preservada:** documentos 1.0/2.0/2.1 e o diagnóstico pré-execução deste arquivo
   permanecem como ledger; nenhuma compat layer, shim ou substituto `shared/common/foundation/core2`
   foi criado para simular a extinção.
+- **Publicação:** o snapshot validado foi publicado em `main`; a prova pós-push confirmou
+  `HEAD == origin/main == ls-remote`, divergência `0:0`, working tree limpa e MCP workspace smoke
+  `status=ok` com 13/13 checks, sem warnings ou critical findings.
 
 ---
 
