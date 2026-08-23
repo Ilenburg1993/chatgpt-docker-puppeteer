@@ -1882,7 +1882,7 @@ architecture sem workload.
 
 ---
 
-## Faixa M — fechamento da 2.1 — FECHADA em 2026-08-22
+## Faixa M — fechamento da 2.1 — FECHADA; REVALIDADA em 2026-08-23
 
 ### M.1 — targeted validation discipline — FECHADO
 
@@ -1920,33 +1920,42 @@ architecture sem workload.
 - [x] Model Gateway/LLM-B readiness verde com SQLite observability e redaction audit;
 - [x] roadmap 2.1 atualizado com evidência final.
 
-### M.3 — evidência final consolidada — FECHADO
+### M.3 — evidência final consolidada — REVALIDADO em 2026-08-23
 
 - [x] **TS7 strict global:** `npm run -s typecheck:strict` → exit 0 no snapshot final de código.
 - [x] **Lint:** `npm run -s lint:copilot` → exit 0.
 - [x] **Format:** `npm run -s format:check` → `All matched files use Prettier code style!`.
 - [x] **Architecture:** `npm run -s copilot:architecture:check` → verde, incluindo package imports,
       authority/signatures, static cost, mutable-state, cold baseline e API reference.
-- [x] **Package-map:** 228 aliases Copilot, 45 testing aliases e 17 SDK surfaces; zero
+- [x] **Package-map:** 234 aliases Copilot, 45 testing aliases e 16 SDK surfaces; zero
       broken/wildcard, testing leak, stale alias ou divergência
       `SDK_ALIAS_LAYOUT ↔ imports ↔ exports`.
-- [x] **Dependency graph:** 2.019 source files / 5.604 edges / **0 cycles / 0 unresolved / 0 parse
-      errors** após mover MCP startup maintenance para seu owner de runtime.
+- [x] **Dependency graph:** 2.031 source files / 5.654 edges / **0 cycles / 0 unresolved / 0 parse
+      errors** no snapshot final pós-extinção de Core e hardening da network membrane.
 - [x] **Suppressions/authority I/O:** 0 TS suppressions; configured-FS governance verde; zero
       trusted-I/O proibido.
-- [x] **Unit suite final:** `7.222 total / 7.194 passed / 0 failed / 28 pending`, `2.199/2.199`
-      suites verdes, artifact `artifacts/test-runs/copilot/2026-08-22T22-46-38-246Z/summary.md`. O
-      WARN do detached LLM-B reaper é uma falha sintética deliberada do próprio teste e não uma
-      assertion failure.
-- [x] **Performance final isolada:** 32 public hot aliases × 5 amostras (+1 warmup), `success=true`,
-      zero violações de import time, wall time ou RSS; baseline não foi relaxada para obter o verde.
+- [x] **Unit suite final:** `7.061 total / 7.033 passed / 0 failed / 28 pending`, `2.170/2.170`
+      suites verdes, artifact `artifacts/test-runs/copilot/2026-08-23T04-16-11-466Z/summary.md`. Os
+      três WARNs do detached LLM-B reaper são uma falha sintética deliberada do próprio teste e não
+      assertion failures.
+- [x] **Integration/regression:** integration Copilot `17 total / 12 passed / 0 failed / 5 pending`
+      (`artifacts/test-runs/copilot/2026-08-23T04-20-19-189Z/summary.md`) e regression Copilot
+      `31/31` (`artifacts/test-runs/copilot/2026-08-23T04-20-22-455Z/summary.md`).
+- [x] **Performance final isolada:** 38 public hot aliases × 5 amostras (+1 warmup), `success=true`,
+      zero violações de import time, wall time ou RSS; baseline cold não foi relaxada para obter o
+      verde.
+- [x] **Network membrane hardening:** `#copilot/infra/public/platform/network` é fail-closed por
+      construção e não exporta resolver injection/private-network bypass. O seam white-box permanece
+      interno; `WEBHOOK_ALLOW_PRIVATE_HOSTS` foi removido por ser authority órfã. Closure estática
+      final **10 módulos / 21.838 bytes**, ratchet **15 / 32.757**; performance final **22,140 ms
+      import / 77,559 ms wall / 62,047 MiB RSS**.
 - [x] **Workspace MCP smoke:** 13/13 checks operacionais verdes; status `degraded` apenas enquanto o
       Git estava deliberadamente dirty antes do commit, sem critical findings.
 - [x] **Connector smoke refresh:** MCP protocol `2025-11-25`, OAuth metadata/challenge verdes,
       runtime health 200, **131/131 tools**, SSE inicial/reconnect/Last-Event-ID verdes.
-- [x] **Cloudflare post-change gates:** `ok=true`, 4 HA connections, QUIC presente, RTT 28 ms e
-      smoke fresh. `requestErrorRate` agregado permaneceu histórico e p95 RPC antigo em 3510 ms
-      ficou como warning observacional, não como blocker atual.
+- [x] **Cloudflare post-change gates:** `ok=true`, 4 HA connections, QUIC presente, RTT 20 ms e
+      smoke fresh. `requestErrorRate=0,244027` permaneceu histórico e RPC p95 ficou em 1.170 ms;
+      ambos são evidência observacional, sem blocker atual.
 - [x] **Incidente transitório observado e preservado:** após o refresh houve janela de 502 do
       conector; post-restart diagnostics registraram TLS handshake timeouts no origin entre
       aproximadamente 23:00–23:01 UTC. O serviço recuperou sem mudança de código: MCP HTTP e
@@ -1955,9 +1964,10 @@ architecture sem workload.
       futura.
 - [x] **LLM-B readiness:** `ok=true`; catalog integrity e SQLite parity verdes; redaction
       `catalogLeaks=0/sqliteLeaks=0`; 7/7 perfis selecionáveis; runtime selector 7/7 e terminal live
-      selector 3/3 prontos, sem blockers de acesso/ambiente.
+      selector 3/3 prontos; SQLite observability com `runtimeRows=324632`,
+      `healthObservations=177541`, `probeResults=143527`, sem blockers de acesso/ambiente.
 
-**Gate da Faixa M — FECHADO em 2026-08-22**
+**Gate da Faixa M — FECHADO; REVALIDADO em 2026-08-23**
 
 A arquitetura 2.1 satisfaz o Definition of Done técnico. O único trabalho remanescente deste ciclo é
 puramente de publicação: registrar este snapshot validado em commits coerentes, enviar `main` ao

@@ -183,6 +183,11 @@ Primitives sem semântica de domínio:
 Deve permanecer na base do grafo e evitar dependência de cache, indexing ou filesystem de alto
 nível.
 
+A projeção runtime de `platform/network` é **fail-closed por construção**: ela não exporta resolver
+DNS injetável, `allowPrivate`, localhost/private-network bypass nem configuração equivalente. O
+resolver injetável existe somente no owner interno para testes white-box da policy connection-bound;
+consumidores de produção recebem apenas a façade pública segura.
+
 ### 4.2 `concurrency/`
 
 - `bulk/`: execução bounded em lote;
