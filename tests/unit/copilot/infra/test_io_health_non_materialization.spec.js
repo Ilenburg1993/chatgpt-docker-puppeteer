@@ -63,7 +63,6 @@ function captureMaterializationState(processInfra, runtime, workspace) {
             pending: invalidation.pending,
             timerPending: invalidation.timerPending,
             consumerStarted: invalidation.consumerStarted,
-            shutdownRegistered: invalidation.shutdownRegistered,
             crossProcessPolling: invalidation.crossProcess['polling'],
         }),
         workspace: Object.freeze({

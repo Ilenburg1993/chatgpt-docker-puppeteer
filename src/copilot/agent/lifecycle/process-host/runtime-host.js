@@ -13,7 +13,12 @@
  * @module copilot/agent/lifecycle/process-host/runtime-host
  */
 
-import { SHUTDOWN_PRIORITY, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
+import {
+    PROCESS_SHUTDOWN_PHASE,
+    registerApplicationShutdownHandler,
+    runApplicationShutdown,
+} from '#copilot/boot/process-runtime';
+import { toError } from '#copilot/infra/public/platform/error';
 import { readRuntimeControlState } from '../../facades/agent-runtime-controls.js';
 
 /** @type {boolean} */
@@ -53,7 +58,7 @@ export function discoverRuntimePlugins({ pluginsDir, registry, log }) {
  * @returns {(signal?: string) => Promise<never>}
  */
 export function registerRuntimeShutdownHost({ agent, drainStateWrites, drainTimeoutMs, log }) {
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'agent.stop',
         async () => {
             try {
@@ -63,20 +68,20 @@ export function registerRuntimeShutdownHost({ agent, drainStateWrites, drainTime
                 log('WARN', `[copilot/runtime-host] Erro no shutdown do agente: ${toError(e).message}`);
             }
         },
-        SHUTDOWN_PRIORITY.COMPAT_RUNTIME_HOST,
+        PROCESS_SHUTDOWN_PHASE.HOST_EARLY,
     );
 
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'state.drain',
         async () => {
             await drainStateWrites(drainTimeoutMs);
         },
-        SHUTDOWN_PRIORITY.RUNTIME_STATE_DRAIN,
+        PROCESS_SHUTDOWN_PHASE.STATE_DRAIN,
     );
 
     return async function shutdown(signal = 'SIGTERM') {
         log('INFO', `[copilot/runtime-host] Sinal ${signal} recebido — encerrando graciosamente...`);
-        await runShutdown(signal);
+        await runApplicationShutdown(signal);
         process.exit(0);
     };
 }
@@ -154,7 +159,7 @@ export function registerRuntimeAgentEventHost({ agent, events, log }) {
     agent.on(events.sessionFatal, (/** @type {Record<string, unknown>} */ evt) => {
         const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
         log('ERROR', `[copilot/runtime-host] session.fatal recebido — encerrando processo: ${reason}`);
-        void runShutdown('session.fatal').finally(() => {
+        void runApplicationShutdown('session.fatal').finally(() => {
             process.exitCode = 1;
             process.exit(1);
         });

@@ -10,6 +10,7 @@
  * @module copilot/agent/always-alive-singleton
  */
 
+import { getApplicationEventBus } from '#copilot/boot/application-events';
 import { AlwaysAliveAgent } from './always-alive.js';
 import { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge/index.js';
 import { registerAgentRuntime, unregisterAgentRuntime } from './runtime/registry/index.js';
@@ -41,7 +42,7 @@ export function resetAgent() {
  */
 export function getAgent() {
     if (!_alwaysAliveAgent) {
-        _alwaysAliveAgent = new AlwaysAliveAgent();
+        _alwaysAliveAgent = new AlwaysAliveAgent({ eventBus: getApplicationEventBus() });
     }
     registerAgentRuntime(_alwaysAliveAgent, 'default', { agentProfileId: 'always-alive' });
     ensureAgentEventBusBridge(_alwaysAliveAgent, {

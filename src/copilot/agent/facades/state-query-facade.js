@@ -6,9 +6,8 @@
  *   Extração de 14 getters do AlwaysAliveAgent para reduzir complexidade.
  */
 
-import { container } from '#copilot/core';
 import {
-    METRICS_STORE,
+    defaultMetrics,
     readRuntimeControlState,
     readRuntimeInteractionState,
     readRuntimeToolRegistry,
@@ -78,7 +77,7 @@ export class StateQueryFacade {
      * @returns {object}
      */
     get telemetry() {
-        return container.resolve(METRICS_STORE).getSummary();
+        return defaultMetrics.getSummary();
     }
 
     /**

@@ -7,7 +7,7 @@
  *   `presentation/` resolva runtime e delegue intenção, sem precisar conhecer nomes crus da sessão SDK.
  */
 
-import { SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import { modeGet, modeSet, planDelete, planRead, planUpdate } from '#copilot/sdk/rpc';
 
 /**
@@ -22,7 +22,7 @@ import { modeGet, modeSet, planDelete, planRead, planUpdate } from '#copilot/sdk
 function requireSession(ctx, caller) {
     const session = typeof ctx.getSessionSnapshot === 'function' ? ctx.getSessionSnapshot() : null;
     if (!session) {
-        throw new SessionError(`[agent-sdk-session] sessão indisponível: ${caller}`, 'SDK_SESSION_UNAVAILABLE');
+        throw new AgentSessionError(`[agent-sdk-session] sessão indisponível: ${caller}`, 'SDK_SESSION_UNAVAILABLE');
     }
     return session;
 }
@@ -35,7 +35,7 @@ function requireSession(ctx, caller) {
 function requireAgentMethod(agent, method) {
     const fn = agent && typeof agent === 'object' ? Reflect.get(agent, method) : null;
     if (typeof fn !== 'function') {
-        throw new SessionError(`[agent-sdk-session] método indisponível: ${method}`, 'SDK_SESSION_UNAVAILABLE');
+        throw new AgentSessionError(`[agent-sdk-session] método indisponível: ${method}`, 'SDK_SESSION_UNAVAILABLE');
     }
     return fn.bind(agent);
 }

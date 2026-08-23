@@ -1,7 +1,7 @@
 // @ts-check
 /** Derived-index acceleration/fallback decision for completeness-oriented text search. */
 
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { publishIoOperationResult } from '#copilot/infra/internal/telemetry';
 import {
     canUseIndexSearch,

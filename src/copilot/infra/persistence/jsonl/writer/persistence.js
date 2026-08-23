@@ -3,7 +3,7 @@
 import { withIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';
 import { appendFileUnlocked } from '#copilot/infra/internal/filesystem/write';
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { assertSuccessfulSync } from '#copilot/infra/internal/platform/node/filesystem';
 import { markMutationAppliedError } from '#copilot/infra/internal/policy';
 import { rename } from 'node:fs/promises';

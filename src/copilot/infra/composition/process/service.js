@@ -1,7 +1,6 @@
 // @ts-check
 /** @module copilot/infra/composition/process/service */
 
-import { activateCoreProcessPolicy } from '#copilot/core/process-policy';
 import { activateWorkspacePathPolicyCacheConfig } from '#copilot/infra/internal/filesystem/workspace';
 import { activateProcessBudgetConfig } from '#copilot/infra/internal/policy';
 import { createProcessLockRuntime } from '../../concurrency/locks/process/index.js';
@@ -10,6 +9,8 @@ import { activateCopilotNodeCompileCacheProcessOwner } from '../../platform/node
 import { createInfraLifecycle } from '../lifecycle/index.js';
 import { createInfraRuntime } from '../runtime/index.js';
 import { readProcessInfraConfig } from './config/index.js';
+import { createProcessScheduler } from './scheduler/index.js';
+import { createProcessShutdownController } from './shutdown/index.js';
 
 let processSequence = 0;
 
@@ -19,12 +20,12 @@ export function createProcessInfra(options = {}) {
     const config = options.config ?? readProcessInfraConfig(options.env ?? process.env);
     const lifecycle = createInfraLifecycle(`ProcessInfra(${processId})`);
     const processLocks = createProcessLockRuntime({ processId, config: config.locks });
+    const scheduler = createProcessScheduler({ processId });
+    const shutdown = createProcessShutdownController({ processId });
     const processPolicyToken = Object.freeze({ processId });
     const processPoliciesActivated = options.activateProcessPolicies === true;
     /** @type {(() => void) | null} */
     let deactivateCompileCache = null;
-    /** @type {(() => void) | null} */
-    let deactivateCorePolicy = null;
     /** @type {(() => void) | null} */
     let deactivatePathPolicy = null;
     /** @type {(() => void) | null} */
@@ -38,11 +39,6 @@ export function createProcessInfra(options = {}) {
                 token: processPolicyToken,
                 processId,
                 config: config.compileCache,
-            });
-            deactivateCorePolicy = activateCoreProcessPolicy({
-                token: processPolicyToken,
-                processId,
-                config: config.core,
             });
             deactivatePathPolicy = activateWorkspacePathPolicyCacheConfig({
                 token: processPolicyToken,
@@ -66,8 +62,6 @@ export function createProcessInfra(options = {}) {
             deactivateBudgetPolicy = null;
             deactivatePathPolicy?.();
             deactivatePathPolicy = null;
-            deactivateCorePolicy?.();
-            deactivateCorePolicy = null;
             deactivateCompileCache?.();
             deactivateCompileCache = null;
             processLocks.dispose();
@@ -83,6 +77,8 @@ export function createProcessInfra(options = {}) {
     return Object.freeze({
         processId,
         config,
+        scheduler,
+        shutdown,
         /** @param {Omit<NonNullable<Parameters<typeof createInfraRuntime>[0]>, 'env' | 'processConfig' | 'runtimeConfig'>} [runtimeOptions] */
         createRuntime(runtimeOptions = {}) {
             if (lifecycle.state !== 'active') throw new Error(`ProcessInfra(${processId}) is ${lifecycle.state}.`);
@@ -132,6 +128,8 @@ export function createProcessInfra(options = {}) {
                 runtimes: runtimes.size,
                 runtimeIds: Object.freeze([...runtimes.keys()]),
                 locks: processLocks.snapshot(),
+                scheduler: scheduler.snapshot(),
+                shutdown: shutdown.snapshot(),
             });
         },
         dispose() {
@@ -164,12 +162,6 @@ export function createProcessInfra(options = {}) {
                     failures.push(error);
                 }
                 try {
-                    deactivateCorePolicy?.();
-                    deactivateCorePolicy = null;
-                } catch (error) {
-                    failures.push(error);
-                }
-                try {
                     deactivateCompileCache?.();
                     deactivateCompileCache = null;
                 } catch (error) {
@@ -177,6 +169,16 @@ export function createProcessInfra(options = {}) {
                 }
                 try {
                     processLocks.dispose();
+                } catch (error) {
+                    failures.push(error);
+                }
+                try {
+                    scheduler.dispose();
+                } catch (error) {
+                    failures.push(error);
+                }
+                try {
+                    shutdown.dispose();
                 } catch (error) {
                     failures.push(error);
                 }

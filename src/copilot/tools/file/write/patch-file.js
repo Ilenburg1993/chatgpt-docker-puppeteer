@@ -5,8 +5,8 @@
  * @module copilot/tools/file/write/patch-file
  */
 
-import { withIoMeta } from '#copilot/core/io-contracts';
 import { createIoOperationEnvelope } from '#copilot/infra/public/operations';
+import { withIoMeta } from '#copilot/infra/public/operations/contracts';
 import { IO_CAPABILITY, IO_RISK, riskForDryRun } from '#copilot/infra/public/policy';
 import { z } from 'zod';
 import { log } from '../../infra/logger.js';

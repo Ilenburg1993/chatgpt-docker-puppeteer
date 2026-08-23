@@ -17,12 +17,14 @@
 import { readBootSkillConfig, resolveHooksStateFile, resolveWorkspacePath } from '#copilot/boot';
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
-import { container, logSwallowed, safeJsonParse, toError } from '#copilot/core';
 import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
 import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
 import { z } from 'zod';
 import { log } from '../../ports/logging/index.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import { readAgentTodoStore } from '../../ports/tool-port.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -123,7 +125,7 @@ export async function buildHookSystemContext() {
     try {
         const raw = (await hookContextWorkspaceIo.readTextFresh(SESSION_JSON_FILE, { includeHash: false })).content;
         // F5.1 (ARCH-01): valida session.json com schema Zod para detectar corrupcao precocemente
-        const jsonResult = safeJsonParse(raw, '[hook-context/session.json]');
+        const jsonResult = parseJsonResult(raw, '[hook-context/session.json]');
         if (!jsonResult.ok) {
             log('WARN', `[hook-context] session.json corrompido (JSON inválido)`);
         }
@@ -193,7 +195,7 @@ export async function buildHookSystemContext() {
 
     // F5.2: estado runtime do agente SDK (in-memory, sem I/O de arquivo)
     try {
-        const summary = container.resolve(METRICS_STORE).getSummary();
+        const summary = defaultMetrics.getSummary();
         const uptimeSecs = Math.round(process.uptime());
         const sdkTurnsTotal = Number(summary.sdkDialog?.turnsTotal ?? summary.dialog?.turnsTotal ?? 0);
         const inputTokens = Number(summary.tokens?.inputTokens ?? 0);

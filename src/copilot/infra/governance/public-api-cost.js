@@ -9,6 +9,7 @@
  * @module copilot/infra/governance/public-api-cost
  */
 
+import { parse } from '@babel/parser';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,8 +18,6 @@ const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const PACKAGE_JSON_PATH = join(REPO_ROOT, 'package.json');
 const PACKAGE_IMPORTS = Object.freeze(JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf8')).imports ?? {});
 const MODULE_CANDIDATES = Object.freeze(['.js', '.mjs', '.cjs', '.json']);
-const STATIC_MODULE_SPECIFIER_PATTERN =
-    /(?:^|\n)\s*(?:import\s+(?:[^'"\n;]*?\s+from\s+)?|export\s+(?:\*|\{[^}]*\})\s+from\s+)['"]([^'"]+)['"]/g;
 
 /** @param {string} candidate @returns {string | null} */
 function resolveFileCandidate(candidate) {
@@ -71,11 +70,32 @@ function resolveStaticSpecifier(importer, specifier) {
     return { kind: 'external', packageName: externalPackageName(specifier) };
 }
 
-/** @param {string} source @returns {string[]} */
+/**
+ * Parse real static ESM edges. Multiline imports/reexports are intentionally supported; dynamic import() remains lazy
+ * and is therefore excluded from the static closure.
+ *
+ * @param {string} source
+ * @returns {string[]}
+ */
 export function listStaticModuleSpecifiers(source) {
-    return [...source.matchAll(STATIC_MODULE_SPECIFIER_PATTERN)]
-        .map((match) => match[1])
-        .filter((specifier) => typeof specifier === 'string');
+    const ast = parse(source, {
+        sourceType: 'unambiguous',
+        allowAwaitOutsideFunction: true,
+        errorRecovery: false,
+    });
+    /** @type {string[]} */
+    const specifiers = [];
+    for (const statement of ast.program.body) {
+        if (
+            (statement.type === 'ImportDeclaration' ||
+                statement.type === 'ExportNamedDeclaration' ||
+                statement.type === 'ExportAllDeclaration') &&
+            statement.source?.value
+        ) {
+            specifiers.push(String(statement.source.value));
+        }
+    }
+    return specifiers;
 }
 
 /**

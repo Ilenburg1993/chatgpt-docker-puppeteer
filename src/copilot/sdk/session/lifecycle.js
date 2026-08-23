@@ -16,8 +16,8 @@
  * @see module:copilot/config/session-config
  */
 
-import { sleepMs } from '#copilot/core';
-import { toError } from '#copilot/core/error-handlers';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { CopilotClient, RuntimeConnection } from '@github/copilot-sdk';
 import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
@@ -214,10 +214,7 @@ function assertSession(session, caller) {
  * @returns {Promise<void>}
  */
 async function wait(ms) {
-    await sleepMs(ms, {
-        id: `sdk.session.lifecycle.wait:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-        unref: true,
-    });
+    await sleep(ms);
 }
 
 /**

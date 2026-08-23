@@ -9,9 +9,15 @@
  * @see EventBus
  */
 
-import { resolveModelSelectionMismatch, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { executeModelGatewayRuntimeModelSwitch } from '#copilot/model-gateway';
-import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
+import {
+    describeAutoModelPolicy,
+    listModels,
+    modelRegistry,
+    modelStatsTracker,
+    resolveModelSelectionMismatch,
+} from '#copilot/sdk/models';
 import { setSessionModel } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/logging/index.js';
 import { trySetLiveSessionModel } from '../runtime/contracts/index.js';

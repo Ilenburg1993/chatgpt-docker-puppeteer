@@ -7,8 +7,9 @@
  *   e terminal passam a consumir a mesma SSOT de presentation para operações ligadas ao `ConversationHub`.
  */
 
-import { CONVERSATION_STORE, conversationHub, conversationStore } from '#copilot/conversation-hub';
-import { container, getHubSessionId, getSharedSdkSessionId, toError } from '#copilot/core';
+import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { toError } from '#copilot/infra/public/platform/error';
+import { getDefaultAgentRuntime } from '../agent/runtime/runtime-selection.js';
 
 /**
  * @typedef {import('../contracts/index.js').HandlerResult} HandlerResult
@@ -21,7 +22,7 @@ export const VALID_HUB_SESSION_STATUS = /** @type {const} */ (['active', 'closed
  * @returns {import('../../conversation-hub/store.js').ConversationStore}
  */
 function getConversationStore() {
-    return container.has(CONVERSATION_STORE) ? container.resolve(CONVERSATION_STORE) : conversationStore;
+    return conversationStore;
 }
 
 /**
@@ -43,7 +44,11 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
             }),
         };
         const sessions = getConversationStore().listHubSessions(opts);
-        return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
+        return {
+            status: 200,
+            cors: true,
+            body: { ok: true, sessions, current: getDefaultAgentRuntime().getSessionBindingSnapshot().hubSessionId },
+        };
     } catch (e) {
         return { status: 500, body: { ok: false, error: toError(e).message } };
     }
@@ -82,7 +87,10 @@ export function handleStoreMemory(body) {
         return { status: 400, body: { ok: false, error: '"content" obrigatório' } };
     }
     try {
-        const hubSessionId = typeof body.hubSessionId === 'string' ? body.hubSessionId : getHubSessionId();
+        const hubSessionId =
+            typeof body.hubSessionId === 'string'
+                ? body.hubSessionId
+                : getDefaultAgentRuntime().getSessionBindingSnapshot().hubSessionId;
         const id = getConversationStore().storeMemory({
             content: body.content,
             tag: body.tag ?? 'geral',
@@ -164,7 +172,7 @@ export function handleCreateHubSession({ body = {} } = {}) {
         if (sdkSessionId) {
             hubOpts.sdkSessionId = sdkSessionId;
         } else {
-            const activeSdkSessionId = getSharedSdkSessionId();
+            const activeSdkSessionId = getDefaultAgentRuntime().getSessionBindingSnapshot().sdkSessionId;
             if (activeSdkSessionId) hubOpts.sdkSessionId = activeSdkSessionId;
         }
         if (metadata) hubOpts.metadata = metadata;

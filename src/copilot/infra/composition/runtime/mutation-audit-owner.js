@@ -50,7 +50,7 @@ export function createRuntimeMutationAuditOwner(options) {
 
     /**
      * @param {ReturnType<typeof import('#copilot/infra/internal/operations').createIoOperationEnvelope>} envelope
-     * @param {{tool?:string;io?:import('#copilot/core/io-contracts').IoMeta|null;result?:Record<string,unknown>}} [context]
+     * @param {{tool?:string;io?:import('#copilot/infra/internal/operations/contracts').IoMeta|null;result?:Record<string,unknown>}} [context]
      * @returns {Promise<{enabled:boolean;path:string|null;written:boolean;error?:string}>}
      */
     async function record(envelope, context = {}) {

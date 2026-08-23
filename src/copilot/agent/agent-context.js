@@ -68,6 +68,8 @@ export class AgentContext {
     runtimeState;
     /** @type {AgentIOState} */
     ioState;
+    /** @type {import('#copilot/events/runtime').EventBus | null} */
+    eventBus;
 
     /** @type {import('./dialog/orchestrators/loop-manager.js').DialogLoopManager} */
     dialogLoop;
@@ -91,6 +93,8 @@ export class AgentContext {
     sdkElicitation;
     /** @type {import('./background/index.js').BackgroundTasks} */
     backgroundTasks;
+    /** @type {ReturnType<typeof import('./session/state/binding-runtime.js').createAgentSessionBindingRuntime>} */
+    sessionBinding;
 
     /**
      * @param {import('node:events').EventEmitter} emitter
@@ -99,6 +103,7 @@ export class AgentContext {
      *     reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
      *     factories?: Partial<import('./context/factories/index.js').AgentContextFactories>;
      *     mcpBridge?: import('./ports/index.js').AgentMcpCapability | null;
+     *     eventBus?: import('#copilot/events/runtime').EventBus | null;
      * }} [options]
      */
     constructor(emitter, options = {}) {
@@ -130,6 +135,7 @@ export class AgentContext {
         };
         // Compat grep-based contract: quotaMonitor = null
         this.ioState = { client: null };
+        this.eventBus = options.eventBus ?? null;
 
         this.#factories = createAgentContextFactories(options.factories);
         this.#factoryHost = {
@@ -147,6 +153,7 @@ export class AgentContext {
         this.keepalive = this.#factories.createKeepalive(this.#factoryHost);
         this.handoff = this.#factories.createHandoff(this.#factoryHost);
         this.messagesCache = this.#factories.createMessagesCache(this.#factoryHost);
+        this.sessionBinding = this.#factories.createSessionBinding(this.#factoryHost);
         this.sdkElicitation = this.#factories.createSdkElicitation(this.#factoryHost);
         this.backgroundTasks = this.#factories.createBackgroundTasks(this.#factoryHost);
     }

@@ -803,7 +803,7 @@ export default tseslint.config(
         },
     },
 
-    // ── Timers recorrentes canônicos — use registerInterval do core ─────────
+    // ── Timers recorrentes canônicos — ProcessInfra scheduler / pure resilience ──
     {
         files: [
             'src/copilot/sdk/telemetry/quota-monitor.js',
@@ -828,14 +828,14 @@ export default tseslint.config(
                 {
                     selector: "CallExpression[callee.name='setInterval']",
                     message:
-                        'Use registerInterval from #copilot/core for recurring timers. ' +
-                        'Ele registra o timer no shutdown registry e evita reaparição de polling cru.',
+                        'Use registerApplicationInterval from #copilot/boot/process-runtime for process-scoped recurring timers. ' +
+                        'Resources with narrower ownership should own and dispose their timer explicitly.',
                 },
                 {
                     selector: "AwaitExpression CallExpression[callee.name='setTimeout']",
                     message:
-                        'Use sleepMs from #copilot/core para esperas assíncronas canônicas. ' +
-                        'Evite await-setTimeout manual para manter governança de timers e shutdown.',
+                        'Use sleep from #copilot/infra/public/concurrency/resilience for pure asynchronous waits. ' +
+                        'Do not recreate a global timer registry for finite delays.',
                 },
             ],
         },

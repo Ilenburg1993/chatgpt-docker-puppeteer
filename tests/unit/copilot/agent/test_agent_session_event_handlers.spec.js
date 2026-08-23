@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
         getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })),
     },
     readTodoStore: vi.fn(async () => ({ tasks: {} })),
-    safeJsonParse: vi.fn((/** @type {string} */ raw) => {
+    parseJsonResult: vi.fn((/** @type {string} */ raw) => {
         try {
             return { ok: true, data: JSON.parse(raw) };
         } catch {
@@ -42,7 +42,7 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/core/error-handlers', async (importOriginal) => {
+vi.mock('#copilot/observability/swallowed', async (importOriginal) => {
     const actual = /** @type {any} */ (await importOriginal());
     return {
         ...actual,

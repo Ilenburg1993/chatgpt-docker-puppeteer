@@ -7,7 +7,7 @@ import { registerTerminalShutdownHandlers } from '../../../../src/copilot/termin
 
 describe('terminal/terminal-phases/boot-shutdown', () => {
     it('registra handlers canônicos do terminal e executa rollbacks semânticos', async () => {
-        /** @type {{ name: string; handler: () => Promise<void>; priority: unknown; options: unknown }[]} */
+        /** @type {{ name: string; handler: Parameters<typeof import('../../../../src/copilot/boot/process-runtime.js').registerApplicationShutdownHandler>[1]; phase: unknown; options: unknown }[]} */
         const registrations = [];
         const rollbackRuntimeListenersPhase = vi.fn(async () => undefined);
         const rollbackPinnedContextPhaseFn = vi.fn(async () => undefined);
@@ -42,8 +42,9 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                 flushTerminalTranscriptArchiveFn,
                 flushModelGatewayRuntimeHealthMirrorFn,
                 logFn: vi.fn(),
-                registerShutdownHandlerFn: (name, handler, priority, options) => {
-                    registrations.push({ name, handler, priority, options });
+                registerShutdownHandlerFn: (name, handler, phase, options) => {
+                    registrations.push({ name, handler, phase, options });
+                    return () => {};
                 },
             },
         );
@@ -60,12 +61,18 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
             ],
         );
 
-        await registrations[0]?.handler();
-        await registrations[1]?.handler();
-        await registrations[2]?.handler();
-        await registrations[3]?.handler();
-        await registrations[4]?.handler();
-        await registrations[5]?.handler();
+        const shutdownContext = {
+            signal: new AbortController().signal,
+            reason: 'test',
+            name: 'test-handler',
+            phase: 'test-phase',
+        };
+        await registrations[0]?.handler(shutdownContext);
+        await registrations[1]?.handler(shutdownContext);
+        await registrations[2]?.handler(shutdownContext);
+        await registrations[3]?.handler(shutdownContext);
+        await registrations[4]?.handler(shutdownContext);
+        await registrations[5]?.handler(shutdownContext);
 
         assert.equal(rollbackRuntimeListenersPhase.mock.calls.length, 2);
         assert.equal(rollbackPinnedContextPhaseFn.mock.calls.length, 1);

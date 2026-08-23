@@ -6,12 +6,13 @@
 
 import { resolveHooksStateDir } from '#copilot/boot';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
-import { safeJsonParse, SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
 import { join, resolve } from 'node:path';
-import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
 import { startSpan } from '../../ports/tracing-port.js';
+import { SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '../../state/schemas/index.js';
 
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
 const SNAPSHOT_FS = createConfiguredFsIo(
@@ -104,7 +105,7 @@ export async function listSnapshotFilesAsync() {
         const filepath = join(SNAPSHOT_DIR, f);
         try {
             const text = (await SNAPSHOT_FS.readTextFresh(filepath)).content;
-            const jsonResult = safeJsonParse(text, `[SessionSnapshot/listAsync/${f}]`);
+            const jsonResult = parseJsonResult(text, `[SessionSnapshot/listAsync/${f}]`);
             if (!jsonResult.ok) continue;
             const parsed = SnapshotListItemSchema.safeParse(jsonResult.data);
             if (!parsed.success) {
@@ -144,7 +145,7 @@ export async function loadSnapshotFileAsync(snapshotId) {
 
         try {
             const text = (await SNAPSHOT_FS.readTextFresh(filepath)).content;
-            const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
+            const jsonResult = parseJsonResult(text, `[SessionSnapshot/loadAsync/${filepath}]`);
             if (!jsonResult.ok) return null;
             const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
             if (!parsed.success || parsed.data.snapshotId !== normalizedSnapshotId) return null;

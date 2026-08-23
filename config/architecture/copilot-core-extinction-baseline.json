@@ -1,0 +1,3311 @@
+{
+  "schemaVersion": 1,
+  "policy": "copilot-core-extinction-monotonic-ratchet",
+  "generatedFromHead": null,
+  "corePath": "src/copilot/core",
+  "packageAliases": [
+    "#copilot/core",
+    "#copilot/core/circuit-breaker",
+    "#copilot/core/di",
+    "#copilot/core/di-tokens",
+    "#copilot/core/elicitation-schema",
+    "#copilot/core/error-codes",
+    "#copilot/core/error-handlers",
+    "#copilot/core/errors",
+    "#copilot/core/event-bus",
+    "#copilot/core/interfaces",
+    "#copilot/core/io-contracts",
+    "#copilot/core/io-policy",
+    "#copilot/core/process-policy",
+    "#copilot/core/safe-json",
+    "#copilot/core/schemas",
+    "#copilot/core/security/url-validator",
+    "#copilot/core/shutdown",
+    "#copilot/core/structured-message",
+    "#copilot/core/tool-contracts"
+  ],
+  "dependencies": [
+    {
+      "file": "src/copilot/agent/always-alive.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/background-tasks.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/boot/loop-boot-circuit.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/boot/loop-boot-runner.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/controllers/agent-dialog-controller.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/executors/turn-executor.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/orchestrators/loop-manager.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/seams/turn-execution-context.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/seams/turn-result-persistence.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/state/backpressure.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/watchdogs/watchdog.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/dialog/wiring/user-input-handler.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/error-policy.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/event-bridge-wiring.js",
+      "kind": "dynamic-import",
+      "specifier": "../core/di-tokens.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/event-bridge-wiring.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/agent-model-config.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/agent-runtime-event-bridge.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/agent-runtime-event-bridge.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/agent-sdk-session.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/agent-session-ops.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/sdk/agent-contract.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/sdk/ctx-refs.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/sdk/sessions.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/facades/state-query-facade.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/infra/index.js",
+      "kind": "static-export",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/infra/message-queue.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/infra/webhook-manager.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/entrypoints/entry.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/policies/reconnect-policy.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/process-host/runtime-host.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/setup/session-setup.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/state/state-io.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/lifecycle/teardown/runtime-teardown.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/messaging/agent-messaging.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/ports/conversation-port.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/ports/core-runtime-port.js",
+      "kind": "static-export",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/runtime-contracts.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/runtime/pending-question-state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/runtime/session-bootstrap-state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-dialog-recovery.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-runtime-bind.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-runtime-bind.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-session-prep.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-wiring.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/boot/boot-wiring.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/context/hook-context.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/initializers/initializer.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/lifecycle/cleanup.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/lifecycle/keepalive.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/state/snapshot-store.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/state/snapshot.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../core/interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/agent/session/wiring/event-wirer.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di-tokens.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/pipeline-audit-log.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/pipeline-permission.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/pipeline-sdk-buffer.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/audit/pipeline-sdk-buffer.js",
+      "kind": "static-import",
+      "specifier": "../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/boot/application-infra-host.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/shutdown",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/boot/lifecycle-runner.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/boot/runtime-bootstrap.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/boot/runtime-bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/boot/runtime-bootstrap.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/gh/ci.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/gh/index.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/git-bridge-read.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/git-bridge-write.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/mcp-tool-bridge.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/bridges/nerv-event-bus-adapter.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/client-structured.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/structured-message",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/client-structured.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/client.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/structured-message",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/client.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/client.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/inject.js",
+      "kind": "static-import",
+      "specifier": "../core/schemas.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/inject.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/channel/sse-client.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/config/custom-agents.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/config/declarative-runtime-config.js",
+      "kind": "static-import",
+      "specifier": "../core/safe-json.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/config/env.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/config/pinned-files.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/call-strategies.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/structured-message",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/call-strategies.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/hub.js",
+      "kind": "static-import",
+      "specifier": "../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/hub.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/orchestrator.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/orchestrator.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/send-pipeline.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/store-helpers.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/conversation-hub/store.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/circuit-breaker.js",
+      "kind": "static-import",
+      "specifier": "./errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/di-container.js",
+      "kind": "jsdoc-type",
+      "specifier": "./di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/di-container.js",
+      "kind": "static-import",
+      "specifier": "./di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "./di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "./event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "./di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/error-handlers.js",
+      "kind": "static-import",
+      "specifier": "./circuit-breaker.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/error-handlers.js",
+      "kind": "static-import",
+      "specifier": "./errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/event-bus.js",
+      "kind": "jsdoc-type",
+      "specifier": "./interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/event-bus.js",
+      "kind": "static-import",
+      "specifier": "./process-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./cache.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./circuit-breaker.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./di-tokens.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./dialog-timeout-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./error-codes.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./io-contracts.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./io-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./model-selection.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./mutex.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./process-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./retry.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./safe-json.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./schemas.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./sdk-error-taxonomy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./sdk-fs-routing.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./security/url-validator.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./shared-state.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./structured-message.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./timer-registry.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./tool-contracts.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/index.js",
+      "kind": "static-export",
+      "specifier": "./tool-name-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/io-policy.js",
+      "kind": "static-import",
+      "specifier": "./security/url-validator.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/retry.js",
+      "kind": "static-import",
+      "specifier": "./errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/safe-json.js",
+      "kind": "static-import",
+      "specifier": "./error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/safe-json.js",
+      "kind": "static-import",
+      "specifier": "./errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/security/url-validator.js",
+      "kind": "static-import",
+      "specifier": "../errors.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/security/url-validator.js",
+      "kind": "static-import",
+      "specifier": "../process-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/shutdown.js",
+      "kind": "static-import",
+      "specifier": "./error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/shutdown.js",
+      "kind": "static-import",
+      "specifier": "./shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/timer-registry.js",
+      "kind": "static-import",
+      "specifier": "./shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/timer-registry.js",
+      "kind": "static-import",
+      "specifier": "./shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/core/tool-target-introspection.js",
+      "kind": "static-import",
+      "specifier": "./security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/event-handlers/usage-classifier.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/events/middleware/correlation-enricher.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/events/middleware/index.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/events/middleware/rate-limiter.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/events/middleware/schema-validator.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/events/middleware/timestamp-enricher.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/hooks/composer.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/hooks/factory.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/hooks/factory.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/hooks/session-hooks.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/cache/l2/cache-runtime.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/composition/process/config/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/process-policy",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/composition/process/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/process-policy",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/composition/runtime/mutation-audit-owner.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/concurrency/locks/file/policy.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/concurrency/locks/local/resource-lock.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/database/sqlite/application/migration-runner.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/database/sqlite/better-sqlite3/runtime.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/configured/physical.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/invalidation/bus/bus-runtime.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/shutdown",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/delete.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/delete.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/patch/batch.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/patch/single.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/transfer/copy.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/mutation/transfer/move.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/patch/diff/service.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/patch/diff/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/read/cache/bytes.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/read/cache/text.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/read/chunks/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/read/fresh/data.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/read/fresh/metadata.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/append/locked.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/append/locked.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/atomic/locked.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/atomic/locked.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/atomic/portable.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/directory/locked.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/directory/locked.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/metadata/locked.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/filesystem/write/metadata/locked.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/registry/sqlite/directory-builder.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/registry/sqlite/writer.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/scanner/service.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/scanner/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/scanner/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/search/shared/output.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-policy",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/search/symbol/service.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/search/symbol/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/search/text/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/indexing/search/text/types.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/observability/process/service.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/process-policy",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/audit-log.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/audit-log.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/contracts/types.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/operation.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/operation.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/operations/transaction.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/policy/risk.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/telemetry/durability.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/telemetry/mutation-state.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/telemetry/publisher.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/telemetry/publisher.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/infra/telemetry/runtime.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/model-gateway/health/provider-failure.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/model-gateway/health/provider-health.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/model-gateway/secrets/redaction.js",
+      "kind": "static-export",
+      "specifier": "../../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/agent-event-observer.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/agent-event-observer.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/io-contracts.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bootstrap.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/activity-tracker.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/correlation-tracer.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/error-alerter.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/error-alerter.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/health-updater.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/log-observer.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/log-observer.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/metrics-collector.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/bus-actions/metrics-collector.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/collectors/tool-handlers.js",
+      "kind": "static-import",
+      "specifier": "../../core/tool-target-introspection.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/convergence-trace-store.js",
+      "kind": "static-import",
+      "specifier": "../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/error-alerting.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/error-tracker.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/event-bus-runtime.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/event-collector.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "kind": "static-import",
+      "specifier": "../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/metrics.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/interfaces.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/metrics.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/metrics.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/observers/dialog-task-handlers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/observers/session-agent-handlers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/otel.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/otel.js",
+      "kind": "static-import",
+      "specifier": "../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/observability/sdk-metric-bridge.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/plugins/index.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/plugins/plugin-registry.js",
+      "kind": "jsdoc-type",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/plugins/plugin-registry.js",
+      "kind": "static-import",
+      "specifier": "../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/agent/control/handlers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/agent/http-errors.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/agent/runtime/runtime-selection.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/conversation/hub.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/dialog-timeout-policy.js",
+      "kind": "static-export",
+      "specifier": "../core/dialog-timeout-policy.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/files/context.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/files/routing.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/sdk-fs-routing.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/files/routing.js",
+      "kind": "static-import",
+      "specifier": "../../core/sdk-fs-routing.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/realtime/sse/utils.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/runtime/dialog.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/runtime/health.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/runtime/lifecycle.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/runtime/sdk-session.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/sdk/recovery-policy.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/sdk/sessions.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/state/ui-store/store.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/system/config.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/presentation/system/metrics/handlers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/runtime-wiring.js",
+      "kind": "static-import",
+      "specifier": "./core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/runtime-wiring.js",
+      "kind": "static-import",
+      "specifier": "./core/shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/runtime-wiring.js",
+      "kind": "static-import",
+      "specifier": "./core/shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/agent/agents.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/di",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/di-tokens",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/di",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/errors.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/models/helpers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/models/helpers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/models/index.js",
+      "kind": "static-export",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/models/persistent-cache.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/client-facade.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/client.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/client.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/circuit-breaker",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/client.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/elicitation.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/elicitation-schema",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/hook-bus.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/event-bus",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/hook-bus.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/lifecycle.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/lifecycle.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/model-switch-verify-retry.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/permission-runtime.js",
+      "kind": "static-export",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/permissions.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/provider.js",
+      "kind": "static-import",
+      "specifier": "../../core/index.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/session/runtime.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/telemetry/preflight.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/telemetry/quota-monitor.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/core.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/custom.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/custom.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/safe-json",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/custom.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/schemas",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/registry.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/interfaces",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/registry.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/registry.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/tool-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/safe-json",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/sdk/tools/state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/schemas",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/index.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/shutdown",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/control.js",
+      "kind": "static-import",
+      "specifier": "../../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/control.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/dialog.js",
+      "kind": "static-import",
+      "specifier": "../../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/stream.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/tasks.js",
+      "kind": "static-import",
+      "specifier": "../../../core/elicitation-schema.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/copilot-api/tasks.js",
+      "kind": "static-import",
+      "specifier": "../../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/health-modules.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/health-registry.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/health.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/client.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/deps.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/hooks.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/middleware.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/observability.js",
+      "kind": "static-import",
+      "specifier": "../../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/observability.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-core-routes.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-crud.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-middleware.js",
+      "kind": "static-import",
+      "specifier": "../../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-middleware.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-route-helpers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/sdk/session-workspace-routes.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/routes/webhooks.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/server/socket/hub-ns.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/bootstrap-lifecycle.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/bootstrap-lifecycle.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/config.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/events.js",
+      "kind": "static-import",
+      "specifier": "../../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/export.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/export.js",
+      "kind": "static-import",
+      "specifier": "../../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/fs.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/resume.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/scope.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/sdk.js",
+      "kind": "static-import",
+      "specifier": "../../core/elicitation-schema.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/sdk.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/search.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/session.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/commands/workspace-index.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dev-watch.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown-priorities.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dev-watch.js",
+      "kind": "static-import",
+      "specifier": "../core/shutdown.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dev-watch.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dialog/engine-persistence.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dialog/engine.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dialog/output.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/dialog/sse.js",
+      "kind": "static-import",
+      "specifier": "../../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/events/agent-runtime-events.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/events/io-activity-events.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/io-contracts.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/events/tool-activity-presenter.js",
+      "kind": "static-import",
+      "specifier": "../../core/tool-target-introspection.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/events/tool-lifecycle-event.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/frontend/gateways/agent-runtime.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/frontend/projections/shared.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/frontend/projections/timeline.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/auto-brief.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/live-status-line.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl-command-router.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl-command-router.js",
+      "kind": "static-import",
+      "specifier": "../../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl-command-router.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl-command-router.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl-lifecycle.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/repl/repl.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/runtime-root.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/state/activity-state.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/state/sse-event-archive.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/state/sse-event-archive.js",
+      "kind": "static-import",
+      "specifier": "../../core/security/redaction.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/state/transcript-archive.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/stores/alias-store.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/stores/alias-store.js",
+      "kind": "static-import",
+      "specifier": "../../core/safe-json.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/stores/alias-store.js",
+      "kind": "static-import",
+      "specifier": "../../core/schemas.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-hub.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-listeners.js",
+      "kind": "static-import",
+      "specifier": "../../core/timer-registry.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-pinned.js",
+      "kind": "static-import",
+      "specifier": "../../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-pinned.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-reflection-loop.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-reflection-loop.js",
+      "kind": "static-import",
+      "specifier": "../../core/timer-registry.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/terminal-phases/boot-shutdown.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/shutdown",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/wiring/terminal-agent-wiring.js",
+      "kind": "static-import",
+      "specifier": "../../core/error-handlers.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/terminal/wiring/terminal-agent-wiring.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/code/code-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/index-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/read-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/read/read-file-content.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/write-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/write/mutation-helpers.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/write/mutation-helpers.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/file/write/patch-file.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/io-contracts",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/git/git-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/hook/hook-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/hub/hub-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/di",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/di-tokens.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/di-tokens",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/di-tokens.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/logger.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/tool-factory.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/infra/tool-feedback.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/permission/permission-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/search/symbol-search-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/search/text-search-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/session/experimental-rpc-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/session/session-rpc-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/session/session-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/shell/executor.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/task/task-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/todo/store.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/tools/web/web-tools.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/types/index.js",
+      "kind": "static-export",
+      "specifier": "../core/di-container.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/types/index.js",
+      "kind": "static-export",
+      "specifier": "../core/di.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/types/index.js",
+      "kind": "static-export",
+      "specifier": "../core/event-bus.js",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/copilot/types/index.js",
+      "kind": "static-export",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "src/server/api/controllers/health.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "runtime"
+    },
+    {
+      "file": "tests/unit/copilot/agent/test_agent_session_event_handlers.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/agent/test_hook_context_webhook_manager.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/agent/test_hook_context_webhook_manager.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/agent/test_hook_context_webhook_manager.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/security/url-validator",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/boot/test_application_infra_host.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/channel/test_channel_modules.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/channel/test_channel_modules.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/channel/test_channel_modules.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/contracts/test_arch_contracts.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../../src/copilot/core/di-tokens.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/contracts/test_arch_contracts.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/contracts/test_barrel_contracts.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/contracts/test_di_contracts.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/contracts/test_io_contracts.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/core/test_io_policy.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/io-policy.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/core/test_sdk_fs_routing.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/sdk-fs-routing.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/core/test_security_redaction.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/security/redaction.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/core/test_tool_target_introspection.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/tool-target-introspection.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/infra/test_infra_composition_scopes.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../../src/copilot/core/io-contracts.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/infra/test_infra_config_ownership.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/infra/test_io_cache_l2_registry.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/infra/test_io_observability_bounds.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../../src/copilot/core/io-contracts.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_bus_actions.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_dialog_task_handlers.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_event_bus_runtime.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_metrics.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_metrics.spec.js",
+      "kind": "mock",
+      "specifier": "../../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_metrics.spec.js",
+      "kind": "mock",
+      "specifier": "../../../../src/copilot/core/timer-registry.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/observability/test_sdk_metric_bridge.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_custom_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_custom_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/safe-json",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_custom_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/schemas",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_agents.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_barrel.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_error_handling_f31.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-codes",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_error_handling_f31.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_error_handling_f31.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_integration.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_integration.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/safe-json",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_integration.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/schemas",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_models.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_tools_state.spec.js",
+      "kind": "mock",
+      "specifier": "../../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_tools_state.spec.js",
+      "kind": "mock",
+      "specifier": "../../../../src/copilot/core/safe-json.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/sdk/test_sdk_tools_state.spec.js",
+      "kind": "mock",
+      "specifier": "../../../../src/copilot/core/schemas.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/terminal/test_commands_diagnose.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/terminal/test_commands_session.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/terminal/test_state.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/terminal/test_timeline_projection.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_agent_health_routes.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_agent_integration.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_boot_surface_validation.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_bootstrap.spec.js",
+      "kind": "mock",
+      "specifier": "../../../src/copilot/core/di-container.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_bootstrap.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_channel_inject_timeout_contract.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_abort_utils.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/errors.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_abort_utils.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/retry.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_circuit_breaker.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/circuit-breaker.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_di.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/di.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_error_handlers.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/circuit-breaker.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_error_handlers.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_error_handlers.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/errors.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_error_handlers.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_event_bus.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_event_bus.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_event_bus.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_retry.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/retry.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_safe_json.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/errors.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_safe_json.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/safe-json.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_shutdown.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/shutdown.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_timer_registry.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/shutdown.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_core_timer_registry.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/timer-registry.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_error_alerting_jsonl.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_error_alerting_jsonl.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_hooks_bus.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/event-bus.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_initializer_session_fs.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_inject_retry.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_loop_manager.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_plugin_registry.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/di.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_presentation_runtime_route_deps.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_sdk_route_session_ownership.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_sdk_runtime_projection_routes.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_session_ownership_ssot.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/index.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_sessions_router_shared_binding.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_snapshot.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/error-handlers",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_snapshot.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/safe-json",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_snapshot.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/schemas",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_structured_message.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "#copilot/core/structured-message",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_structured_message.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core/structured-message",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_terminal_alias_store.spec.js",
+      "kind": "mock",
+      "specifier": "../../../src/copilot/core/error-handlers.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_terminal_dialog_engine.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_terminal_frontend_primary.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_terminal_runtime_frontend.spec.js",
+      "kind": "dynamic-import",
+      "specifier": "../../../src/copilot/core/shared-state.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_terminal_runtime_frontend.spec.js",
+      "kind": "jsdoc-type",
+      "specifier": "../../../src/copilot/core/shared-state.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_turn_executor.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_turn_executor.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core/errors",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_url_validator_infra.spec.js",
+      "kind": "static-import",
+      "specifier": "../../../src/copilot/core/security/url-validator.js",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/test_url_validator.spec.js",
+      "kind": "static-import",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/tools/test_experimental_rpc_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/tools/test_session_rpc_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/tools/test_session_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    },
+    {
+      "file": "tests/unit/copilot/tools/test_web_tools.spec.js",
+      "kind": "mock",
+      "specifier": "#copilot/core",
+      "audience": "test"
+    }
+  ],
+  "summary": {
+    "total": 523,
+    "byAudience": {
+      "runtime": 422,
+      "test": 101
+    },
+    "byOwner": {
+      "agent": 54,
+      "audit": 7,
+      "boot": 5,
+      "bridges": 8,
+      "channel": 8,
+      "config": 4,
+      "conversation-hub": 11,
+      "core": 51,
+      "event-handlers": 1,
+      "events": 5,
+      "hooks": 4,
+      "infra": 55,
+      "model-gateway": 3,
+      "observability": 38,
+      "plugins": 3,
+      "presentation": 18,
+      "runtime-wiring.js": 3,
+      "sdk": 35,
+      "server": 24,
+      "terminal": 53,
+      "tools": 27,
+      "types": 4,
+      "src": 1,
+      "tests": 101
+    },
+    "bySpecifier": {
+      "#copilot/core/error-handlers": 70,
+      "../core/di.js": 12,
+      "#copilot/core": 149,
+      "../core/di-tokens.js": 2,
+      "../../core/event-bus.js": 13,
+      "../../core/di.js": 1,
+      "../../../core/event-bus.js": 3,
+      "../../../core/interfaces.js": 1,
+      "../core/error-handlers.js": 15,
+      "../core/security/redaction.js": 4,
+      "#copilot/core/shutdown": 4,
+      "../core/di-container.js": 4,
+      "../core/event-bus.js": 6,
+      "#copilot/core/structured-message": 5,
+      "../core/schemas.js": 1,
+      "../core/safe-json.js": 1,
+      "../core/interfaces.js": 3,
+      "./errors.js": 5,
+      "./di.js": 5,
+      "./event-bus.js": 2,
+      "./circuit-breaker.js": 2,
+      "./interfaces.js": 2,
+      "./process-policy.js": 2,
+      "./cache.js": 1,
+      "./di-container.js": 1,
+      "./di-tokens.js": 1,
+      "./dialog-timeout-policy.js": 1,
+      "./error-codes.js": 1,
+      "./error-handlers.js": 3,
+      "./io-contracts.js": 1,
+      "./io-policy.js": 1,
+      "./model-selection.js": 1,
+      "./mutex.js": 1,
+      "./retry.js": 1,
+      "./safe-json.js": 1,
+      "./schemas.js": 1,
+      "./sdk-error-taxonomy.js": 1,
+      "./sdk-fs-routing.js": 1,
+      "./security/redaction.js": 2,
+      "./security/url-validator.js": 2,
+      "./shared-state.js": 1,
+      "./shutdown-priorities.js": 3,
+      "./shutdown.js": 2,
+      "./structured-message.js": 1,
+      "./timer-registry.js": 1,
+      "./tool-contracts.js": 1,
+      "./tool-name-policy.js": 1,
+      "../errors.js": 1,
+      "../process-policy.js": 1,
+      "#copilot/core/process-policy": 3,
+      "#copilot/core/io-contracts": 45,
+      "#copilot/core/io-policy": 1,
+      "../../core/security/redaction.js": 5,
+      "../core/io-contracts.js": 1,
+      "../core/shutdown-priorities.js": 3,
+      "../core/shutdown.js": 4,
+      "../../core/error-handlers.js": 16,
+      "../../core/tool-target-introspection.js": 2,
+      "../core/dialog-timeout-policy.js": 1,
+      "../../core/sdk-fs-routing.js": 2,
+      "./core/di-container.js": 1,
+      "./core/shutdown-priorities.js": 1,
+      "./core/shutdown.js": 1,
+      "#copilot/core/di": 3,
+      "#copilot/core/di-tokens": 2,
+      "#copilot/core/circuit-breaker": 1,
+      "#copilot/core/elicitation-schema": 1,
+      "#copilot/core/event-bus": 1,
+      "../../core/index.js": 1,
+      "#copilot/core/safe-json": 5,
+      "#copilot/core/schemas": 5,
+      "#copilot/core/interfaces": 1,
+      "#copilot/core/tool-contracts": 1,
+      "../../../core/error-handlers.js": 5,
+      "../../../core/elicitation-schema.js": 1,
+      "../../core/elicitation-schema.js": 1,
+      "../../core/io-contracts.js": 1,
+      "../../core/di-container.js": 2,
+      "../../core/safe-json.js": 1,
+      "../../core/schemas.js": 1,
+      "../../core/timer-registry.js": 2,
+      "#copilot/core/security/url-validator": 1,
+      "../../../../src/copilot/core/di-tokens.js": 1,
+      "../../../../src/copilot/core/index.js": 4,
+      "../../../../src/copilot/core/io-policy.js": 1,
+      "../../../../src/copilot/core/sdk-fs-routing.js": 1,
+      "../../../../src/copilot/core/security/redaction.js": 1,
+      "../../../../src/copilot/core/tool-target-introspection.js": 1,
+      "../../../../src/copilot/core/io-contracts.js": 2,
+      "../../../../src/copilot/core/event-bus.js": 3,
+      "#copilot/core/errors": 8,
+      "../../../../src/copilot/core/error-handlers.js": 3,
+      "../../../../src/copilot/core/timer-registry.js": 1,
+      "#copilot/core/error-codes": 1,
+      "../../../../src/copilot/core/safe-json.js": 1,
+      "../../../../src/copilot/core/schemas.js": 1,
+      "../../../src/copilot/core/di-container.js": 1,
+      "../../../src/copilot/core/index.js": 3,
+      "../../../src/copilot/core/errors.js": 3,
+      "../../../src/copilot/core/retry.js": 2,
+      "../../../src/copilot/core/circuit-breaker.js": 2,
+      "../../../src/copilot/core/di.js": 2,
+      "../../../src/copilot/core/error-handlers.js": 3,
+      "../../../src/copilot/core/event-bus.js": 4,
+      "../../../src/copilot/core/safe-json.js": 1,
+      "../../../src/copilot/core/shutdown.js": 2,
+      "../../../src/copilot/core/timer-registry.js": 1,
+      "../../../src/copilot/core/shared-state.js": 2,
+      "../../../src/copilot/core/security/url-validator.js": 1
+    }
+  }
+}

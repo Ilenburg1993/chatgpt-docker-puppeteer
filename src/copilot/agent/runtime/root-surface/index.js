@@ -28,7 +28,8 @@ export {
     sendMessageDialogBoot as msgSendBoot,
     steerMessage as msgSteer,
 } from '../../messaging/agent-messaging.js';
-export { METRICS_STORE } from '../../ports/metrics-port.js';
+export { logSwallowed } from '../../ports/logging/swallowed.js';
+export { defaultMetrics } from '../../ports/metrics-port.js';
 export {
     listenerDiagnostics as stateDiagnostics,
     getStatusSnapshot as stateSnapshot,

@@ -15,8 +15,8 @@ import {
 } from '#copilot/agent/facades';
 import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container, toError } from '#copilot/core';
+import { conversationStore } from '#copilot/conversation-hub';
+import { toError } from '#copilot/infra/public/platform/error';
 import { resolveAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { createRequire } from 'node:module';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
@@ -150,7 +150,7 @@ export function buildAgentHealthHttpResponse(runtimeId) {
  */
 function readConversationStorePing() {
     try {
-        const store = container.resolve(CONVERSATION_STORE);
+        const store = conversationStore;
         if (!store.db) return { ok: false, error: 'db não inicializado' };
         store.db.prepare('SELECT 1').get();
         return { ok: true };

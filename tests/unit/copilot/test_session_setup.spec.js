@@ -355,7 +355,7 @@ describe('session-setup (F63)', () => {
             );
         });
 
-        it('normaliza allowFreeform=false legado para texto livre efetivo', async () => {
+        it('preserva allowFreeform=false do caller SDK', async () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
@@ -369,7 +369,7 @@ describe('session-setup (F63)', () => {
             expect(handleUserInputRequest).toHaveBeenLastCalledWith(
                 {
                     question: 'Escolha',
-                    allowFreeform: true,
+                    allowFreeform: false,
                 },
                 expect.any(Object),
             );

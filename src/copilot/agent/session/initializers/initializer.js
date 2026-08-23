@@ -24,7 +24,7 @@ import {
     resolveConfiguredByokSessionOverrides,
 } from '#copilot/config';
 import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
-import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
     buildLiveSystemMessage,
     buildSystemPromptBindingSnapshot,
@@ -56,6 +56,7 @@ import {
 } from '../../facades/sdk-access.js';
 import { log } from '../../ports/logging/index.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';
+import { buildCanonicalLocalSurfaceExcludedTools } from '../../ports/tool-surface-policy-port.js';
 import { buildHookSystemContextSafe } from '../context/index.js';
 
 // Re-exports para backward compatibility

@@ -10,7 +10,7 @@
  */
 
 import { getShellOutputPolicy } from '#copilot/config';
-import { toExecError } from '#copilot/core/error-handlers';
+import { toExecError } from '#copilot/infra/public/platform/error';
 import { createBoundedProcessOutputCapture } from '#copilot/infra/public/platform/process-output';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile, spawn } from 'node:child_process';

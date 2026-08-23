@@ -469,15 +469,14 @@ export function getInjectInterventionPolicy() {
     };
 }
 
-// ─── IConfigProvider singleton (Faixa 3.2 — AC-5-06) ────────────────────────
-
 /**
- * Adapter sobre `process.env` que implementa a interface `IConfigProvider`.
- *
- * Permite que consumidores aceitem um contrato estável em vez de acessar `process.env` diretamente, facilitando
- * substituição em testes.
- *
- * @type {import('../core/interfaces.js').IConfigProvider}
+ * Structural configuration provider over process.env.
+ * @type {{
+ *     getString: (key: string) => string | undefined;
+ *     getInt: (key: string, fallback: number) => number;
+ *     getBool: (key: string) => boolean;
+ *     has: (key: string) => boolean;
+ * }}
  */
 export const envProvider = {
     /** @param {string} key */

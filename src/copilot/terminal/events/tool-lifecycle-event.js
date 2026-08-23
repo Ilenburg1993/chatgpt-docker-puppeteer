@@ -23,7 +23,7 @@
  * @see tool-call-registry.js
  */
 
-import { redactSecretRecord, redactSecretText } from '#copilot/core';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
 
 /**
  * Tipos válidos de evento de lifecycle de tool.

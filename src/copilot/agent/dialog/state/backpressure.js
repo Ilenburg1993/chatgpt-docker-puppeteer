@@ -15,7 +15,8 @@
  * @see EventBus
  */
 
-import { logSwallowed, SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
 
 /**
  * Serializa execução de turnos com backpressure baseada em profundidade da fila.
@@ -56,12 +57,12 @@ export class TurnQueue {
      * @template T
      * @param {() => Promise<T>} fn - Função assíncrona a executar quando for sua vez no mutex
      * @returns {Promise<T>}
-     * @throws {SessionError} com código `DIALOG_QUEUE_FULL` se a fila estiver cheia
+     * @throws {AgentSessionError} com código `DIALOG_QUEUE_FULL` se a fila estiver cheia
      */
     enqueue(fn) {
         if (this.#depth >= this.#maxSize) {
             return Promise.reject(
-                new SessionError(`[TurnQueue] Fila cheia (${this.#depth}/${this.#maxSize}).`, 'DIALOG_QUEUE_FULL'),
+                new AgentSessionError(`[TurnQueue] Fila cheia (${this.#depth}/${this.#maxSize}).`, 'DIALOG_QUEUE_FULL'),
             );
         }
 

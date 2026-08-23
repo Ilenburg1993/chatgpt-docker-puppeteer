@@ -1,7 +1,7 @@
 // @ts-check
 /** Bounded buffered subprocess execution for local search adapters. */
 
-import { concatBufferViews, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { concatBufferViews, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 import { spawn } from 'node:child_process';
 import {
     makeSearchExitError,

@@ -8,7 +8,7 @@
  * @module copilot/infra/filesystem/read/snapshot/text
  */
 
-import { decodeUtf8Buffer } from '#copilot/infra/internal/platform';
+import { decodeUtf8Buffer } from '#copilot/infra/internal/platform/buffer';
 import { readBytesFileSnapshot } from './bytes.js';
 
 /**

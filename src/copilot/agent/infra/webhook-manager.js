@@ -8,8 +8,10 @@
  * @see EventBus
  */
 
+import { AgentSessionError } from '#copilot/agent/errors';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '#copilot/config/agent';
-import { ConfigError, checkResolvedIp, toError, validateWebhookUrl } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
+import { fetchPublicHttp, validateUrlString } from '#copilot/infra/public/platform/network';
 import { log } from '../ports/logging/index.js';
 
 /**
@@ -50,15 +52,15 @@ function createTimeoutSignal(timeoutMs) {
 export class WebhookManager {
     /** @type {Map<string, string>} Map de id → URL */
     #urls = new Map();
-
     /**
      * Valida se uma URL de webhook é segura — delega para url-validator.js.
      *
      * @param {string} url
-     * @throws {ConfigError} Se a URL for inválida ou insegura
+     * @throws {AgentSessionError} Se a URL for inválida ou insegura
      */
-    static #validateUrl(url) {
-        validateWebhookUrl(url);
+    #validateUrl(url) {
+        const result = validateUrlString(url);
+        if (!result.safe) throw new AgentSessionError(`[WebhookManager] URL bloqueada: ${result.reason ?? 'policy'}`);
     }
 
     /**
@@ -70,12 +72,12 @@ export class WebhookManager {
      *
      * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
      * @returns {WebhookEntry} Entrada registrada
-     * @throws {ConfigError} Se a URL for inválida/insegura ou o limite de webhooks for atingido
+     * @throws {AgentSessionError} Se a URL for inválida/insegura ou o limite de webhooks for atingido
      */
     register(url) {
-        WebhookManager.#validateUrl(url);
+        this.#validateUrl(url);
         if (this.#urls.size >= MAX_WEBHOOKS) {
-            throw new ConfigError(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
+            throw new AgentSessionError(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
         }
         const id = `wh_${Date.now()}_${globalThis.crypto.randomUUID().slice(-8)}`;
         this.#urls.set(id, url);
@@ -144,17 +146,6 @@ export class WebhookManager {
     }
 
     /**
-     * SEC-AGENT-005: Verifica DNS rebinding — delega para url-validator.js.
-     *
-     * @param {string} hostname
-     * @returns {Promise<void>}
-     * @throws {Error} Se o IP resolvido for privado/loopback
-     */
-    static async #checkResolvedIp(hostname) {
-        await checkResolvedIp(hostname);
-    }
-
-    /**
      * Emite um evento para todas as URLs registradas via HTTP POST.
      *
      * Falhas individuais são logadas mas não propagadas (allSettled).
@@ -174,16 +165,8 @@ export class WebhookManager {
 
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
-                // SEC-AGENT-005: Core é o único owner do default allow-private; explicit policy override continua lá.
-                try {
-                    const hostname = new URL(url).hostname;
-                    await WebhookManager.#checkResolvedIp(hostname);
-                } catch (e) {
-                    log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${toError(e).message}`);
-                    return;
-                }
                 // GAP-ROUTE-002: retry com exponential backoff para falhas retriable
-                await WebhookManager.#deliverWithRetry(id, url, body, WEBHOOK_MAX_RETRIES);
+                await this.#deliverWithRetry(id, url, body, WEBHOOK_MAX_RETRIES);
             }),
         );
     }
@@ -198,7 +181,7 @@ export class WebhookManager {
      * @param {number} maxRetries - Número máximo de retries
      * @returns {Promise<void>}
      */
-    static async #deliverWithRetry(id, url, body, maxRetries) {
+    async #deliverWithRetry(id, url, body, maxRetries) {
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             if (attempt > 0) {
                 // Exponential backoff: 500ms, 1000ms, 2000ms...
@@ -211,7 +194,7 @@ export class WebhookManager {
 
             const timeoutHandle = createTimeoutSignal(WEBHOOK_TIMEOUT_MS);
             try {
-                const resp = await fetch(url, {
+                const resp = await fetchPublicHttp(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body,

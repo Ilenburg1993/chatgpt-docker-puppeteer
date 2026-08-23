@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "policy": "copilot-core-extinction-target-owners",
+  "objective": "src/copilot/core must disappear without a horizontal replacement owner",
+  "modules": [
+    {
+      "module": "cache.js",
+      "disposition": "delete",
+      "owner": "infra/cache"
+    },
+    {
+      "module": "circuit-breaker.js",
+      "disposition": "absorb-rewrite",
+      "owner": "sdk/session/resilience"
+    },
+    {
+      "module": "di-container.js",
+      "disposition": "delete",
+      "owner": "explicit-composition"
+    },
+    {
+      "module": "di-tokens.js",
+      "disposition": "split-delete",
+      "owner": "owner-local-composition"
+    },
+    {
+      "module": "di.js",
+      "disposition": "decommission",
+      "owner": "explicit-composition"
+    },
+    {
+      "module": "dialog-timeout-policy.js",
+      "disposition": "absorb",
+      "owner": "presentation/dialog"
+    },
+    {
+      "module": "elicitation-schema.js",
+      "disposition": "rewrite-absorb",
+      "owner": "sdk/session/elicitation"
+    },
+    {
+      "module": "error-codes.js",
+      "disposition": "split-delete",
+      "owner": "domain-local-errors"
+    },
+    {
+      "module": "error-handlers.js",
+      "disposition": "split-rewrite",
+      "owner": "infra/platform/error + owner-local-policy"
+    },
+    {
+      "module": "errors.js",
+      "disposition": "split",
+      "owner": "domain-local-errors"
+    },
+    {
+      "module": "event-bus.js",
+      "disposition": "rebuild-absorb",
+      "owner": "events/runtime"
+    },
+    {
+      "module": "index.js",
+      "disposition": "delete-last",
+      "owner": "none"
+    },
+    {
+      "module": "interfaces.js",
+      "disposition": "decompose-delete",
+      "owner": "owner-local-ports"
+    },
+    {
+      "module": "io-contracts.js",
+      "disposition": "absorb",
+      "owner": "infra/operations/contracts"
+    },
+    {
+      "module": "io-policy.js",
+      "disposition": "split-absorb",
+      "owner": "infra/policy + infra/platform/network"
+    },
+    {
+      "module": "model-selection.js",
+      "disposition": "absorb",
+      "owner": "sdk/models"
+    },
+    {
+      "module": "mutex.js",
+      "disposition": "delete-replace",
+      "owner": "infra/concurrency/locks"
+    },
+    {
+      "module": "process-policy.js",
+      "disposition": "absorb",
+      "owner": "infra/composition/process/config"
+    },
+    {
+      "module": "retry.js",
+      "disposition": "rewrite-absorb",
+      "owner": "infra/concurrency/resilience"
+    },
+    {
+      "module": "safe-json.js",
+      "disposition": "split-delete",
+      "owner": "infra/platform/json"
+    },
+    {
+      "module": "schemas.js",
+      "disposition": "decompose",
+      "owner": "domain-local-schemas"
+    },
+    {
+      "module": "sdk-error-taxonomy.js",
+      "disposition": "absorb",
+      "owner": "sdk/errors"
+    },
+    {
+      "module": "sdk-fs-routing.js",
+      "disposition": "split-absorb",
+      "owner": "presentation/files + sdk/tools"
+    },
+    {
+      "module": "security/redaction.js",
+      "disposition": "rewrite-absorb",
+      "owner": "infra/observability/redaction"
+    },
+    {
+      "module": "security/url-validator.js",
+      "disposition": "rewrite",
+      "owner": "infra/platform/network"
+    },
+    {
+      "module": "shared-state.js",
+      "disposition": "delete-after-migration",
+      "owner": "runtime-session-state"
+    },
+    {
+      "module": "shutdown-priorities.js",
+      "disposition": "absorb",
+      "owner": "process-lifecycle"
+    },
+    {
+      "module": "shutdown.js",
+      "disposition": "rewrite",
+      "owner": "process-lifecycle"
+    },
+    {
+      "module": "structured-message.js",
+      "disposition": "absorb",
+      "owner": "channel/protocol"
+    },
+    {
+      "module": "timer-registry.js",
+      "disposition": "rewrite-delete",
+      "owner": "runtime-scheduler/lifecycle"
+    },
+    {
+      "module": "tool-contracts.js",
+      "disposition": "rewrite-absorb",
+      "owner": "tools/contracts + sdk/tools"
+    },
+    {
+      "module": "tool-name-policy.js",
+      "disposition": "absorb",
+      "owner": "tools/contracts"
+    },
+    {
+      "module": "tool-target-introspection.js",
+      "disposition": "rewrite-absorb",
+      "owner": "observability/tool-targets"
+    }
+  ]
+}

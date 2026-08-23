@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { fmtDate, repoArgs, runGh, runGhJson } from './shared.js';
 
 // Re-export domínios

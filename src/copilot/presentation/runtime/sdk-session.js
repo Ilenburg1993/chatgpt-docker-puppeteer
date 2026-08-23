@@ -19,12 +19,14 @@
 
 import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
+    normalizeAgentSdkElicitationResult,
     persistAgentRuntimeStatePartial,
     readAgentConfiguredSessionFsState,
     readAgentRuntimePersistedStateAsync,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
     readAgentSdkSessionMode,
     readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
+    sanitizeAgentSdkToolNames,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
@@ -34,9 +36,23 @@ import {
     readSessionInstructionSources,
     readSystemPromptStatus,
 } from '#copilot/config';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { readAgentStatusSnapshot } from './status.js';
+
+/** @param {unknown[]} names @returns {string[]} */
+export function sanitizeRuntimePermissionToolNames(names) {
+    return sanitizeAgentSdkToolNames(names);
+}
+
+/**
+ * @param {unknown} value
+ * @param {unknown} schema
+ * @param {{ context?: string }} [options]
+ */
+export function normalizeRuntimeElicitationResult(value, schema, options) {
+    return normalizeAgentSdkElicitationResult(value, schema, options);
+}
 
 /**
  * @param {string | null | undefined} [runtimeId]

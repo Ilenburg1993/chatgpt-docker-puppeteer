@@ -8,13 +8,14 @@
  * @see EventBus
  */
 
-import { SessionError, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import { COPILOT_MODEL } from '../config/agent.js';
 import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
 import { resolveHubTurnTimeout } from '../config/hub-timeout-policy.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
+import { ConversationHubError } from './errors.js';
 
 /**
  * @typedef {Object} SendPipelineDeps
@@ -57,12 +58,15 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
     const { store, bridge, agent, fallbackAgent, emit, getActiveSdkSessionId } = deps;
 
     if (!bridge) {
-        throw new SessionError('[HubOrchestrator] Não inicializado. Chame init() primeiro.', 'ORCH_NOT_INITIALIZED');
+        throw new ConversationHubError(
+            '[HubOrchestrator] Não inicializado. Chame init() primeiro.',
+            'ORCH_NOT_INITIALIZED',
+        );
     }
 
     const agentCheck = agent ?? fallbackAgent;
     if (!agentCheck || agentCheck.status === 'stopped') {
-        throw new SessionError('[HubOrchestrator] AlwaysAliveAgent não está ativo', 'ORCH_AGENT_INACTIVE');
+        throw new ConversationHubError('[HubOrchestrator] AlwaysAliveAgent não está ativo', 'ORCH_AGENT_INACTIVE');
     }
 
     const useStructured = opts.useStructured !== false;
@@ -103,7 +107,7 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
     const llmATurn = store.getTurn(llmATurnId);
     const turnNumber = llmATurn?.turn_number;
     if (!turnNumber) {
-        throw new SessionError(
+        throw new ConversationHubError(
             `[HubOrchestrator] Turno ${llmATurnId} não encontrado após writeTurn`,
             'ORCH_TURN_NOT_FOUND',
         );
@@ -145,7 +149,7 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
 
         if (useDialogLoop) {
             if (!agentInst) {
-                throw new SessionError('[HubOrchestrator] Agent não disponível', 'ORCH_AGENT_INACTIVE');
+                throw new ConversationHubError('[HubOrchestrator] Agent não disponível', 'ORCH_AGENT_INACTIVE');
             }
             llmBResponse = await callViaDialogLoop(agentInst, message, messageContent, ctx);
         } else if (useStructured && typeof message === 'object') {

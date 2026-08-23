@@ -22,6 +22,7 @@ const COPILOT_ROOT = 'src/copilot';
 /** @type {Record<string, number>} */
 const LAYER_MAP = {
     core: 0,
+    dialog: 0,
     types: 0,
     infra: 0,
     boot: 0,
@@ -69,6 +70,10 @@ function isAllowedBoundaryImport(relFile, targetModule, spec) {
             spec.startsWith('../hooks/') ||
             spec.startsWith('../tools/')
         );
+    }
+
+    if (relFile === 'boot/application-events.js' && targetModule === 'events') {
+        return true;
     }
 
     if (relFile.startsWith('boot/')) {

@@ -163,12 +163,17 @@ function fromSnapshotRecord(snapshot) {
     return normalizeSnapshotRecord(snapshot);
 }
 
-// ─── IStateStore singleton (Faixa 3.2 — AC-5-03) ────────────────────────────
-
 /**
- * Adapter sobre as funções de snapshot que implementa a interface `IStateStore`.
+ * Structural adapter over Agent snapshot operations.
  *
- * @type {import('../../../core/interfaces.js').IStateStore}
+ * @typedef {{
+ *     createSnapshot: (opts: Parameters<typeof createSnapshot>[0]) => Record<string, unknown>;
+ *     saveSnapshot: (snapshot: Record<string, unknown>) => Promise<void>;
+ *     loadSnapshot: (snapshotId?: string) => Promise<Record<string, unknown> | null>;
+ *     listSnapshots: () => Promise<SnapshotListItem[]>;
+ * }} AgentSnapshotStore
+ *
+ * @type {AgentSnapshotStore}
  */
 export const snapshotStore = {
     createSnapshot: (opts) => toSnapshotRecord(createSnapshot(opts)),

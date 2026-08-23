@@ -4,10 +4,10 @@
  * @file Helpers do reflection loop do terminal.
  */
 
+import { adoptApplicationTimer, cancelApplicationTimer } from '#copilot/boot/process-runtime';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../../core/error-handlers.js';
-import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { sendTurn } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 
@@ -23,7 +23,7 @@ let _reflectionTimer = null;
  *     readTerminalRuntimeStateFn?: (...args: unknown[]) => { dialogLoopActive: boolean; queueSize: number };
  *     sendTurnFn?: (message: string, actor?: string) => Promise<unknown>;
  *     setIntervalFn?: (callback: () => void, delay: number) => unknown;
- *     registerTimerFn?: typeof registerTimer;
+ *     adoptApplicationTimerFn?: typeof adoptApplicationTimer;
  * }} [deps]
  * @returns {unknown | null}
  */
@@ -35,7 +35,7 @@ export function startReflectionLoop(deps = {}) {
     const readTerminalRuntimeStateFn = deps.readTerminalRuntimeStateFn ?? readTerminalRuntimeState;
     const sendTurnFn = deps.sendTurnFn ?? sendTurn;
     const setIntervalFn = deps.setIntervalFn ?? setInterval;
-    const registerTimerFn = deps.registerTimerFn ?? registerTimer;
+    const adoptApplicationTimerFn = deps.adoptApplicationTimerFn ?? adoptApplicationTimer;
 
     if (reflectionIntervalMin <= 0) return null;
 
@@ -68,7 +68,7 @@ export function startReflectionLoop(deps = {}) {
     const timerObj = timer && typeof timer === 'object' ? /** @type {{ unref?: () => void }} */ (timer) : null;
     if (typeof timerObj?.unref === 'function') timerObj.unref();
     _reflectionTimer = timer;
-    registerTimerFn(
+    adoptApplicationTimerFn(
         'terminal.reflection',
         'interval',
         /** @type {ReturnType<typeof setInterval>} */ (/** @type {unknown} */ (timer)),
@@ -81,7 +81,7 @@ export function startReflectionLoop(deps = {}) {
  *
  * @param {{
  *     clearIntervalFn?: (timer: unknown) => void;
- *     cancelTimerFn?: typeof cancelTimer;
+ *     cancelApplicationTimerFn?: typeof cancelApplicationTimer;
  * }} [deps]
  * @returns {void}
  */
@@ -89,9 +89,9 @@ export function stopReflectionLoop(deps = {}) {
     if (_reflectionTimer === null) return;
     const clearIntervalFn =
         deps.clearIntervalFn ?? ((timer) => clearInterval(/** @type {ReturnType<typeof setInterval>} */ (timer)));
-    const cancelTimerFn = deps.cancelTimerFn ?? cancelTimer;
+    const cancelApplicationTimerFn = deps.cancelApplicationTimerFn ?? cancelApplicationTimer;
     clearIntervalFn(_reflectionTimer);
-    cancelTimerFn('terminal.reflection');
+    cancelApplicationTimerFn('terminal.reflection');
     _reflectionTimer = null;
 }
 

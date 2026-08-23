@@ -1,7 +1,7 @@
 // @ts-check
 /** Serialization and physical-fingerprint checks for read-cache entries. */
 
-import { fingerprintMatches, richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { fingerprintMatches, richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 
 /** @param {unknown} metaJson @returns {Record<string, unknown>} */
 export function parseCacheMetaJson(metaJson) {

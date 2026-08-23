@@ -5,7 +5,7 @@
  */
 
 /**
- * @typedef {'core' | 'sdk' | 'agent' | 'terminal' | 'phaseHandlers'} CopilotBootSurfaceGroupName
+ * @typedef {'processRuntime' | 'sdk' | 'agent' | 'terminal' | 'phaseHandlers'} CopilotBootSurfaceGroupName
  *
  * @typedef {{
  *     name: CopilotBootSurfaceGroupName;
@@ -25,15 +25,14 @@
  */
 
 export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
-    core: Object.freeze([
-        'runShutdown',
-        'isShuttingDown',
-        'getLastShutdownReport',
-        'getShutdownLifecycleMetrics',
-        'listShutdownHandlers',
-        'registerTimer',
-        'listActiveTimers',
-        'activeTimerCount',
+    processRuntime: Object.freeze([
+        'runApplicationShutdown',
+        'isApplicationShuttingDown',
+        'getLastApplicationShutdownReport',
+        'getApplicationShutdownMetrics',
+        'listApplicationShutdownHandlers',
+        'listActiveApplicationTimers',
+        'activeApplicationTimerCount',
     ]),
     sdk: Object.freeze([
         'createCopilotClient',
@@ -70,7 +69,6 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
         'startRuntime',
         'startAgentDialogLoop',
         'sendAgentDialogTurn',
-        'ALWAYS_ALIVE_AGENT',
     ]),
     terminal: Object.freeze([
         'createTerminalBootContext',
@@ -92,7 +90,7 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
  * Valida superfícies carregadas do SDK/agent/terminal e a cobertura dos phase handlers do boot plan.
  *
  * @param {{
- *     core: Record<string, unknown>;
+ *     processRuntime: Record<string, unknown>;
  *     sdk: Record<string, unknown>;
  *     agent: Record<string, unknown>;
  *     terminal: Record<string, unknown>;
@@ -103,7 +101,7 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
  */
 export function validateCopilotBootSurfaces(input) {
     const groups = [
-        buildSurfaceGroupReport('core', input.core, COPILOT_BOOT_REQUIRED_SURFACES.core),
+        buildSurfaceGroupReport('processRuntime', input.processRuntime, COPILOT_BOOT_REQUIRED_SURFACES.processRuntime),
         buildSurfaceGroupReport('sdk', input.sdk, COPILOT_BOOT_REQUIRED_SURFACES.sdk),
         buildSurfaceGroupReport('agent', input.agent, COPILOT_BOOT_REQUIRED_SURFACES.agent),
         buildSurfaceGroupReport('terminal', input.terminal, COPILOT_BOOT_REQUIRED_SURFACES.terminal),

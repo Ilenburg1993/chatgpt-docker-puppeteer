@@ -11,7 +11,7 @@
  * @see module:copilot/hooks/factory
  */
 
-import { toError } from '../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from './logger.js';
 
 /**

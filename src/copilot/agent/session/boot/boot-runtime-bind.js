@@ -4,8 +4,8 @@
  * @file Seams de binding operacional do runtime (observer, métricas, MCP, keepalive e relays).
  */
 
+import { registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '#copilot/config/agent';
-import { registerInterval } from '#copilot/core';
 import {
     EMITTER_AGENT_METRICS,
     EMITTER_MCP_RECONNECTED,
@@ -30,7 +30,7 @@ import { reapExpiredPendingQuestionShadow } from './boot-dialog-recovery.js';
 /**
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringPipelineState} state
- * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options]
+ * @param {{ eventBus?: import('#copilot/events/runtime').EventBus }} [options]
  * @returns {void}
  */
 export function stepAttachAgentObserver(agentEmitter, state, options) {
@@ -58,7 +58,7 @@ export function stepStartMetricsTimer(ctx, state) {
         return;
     }
 
-    const metricsTimer = registerInterval(
+    const metricsTimer = registerApplicationInterval(
         'agent.metricsEmit',
         () => {
             reapExpiredPendingQuestionShadow(ctx);

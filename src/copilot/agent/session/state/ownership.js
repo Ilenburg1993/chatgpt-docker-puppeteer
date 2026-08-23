@@ -23,15 +23,14 @@ function logOwnershipPolicyError(label, error, disposition) {
  *
  * @param {string | null} sdkSessionId
  * @param {{
- *     getHubSessionId: () => string | null;
- *     setSharedSdkSessionId: (id: string | null) => void;
+ *     sessionBinding: { snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null}; setSdkSessionId:(id:string|null)=>unknown; clearSdkSessionId:()=>unknown };
  *     conversationStore?: { updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null;
  * }} deps
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; persistedToStore: boolean }}
  */
 export function syncActiveSessionOwnership(sdkSessionId, deps) {
-    deps.setSharedSdkSessionId(sdkSessionId);
-    const hubSessionId = deps.getHubSessionId();
+    deps.sessionBinding.setSdkSessionId(sdkSessionId);
+    const hubSessionId = deps.sessionBinding.snapshot().hubSessionId;
 
     let persistedToStore = false;
     if (hubSessionId && sdkSessionId && deps.conversationStore?.updateSdkSession) {
@@ -47,8 +46,7 @@ export function syncActiveSessionOwnership(sdkSessionId, deps) {
  *
  * @param {string | null} sdkSessionId
  * @param {{
- *     getHubSessionId: () => string | null;
- *     setSharedSdkSessionId: (id: string | null) => void;
+ *     sessionBinding: { snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null}; setSdkSessionId:(id:string|null)=>unknown; clearSdkSessionId:()=>unknown };
  *     conversationStore?: { updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null;
  * }} deps
  * @param {{ label?: string }} [opts]
@@ -67,13 +65,13 @@ export async function syncActiveSessionOwnershipWithPolicy(sdkSessionId, deps, o
 /**
  * Limpa apenas o vínculo de sessão SDK ativa, preservando o hub conversacional corrente.
  *
- * @param {{ setSharedSdkSessionId: (id: string | null) => void; getHubSessionId: () => string | null }} deps
+ * @param {{ sessionBinding:{snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null};clearSdkSessionId:()=>unknown} }} deps
  * @returns {{ hubSessionId: string | null; sdkSessionId: null }}
  */
 export function clearActiveSdkSessionOwnership(deps) {
-    deps.setSharedSdkSessionId(null);
+    deps.sessionBinding.clearSdkSessionId();
     return {
-        hubSessionId: deps.getHubSessionId(),
+        hubSessionId: deps.sessionBinding.snapshot().hubSessionId,
         sdkSessionId: null,
     };
 }
@@ -82,7 +80,7 @@ export function clearActiveSdkSessionOwnership(deps) {
  * Variante protegida por policy canônica para limpar ownership ativo sem transformar cleanup lateral em falha fatal do
  * shutdown.
  *
- * @param {{ setSharedSdkSessionId: (id: string | null) => void; getHubSessionId: () => string | null }} deps
+ * @param {{ sessionBinding:{snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null};clearSdkSessionId:()=>unknown} }} deps
  * @param {{ label?: string }} [opts]
  * @returns {Promise<
  *     import('../../error/index.js').AgentPolicyResult<ReturnType<typeof clearActiveSdkSessionOwnership>>

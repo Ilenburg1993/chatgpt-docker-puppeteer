@@ -16,12 +16,12 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
-import { safeJsonParse } from '#copilot/core/safe-json';
-import { CustomToolsFileSchema } from '#copilot/core/schemas';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { log } from '../logger.js';
+import { toError } from '#copilot/infra/public/platform/error';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
+import { log, logSdkSwallowed } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
+import { CustomToolsFileSchema } from './schemas.js';
 
 /**
  * @typedef {(opts: {
@@ -207,7 +207,7 @@ export async function loadCustomToolsAsync() {
             log('DEBUG', '[custom-tools-registry] custom-tools.json ausente — registry vazio (opcional).');
             return;
         }
-        const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomToolsAsync]');
+        const jsonResult = parseJsonResult(raw, '[custom-tools/loadCustomToolsAsync]');
         if (!jsonResult.ok) {
             log('WARN', '[custom-tools-registry] custom-tools.json JSON inválido.');
             return;
@@ -222,7 +222,7 @@ export async function loadCustomToolsAsync() {
         _registry = new Map(items.map((item) => [item.name, item]));
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
     } catch (e) {
-        logSwallowed(e, 'sdk.customTools.loadRegistry');
+        logSdkSwallowed(e, 'sdk.customTools.loadRegistry');
     }
 }
 

@@ -1,7 +1,7 @@
 // @ts-check
 /** Instance-owned L1 LRU cache. No operational state exists at module scope. */
 import { normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
-import { readEnvIntAtLeast, readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvIntAtLeast, readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 import { LRUCache } from 'lru-cache';
 import * as nodePath from 'node:path';
 import { verifyIoL1EntrySnapshot } from './verifier.js';

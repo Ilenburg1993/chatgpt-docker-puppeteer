@@ -57,9 +57,7 @@ vi.mock('#copilot/config', async (importOriginal) => ({
     MAESTRO_AGENT_NAME: 'agent-full',
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
-vi.mock('#copilot/core', async (importOriginal) => ({
-    .../** @type {any} */ (await importOriginal()),
-    SHUTDOWN_PRIORITY: { BACKGROUND: 50 },
+vi.mock('../../../src/copilot/agent/ports/tool-surface-policy-port.js', () => ({
     buildCanonicalLocalSurfaceExcludedTools: (
         /** @type {string[]} */ toolNames,
         /** @type {string[]} */ baseExcluded = [],
@@ -79,7 +77,6 @@ vi.mock('#copilot/core', async (importOriginal) => ({
         return [...excluded].sort();
     },
     logSwallowed: vi.fn(),
-    registerShutdownHandler: vi.fn(),
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
 vi.mock('../../../src/copilot/config/agent.js', () => ({

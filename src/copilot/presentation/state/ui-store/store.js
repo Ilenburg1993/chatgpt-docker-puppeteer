@@ -19,8 +19,9 @@ import {
     TERMINAL_SHOW_TOOL_ACTIVITY,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
-import { getHubSessionId as _getCoreHubSessionId, CopilotError, setSharedHubSessionId } from '#copilot/core';
 import { EventEmitter } from 'node:events';
+import { getDefaultAgentRuntime } from '../../agent/runtime/runtime-selection.js';
+import { UiStateError } from '../errors.js';
 
 export const stateEmitter = new EventEmitter();
 stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
@@ -143,12 +144,13 @@ let _sdkPlanChangedAt = null;
 
 /** @returns {string | null} */
 export function getHubSessionId() {
-    return _getCoreHubSessionId();
+    return getDefaultAgentRuntime().getSessionBindingSnapshot().hubSessionId;
 }
 /** @param {string | null} id @returns {void} */
 export function setHubSessionId(id) {
-    const prev = _getCoreHubSessionId();
-    setSharedHubSessionId(id);
+    const runtime = getDefaultAgentRuntime();
+    const prev = runtime.getSessionBindingSnapshot().hubSessionId;
+    runtime.setHubSessionId(id);
     if (prev !== id) stateEmitter.emit(TERMINAL_EVENTS.HUB_SESSION_CHANGED, id, prev);
 }
 
@@ -224,7 +226,7 @@ export function getAttachmentQueue() {
  */
 export function addAttachment(attachment) {
     if (_attachmentQueue.length >= MAX_ATTACHMENT_QUEUE) {
-        throw new CopilotError(`[runtime-ui-state-store] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
+        throw new UiStateError(`[runtime-ui-state-store] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
     }
     const key = attachmentQueueKey(attachment);
     if (!_attachmentQueue.some((entry) => attachmentQueueKey(entry) === key)) {
@@ -784,7 +786,7 @@ export function getTerminalPhase() {
 export function transitionTerminalPhase(next) {
     const allowed = VALID_TRANSITIONS.get(_phase);
     if (!allowed?.includes(next)) {
-        throw new CopilotError(
+        throw new UiStateError(
             `[TerminalSM] transição inválida: ${_phase} → ${next} (permitidas: ${allowed?.join(', ') ?? 'nenhuma'})`,
             'STATE_TRANSITION_ERROR',
         );

@@ -16,7 +16,8 @@ import {
     formatBabelParserError,
     resolveBabelParserOptions,
 } from '#copilot/infra/internal/code-analysis';
-import { countPhysicalTextLines, truncateUtf8String, utf8ByteLength } from '#copilot/infra/internal/platform';
+import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
+import { countPhysicalTextLines } from '#copilot/infra/internal/platform/text-lines';
 import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import {

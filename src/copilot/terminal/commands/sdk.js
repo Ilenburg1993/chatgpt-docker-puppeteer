@@ -7,10 +7,10 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
 import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
-import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
+import { decideSdkFsRouting } from '../../presentation/files/index.js';
 import {
     clearNextTurnRequestHeaders,
     getNextTurnRequestHeaders,
@@ -30,13 +30,16 @@ import {
     getTerminalSdkUsageMetrics,
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
+    isTerminalRuntimeElicitationSchema,
     isTerminalSdkSessionUiElicitationAvailable,
+    listTerminalCanonicalLocalFsToolNames,
     listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingPermissions,
     listTerminalSdkSkills,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
+    normalizeTerminalElicitationContentWithSchema,
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
     readTerminalSdkSkillsGovernance,
@@ -631,7 +634,7 @@ async function renderSdkDoctor({ println }, runtimeId) {
     const sdkUi = objectOrNull(caps['ui']) ?? {};
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
 
-    const localFsToolNames = [...CANONICAL_LOCAL_FS_TOOL_NAMES];
+    const localFsToolNames = listTerminalCanonicalLocalFsToolNames();
     const registrySnapshot = readTerminalToolRegistrySnapshot();
     const localFsToolsReady = registrySnapshot.hasCanonicalLocalFsTools === true;
     const contract = registrySnapshot.toolContract;
@@ -844,7 +847,7 @@ function defaultElicitationSchema() {
  * @returns {{ key: string; field: Record<string, unknown> } | null}
  */
 function getSingleElicitationField(schema) {
-    if (!isRuntimeElicitationSchema(schema)) return null;
+    if (!isTerminalRuntimeElicitationSchema(schema)) return null;
     const entries = Object.entries(schema.properties);
     if (entries.length !== 1) return null;
     const [key, field] = /** @type {[string, unknown]} */ (entries[0]);
@@ -982,7 +985,7 @@ function parseElicitationResult(action, rest, schema) {
     }
     const parsed = parseElicitationAcceptContent(rest, schema);
     if (!parsed.ok) return parsed;
-    const normalized = normalizeElicitationContentWithSchema(parsed.content, schema);
+    const normalized = normalizeTerminalElicitationContentWithSchema(parsed.content, schema);
     if (!normalized.ok) {
         return { ok: false, error: normalized.error };
     }
@@ -1126,8 +1129,8 @@ function parseSdkSimulateRequestUserInputArgs(rest) {
     for (let i = 0; i < rest.length; i++) {
         const token = rest[i] ?? '';
         if (!token) continue;
-        if (token === '--required' || token === '--legacy-required') {
-            allowFreeform = true;
+        if (token === '--required') {
+            allowFreeform = false;
             continue;
         }
         if (token === '--freeform') {
@@ -1159,7 +1162,7 @@ function renderSdkSimulate({ println }, rest) {
     if (kind !== 'pergunta' && kind !== 'question' && kind !== 'request-user-input' && kind !== 'request_user_input') {
         println('');
         println(
-            terminalThemeRow('Uso', '/sdk simulate pergunta [--choices "sim|nao"] [--required legado] [texto]', {
+            terminalThemeRow('Uso', '/sdk simulate pergunta [--choices "sim|nao"] [--required] [texto]', {
                 role: 'command',
             }),
         );
@@ -1175,7 +1178,7 @@ function renderSdkSimulate({ println }, rest) {
     const created = createTerminalPendingStructuredUserInput({
         question: parsed.question,
         choices: parsed.choices,
-        allowFreeform: true,
+        allowFreeform: parsed.allowFreeform,
         data: { command: '/sdk simulate pergunta' },
     });
     println('');
@@ -1183,7 +1186,7 @@ function renderSdkSimulate({ println }, rest) {
         title: 'Pergunta humana estruturada',
         question: compactText(parsed.question, 220),
         choices: parsed.choices,
-        allowFreeform: true,
+        allowFreeform: parsed.allowFreeform,
         source: 'diagnóstico de pergunta estruturada',
         state: 'aguardando operador',
         includeDivider: true,
@@ -2390,7 +2393,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 println(terminalThemeRow('JSON', `inválido: ${parsed.error ?? 'schema ausente'}`, { role: 'error' }));
                 return;
             }
-            if (!isRuntimeElicitationSchema(parsed.json)) {
+            if (!isTerminalRuntimeElicitationSchema(parsed.json)) {
                 println(
                     terminalThemeRow('Schema', 'inválido: esperado { "type": "object", "properties": { ... } }.', {
                         role: 'error',

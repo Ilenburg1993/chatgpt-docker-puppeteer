@@ -21,10 +21,10 @@
  */
 
 import { getApplicationInfraRuntime } from '#copilot/boot/application-infra';
-import { decideSdkFsRouting, hasCanonicalLocalFsTools, redactSecretRecord } from '#copilot/core';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { Router } from 'express';
-import { logSwallowed } from '../../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
@@ -41,6 +41,8 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkFileRouting']} sdkFileRouting
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkToolSurfacePolicy']} sdkToolSurfacePolicy
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.
@@ -204,8 +206,8 @@ export default function createObservabilityRouter(deps) {
             const loadedToolNames = Array.isArray(routeDeps.allTools)
                 ? routeDeps.allTools.map((tool) => String(tool.name ?? '')).filter(Boolean)
                 : [];
-            const sdkFsRouting = decideSdkFsRouting({
-                canonicalFsReady: hasCanonicalLocalFsTools(loadedToolNames),
+            const sdkFsRouting = routeDeps.sdkFileRouting.decideSdkFsRouting({
+                canonicalFsReady: routeDeps.sdkToolSurfacePolicy.hasCanonicalLocalFsTools(loadedToolNames),
                 sdkWorkspaceAvailable: typeof routeDeps.sdkSessionRpc?.workspaceReadFile === 'function',
             });
             const convergenceTraceSnapshot =

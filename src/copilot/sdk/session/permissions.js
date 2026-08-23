@@ -13,7 +13,7 @@
  * precisam compor permissões com policy de produto.
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { approveAll } from '@github/copilot-sdk';
 import { PERMISSION_REQUEST_KINDS } from '../constants.js';
 import { log } from '../logger.js';

@@ -1,5 +1,5 @@
 // @ts-check
-import { ConfigError } from '#copilot/core';
+import { SdkConfigError } from '#copilot/sdk/errors';
 import {
     agentDeselect as rpcAgentDeselect,
     agentGetCurrent as rpcAgentGetCurrent,
@@ -73,14 +73,14 @@ export const READ_ONLY_TOOLS = [
  * @param {boolean} [cfg.infer=true] - Se disponível para inferência de modelo. Default is `true`
  * @param {string[]} [cfg.skills] - Skills a pré-carregar no contexto do agente
  * @returns {CustomAgentConfig}
- * @throws {ConfigError} Se name ou prompt forem string vazia ou não-string
+ * @throws {SdkConfigError} Se name ou prompt forem string vazia ou não-string
  * @see createReadOnlyAgent
  */
 export function createAgent({ name, prompt, displayName, description, tools, mcpServers, infer, skills }) {
     if (!name || typeof name !== 'string')
-        throw new ConfigError('[lib/agents] createAgent: "name" (string) é obrigatório.');
+        throw new SdkConfigError('[lib/agents] createAgent: "name" (string) é obrigatório.');
     if (!prompt || typeof prompt !== 'string')
-        throw new ConfigError('[lib/agents] createAgent: "prompt" (string) é obrigatório.');
+        throw new SdkConfigError('[lib/agents] createAgent: "prompt" (string) é obrigatório.');
 
     /** @type {CustomAgentConfig} */
     const config = { name, prompt };

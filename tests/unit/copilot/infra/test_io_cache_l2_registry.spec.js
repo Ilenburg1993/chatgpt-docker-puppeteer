@@ -5,8 +5,9 @@ import { createInfraSqliteProviderBinding } from '#copilot/infra/internal/databa
 import { createBetterSqliteProvider } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { listShutdownHandlers } from '../../../../src/copilot/core/index.js';
 import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/observability/health.js';
 
 /** @type {import('better-sqlite3').Database | null} */
@@ -79,15 +80,12 @@ describe('io-cache-l2 runtime ownership', () => {
         });
     });
 
-    it('does not register process shutdown handlers when materialized', () => {
+    it('is lifecycle-self-owned and has no dependency on application process shutdown', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
         recreateL2Runtime();
-        const before = listShutdownHandlers().filter((entry) => entry.name.includes('io-l2'));
-
         expect(requireL2Runtime().get()).not.toBeNull();
-
-        const after = listShutdownHandlers().filter((entry) => entry.name.includes('io-l2'));
-        expect(after).toEqual(before);
+        const source = readFileSync(resolve('src/copilot/infra/cache/l2/cache-runtime.js'), 'utf8');
+        expect(source).not.toMatch(/process-runtime|shutdown|registerApplicationShutdownHandler/u);
     });
 
     it('keeps explicit off as the single disabled configuration', () => {

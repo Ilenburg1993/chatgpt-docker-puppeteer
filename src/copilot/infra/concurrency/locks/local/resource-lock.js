@@ -63,7 +63,7 @@ export function normalizeIoResourceKey(resourceKey) {
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<IoResourceLockLease>}
  */
@@ -218,7 +218,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<IoResourceLocksLease>}
  */
@@ -293,7 +293,7 @@ export async function acquireIoResourceLocks(resourceKeys, options = {}) {
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
@@ -324,7 +324,7 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<{ value: T; waitMs: number }>}
  */

@@ -44,7 +44,6 @@ describe('M-02 — contratos após remoção de services/', () => {
 
     it('expõe conversation store diretamente via #copilot/conversation-hub', async () => {
         const mod = await import('#copilot/conversation-hub');
-        assert.ok(mod.CONVERSATION_STORE, 'CONVERSATION_STORE deve existir');
         assert.ok(mod.conversationStore, 'conversationStore deve existir');
     });
 });

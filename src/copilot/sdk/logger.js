@@ -12,6 +12,8 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
+
 /**
  * @typedef {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} LogLevel
  */
@@ -43,4 +45,31 @@ export function setSdkLogger(logFn) {
  */
 export function log(level, msg, meta) {
     _log(level, msg, meta);
+}
+
+/** @type {((error: unknown, context: string) => void) | null} */
+let _reportError = null;
+
+/** @param {(error: unknown, context: string) => void} reporter */
+export function setSdkErrorReporter(reporter) {
+    _reportError = typeof reporter === 'function' ? reporter : null;
+}
+
+/**
+ * Best-effort reporting owned by the SDK boundary. Reporting failure never changes SDK control flow.
+ * @param {unknown} error
+ * @param {string} context
+ */
+export function logSdkSwallowed(error, context) {
+    const normalized = toError(error);
+    try {
+        log('DEBUG', `[swallowed:${context}] ${normalized.message}`);
+    } catch {
+        /* reporting never changes control flow */
+    }
+    try {
+        _reportError?.(error, context);
+    } catch {
+        /* reporting never changes control flow */
+    }
 }

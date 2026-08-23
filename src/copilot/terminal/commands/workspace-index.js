@@ -10,9 +10,9 @@
  */
 
 import { getApplicationWorkspaceInfra } from '#copilot/boot';
+import { toError } from '#copilot/infra/public/platform/error';
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
 import {
     formatTerminalTimeLabel,
     terminalThemeHeadline,

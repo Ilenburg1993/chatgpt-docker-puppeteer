@@ -19,6 +19,7 @@ export {
     createAuditLog,
     createAuditPostToolHandler,
     defaultAuditLog,
+    flushPermissionAudit,
     getAuditTail,
     globalAuditBuffer,
     isHighRiskTool,
@@ -35,10 +36,9 @@ export {
 } from './hook-audit-trail.js';
 
 // Logger proxy (DI)
-export { setAuditLogger } from './logger.js';
+export { setAuditErrorReporter, setAuditLogger } from './logger.js';
 
 // Re-export de constantes de eventos de auditoria (SSOT vive em #copilot/events)
 export { AUDIT_LOG } from '#copilot/events';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { AUDIT_BUS, AUDIT_LOGGER } from './di-tokens.js';

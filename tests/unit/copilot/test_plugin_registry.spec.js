@@ -57,17 +57,15 @@ describe('copilot/plugins/PluginRegistry', () => {
                 called = true;
             },
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        const container = createContainer();
-        await reg.install('inst', container);
+        const context = Object.freeze({ feature: 'test' });
+        await reg.install('inst', context);
         expect(called).toBe(true);
         expect(reg.list()[0]?.installed).toBe(true);
     });
 
     it('install() plugin não encontrado lança erro', async () => {
         const reg = await makeRegistry();
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        await expect(reg.install('nope', createContainer())).rejects.toThrow(/not found/);
+        await expect(reg.install('nope', Object.freeze({}))).rejects.toThrow(/not found/);
     });
 
     it('install() plugin já instalado é idempotente', async () => {
@@ -80,10 +78,9 @@ describe('copilot/plugins/PluginRegistry', () => {
                 count++;
             },
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        const container = createContainer();
-        await reg.install('idem', container);
-        await reg.install('idem', container);
+        const context = Object.freeze({});
+        await reg.install('idem', context);
+        await reg.install('idem', context);
         expect(count).toBe(1);
     });
 
@@ -104,8 +101,7 @@ describe('copilot/plugins/PluginRegistry', () => {
                 installed.push('y');
             },
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        await reg.installAll(createContainer());
+        await reg.installAll(Object.freeze({}));
         expect(installed).toEqual(['x', 'y']);
     });
 
@@ -141,13 +137,12 @@ describe('copilot/plugins/PluginRegistry', () => {
             install: () => {},
             dependencies: ['base'],
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        const container = createContainer();
+        const context = Object.freeze({});
         // base não instalado → deve rejeitar
-        await expect(reg.install('dep-child', container)).rejects.toThrow(/requires "base"/);
+        await expect(reg.install('dep-child', context)).rejects.toThrow(/requires "base"/);
         // instalar base primeiro → funciona
-        await reg.install('base', container);
-        await reg.install('dep-child', container);
+        await reg.install('base', context);
+        await reg.install('dep-child', context);
         expect(reg.list().find((p) => p.name === 'dep-child')?.installed).toBe(true);
     });
 
@@ -176,8 +171,7 @@ describe('copilot/plugins/PluginRegistry', () => {
                 installed.push('gamma');
             },
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        const result = await activatePlugins(reg, createContainer(), ['alpha', 'gamma']);
+        const result = await activatePlugins(reg, Object.freeze({}), ['alpha', 'gamma']);
         expect(result).toEqual(['alpha', 'gamma']);
         expect(installed).toEqual(['alpha', 'gamma']);
     });
@@ -195,8 +189,7 @@ describe('copilot/plugins/PluginRegistry', () => {
             type: /** @type {const} */ ('hook'),
             install: () => {},
         });
-        const { createContainer } = await import('../../../src/copilot/core/di.js');
-        const result = await activatePlugins(reg, createContainer());
+        const result = await activatePlugins(reg, Object.freeze({}));
         expect(result.length).toBe(2);
         expect(result).toContain('all1');
         expect(result).toContain('all2');

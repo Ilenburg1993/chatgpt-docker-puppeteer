@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 /** @type {string[]} */
 const tempRoots = [];
@@ -111,37 +111,31 @@ describe('ApplicationInfraHost', () => {
         });
     });
 
-    it('registers exactly one host-owned graceful-shutdown handler when explicitly enabled', async () => {
+    it('registers exactly one host-owned graceful-shutdown handler in its ProcessInfra controller', async () => {
         const root = await createTempRoot();
-        /** @type {Array<{name:string;fn:()=>Promise<void>;priority:number|undefined;options:{timeoutMs?:number}|undefined}>} */
-        const registrations = [];
-        /** @type {typeof import('#copilot/core').registerShutdownHandler} */
-        const registerShutdownHandlerFn = vi.fn((name, fn, priority, options) => {
-            registrations.push({ name, fn, priority, options });
-        });
         const host = createApplicationInfraHost({
             hostId: 'shutdown-host',
             defaultWorkspaceRoot: root,
             registerProcessShutdown: true,
             shutdownHandlerName: 'test.application-infra.dispose',
             shutdownTimeoutMs: 12_345,
-            registerShutdownHandlerFn,
         });
         hosts.push(host);
 
         host.workspace();
-        host.snapshot();
-        expect(registerShutdownHandlerFn).toHaveBeenCalledTimes(1);
-        expect(registrations[0]?.name).toBe('test.application-infra.dispose');
-        expect(registrations[0]?.priority).toBe(13);
-        expect(registrations[0]?.options).toEqual({ timeoutMs: 12_345 });
+        const registrations = host.processInfra.shutdown.handlers();
+        expect(registrations).toEqual([
+            {
+                name: 'test.application-infra.dispose',
+                phase: 'application-infra',
+                timeoutMs: 12_345,
+            },
+        ]);
         expect(host.snapshot().shutdownRegistered).toBe(true);
 
-        const shutdown = registrations[0]?.fn;
-        expect(typeof shutdown).toBe('function');
-        if (!shutdown) throw new Error('shutdown handler was not registered');
-        await shutdown();
+        await host.processInfra.shutdown.run('unit-test');
         expect(host.snapshot().state).toBe('disposed');
+        expect(host.processInfra.shutdown.lastReport()?.handlers[0]?.status).toBe('ok');
     });
 
     it('coalesces concurrent SQLite bootstrap and allows an explicit provider reset/rebind', async () => {

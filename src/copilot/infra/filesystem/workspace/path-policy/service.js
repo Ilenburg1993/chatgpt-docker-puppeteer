@@ -18,7 +18,7 @@ import {
     normalizeWorkspacePathPolicyMode,
     splitWorkspacePathSegments,
     workspacePathPolicyFailure,
-} from '#copilot/infra/internal/policy';
+} from '#copilot/infra/internal/policy/workspace-path';
 import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -40,7 +40,7 @@ import {
  *   preserveFinalSymlink?:boolean;
  *   mode?:'read'|'write'|'append'|'scan'|'search'|'fetch'|'copy'|'move'|'delete'|'patch'|'mkdir'|'metadata'|'stat';
  * }} options
- * @returns {Promise<import('#copilot/infra/internal/policy').WorkspacePathPolicyResult>}
+ * @returns {Promise<import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicyResult>}
  */
 export async function evaluateWorkspacePathPolicyAsync(inputPath, options) {
     const base = evaluateWorkspacePathPolicy(inputPath, options);
@@ -93,7 +93,7 @@ export async function evaluateWorkspacePathPolicyAsync(inputPath, options) {
         );
     }
 
-    const result = /** @type {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} */ ({
+    const result = /** @type {import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicySuccess} */ ({
         ...base,
         relativePath: containment.relativePath,
         realPath: normalizedTargetPath,
@@ -127,7 +127,7 @@ async function resolveRealTargetForWorkspacePolicy(absolutePath) {
     }
 }
 
-/** @param {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} base @param {readonly string[]} blockedSegments @param {readonly RegExp[]} blockedPatterns */
+/** @param {import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicySuccess} base @param {readonly string[]} blockedSegments @param {readonly RegExp[]} blockedPatterns */
 function buildWorkspacePathPolicyCacheKey(base, blockedSegments, blockedPatterns) {
     return JSON.stringify([
         IO_PATH_POLICY_VERSION,

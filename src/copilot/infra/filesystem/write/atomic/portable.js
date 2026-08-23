@@ -19,7 +19,7 @@ import { writeAtomicFileUnlocked } from './unlocked.js';
  * @param {{
  *     mode?: number;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<void>}
  */

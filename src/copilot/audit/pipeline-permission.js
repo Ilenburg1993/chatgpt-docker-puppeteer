@@ -9,12 +9,12 @@
  * @see EventBus
  */
 
-import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { toError } from '#copilot/infra/public/platform/error';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { join, resolve } from 'node:path';
-import { getLogDir, log } from './logger.js';
+import { getLogDir, log, logAuditSwallowed } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
 const envInt = (key, def) => {
@@ -68,7 +68,7 @@ const permissionAuditWriter = createBoundJsonlFileWriter({
     maxQueueLines: 10_000,
     softQueueLines: 8_000,
     durability: 'file',
-    onError: (error) => logSwallowed(error, 'audit.pipeline.logPermission'),
+    onError: (error) => logAuditSwallowed(error, 'audit.pipeline.logPermission'),
 });
 
 /**
@@ -117,17 +117,14 @@ export function logToolAudit(entry) {
     permissionAuditWriter.enqueueLine(line);
 }
 
-registerShutdownHandler(
-    'audit.permission.flush',
-    async () => {
-        try {
-            await permissionAuditWriter.flush();
-        } catch (error) {
-            logSwallowed(error, 'audit.pipeline.flushPermission');
-        }
-    },
-    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
-);
+/** Flush the application permission-audit writer without owning process lifecycle registration. */
+export async function flushPermissionAudit() {
+    try {
+        await permissionAuditWriter.flush();
+    } catch (error) {
+        logAuditSwallowed(error, 'audit.pipeline.flushPermission');
+    }
+}
 
 /**
  * @param {unknown} kind

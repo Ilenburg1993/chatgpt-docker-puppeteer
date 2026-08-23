@@ -13,7 +13,7 @@ import { AGENT_EMITTER_ERROR, AGENT_SESSION_FATAL } from '#copilot/events';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 
 /**
  * @param {unknown} raw

@@ -57,7 +57,9 @@ export function resetValidationStats() {
 /**
  * Middleware de validação de schema.
  *
- * @type {import('../../core/event-bus.js').Middleware}
+ * @param {import('../base-events.js').BaseEvent} event
+ * @param {() => void | Promise<void>} next
+ * @returns {void | Promise<void>}
  */
 export function schemaValidator(event, next) {
     // ── Base validation (L6) ─────────────────────────────

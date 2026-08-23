@@ -1,9 +1,9 @@
 // @ts-check
 /** diagnostics_channel publication for IO operations and lifecycle events. */
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/internal/platform/error';
 import { channel } from 'node:diagnostics_channel';
 
-/** @typedef {{ recordOperation(io:import('#copilot/core/io-contracts').IoMeta, opts:{success:boolean;error?:unknown}):void }} IoTelemetryRuntime */
+/** @typedef {{ recordOperation(io:import('#copilot/infra/internal/operations/contracts').IoMeta, opts:{success:boolean;error?:unknown}):void }} IoTelemetryRuntime */
 
 const IO_TELEMETRY_RUNTIME = Symbol('copilot.io.telemetry-runtime');
 
@@ -39,7 +39,7 @@ const lifecycleChannels = {
     scan: channel('copilot.io.scan'),
 };
 
-/** @param {import('#copilot/core/io-contracts').IoMeta} io @param {{success:boolean;error?:unknown}} opts @param {IoTelemetryRuntime} [telemetryRuntime] */
+/** @param {import('#copilot/infra/internal/operations/contracts').IoMeta} io @param {{success:boolean;error?:unknown}} opts @param {IoTelemetryRuntime} [telemetryRuntime] */
 export function publishIoOperation(io, opts, telemetryRuntime) {
     try {
         telemetryRuntime?.recordOperation(io, opts);
@@ -54,12 +54,12 @@ export function publishIoOperation(io, opts, telemetryRuntime) {
                   })()
                 : {}),
         });
-    } catch (error) {
-        logSwallowed(error, 'io-observability.diagnostics_channel');
+    } catch {
+        // diagnostics_channel is already the reporting boundary; publication failure must not escape the IO operation.
     }
 }
 
-/** @param {import('#copilot/core/io-contracts').IoMeta} io @param {boolean} success @param {unknown} [error] @param {IoTelemetryRuntime} [telemetryRuntime] */
+/** @param {import('#copilot/infra/internal/operations/contracts').IoMeta} io @param {boolean} success @param {unknown} [error] @param {IoTelemetryRuntime} [telemetryRuntime] */
 export function publishIoOperationResult(io, success, error, telemetryRuntime) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) }, telemetryRuntime);
     return io;
@@ -69,7 +69,7 @@ export function publishIoOperationResult(io, success, error, telemetryRuntime) {
 export function publishIoLifecycleEvent(domain, phase, payload = {}) {
     try {
         lifecycleChannels[domain].publish({ ts: Date.now(), domain, phase, ...payload });
-    } catch (error) {
-        logSwallowed(error, `io-observability.lifecycle.${domain}.${phase}`);
+    } catch {
+        // diagnostics_channel is already the reporting boundary; publication failure remains contained.
     }
 }

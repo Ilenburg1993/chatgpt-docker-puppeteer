@@ -68,15 +68,12 @@ function collectImportSpecifiers(filePath) {
 }
 
 describe('IO/tools boundary contracts', () => {
-    it('core L0 não possui autoridade ambiental implícita', () => {
-        const violations = [];
-        for (const filePath of listJsFiles(CORE_ROOT)) {
-            const source = stripJavaScriptComments(readFileSync(filePath, 'utf8'));
-            const rel = relative(REPO_ROOT, filePath).replace(/\\/g, '/');
-            if (/\bprocess\s*\.\s*env\b/u.test(source)) violations.push(`${rel}: process.env`);
-            if (/['"](?:node:)?process['"]/u.test(source)) violations.push(`${rel}: process module import`);
-        }
-        expect(violations).toEqual([]);
+    it('former Core L0 permanece fisicamente extinto e sem aliases de pacote', () => {
+        expect(existsSync(CORE_ROOT)).toBe(false);
+        const aliases = Object.keys(PACKAGE_JSON.imports ?? {}).filter(
+            (key) => key === '#copilot/core' || key.startsWith('#copilot/core/'),
+        );
+        expect(aliases).toEqual([]);
     });
 
     it('infra concentra child_process nos dois adapters de search com ambiente explícito', () => {

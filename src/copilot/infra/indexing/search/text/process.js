@@ -1,7 +1,7 @@
 // @ts-check
 /** ripgrep/grep execution path for completeness-oriented text search. */
 
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { publishIoOperationResult } from '#copilot/infra/internal/telemetry';
 import {
     countSearchMatchLines,

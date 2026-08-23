@@ -11,7 +11,6 @@ import { validatePath, WORKSPACE_INDEXING, WORKSPACE_IO, WORKSPACE_ROOT } from '
  * @module copilot/tools/file/index-tools
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { windowFileContext } from '#copilot/infra/public/indexing/file-context';
 import {
     filterIndexRowsByGlob,
@@ -21,6 +20,7 @@ import {
     normalizeSearchWindow,
     paginateSearchItems,
 } from '#copilot/infra/public/indexing/search';
+import { toError } from '#copilot/infra/public/platform/error';
 
 const INDEX_REGISTRY = WORKSPACE_INDEXING.registry;
 if (!INDEX_REGISTRY) throw new Error('File tools workspace is not attached to an InfraRuntime index registry.');

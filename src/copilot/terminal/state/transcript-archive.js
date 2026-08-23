@@ -10,8 +10,8 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { toError } from '#copilot/infra/public/platform/error';
 import { join, resolve } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
 
 const DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
 const TERMINAL_TRANSCRIPT_ARCHIVE_DIR = resolve(

@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
     bootRollbacks: /** @type {{ phaseId: string; id: string; rollback: () => void | Promise<void> }[]} */ ([]),
     bootstrapObservability: vi.fn(),
     bootstrapLateDeps: vi.fn(),
-    validateRequired: vi.fn(),
     assertCopilotBootSurfaces: vi.fn(() => ({ ok: true, groups: [], missing: [] })),
     createCopilotBootPlan: vi.fn(() => ({
         phases: [
@@ -60,10 +59,11 @@ const mocks = vi.hoisted(() => ({
     rollbackTerminalPinnedContextPhase: vi.fn(),
     rollbackTerminalHttpServerPhase: vi.fn(),
     rollbackTerminalRuntimeListenersPhase: vi.fn(),
-    wireCopilotRuntimeDI: vi.fn(),
+    wireCopilotRuntime: vi.fn(),
     startTodoCleanupJob: vi.fn(),
     buildTool: vi.fn(),
     setAuditBus: vi.fn(),
+    flushPermissionAudit: vi.fn(async () => {}),
     defaultBus: { on: vi.fn(), emit: vi.fn() },
     registerGlobalHandlers: vi.fn(),
 }));
@@ -71,17 +71,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../src/copilot/observability/bootstrap.js', () => ({
     bootstrapObservability: mocks.bootstrapObservability,
     bootstrapLateDeps: mocks.bootstrapLateDeps,
-}));
-
-vi.mock('../../../src/copilot/core/di-container.js', () => ({
-    container: {
-        has: vi.fn(() => false),
-        register: vi.fn(),
-        resolve: vi.fn((token) =>
-            token === Symbol.for('ERROR_TRACKER') ? { registerGlobalHandlers: mocks.registerGlobalHandlers } : null,
-        ),
-        validateRequired: mocks.validateRequired,
-    },
 }));
 
 vi.mock('#copilot/boot', async (importOriginal) => ({
@@ -112,7 +101,7 @@ vi.mock('#copilot/sdk/telemetry', () => ({
 }));
 
 vi.mock('../../../src/copilot/runtime-wiring.js', () => ({
-    wireCopilotRuntimeDI: mocks.wireCopilotRuntimeDI,
+    wireCopilotRuntime: mocks.wireCopilotRuntime,
 }));
 
 vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
@@ -123,8 +112,6 @@ vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
 vi.mock('../../../src/copilot/tools/index.js', async (importOriginal) => ({
     ...(await importOriginal()),
     buildTool: mocks.buildTool,
-    TOOLS_LOGGER: Symbol.for('TOOLS_LOGGER'),
-    TOOLS_METRICS: Symbol.for('TOOLS_METRICS'),
 }));
 
 vi.mock('../../../src/copilot/hooks/bus.js', () => ({
@@ -133,20 +120,11 @@ vi.mock('../../../src/copilot/hooks/bus.js', () => ({
 
 vi.mock('../../../src/copilot/audit/pipeline-permission.js', () => ({
     setAuditBus: mocks.setAuditBus,
+    flushPermissionAudit: mocks.flushPermissionAudit,
 }));
 
 vi.mock('../../../src/copilot/server/index.js', () => ({
     startCopilotServer: vi.fn(),
-}));
-
-vi.mock('#copilot/audit', () => ({
-    AUDIT_BUS: Symbol.for('AUDIT_BUS'),
-}));
-
-vi.mock('#copilot/core', async (importOriginal) => ({
-    ...(await importOriginal()),
-    EVENT_BUS: Symbol.for('EVENT_BUS'),
-    SHUTDOWN_LOGGER: Symbol.for('SHUTDOWN_LOGGER'),
 }));
 
 vi.mock('#copilot/hooks', () => ({
@@ -155,13 +133,11 @@ vi.mock('#copilot/hooks', () => ({
 
 vi.mock('#copilot/observability', () => ({
     ERROR_TRACKER: Symbol.for('ERROR_TRACKER'),
+    defaultErrorTracker: { registerGlobalHandlers: mocks.registerGlobalHandlers },
 }));
 
 vi.mock('#copilot/sdk', () => ({
     CopilotClient: class MockCopilotClient {},
-    SDK_LOGGER: Symbol.for('SDK_LOGGER'),
-    HOOKS_LOGGER: Symbol.for('HOOKS_LOGGER'),
-    TOOLS_BUILDER: Symbol.for('TOOLS_BUILDER'),
     defaultHookBus: mocks.defaultBus,
     checkAuthStatus: vi.fn(),
 }));
@@ -169,8 +145,6 @@ vi.mock('#copilot/sdk', () => ({
 vi.mock('#copilot/tools', async (importOriginal) => ({
     ...(await importOriginal()),
     buildTool: mocks.buildTool,
-    TOOLS_LOGGER: Symbol.for('TOOLS_LOGGER'),
-    TOOLS_METRICS: Symbol.for('TOOLS_METRICS'),
 }));
 
 vi.mock('../../../src/copilot/config/agent.js', () => ({
@@ -243,7 +217,7 @@ describe('copilot/bootstrap', () => {
         mocks.rollbackTerminalPinnedContextPhase.mockReset();
         mocks.rollbackTerminalHttpServerPhase.mockReset();
         mocks.rollbackTerminalRuntimeListenersPhase.mockReset();
-        mocks.wireCopilotRuntimeDI.mockReset();
+        mocks.wireCopilotRuntime.mockReset();
         mocks.assertCopilotBootSurfaces.mockClear();
         mocks.registerGlobalHandlers.mockReset();
         mocks.bootRollbacks.length = 0;

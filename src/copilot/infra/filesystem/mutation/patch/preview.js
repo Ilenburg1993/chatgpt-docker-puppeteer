@@ -1,6 +1,6 @@
 // @ts-check
 /** Bounded textual diff preview policy shared by locked patch variants. */
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 
 const DEFAULT_PATCH_DIFF_MAX_LINES = 160;
 const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;

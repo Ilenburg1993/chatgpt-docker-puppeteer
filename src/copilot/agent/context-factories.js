@@ -32,6 +32,7 @@ import { defaultMetrics } from './ports/metrics-port.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history/index.js';
 import { SessionKeepalive } from './session/lifecycle/index.js';
+import { createAgentSessionBindingRuntime } from './session/state/index.js';
 
 /**
  * @typedef {{
@@ -50,6 +51,7 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *     createKeepalive: (host: AgentContextFactoryHost) => SessionKeepalive;
  *     createHandoff: (host: AgentContextFactoryHost) => HandoffManager;
  *     createMessagesCache: (host: AgentContextFactoryHost) => SessionMessagesCache;
+ *     createSessionBinding: (host: AgentContextFactoryHost) => ReturnType<typeof createAgentSessionBindingRuntime>;
  *     createSdkElicitation: (host: AgentContextFactoryHost) => {
  *         handler: import('#copilot/sdk/types').ElicitationHandler;
  *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
@@ -81,6 +83,7 @@ export const defaultAgentContextFactories = Object.freeze({
     createKeepalive: () => new SessionKeepalive(),
     createHandoff: () => new HandoffManager(),
     createMessagesCache: () => new SessionMessagesCache(MESSAGES_CACHE_TTL_MS),
+    createSessionBinding: () => createAgentSessionBindingRuntime(),
     createSdkElicitation: (host) => {
         const queued = createQueuedElicitationHandler({
             onPending: (entry) => {
@@ -180,6 +183,11 @@ export const defaultAgentContextFactories = Object.freeze({
         'runtime.background-tasks': {
             provider: 'agent/background-tasks',
             factory: 'defaultAgentContextFactories.createBackgroundTasks',
+            runtimeAuthority: 'agent',
+        },
+        'runtime.session-binding': {
+            provider: 'agent/session/state/binding-runtime',
+            factory: 'defaultAgentContextFactories.createSessionBinding',
             runtimeAuthority: 'agent',
         },
         'sdk.session-history-cache': {

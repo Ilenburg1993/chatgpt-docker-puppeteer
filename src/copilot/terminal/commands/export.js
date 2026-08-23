@@ -10,9 +10,9 @@
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { join, resolve } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
-import { redactSecretText } from '../../core/security/redaction.js';
 import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';

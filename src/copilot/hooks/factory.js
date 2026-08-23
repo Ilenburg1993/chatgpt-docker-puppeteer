@@ -13,7 +13,7 @@
  * @see module:copilot/hooks/composer
  */
 
-import { toError } from '../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
 import { isDynamicOnly } from './tool-filter.js';
@@ -287,9 +287,6 @@ function buildErrorOccurredHandler() {
 /**
  * Cria um objeto `SessionHooks` configurável para uso com `createSession()` ou `resumeSession()`.
  *
- * O resultado é compatível com {@link import('../core/interfaces.js').IHooksPipeline IHooksPipeline} (Faixa 3.2 —
- * AC-5-05).
- *
  * Os handlers customizados passados via `cfg` substituem os defaults. Se não forem passados, são construídos baseados
  * nas listas `allowTools`/`denyTools`/`denyPatterns` e `auditLog`.
  *
@@ -299,7 +296,6 @@ function buildErrorOccurredHandler() {
  *
  * @param {HooksConfig} [cfg={}] - Configuração dos hooks. Default is `{}`
  * @returns {SessionHooks}
- * @see module:copilot/core/interfaces
  */
 export function createHooks(cfg = {}) {
     const auditLog = cfg.auditLog ?? false;

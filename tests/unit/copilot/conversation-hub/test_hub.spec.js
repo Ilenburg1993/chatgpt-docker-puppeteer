@@ -6,6 +6,7 @@
  * facade methods, isReady, stop, close.
  */
 
+import { createEventBus } from '#copilot/events/runtime';
 import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
@@ -43,7 +44,7 @@ async function createHub() {
     applyCopilotMigrations(db);
     const store = new ConversationStore();
     store.init(adaptBetterSqliteDatabase(db));
-    const hub = new ConversationHub(store);
+    const hub = new ConversationHub({ store, eventBus: createEventBus() });
     await hub.init();
     /** @type {ConversationHub & { __testDb?: import('better-sqlite3').Database }} */
     const testHub = hub;
@@ -79,7 +80,7 @@ describe('ConversationHub lifecycle', () => {
     });
 
     it('orchestrator getter lança antes de init', () => {
-        const hub = new ConversationHub();
+        const hub = new ConversationHub({ eventBus: createEventBus() });
         assert.throws(() => hub.orchestrator, /Não inicializado/);
     });
 
@@ -91,7 +92,7 @@ describe('ConversationHub lifecycle', () => {
     });
 
     it('close é no-op se não inicializado', async () => {
-        const hub = new ConversationHub();
+        const hub = new ConversationHub({ eventBus: createEventBus() });
         await hub.close(); // deve não lançar
         assert.strictEqual(hub.isReady, false);
     });

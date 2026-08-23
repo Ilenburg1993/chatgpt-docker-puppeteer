@@ -6,7 +6,7 @@
  * remonte payload HTTP de erro/sucesso manualmente.
  */
 
-import { redactSecretText } from '#copilot/core';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
 
 /**
  * @typedef {import('express').Response} Res

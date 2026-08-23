@@ -46,10 +46,7 @@ vi.mock('#copilot/boot', () => ({
     }),
 }));
 
-vi.mock('#copilot/core', () => ({
-    sleepMs: vi.fn(async () => undefined),
-    toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
-}));
+vi.mock('#copilot/infra/public/concurrency/resilience', () => ({ sleep: vi.fn(async () => undefined) }));
 
 vi.mock('../../../../src/copilot/presentation/runtime/index.js', () => ({
     sendRuntimeDialogTurnForRuntime: vi.fn(async () => ({ reply: 'ok' })),

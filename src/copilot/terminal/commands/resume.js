@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
 import {
     formatTerminalTimeLabel,

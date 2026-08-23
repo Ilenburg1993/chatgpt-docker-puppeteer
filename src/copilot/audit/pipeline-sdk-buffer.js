@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
-import { toError } from '../core/error-handlers.js';
-import { redactSecretRecord } from '../core/security/redaction.js';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from './logger.js';
 import { AuditRingBuffer } from './ring-buffer.js';
 

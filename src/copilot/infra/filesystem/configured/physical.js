@@ -10,8 +10,8 @@
  * @module copilot/infra/filesystem/configured/physical
  */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { withConfiguredResourceLocks } from '#copilot/infra/internal/concurrency/locks/configured';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import {
     assertSuccessfulSync,
     normalizeIoDurability,

@@ -17,7 +17,7 @@ import {
     readSystemPromptStatus,
     SDK_API_TOKEN,
 } from '#copilot/config';
-import { container } from '#copilot/core';
+import { resolveOptionalDialogTimeout } from '#copilot/dialog/timeout-policy';
 import {
     DEFAULT_OTEL_FILE,
     defaultConvergenceTraceStore,
@@ -30,8 +30,8 @@ import {
     getRecentLogs,
     isOtelEnabled,
     log,
-    METRICS_STORE,
 } from '#copilot/observability';
+import { resolveModelSelectionMismatch } from '#copilot/sdk/models';
 import {
     commandsHandlePending,
     compactionCompact,
@@ -80,10 +80,11 @@ import {
     validateProviderConfig,
 } from '#copilot/sdk/session';
 import { emitSdkOperationMetric } from '#copilot/sdk/telemetry';
+import { hasCanonicalLocalFsTools } from '#copilot/sdk/tools';
 import { pickDefined } from '#copilot/sdk/utils';
 import { getAllTools } from '#copilot/tools';
 import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
-import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { decideSdkFsRouting } from '../../../presentation/files/index.js';
 import {
     createEventFilter,
     createSseWriter,
@@ -275,6 +276,10 @@ const sdkTelemetryOps = Object.freeze({
     emitOperationMetric: emitSdkOperationMetric,
 });
 
+const sdkModelPolicyOps = Object.freeze({ resolveModelSelectionMismatch });
+const sdkToolSurfacePolicyOps = Object.freeze({ hasCanonicalLocalFsTools });
+const sdkFileRoutingOps = Object.freeze({ decideSdkFsRouting });
+
 const sdkRealtimeOps = Object.freeze({
     createEventFilter,
     createSseWriter,
@@ -289,7 +294,7 @@ const sdkRealtimeOps = Object.freeze({
  */
 function resolveMetricsStore() {
     try {
-        return /** @type {import('#copilot/observability/metrics').MetricsStore} */ (container.resolve(METRICS_STORE));
+        return /** @type {import('#copilot/observability/metrics').MetricsStore} */ (defaultMetrics);
     } catch {
         return defaultMetrics;
     }
@@ -322,6 +327,9 @@ function resolveMetricsStore() {
  *     sdkHooks: typeof sdkHookOps;
  *     sdkSessionPolicy: typeof sdkSessionPolicyOps;
  *     sdkTelemetry: typeof sdkTelemetryOps;
+ *     sdkModelPolicy: typeof sdkModelPolicyOps;
+ *     sdkToolSurfacePolicy: typeof sdkToolSurfacePolicyOps;
+ *     sdkFileRouting: typeof sdkFileRoutingOps;
  *     sdkRealtime: typeof sdkRealtimeOps;
  *     sdkApiToken: string | null;
  *     bridgeAdminToken: string | undefined;
@@ -348,12 +356,27 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkSessionRuntime: sdkSessionRuntimeOps,
         sdkRuntimeSession: sdkRuntimeSessionOps,
         sdkSystemPrompt: sdkSystemPromptOps,
-        sdkSessionOwnership: sdkSessionOwnershipOps,
+        sdkSessionOwnership: Object.freeze({
+            attachSdkSessionOwnership: (payload, sessionId) =>
+                sdkSessionOwnershipOps.attachSdkSessionOwnership(payload, sessionId, selection.runtime),
+            clearSdkRuntimeBinding: () => sdkSessionOwnershipOps.clearSdkRuntimeBinding(selection.runtime),
+            forgetSdkSessionOwnership: (sessionId) =>
+                sdkSessionOwnershipOps.forgetSdkSessionOwnership(sessionId, selection.runtime),
+            rememberSdkSessionOwnership: (sessionId) =>
+                sdkSessionOwnershipOps.rememberSdkSessionOwnership(sessionId, selection.runtime),
+            resolveSdkRuntimeProjection: sdkSessionOwnershipOps.resolveSdkRuntimeProjection,
+            resolveSdkRuntimeProjectionForRuntime: sdkSessionOwnershipOps.resolveSdkRuntimeProjectionForRuntime,
+            resolveSdkSessionRouteMeta: (client) =>
+                sdkSessionOwnershipOps.resolveSdkSessionRouteMeta(client, selection.runtime),
+        }),
         sdkRuntimeProjection: sdkRuntimeProjectionOps,
         sdkObservability: sdkObservabilityOps,
         sdkHooks: sdkHookOps,
         sdkSessionPolicy: sdkSessionPolicyOps,
         sdkTelemetry: sdkTelemetryOps,
+        sdkModelPolicy: sdkModelPolicyOps,
+        sdkToolSurfacePolicy: sdkToolSurfacePolicyOps,
+        sdkFileRouting: sdkFileRoutingOps,
         sdkRealtime: sdkRealtimeOps,
         sdkApiToken: SDK_API_TOKEN,
         bridgeAdminToken: BRIDGE_ADMIN_TOKEN,

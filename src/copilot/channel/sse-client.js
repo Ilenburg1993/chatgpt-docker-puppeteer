@@ -11,8 +11,8 @@
 
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import http from 'node:http';
-import { logSwallowed } from '../core/error-handlers.js';
 
 export const MAX_SSE_PENDING_EVENT_BYTES = 1024 * 1024;
 

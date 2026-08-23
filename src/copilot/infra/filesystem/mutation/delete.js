@@ -1,13 +1,13 @@
 // @ts-check
 /** Locked delete/remove operations. */
 
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import {
     invalidateIoCoherencePath,
     invalidateIoCoherenceSubtree,
 } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { deleteFileUnlocked, removePathUnlocked } from '#copilot/infra/internal/filesystem/write';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/infra/internal/operations/contracts';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,
@@ -31,7 +31,7 @@ import { readMutationSnapshot } from './rollback/index.js';
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  *     lockWaitMs: number;
  *     previousHash: string;
  *     previousBytes: number;
@@ -148,7 +148,7 @@ export async function deleteFileLocked(filePath, options = {}, invalidationBus =
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  *     lockWaitMs: number;
  *     durability: Awaited<ReturnType<typeof removePathUnlocked>>;
  * }>}

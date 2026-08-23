@@ -9,8 +9,9 @@
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { normalizeIoCacheKey } from '#copilot/infra/public/cache/keys';
 import { decodeBase64ToOwnedBuffer } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { extname, resolve as pathResolve, sep } from 'node:path';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
 export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;

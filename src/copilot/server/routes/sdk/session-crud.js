@@ -6,7 +6,8 @@
  * @see EventBus
  */
 
-import { redactSecretRecord, toError } from '#copilot/core';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { Router } from 'express';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';

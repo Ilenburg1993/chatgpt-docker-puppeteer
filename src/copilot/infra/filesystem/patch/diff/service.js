@@ -5,8 +5,8 @@
  * @module copilot/infra/filesystem/patch/diff/service
  */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { readText } from '#copilot/infra/internal/filesystem/read';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,
@@ -38,7 +38,7 @@ import { buildSimpleTextDiff } from './algorithm.js';
  *     pathB: string;
  *     diff: string;
  *     identical: boolean;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  * }>}
  */
 export async function diffTextWithReader(readTextLike, pathA, pathB, options = {}) {

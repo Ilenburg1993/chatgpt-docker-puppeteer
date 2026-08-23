@@ -20,7 +20,7 @@ import {
     windowFileContext,
 } from '#copilot/infra/internal/indexing/parser';
 import { createParserCacheRuntime, readParserCacheRuntimeConfig } from '#copilot/infra/internal/indexing/parser/cache';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import * as assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';

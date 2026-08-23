@@ -43,20 +43,6 @@ vi.mock('#copilot/testing/config/env', async (importOriginal) => {
     };
 });
 
-vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
-    return {
-        ...actual,
-        TimeoutError: class TimeoutError extends Error {
-            constructor(/** @type {string} */ msg) {
-                super(msg);
-                this.name = 'TimeoutError';
-            }
-        },
-        toError: mocks.toError,
-    };
-});
-
 vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));

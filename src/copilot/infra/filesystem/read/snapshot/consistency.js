@@ -5,7 +5,8 @@
  * @module copilot/infra/filesystem/read/snapshot/consistency
  */
 
-import { richFingerprintMatches, sha256 } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 
 /**
  * @typedef {{

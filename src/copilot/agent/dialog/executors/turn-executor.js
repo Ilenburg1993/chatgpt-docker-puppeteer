@@ -7,7 +7,7 @@
  *   src/copilot/agent/dialog/executors/turn-executor.js
  */
 
-import { container, SessionError, toError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import {
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
@@ -15,9 +15,10 @@ import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TURN_START,
 } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { persistAgentRuntimePendingTurnState } from '../../facades/agent-runtime-state.js';
 import { log } from '../../ports/logging/index.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import { startSpan } from '../../ports/tracing-port.js';
 import {
     buildTurnResolutionListenersImpl,
@@ -335,7 +336,7 @@ export function dispatchTurnToHost(emitter, opts) {
  * @returns {Promise<string>}
  */
 export function waitForRestartAndReply(emitter, host, message, timeout, stopReason, signal) {
-    if (!host) return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
+    if (!host) return Promise.reject(new AgentSessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
     if (signal?.aborted) {
         return Promise.reject(createAbortError('[DialogLoopManager] restart abortado.'));
     }
@@ -385,7 +386,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                 ? null
                 : setTimeout(() => {
                       settleReject(
-                          new SessionError(
+                          new AgentSessionError(
                               `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
                               'DIALOG_RESTART_TIMEOUT',
                           ),
@@ -401,7 +402,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                     }
                     const stoppedEvt = normalizeStopEvent(rawEvt);
                     settleReject(
-                        new SessionError(
+                        new AgentSessionError(
                             `[DialogLoopManager] stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
                             'DIALOG_STOPPED_DURING_RETRY',
                         ),
@@ -440,7 +441,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
     const { host, sendCountRef } = ctx;
 
     if (!host) {
-        return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
+        return Promise.reject(new AgentSessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
     }
     if (signal?.aborted) {
         return Promise.reject(createAbortError('[DialogLoopManager] sendTurn abortado.'));
@@ -527,7 +528,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         (replyTurnStart, reply) =>
                             finalizeTurnReply(replyTurnStart, reply, {
                                 emit: (event, payload) => emitter.emit(event, payload),
-                                metrics: container.resolve(METRICS_STORE),
+                                metrics: defaultMetrics,
                             }),
                     );
                 }
@@ -544,7 +545,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         (replyTurnStart, reply) =>
                             finalizeTurnReply(replyTurnStart, reply, {
                                 emit: (event, payload) => emitter.emit(event, payload),
-                                metrics: container.resolve(METRICS_STORE),
+                                metrics: defaultMetrics,
                             }),
                         { allowDeltaFallback: false },
                     );

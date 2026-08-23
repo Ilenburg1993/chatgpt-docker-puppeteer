@@ -8,11 +8,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-    clearSharedSessionBinding,
-    getSharedSdkSessionId,
-    setSharedSdkSessionId,
-} from '../../../../src/copilot/core/index.js';
-import {
     addAttachment,
     appendThinkingHistoryChunk,
     clearAttachments,
@@ -54,7 +49,6 @@ import {
 
 describe('state getters/setters', () => {
     afterEach(() => {
-        clearSharedSessionBinding();
         setHubSessionId(null);
         setBusy(false);
         setSdkSessionMode(null);
@@ -64,11 +58,6 @@ describe('state getters/setters', () => {
     it('getHubSessionId/setHubSessionId round-trip', () => {
         setHubSessionId('sess-123');
         expect(getHubSessionId()).toBe('sess-123');
-    });
-
-    it('enxerga sdkSessionId compartilhado do core', () => {
-        setSharedSdkSessionId('sdk-123');
-        expect(getSharedSdkSessionId()).toBe('sdk-123');
     });
 
     it('getBusy/setBusy round-trip', () => {

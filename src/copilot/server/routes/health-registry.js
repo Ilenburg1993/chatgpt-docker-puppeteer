@@ -7,8 +7,8 @@
  * @module copilot/server/routes/health-registry
  */
 
-import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
-import { bridgeEmitter, container } from '#copilot/core';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
+import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getObservabilityBusDiagnostics } from '#copilot/observability';
 import { buildDefaultAgentModuleHealth } from '../../presentation/runtime/index.js';
 import { registerModuleHealth } from './health-modules.js';
@@ -24,8 +24,8 @@ export function registerCopilotHealthChecks() {
 
     // ── ConversationHub ──────────────────────────────────────────────────────
     registerModuleHealth('conversation-hub', () => {
-        const hub = container.resolve(HUB);
-        const store = container.resolve(CONVERSATION_STORE);
+        const hub = conversationHub;
+        const store = conversationStore;
         const activeSessions = hub.isReady ? store.countHubSessions({ status: 'active' }) : 0;
         return {
             ok: true,
@@ -37,10 +37,10 @@ export function registerCopilotHealthChecks() {
     });
 
     // ── EventBus ─────────────────────────────────────────────────────────────
-    registerModuleHealth('events', () => ({
-        ok: !!bridgeEmitter,
-        details: { bridgeEmitterAvailable: !!bridgeEmitter },
-    }));
+    registerModuleHealth('events', () => {
+        const diagnostics = getApplicationEventBus().diagnostics();
+        return { ok: diagnostics.disposed !== true, details: diagnostics };
+    });
 
     // ── Observability ───────────────────────────────────────────────────────
     registerModuleHealth('observability', () => {

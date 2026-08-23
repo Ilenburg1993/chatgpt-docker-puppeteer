@@ -11,7 +11,6 @@
  */
 
 import { log } from '#copilot/agent/ports';
-import { toError } from '#copilot/core/error-handlers';
 import {
     wireCatchAll,
     wireCompactionEvents,
@@ -27,6 +26,7 @@ import {
     wireUsageEvent,
 } from '#copilot/event-handlers';
 import { EMITTER_SESSION_ERROR } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 
 // Re-exportar KNOWN_SDK_EVENTS para consumidores existentes
 export { KNOWN_SDK_EVENTS } from '#copilot/event-handlers';

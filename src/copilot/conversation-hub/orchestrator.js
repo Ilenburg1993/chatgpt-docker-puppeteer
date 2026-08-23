@@ -11,12 +11,13 @@
  * @see module:copilot/always-alive
  */
 
-import { getSharedSdkSessionId, SessionError, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { EventEmitter } from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
-import { logSwallowed } from '../core/error-handlers.js';
+import { ConversationHubError } from './errors.js';
 import { executeSendToLlmB } from './send-pipeline.js';
 
 /**
@@ -192,7 +193,7 @@ export class HubOrchestrator extends EventEmitter {
      */
     createSession(opts = {}) {
         if (this.#destroyed) {
-            throw new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
+            throw new ConversationHubError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
         }
 
         const sdkSessionId = this.#getActiveSdkSessionId();
@@ -252,13 +253,18 @@ export class HubOrchestrator extends EventEmitter {
      */
     sendToLlmB(hubSessionId, message, opts = {}) {
         if (this.#destroyed) {
-            return Promise.reject(new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED'));
+            return Promise.reject(
+                new ConversationHubError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED'),
+            );
         }
 
         // F6.5 (BUG-MOD-09): bloquear novas mensagens para sessões já encerradas
         if (this.#closedSessions.has(hubSessionId)) {
             return Promise.reject(
-                new SessionError(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`, 'ORCH_SESSION_ENDED'),
+                new ConversationHubError(
+                    `[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`,
+                    'ORCH_SESSION_ENDED',
+                ),
             );
         }
 
@@ -269,7 +275,7 @@ export class HubOrchestrator extends EventEmitter {
         const next = prev.then(() => {
             // Verificação dupla: pode ter sido fechada enquanto aguardava na fila
             if (this.#closedSessions.has(hubSessionId)) {
-                throw new SessionError(
+                throw new ConversationHubError(
                     `[HubOrchestrator] Sessão encerrada durante enfileiramento: ${hubSessionId}`,
                     'ORCH_SESSION_ENDED',
                 );
@@ -304,7 +310,7 @@ export class HubOrchestrator extends EventEmitter {
      */
     async #executeSendToLlmB(hubSessionId, message, opts = {}) {
         if (!this.#bridge) {
-            throw new SessionError(
+            throw new ConversationHubError(
                 '[HubOrchestrator] Bridge não inicializado ou já destruído.',
                 'ORCH_BRIDGE_UNAVAILABLE',
             );
@@ -330,11 +336,14 @@ export class HubOrchestrator extends EventEmitter {
      */
     async injectUserMessage(hubSessionId, content, opts = {}) {
         if (this.#destroyed) {
-            throw new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
+            throw new ConversationHubError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
         }
 
         if (this.#closedSessions.has(hubSessionId)) {
-            throw new SessionError(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`, 'ORCH_SESSION_ENDED');
+            throw new ConversationHubError(
+                `[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`,
+                'ORCH_SESSION_ENDED',
+            );
         }
 
         const turnId = await this.#store.injectUserMessage(hubSessionId, content, opts);
@@ -448,9 +457,6 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {string | undefined}
      */
     #getActiveSdkSessionId() {
-        const shared = getSharedSdkSessionId();
-        if (shared) return shared;
-
         try {
             // BUG-06 (fix): usar agentOverride quando fornecido em vez de hardcodar alwaysAliveAgent
             const activeAgent = this.#agent ?? _fallbackAgent;

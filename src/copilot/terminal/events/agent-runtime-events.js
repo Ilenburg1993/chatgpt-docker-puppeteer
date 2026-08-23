@@ -10,14 +10,8 @@
  * @module copilot/terminal/agent-runtime-events
  */
 
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { readConfiguredByokSummary } from '#copilot/config';
-import {
-    cancelTimer,
-    redactSecretRecord,
-    redactSecretText,
-    registerInterval,
-    resolveModelSelectionMismatch,
-} from '#copilot/core';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
@@ -44,6 +38,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
 import {
     classifyByokProviderFailure,
     recordByokProviderModelCallFailure,
@@ -59,7 +54,7 @@ import {
     scheduleTerminalPromptRedraw,
     writeInlineStatus,
 } from '../dialog/io/index.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import { readTerminalRuntimeState, resolveTerminalModelSelectionMismatch } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnMaterialization,
     completeTerminalTurnTrace,
@@ -561,7 +556,7 @@ function normalizeUsageBilling(evt) {
     const billedModel = typeof evt?.['model'] === 'string' ? evt['model'] : null;
     const configuredModel = typeof evt?.['configuredModel'] === 'string' ? evt['configuredModel'] : null;
     const effectiveModel = typeof evt?.['effectiveModel'] === 'string' ? evt['effectiveModel'] : null;
-    const mismatch = resolveModelSelectionMismatch({
+    const mismatch = resolveTerminalModelSelectionMismatch({
         configuredModel,
         billedModel,
         effectiveModel,
@@ -663,7 +658,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     /** @type {Map<string, number>} */
     const recoverableModelErrorPrintedAtByKey = new Map();
     const toolHeartbeatTimerId = `terminal.agent-runtime-events.tool-heartbeat:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    const toolHeartbeatTimer = registerInterval(
+    const toolHeartbeatTimer = registerApplicationInterval(
         toolHeartbeatTimerId,
         () => {
             const inFlight = _reg.getAllInFlight();
@@ -1444,7 +1439,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     }
 
     return () => {
-        cancelTimer(toolHeartbeatTimerId);
+        cancelApplicationTimer(toolHeartbeatTimerId);
         agent.off(EMITTER_QUESTION_PENDING, onQuestion);
         agent.off(EMITTER_ERROR, onAgentError);
         agent.off(EMITTER_STOPPED, onStopped);

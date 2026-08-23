@@ -5,7 +5,6 @@
  * @module copilot/sdk/session/hook-bus
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import {
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
@@ -16,13 +15,14 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '#copilot/events/hook-events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { EventEmitter } from 'node:events';
 import { log } from './hook-logger.js';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
  *
- * @typedef {import('#copilot/core/event-bus').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  */
 
 /** @type {Record<string, string>} */

@@ -1,7 +1,7 @@
 // @ts-check
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
 import { SERVER_PORT } from '#copilot/config';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { httpRequest } from '#copilot/sdk/http-request';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

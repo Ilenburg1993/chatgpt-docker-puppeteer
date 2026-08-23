@@ -4,9 +4,10 @@
  * @file Seams de recuperação do dialog loop durante boot/resume.
  */
 
+import { cancelApplicationTimer, registerApplicationTimeout } from '#copilot/boot/process-runtime';
 import { BOOT_RECOVERY_DELAY_MS, DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK } from '#copilot/config/agent';
-import { cancelTimer, registerTimeout, toError } from '#copilot/core';
 import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
@@ -28,10 +29,10 @@ import { log } from '../../ports/logging/index.js';
 export function scheduleDialogBootRecovery(ctx) {
     log('DEBUG', '[AlwaysAlive] F53/F42.1: Recovery do dialog loop agendado após resume.');
     const timerId = 'agent.dialogBootRecovery';
-    const bootRecoveryTimer = registerTimeout(
+    const bootRecoveryTimer = registerApplicationTimeout(
         timerId,
         () => {
-            cancelTimer(timerId);
+            cancelApplicationTimer(timerId);
             if (ctx.getStatus() === 'stopped') {
                 return;
             }
@@ -45,7 +46,7 @@ export function scheduleDialogBootRecovery(ctx) {
     );
     bootRecoveryTimer.unref?.();
     return () => {
-        cancelTimer(timerId);
+        cancelApplicationTimer(timerId);
     };
 }
 

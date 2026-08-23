@@ -13,7 +13,7 @@
  */
 
 import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import {
     deleteAgentSdkSessionByClient,

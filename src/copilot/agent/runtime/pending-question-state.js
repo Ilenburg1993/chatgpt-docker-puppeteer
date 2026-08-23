@@ -4,8 +4,8 @@
  * @file Seams de governança da pending question/shadow do runtime.
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
 import { persistStateWithPolicy } from '../lifecycle/state/index.js';
+import { logSwallowed } from '../ports/logging/swallowed.js';
 
 /**
  * @typedef {import('../facades/agent-runtime-state.js').AgentRuntimeStateContext} AgentRuntimeStateContext

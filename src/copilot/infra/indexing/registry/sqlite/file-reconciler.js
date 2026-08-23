@@ -1,7 +1,8 @@
 // @ts-check
 /** Per-file freshness/hash/snapshot reconciliation for directory index builds. */
 import { readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
-import { fingerprintMatches, sha256 } from '#copilot/infra/internal/platform';
+import { fingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { extname } from 'node:path';
 import { SYMBOL_EXTENSIONS } from './content.js';

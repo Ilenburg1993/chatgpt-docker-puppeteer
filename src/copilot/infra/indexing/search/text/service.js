@@ -1,7 +1,7 @@
 // @ts-check
 /** Completeness-oriented text/regex search orchestration. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import { hasNullByte } from '#copilot/infra/internal/policy';
 import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
 import { assertValidTargetPath, getIoSearchBudget, normalizeSearchWindow } from '../shared/index.js';

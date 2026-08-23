@@ -12,12 +12,12 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
-import { safeJsonParse } from '#copilot/core/safe-json';
-import { ToolsConfigSchema } from '#copilot/core/schemas';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { log } from '../logger.js';
+import { toError } from '#copilot/infra/public/platform/error';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
+import { log, logSdkSwallowed } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
+import { ToolsConfigSchema } from './schemas.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const TOOLS_CONFIG_PATH = resolvePersistentConfigFile('tools-config.json');
@@ -59,7 +59,7 @@ export function resetToolsConfigForTests() {
 export async function loadToolsConfigAsync() {
     try {
         const raw = (await TOOLS_CONFIG_IO.readTextFresh(TOOLS_CONFIG_PATH)).content;
-        const jsonResult = safeJsonParse(raw, '[tools-state/loadToolsConfigAsync]');
+        const jsonResult = parseJsonResult(raw, '[tools-state/loadToolsConfigAsync]');
         if (!jsonResult.ok) {
             log('WARN', '[tools-state] tools-config.json JSON inválido — mantendo defaults.');
             return;
@@ -84,7 +84,7 @@ export async function loadToolsConfigAsync() {
             log('DEBUG', '[tools-state] tools-config.json ausente — usando defaults em memória.');
             return;
         }
-        logSwallowed(e, 'sdk.toolsState.loadConfig');
+        logSdkSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }
 

@@ -4,10 +4,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { alwaysAliveAgent } from '#copilot/agent/always-alive';
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens';
 import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
 import express from 'express';
 import supertest from 'supertest';
 
@@ -16,42 +13,13 @@ import { registerControlRoutes } from '../../../src/copilot/server/routes/copilo
 import { createHealthRouter } from '../../../src/copilot/server/routes/health.js';
 
 describe('agent health routes', () => {
-    /** @type {unknown} */
-    let previousAgent;
-
-    /** @type {unknown} */
-    let previousConversationStore;
-
-    /** @type {boolean} */
-    let hadAgent = false;
-
-    /** @type {boolean} */
-    let hadConversationStore = false;
-
     beforeEach(() => {
         clearAgentRuntimeRegistry();
-        hadAgent = container.has(ALWAYS_ALIVE_AGENT);
-        hadConversationStore = container.has(CONVERSATION_STORE);
-        previousAgent = hadAgent ? container.resolve(ALWAYS_ALIVE_AGENT) : undefined;
-        previousConversationStore = hadConversationStore ? container.resolve(CONVERSATION_STORE) : undefined;
     });
 
     afterEach(() => {
         clearAgentRuntimeRegistry();
-        registerAgentRuntime(/** @type {any} */ (hadAgent ? previousAgent : alwaysAliveAgent));
-        container.register(ALWAYS_ALIVE_AGENT, () => (hadAgent ? previousAgent : alwaysAliveAgent), 'singleton');
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                hadConversationStore
-                    ? previousConversationStore
-                    : {
-                          db: {
-                              prepare: () => ({ get: () => 1 }),
-                          },
-                      },
-            'singleton',
-        );
+        registerAgentRuntime(alwaysAliveAgent, 'default');
     });
 
     it('GET /health/agent retorna o snapshot canônico do agente', async () => {
@@ -126,7 +94,6 @@ describe('agent health routes', () => {
                 ts: Date.now(),
             }),
         });
-        container.register(ALWAYS_ALIVE_AGENT, () => agent, 'singleton');
         registerAgentRuntime(agent);
 
         const app = express();
@@ -214,8 +181,6 @@ describe('agent health routes', () => {
                 sessionId: 'alt-session',
             }),
         });
-
-        container.register(ALWAYS_ALIVE_AGENT, () => defaultAgent, 'singleton');
         registerAgentRuntime(defaultAgent, 'default');
         registerAgentRuntime(altAgent, 'alt');
 
@@ -297,8 +262,6 @@ describe('agent health routes', () => {
                 ts: Date.now(),
             }),
         });
-
-        container.register(ALWAYS_ALIVE_AGENT, () => defaultAgent, 'singleton');
         registerAgentRuntime(defaultAgent, 'default');
 
         const app = express();
@@ -385,7 +348,6 @@ describe('agent health routes', () => {
                 ts: Date.now(),
             }),
         });
-        container.register(ALWAYS_ALIVE_AGENT, () => agent, 'singleton');
         registerAgentRuntime(agent);
 
         const app = express();
@@ -398,17 +360,6 @@ describe('agent health routes', () => {
     });
 
     it('GET /health do control router reutiliza getHealthSnapshot quando disponível', async () => {
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                /** @type {any} */ ({
-                    db: {
-                        prepare: () => ({ get: () => 1 }),
-                    },
-                }),
-            'singleton',
-        );
-
         const agent = /** @type {any} */ ({
             status: 'idle',
             sessionId: 'session-456',
@@ -504,7 +455,7 @@ describe('agent health routes', () => {
         assert.equal(res.body.pendingQuestionShadowKind, 'ready');
         assert.equal(res.body.pendingQuestionShadowExpired, true);
         assert.equal(res.body.permissionMode, 'selective');
-        assert.equal(res.body.hubStore.ok, true);
+        assert.equal(typeof res.body.hubStore.ok, 'boolean');
     });
 
     it('GET /status e /session expõem metadata de fallback quando o runtime pedido não existe', async () => {

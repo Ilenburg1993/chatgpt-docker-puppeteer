@@ -6,12 +6,12 @@
  * @see EventBus
  */
 
-import { ConfigError } from '#copilot/core';
+import { SdkConfigError } from '#copilot/sdk/errors';
 import { log } from '../logger.js';
 import { getModelListClient } from './client-provider.js';
 import { modelSelector } from './registry.js';
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
     clearPersistentModelCache,
     evaluatePersistentCache,
@@ -343,7 +343,7 @@ export function buildReasoningConfig(models, modelId, effort) {
 
     const supported = getSupportedReasoningEfforts(model);
     if (supported.length > 0 && !supported.includes(effort)) {
-        throw new ConfigError(
+        throw new SdkConfigError(
             `[lib/models] reasoningEffort '${effort}' não é suportado por '${modelId}'. Suportados: ${supported.join(', ')}.`,
         );
     }

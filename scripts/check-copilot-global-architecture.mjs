@@ -25,6 +25,7 @@ const COPILOT_ROOT = 'src/copilot';
 /** @type {Record<string, number>} */
 const LAYER_MAP = {
     core: 0,
+    dialog: 0,
     types: 0,
     infra: 0,
     boot: 1,
@@ -241,6 +242,10 @@ function lineForIndex(src, matchIndex) {
 function isDocumentedCompositionImport(relFile, to, spec) {
     if (relFile === 'boot/runtime-bootstrap.js') {
         return ['agent', 'config', 'sdk', 'server', 'terminal', 'tools'].includes(to);
+    }
+
+    if (relFile === 'boot/application-events.js') {
+        return to === 'events';
     }
 
     if (relFile.startsWith('infra/') && to === 'config') {

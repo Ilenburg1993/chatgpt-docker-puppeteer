@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
-import { createEventBus } from '../../../../src/copilot/core/event-bus.js';
+import { createEventBus } from '#copilot/events/runtime';
 import { createActivityTracker } from '../../../../src/copilot/observability/bus-actions/activity-tracker.js';
 import { createCorrelationTracer } from '../../../../src/copilot/observability/bus-actions/correlation-tracer.js';
 import { createErrorAlerterAction } from '../../../../src/copilot/observability/bus-actions/error-alerter.js';

@@ -5,7 +5,7 @@
  * @module copilot/infra/filesystem/patch/diff/algorithm
  */
 
-import { iterateTextLines } from '#copilot/infra/internal/platform';
+import { iterateTextLines } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * @param {string} contentA

@@ -17,13 +17,13 @@ vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/core/error-handlers.js', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: mocks.logSwallowed,
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
 
-vi.mock('../../../../src/copilot/core/safe-json.js', () => ({
-    safeJsonParse: vi.fn((raw) => {
+vi.mock('#copilot/infra/public/platform/json', () => ({
+    parseJsonResult: vi.fn((raw) => {
         try {
             return { ok: true, data: JSON.parse(raw) };
         } catch {
@@ -32,7 +32,7 @@ vi.mock('../../../../src/copilot/core/safe-json.js', () => ({
     }),
 }));
 
-vi.mock('../../../../src/copilot/core/schemas.js', () => ({
+vi.mock('../../../../src/copilot/sdk/tools/schemas.js', () => ({
     ToolsConfigSchema: {
         safeParse: vi.fn((data) => ({ success: true, data })),
     },

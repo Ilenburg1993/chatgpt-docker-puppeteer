@@ -10,7 +10,6 @@
  */
 
 import { LLM_B_TURN_TIMEOUT_MS, LLM_B_WATCHDOG_STALL_MS } from '#copilot/config';
-import { sleepMs } from '#copilot/core';
 import {
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -24,8 +23,9 @@ import {
     EMITTER_SESSION_USAGE,
     EMITTER_USER_INPUT_COMPLETED,
 } from '#copilot/events';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
 import { log } from '#copilot/observability';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { getHubSessionId, getRl } from '../../presentation/state/index.js';
 import {
     broadcastSse,
@@ -438,7 +438,7 @@ export function registerAgentEventListeners(printBanner) {
                 recovered = true;
                 break;
             }
-            await sleepMs(500, { id: 'terminal.watchdog.recovery.wait', unref: true });
+            await sleep(500);
         }
 
         if (recovered) {

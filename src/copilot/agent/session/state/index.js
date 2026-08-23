@@ -1,3 +1,4 @@
+export { createAgentSessionBindingRuntime } from './binding-runtime.js';
 // @ts-check
 
 export * from './ownership.js';

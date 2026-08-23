@@ -9,18 +9,12 @@
  * @see EventBus
  */
 
-import {
-    SHUTDOWN_PRIORITY,
-    logSwallowed,
-    redactSecretRecord,
-    redactSecretText,
-    registerShutdownHandler,
-    toError,
-} from '#copilot/core';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { createBoundJsonlFileWriter, createBoundJsonlTailReader } from '#copilot/infra/public/persistence/jsonl';
+import { toError } from '#copilot/infra/public/platform/error';
 import { join, resolve } from 'node:path';
-import { getLogDir, log } from './logger.js';
+import { getLogDir, log, logAuditSwallowed } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
 const envInt = (key, def) => {
@@ -146,7 +140,7 @@ export function createAuditLog(opts = {}) {
         maxBytes: MAX_TOOL_AUDIT_BYTES,
         maxQueueLines: 10_000,
         softQueueLines: 8_000,
-        onError: (error) => logSwallowed(error, 'audit.pipeline.flushToolAudit'),
+        onError: (error) => logAuditSwallowed(error, 'audit.pipeline.flushToolAudit'),
     });
     const toolAuditTail = createBoundJsonlTailReader({ filePath: toolAuditFile, io });
 
@@ -199,7 +193,7 @@ export function createAuditLog(opts = {}) {
         try {
             await toolAuditWriter.flush();
         } catch (error) {
-            logSwallowed(error, 'audit.pipeline.flushToolAudit');
+            logAuditSwallowed(error, 'audit.pipeline.flushToolAudit');
         }
     }
 
@@ -311,12 +305,3 @@ export function createAuditLog(opts = {}) {
 
 /** Singleton global de audit log. */
 export const defaultAuditLog = createAuditLog();
-
-// F129: flush audit log via shutdown centralizado (priority 90 — low, runs late)
-registerShutdownHandler(
-    'audit.flush',
-    async () => {
-        await defaultAuditLog.flush();
-    },
-    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
-);

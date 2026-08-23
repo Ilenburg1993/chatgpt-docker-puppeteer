@@ -167,7 +167,6 @@ describe('F178 — Pipeline zero-bypass dos módulos mais críticos', () => {
     const CANONICAL_SDK_SUBPATHS = new Set([
         '#copilot/sdk/agents',
         '#copilot/sdk/constants',
-        '#copilot/sdk/di',
         '#copilot/sdk/errors',
         '#copilot/sdk/event-helpers',
         '#copilot/sdk/feature-flags',

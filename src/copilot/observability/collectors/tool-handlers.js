@@ -11,7 +11,7 @@
 import { globalAuditBuffer } from '#copilot/audit';
 import { SESSION_EVENTS as SE } from '#copilot/events';
 import { onSessionEvent } from '#copilot/events/sdk-events';
-import { introspectToolTargets } from '../../core/tool-target-introspection.js';
+import { introspectToolTargets } from '#copilot/observability/tool-target-introspection';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -35,7 +35,7 @@ export function attachToolHandlers(ctx) {
         onSessionEvent(session, SE.TOOL_EXECUTION_START, (event) => {
             const { toolCallId, toolName, mcpServerName } = event.data;
             const toolArgs = /** @type {Record<string, unknown>} */ (event.data.arguments ?? {});
-            const targetMeta = introspectToolTargets({ args: toolArgs });
+            const targetMeta = introspectToolTargets({ toolName, args: toolArgs });
             const _now = Date.now();
             for (const [id, entry] of pending) {
                 if (_now - entry.startTs > _PENDING_TTL_MS) pending.delete(id);

@@ -12,13 +12,6 @@
       }
     },
     {
-      "file": "src/copilot/core/io-policy.js",
-      "classification": "low-level-exception",
-      "operations": {
-        "realpath": 1
-      }
-    },
-    {
       "file": "src/copilot/infra/cache/memory/l1-verifier.js",
       "classification": "low-level-exception",
       "operations": {

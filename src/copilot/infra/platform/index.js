@@ -30,6 +30,18 @@ export {
     readBoundedResponseJson,
     readBoundedResponseText,
 } from './http-response/index.js';
+export { parseJsonResult, parseJsonStrict, stringifyJsonStrict } from './json/index.js';
+export {
+    IO_URL_MAX_REDIRECTS,
+    PublicNetworkPolicyError,
+    assertPublicHttpUrl,
+    evaluatePublicHttpUrlPolicy,
+    fetchPublicHttp,
+    isPrivateIp,
+    resolvePublicAddresses,
+    validateUrl,
+    validateUrlString,
+} from './network/index.js';
 export {
     BoundedProcessOutputCapture,
     DEFAULT_PROCESS_OUTPUT_MAX_BYTES,

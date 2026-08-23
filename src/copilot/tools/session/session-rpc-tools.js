@@ -1,6 +1,7 @@
 // @ts-check
+import { runApplicationShutdown } from '#copilot/boot/process-runtime';
 import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
-import { runShutdown, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
@@ -363,7 +364,7 @@ const sessionCompactTool = buildTool({
 /**
  * Tool: reload_agent_process — encerra o processo graciosamente para que o supervisor reinicie com ESM fresco.
  *
- * Fluxo: graceful shutdown via `runShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna. O
+ * Fluxo: graceful shutdown via `runApplicationShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna. O
  * reload é a única forma confiável de ativar novas tools ou mudanças de módulos em um processo ESM vivo.
  */
 /** @type {import('#copilot/sdk/types').Tool<any>} */
@@ -399,7 +400,7 @@ const reloadAgentProcessTool = buildTool({
             `[reload_agent_process] Graceful shutdown agendado. reason=${reasonStr} supervisor=${supervisor} delay=${delayMs}ms`,
         );
         setTimeout(() => {
-            runShutdown(reasonStr)
+            runApplicationShutdown(reasonStr)
                 .catch(() => {})
                 .finally(() => process.exit(0));
         }, delayMs);

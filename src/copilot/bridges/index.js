@@ -37,4 +37,3 @@ export { NervEventBusAdapter, emitNerv, nervEventBusAdapter } from './nerv-event
 export * from './gh/index.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from './di-tokens.js';

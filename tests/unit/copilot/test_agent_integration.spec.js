@@ -64,32 +64,6 @@ vi.mock('#copilot/testing/config/env', () => ({
     COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
-vi.mock('#copilot/core/errors', () => {
-    class CopilotError extends Error {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg);
-            this.code = code;
-            this.name = 'CopilotError';
-        }
-    }
-    class SessionError extends CopilotError {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg, code);
-            this.name = 'SessionError';
-        }
-    }
-    class BridgeError extends CopilotError {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg, code);
-            this.name = 'BridgeError';
-        }
-    }
-    return { CopilotError, SessionError, BridgeError };
-});
-
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
     LOG_DIR: '/tmp/test-logs',

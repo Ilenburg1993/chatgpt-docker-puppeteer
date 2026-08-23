@@ -35,10 +35,10 @@ describe('Block A — public surface baseline contracts', () => {
             'startRuntime',
             'startAgentDialogLoop',
             'sendAgentDialogTurn',
-            'ALWAYS_ALIVE_AGENT',
         ]) {
             assert.ok(key in agent, `agent barrel deve expor '${key}'`);
         }
+        assert.equal('ALWAYS_ALIVE_AGENT' in agent, false, 'token DI extinto não deve ressurgir no barrel do agent');
     });
 
     it('presentation barrel preserva a shared edge layer canônica', async () => {

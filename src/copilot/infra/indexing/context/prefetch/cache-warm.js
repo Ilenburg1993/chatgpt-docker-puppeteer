@@ -3,7 +3,8 @@
 
 import { makeBytesKey, makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import { readBytesFileSnapshot, readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
-import { decodeUtf8Buffer, sha256, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/internal/platform';
+import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import pLimit from 'p-limit';
 
 /** @typedef {import('./types.js').PrefetchOptions} PrefetchOptions */

@@ -8,7 +8,6 @@
  * @module copilot/infra/database/sqlite/application/migration-runner
  */
 
-import { ConfigError } from '#copilot/core';
 import { runSqliteTransaction } from '#copilot/infra/internal/database/transaction/atomic';
 import { COPILOT_MIGRATIONS } from './migrations.js';
 
@@ -43,8 +42,7 @@ export function migrateCopilotSqliteDatabase(database, options = {}) {
         runSqliteTransaction(database, () => {
             if (typeof migration.upFn === 'function') migration.upFn(database);
             else if (typeof migration.up === 'string') database.exec(migration.up);
-            else
-                throw new ConfigError(`[CopilotDB] Invalid migration shape for v${migration.version}: missing up/upFn`);
+            else throw new TypeError(`[CopilotDB] Invalid migration shape for v${migration.version}: missing up/upFn`);
             insertMigration.run(migration.version, migration.name, Date.now());
         });
     }

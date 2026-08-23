@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { clearSharedSessionBinding, setSharedHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import express from 'express';
 import request from 'supertest';
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 
 import { buildRuntimeRouteMetaPayload } from '../../../src/copilot/presentation/routing/index.js';
 import {
@@ -14,6 +14,9 @@ import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../sr
 import createAgentRouter from '../../../src/copilot/server/routes/sdk/agent.js';
 import createClientRouter from '../../../src/copilot/server/routes/sdk/client.js';
 import createObservabilityRouter from '../../../src/copilot/server/routes/sdk/observability.js';
+
+/** @type {ReturnType<typeof createAgentSessionBindingRuntime>} */
+let sessionBinding = createAgentSessionBindingRuntime();
 
 /** @returns {any} */
 function createMockClient() {
@@ -32,6 +35,11 @@ function createMockClient() {
 /** @returns {any} */
 function createMockAgent() {
     return {
+        ctx: { sessionBinding },
+        getSessionBindingSnapshot: () => sessionBinding.snapshot(),
+        setHubSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setHubSessionId(id),
+        setSdkSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setSdkSessionId(id),
+        clearSdkSessionId: () => sessionBinding.clearSdkSessionId(),
         status: 'running',
         sessionId: 'sdk-runtime',
         getToolRegistryEntriesSnapshot: () => [
@@ -102,8 +110,11 @@ function routeDeps(overrides = {}) {
             }),
         },
         sdkSessionOwnership: {
-            clearSdkRuntimeBinding,
-            resolveSdkRuntimeProjection,
+            clearSdkRuntimeBinding: () => clearSdkRuntimeBinding(agent),
+            resolveSdkRuntimeProjection: (
+                /** @type {Parameters<typeof resolveSdkRuntimeProjection>[1]} */ client,
+                /** @type {string|null} */ connectionState,
+            ) => resolveSdkRuntimeProjection(agent, client, connectionState),
             resolveSdkRuntimeProjectionForRuntime: (
                 /** @type {string | null | undefined} */ _runtimeId,
                 /** @type {Parameters<typeof resolveSdkRuntimeProjection>[1]} */ client,
@@ -143,13 +154,11 @@ function routeDeps(overrides = {}) {
 
 describe('sdk runtime projection routes', () => {
     beforeEach(() => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-shared');
-        setSharedSdkSessionId('sdk-shared');
+        sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-shared', sdkSessionId: 'sdk-shared' });
     });
 
     afterEach(() => {
-        clearSharedSessionBinding();
+        sessionBinding.dispose();
     });
 
     it('GET /status retorna projection canônica de binding e canonical session', async () => {

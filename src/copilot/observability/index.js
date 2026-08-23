@@ -89,4 +89,3 @@ export {
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';

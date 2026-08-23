@@ -1,7 +1,7 @@
 // @ts-check
 /** Process-owned parser configuration and adaptive worker policies. */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 import { availableParallelism } from 'node:os';
 
 /** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] @param {number} [parallelism] */

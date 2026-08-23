@@ -1,7 +1,7 @@
 // @ts-check
 /** Sanitization, redaction and streaming-output collection shared by search operations. */
 
-import { sanitizeIoTextOutput } from '#copilot/core/io-policy';
+import { sanitizeIoTextOutput } from '#copilot/infra/internal/observability/redaction';
 
 const sensitiveLineRe = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
 

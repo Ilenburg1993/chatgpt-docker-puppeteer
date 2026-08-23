@@ -24,12 +24,14 @@
  */
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError, container, toError, withRetry } from '#copilot/core';
+import { withRetry } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { readBoundedResponseJson } from '#copilot/infra/public/platform/http-response';
 import * as observability from '#copilot/observability';
 import { convertMcpCallToolResult } from '#copilot/sdk/tools';
 import { buildTool } from '#copilot/tools';
 import net from 'node:net';
+import { BridgeError } from './errors.js';
 import { buildZodSchema } from './mcp-tool-schema.js';
 
 const CIRCUIT_RESET_MS = 60_000;
@@ -113,21 +115,7 @@ function getMcpStatusFromState(state) {
 }
 
 function resolveBridgeMetricsStore() {
-    const metricsStoreToken = observability.METRICS_STORE;
-    if (!metricsStoreToken) {
-        return {
-            recordToolCall: () => {},
-            recordCounter: () => {},
-        };
-    }
-    try {
-        return /** @type {BridgeMetricsStore} */ (container.resolve(metricsStoreToken));
-    } catch {
-        return {
-            recordToolCall: () => {},
-            recordCounter: () => {},
-        };
-    }
+    return /** @type {BridgeMetricsStore} */ (observability.defaultMetrics);
 }
 
 /**

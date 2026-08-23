@@ -41,8 +41,8 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
-vi.mock('#copilot/core', async (importOriginal) => {
+vi.mock('#copilot/observability/swallowed', () => ({ logSwallowed: mockLogSwallowed }));
+vi.mock('#copilot/channel/structured-message', async (importOriginal) => {
     const actual = /** @type {any} */ (await importOriginal());
     return {
         ...actual,
@@ -390,7 +390,7 @@ describe('F40 — chatStructured', () => {
         );
 
         // buildStructuredRequest should have received custom-sess
-        const { buildStructuredRequest } = await import('#copilot/core');
+        const { buildStructuredRequest } = await import('#copilot/channel/structured-message');
         expect(buildStructuredRequest).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'custom-sess' }));
     });
 });

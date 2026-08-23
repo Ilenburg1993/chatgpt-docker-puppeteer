@@ -8,11 +8,11 @@
  * @module copilot/infra/indexing/registry/sqlite/writer
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
 import { runSqliteTransactionOrDirect } from '#copilot/infra/internal/database/transaction/optional';
 import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser/parse';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { toError } from '#copilot/infra/internal/platform/error';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { basename, extname } from 'node:path';
 import { classifyContentKind, countLines, iterateLineChunks, SYMBOL_EXTENSIONS } from './content.js';

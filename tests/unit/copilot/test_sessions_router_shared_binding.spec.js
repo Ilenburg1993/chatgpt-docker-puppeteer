@@ -1,62 +1,50 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { clearSharedSessionBinding, container, setSharedSdkSessionId } from '#copilot/core';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
+import { conversationStore } from '#copilot/conversation-hub';
 import express from 'express';
 import request from 'supertest';
 
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 import { createSessionsRouter } from '../../../src/copilot/server/routes/sessions.js';
 
-describe('sessions router shared sdk binding', () => {
-    /** @type {unknown} */
-    let previousConversationStore;
-
-    /** @type {boolean} */
-    let hadConversationStore = false;
+describe('sessions router runtime-scoped sdk binding', () => {
+    /** @type {ReturnType<typeof createAgentSessionBindingRuntime>} */
+    let sessionBinding;
 
     beforeEach(() => {
-        hadConversationStore = container.has(CONVERSATION_STORE);
-        previousConversationStore = hadConversationStore ? container.resolve(CONVERSATION_STORE) : undefined;
-        clearSharedSessionBinding();
+        clearAgentRuntimeRegistry();
+        sessionBinding = createAgentSessionBindingRuntime();
+        registerAgentRuntime(
+            /** @type {any} */ ({
+                ctx: { sessionBinding },
+                status: 'idle',
+                sessionId: null,
+                model: 'gpt-5',
+                getSessionBindingSnapshot: () => sessionBinding.snapshot(),
+                setHubSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setHubSessionId(id),
+                setSdkSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setSdkSessionId(id),
+                clearSessionBinding: () => sessionBinding.clear(),
+            }),
+            'default',
+        );
     });
 
     afterEach(() => {
-        clearSharedSessionBinding();
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                hadConversationStore
-                    ? previousConversationStore
-                    : {
-                          createHubSession: () => 'fallback',
-                          getHubSession: () => null,
-                          closeHubSession: () => {},
-                      },
-            'singleton',
-        );
+        vi.restoreAllMocks();
+        sessionBinding.dispose();
+        clearAgentRuntimeRegistry();
     });
 
-    it('POST /sessions usa sdkSessionId compartilhado quando body não informa um', async () => {
-        setSharedSdkSessionId('sdk-shared-1');
-
+    it('POST /sessions usa sdkSessionId do runtime default quando body não informa um', async () => {
+        sessionBinding.setSdkSessionId('sdk-runtime-1');
         /** @type {any[]} */
         const calls = [];
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                /** @type {any} */ ({
-                    createHubSession(
-                        /** @type {{ title?: string; sdkSessionId?: string; metadata?: object } | undefined} */ opts,
-                    ) {
-                        calls.push(opts);
-                        return 'hub-created';
-                    },
-                    getHubSession: () => null,
-                    closeHubSession: () => {},
-                }),
-            'singleton',
-        );
+        vi.spyOn(conversationStore, 'createHubSession').mockImplementation((opts) => {
+            calls.push(opts);
+            return 'hub-created';
+        });
 
         const app = express();
         app.use(express.json());
@@ -65,24 +53,18 @@ describe('sessions router shared sdk binding', () => {
         const res = await request(app).post('/sessions').send({ title: 'Nova conversa' }).expect(201);
 
         assert.equal(res.body.id, 'hub-created');
-        assert.equal(calls[0]?.sdkSessionId, 'sdk-shared-1');
+        assert.equal(calls[0]?.sdkSessionId, 'sdk-runtime-1');
     });
 
-    it('GET /sessions/:sessionId e DELETE /sessions/:sessionId delegam pelo presentation hub boundary', async () => {
+    it('GET /sessions/:sessionId e DELETE /sessions/:sessionId delegam pelo ConversationStore owner', async () => {
         /** @type {string[]} */
         const closed = [];
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                /** @type {any} */ ({
-                    createHubSession: () => 'hub-created',
-                    getHubSession: (/** @type {string} */ id) => (id === 'hub-1' ? { id, title: 'Hub 1' } : null),
-                    closeHubSession: (/** @type {string} */ id) => {
-                        closed.push(id);
-                    },
-                }),
-            'singleton',
+        vi.spyOn(conversationStore, 'getHubSession').mockImplementation((id) =>
+            id === 'hub-1' ? /** @type {any} */ ({ id, title: 'Hub 1' }) : null,
         );
+        vi.spyOn(conversationStore, 'closeHubSession').mockImplementation((id) => {
+            closed.push(id);
+        });
 
         const app = express();
         app.use(express.json());
@@ -90,7 +72,6 @@ describe('sessions router shared sdk binding', () => {
 
         const getRes = await request(app).get('/sessions/hub-1').expect(200);
         assert.equal(getRes.body.session.id, 'hub-1');
-
         await request(app).get('/sessions/missing').expect(404);
 
         const deleteRes = await request(app).delete('/sessions/hub-1').expect(200);

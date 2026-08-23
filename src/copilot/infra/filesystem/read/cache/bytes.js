@@ -1,9 +1,10 @@
 // @ts-check
 /** Cached L1/L2 byte read service. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { makeBytesKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
-import { isBufferValue, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { isBufferValue, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

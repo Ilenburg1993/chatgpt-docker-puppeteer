@@ -9,9 +9,10 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
-import { logSwallowed, toError } from '../core/error-handlers.js';
 import { log } from '../observability/logger.js';
 
 const DEBOUNCE_MS = 500;

@@ -177,7 +177,7 @@ export class ToolSessionContext {
                         ? request.question
                         : '(pergunta sem texto)',
                 choices,
-                allowFreeform: resolveEffectiveUserInputAllowFreeform(),
+                allowFreeform: resolveEffectiveUserInputAllowFreeform(request.allowFreeform),
                 createdAt:
                     typeof request.createdAt === 'number' && Number.isFinite(request.createdAt)
                         ? request.createdAt
@@ -212,20 +212,40 @@ export class ToolSessionContext {
     resolveStructuredInput(answer, requestId) {
         if (this.#pendingInputEntries.size === 0) return false;
 
-        if (requestId) {
-            const entry = this.#pendingInputEntries.get(requestId);
-            if (!entry) return false;
-            this.#pendingInputEntries.delete(requestId);
-            entry.resolve(answer);
+        const target = requestId
+            ? (() => {
+                  const entry = this.#pendingInputEntries.get(requestId);
+                  return entry ? /** @type {const} */ ([requestId, entry]) : null;
+              })()
+            : (() => {
+                  const oldest = this.#pendingInputEntries.entries().next();
+                  return oldest.done ? null : oldest.value;
+              })();
+        if (!target) return false;
+
+        const [id, entry] = target;
+        const normalizedAnswer = answer.trim();
+        const choices = entry.request.choices;
+        if (!entry.request.allowFreeform) {
+            if (choices.length === 0) return false;
+            const numericIndex = Number(normalizedAnswer);
+            const indexedChoice =
+                Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= choices.length
+                    ? (choices[numericIndex - 1] ?? null)
+                    : null;
+            const exactChoice = choices.includes(normalizedAnswer) ? normalizedAnswer : null;
+            const lower = normalizedAnswer.toLocaleLowerCase();
+            const caseMatches = choices.filter((choice) => choice.toLocaleLowerCase() === lower);
+            const caseChoice = caseMatches.length === 1 ? (caseMatches[0] ?? null) : null;
+            const selected = indexedChoice ?? exactChoice ?? caseChoice;
+            if (!selected) return false;
+            this.#pendingInputEntries.delete(id);
+            entry.resolve(selected);
             return true;
         }
 
-        // Resolve o mais antigo
-        const oldest = this.#pendingInputEntries.entries().next();
-        if (oldest.done) return false;
-        const [oldestId, entry] = oldest.value;
-        this.#pendingInputEntries.delete(oldestId);
-        entry.resolve(answer);
+        this.#pendingInputEntries.delete(id);
+        entry.resolve(normalizedAnswer);
         return true;
     }
 

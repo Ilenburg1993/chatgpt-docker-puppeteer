@@ -7,12 +7,12 @@
  *   sessão.
  */
 
-import { bridgeEmitter, EVENT_BUS } from '#copilot/core';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
+import { bridgeEmitter } from '#copilot/events/runtime';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { log } from '#copilot/observability';
 import { PinnedFilesLoader } from '../../config/pinned-files.js';
-import { container } from '../../core/di-container.js';
 import { broadcastSse } from '../dialog/index.js';
 import { recordTerminalActivity, terminalActivityEmitter } from '../state/boot/index.js';
 
@@ -53,10 +53,9 @@ export async function runTerminalPinnedContextPhase(ctx) {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
 
-    const pinnedBus = container.resolve(EVENT_BUS);
-    ctx.disposePinnedBridge = pinnedBus
-        ? bridgeEmitter(pinnedLoader, pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED })
-        : null;
+    ctx.disposePinnedBridge = bridgeEmitter(pinnedLoader, getApplicationEventBus(), {
+        changed: CONFIG_PINNED_FILES_CHANGED,
+    });
 
     ctx.pinnedFilesChangedHandler = (/** @type {{ file: string; type: string }} */ evt) => {
         const updatedAt = new Date().toISOString();

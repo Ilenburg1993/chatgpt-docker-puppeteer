@@ -1,11 +1,11 @@
 // @ts-check
 /** Locked atomic write/create-replace orchestration with rollback evidence. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { readBinaryMutationSnapshot } from '#copilot/infra/internal/filesystem/transaction';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,
@@ -42,7 +42,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  * @param {string | Buffer} content
  * @param {{
  *     encoding?: BufferEncoding;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  *     traceId?: string;
  *     mode?: number;
  *     requireExists?: boolean;
@@ -60,7 +60,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  * @returns {Promise<{
  *     path: string;
  *     bytesWritten: number;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  *     lockWaitMs: number;
  *     previousHash: string | null;
  *     previousBytes: number | null;

@@ -33,7 +33,6 @@ export function createIoCoherenceRuntime(options) {
         l2,
         crossProcess,
         runtimeId: `${runtimeId}:bus`,
-        registerProcessShutdown: false,
         ...(config ? { debounceMs: config.invalidation.debounceMs } : {}),
     });
     const read = createIoReadRuntime({

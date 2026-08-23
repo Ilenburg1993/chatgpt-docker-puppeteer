@@ -103,6 +103,23 @@ function tsOrNow(value) {
 }
 
 /**
+ * Stable bridge payload for structured user input.
+ * @param {{requestId:string;question:string;choices?:unknown;allowFreeform?:boolean}} input
+ */
+export function normalizeUserInputBridgeContract(input) {
+    const requestId = String(input.requestId ?? '').trim();
+    const question = String(input.question ?? '').trim();
+    if (!requestId) throw new TypeError('user-input requestId é obrigatório.');
+    if (!question) throw new TypeError('user-input question é obrigatória.');
+    return {
+        requestId,
+        question,
+        choices: normalizeUserInputChoices(input.choices),
+        allowFreeform: resolveEffectiveUserInputAllowFreeform(input.allowFreeform),
+    };
+}
+
+/**
  * Classifica a pergunta do `ask_user` no mesmo protocolo semântico usado pelo dialog loop.
  *
  * Mantém o contrato canônico em SDK-first para consumers de terminal/event-handlers sem parsing ad-hoc.
@@ -151,7 +168,7 @@ export function normalizeUserInputRequestedEvent(eventOrData) {
             null,
         question: stringOr(payload['question'], ''),
         choices: arrayOfStrings(payload['choices']),
-        allowFreeform: resolveEffectiveUserInputAllowFreeform(),
+        allowFreeform: resolveEffectiveUserInputAllowFreeform(payload['allowFreeform']),
         toolCallId: stringOr(payload['toolCallId'], '') || null,
         data: payload,
         ts: tsOrNow(root['timestamp'] ?? root['ts'] ?? payload['ts']),

@@ -12,8 +12,8 @@
  * @see EventBus
  */
 
+import { AgentSessionError } from '#copilot/agent/errors';
 import { MAX_QUEUE_SIZE } from '#copilot/config';
-import { SessionError } from '#copilot/core';
 import { log } from '../ports/logging/index.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export class MessageQueue {
      * @param {AgentTask} task - Tarefa a enfileirar (já construída pelo host)
      * @param {{ signal?: AbortSignal }} [opts]
      * @returns {void}
-     * @throws {SessionError} Se a fila estiver cheia
+     * @throws {AgentSessionError} Se a fila estiver cheia
      */
     enqueue(task, opts = {}) {
         const { signal } = opts;
@@ -124,7 +124,7 @@ export class MessageQueue {
         }
 
         if (this.#items.length >= MAX_QUEUE_SIZE) {
-            const err = new SessionError(
+            const err = new AgentSessionError(
                 `[AlwaysAlive] Fila cheia (${MAX_QUEUE_SIZE} tarefas). Tente novamente mais tarde.`,
                 'QUEUE_FULL',
             );

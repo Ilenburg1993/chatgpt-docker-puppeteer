@@ -8,8 +8,8 @@
  * @module copilot/terminal/live-status-line
  */
 
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '#copilot/config';
-import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
 import { renderTerminalQuestionActivityLiveLabel } from '../events/presenters/question/index.js';
@@ -673,12 +673,12 @@ export function setupTerminalLiveStatusLine(options = {}) {
         lastRenderedAt = now;
     };
     timerId = `terminal.live-status-line:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    timer = registerInterval(timerId, render, intervalMs);
+    timer = registerApplicationInterval(timerId, render, intervalMs);
     if (typeof timer.unref === 'function') timer.unref();
     render();
     return () => {
         if (timer) {
-            if (timerId) cancelTimer(timerId);
+            if (timerId) cancelApplicationTimer(timerId);
             timer = null;
             timerId = null;
         }

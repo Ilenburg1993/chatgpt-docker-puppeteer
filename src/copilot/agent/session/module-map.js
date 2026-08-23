@@ -193,6 +193,13 @@ export const SESSION_MODULE_LAYOUT = Object.freeze([
         summary: 'Builder/sanitizador do contexto de hooks e briefing de sessao.',
     },
     {
+        path: 'state/binding-runtime.js',
+        role: 'state',
+        tier: 'secondary',
+        public: false,
+        summary: 'Runtime instance-owned do vínculo Hub ↔ sessão SDK; sem estado global de módulo.',
+    },
+    {
         path: 'state/ownership.js',
         role: 'state',
         tier: 'secondary',

@@ -11,8 +11,8 @@
  * @see EventBus
  */
 
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '#copilot/config/agent';
-import { cancelTimer, registerInterval } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { log } from '../../ports/logging/index.js';
 
@@ -71,7 +71,7 @@ export class SessionKeepalive {
         this.#lastActivityAt = Date.now();
         this.#timerId = `agent.session.keepalive:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
-        this.#timer = registerInterval(
+        this.#timer = registerApplicationInterval(
             this.#timerId,
             () => {
                 void this.#tick(callbacks);
@@ -94,7 +94,7 @@ export class SessionKeepalive {
         this.#running = false;
         this.#tickInFlight = false;
         if (this.#timer) {
-            if (this.#timerId) cancelTimer(this.#timerId);
+            if (this.#timerId) cancelApplicationTimer(this.#timerId);
             this.#timer = null;
             this.#timerId = null;
         }

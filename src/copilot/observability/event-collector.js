@@ -8,11 +8,13 @@
  * @see EventBus
  */
 
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
-import { SHUTDOWN_PRIORITY, logSwallowed, redactSecretRecord, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -117,12 +119,12 @@ async function _flushOnExit() {
     }
 }
 
-registerShutdownHandler(
+registerApplicationShutdownHandler(
     'event-collector.flush',
     async () => {
         await _flushOnExit();
     },
-    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+    PROCESS_SHUTDOWN_PHASE.FINAL,
 );
 
 /**

@@ -9,9 +9,10 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { logSessionTimeline, sendSession } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/logging/index.js';
+import { logSwallowed } from '../ports/logging/swallowed.js';
 
 /**
  * Aborta a mensagem SDK em processamento na sessão atual.

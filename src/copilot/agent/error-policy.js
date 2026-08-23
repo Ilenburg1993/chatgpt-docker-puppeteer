@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { isFatalError, toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { getAgentSdkRecoveryPolicy } from './facades/sdk/quota.js';
 
 /**
@@ -22,6 +22,19 @@ function unwrapSdkOperationCause(error) {
         return cause;
     }
     return error;
+}
+
+const FATAL_AGENT_CODES = new Set([
+    'SESSION_FATAL',
+    'ERR_SOCKET_CLOSED',
+    'ERR_IPC_CHANNEL_CLOSED',
+    'ERR_IPC_DISCONNECTED',
+]);
+
+/** @param {Error} error */
+function isFatalAgentRuntimeError(error) {
+    const code = /** @type {Error & {code?:string}} */ (error).code;
+    return error.name === 'CircuitOpenError' || (typeof code === 'string' && FATAL_AGENT_CODES.has(code));
 }
 
 /** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
@@ -75,7 +88,7 @@ function normalizeAgentError(error) {
  *
  * - `AbortError` → `ignore`
  * - quota/rate-limit do SDK → `fatal` operacional: nao reconectar nem retry transparente
- * - erros fatais já reconhecidos por `#copilot/core` → `fatal`
+ * - códigos fatais de runtime/IPC e circuit-open → `fatal`
  * - todo o resto → `retry`
  *
  * @param {unknown} error
@@ -101,7 +114,7 @@ export function classifyAgentError(error) {
     ) {
         return 'fatal';
     }
-    if (typeof isFatalError === 'function' && (isFatalError(normalized) || isFatalError(cause))) {
+    if (isFatalAgentRuntimeError(normalized) || isFatalAgentRuntimeError(cause)) {
         return 'fatal';
     }
     return 'retry';

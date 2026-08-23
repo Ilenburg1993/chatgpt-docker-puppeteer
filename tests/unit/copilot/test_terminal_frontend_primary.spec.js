@@ -1,6 +1,8 @@
 // @ts-check
 
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 
 const clearPendingQuestionShadow = vi.fn(() => true);
 const altClearPendingQuestionShadow = vi.fn(() => true);
@@ -44,7 +46,16 @@ function selectMockRuntime(runtimeId) {
     return runtimeId === 'default' || runtimeId == null ? defaultRuntime : null;
 }
 
+const defaultSessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' });
+const altSessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-alt', sdkSessionId: 'sdk-alt-bound' });
+
 const defaultRuntime = /** @type {any} */ ({
+    ctx: { sessionBinding: defaultSessionBinding },
+    getSessionBindingSnapshot: () => defaultSessionBinding.snapshot(),
+    setHubSessionId: (/** @type {string|null|undefined} */ id) => defaultSessionBinding.setHubSessionId(id),
+    setSdkSessionId: (/** @type {string|null|undefined} */ id) => defaultSessionBinding.setSdkSessionId(id),
+    clearSdkSessionId: () => defaultSessionBinding.clearSdkSessionId(),
+    clearSessionBinding: () => defaultSessionBinding.clear(),
     status: 'idle',
     sessionId: 'runtime-123',
     model: 'gpt-5',
@@ -102,6 +113,12 @@ const defaultRuntime = /** @type {any} */ ({
 });
 
 const altRuntime = /** @type {any} */ ({
+    ctx: { sessionBinding: altSessionBinding },
+    getSessionBindingSnapshot: () => altSessionBinding.snapshot(),
+    setHubSessionId: (/** @type {string|null|undefined} */ id) => altSessionBinding.setHubSessionId(id),
+    setSdkSessionId: (/** @type {string|null|undefined} */ id) => altSessionBinding.setSdkSessionId(id),
+    clearSdkSessionId: () => altSessionBinding.clearSdkSessionId(),
+    clearSessionBinding: () => altSessionBinding.clear(),
     status: 'processing',
     sessionId: 'runtime-alt',
     model: 'gpt-5-mini',
@@ -699,11 +716,6 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-vi.mock('#copilot/core', async (importOriginal) => ({
-    ...(await importOriginal()),
-    getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
-}));
-
 vi.mock('#copilot/observability', async (importOriginal) => ({
     .../** @type {any} */ (await importOriginal()),
     log: vi.fn(),
@@ -787,7 +799,16 @@ vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
 let frontend;
 
 beforeAll(async () => {
+    clearAgentRuntimeRegistry();
+    registerAgentRuntime(defaultRuntime, 'default');
+    registerAgentRuntime(altRuntime, 'alt');
     frontend = await import('../../../src/copilot/terminal/frontend/index.js');
+});
+
+afterAll(() => {
+    clearAgentRuntimeRegistry();
+    defaultSessionBinding.dispose();
+    altSessionBinding.dispose();
 });
 
 describe('terminal/frontend/index', () => {

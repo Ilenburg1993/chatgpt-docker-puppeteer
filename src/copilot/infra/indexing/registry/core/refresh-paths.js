@@ -5,7 +5,7 @@
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
 import { readTextFileSnapshot, statPathSnapshot } from '#copilot/infra/internal/filesystem/read';
 import { loadGitignoreMatcher } from '#copilot/infra/internal/indexing/scanner';
-import { richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 import { extname, relative, resolve } from 'node:path';
 import pLimit from 'p-limit';
 import { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';

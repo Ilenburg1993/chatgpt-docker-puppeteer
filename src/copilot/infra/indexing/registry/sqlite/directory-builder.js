@@ -1,8 +1,8 @@
 // @ts-check
 /** Directory scan/limit/prune/concurrency orchestration for the persistent index registry. */
-import { createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { scanDirectory } from '#copilot/infra/internal/indexing/scanner';
+import { createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import pLimit from 'p-limit';
 import { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';

@@ -1,5 +1,6 @@
 // @ts-check
-import { toError, withIoMeta } from '#copilot/core';
+import { withIoMeta } from '#copilot/infra/public/operations/contracts';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';

@@ -33,7 +33,7 @@ import { timestampEnricher } from './timestamp-enricher.js';
  * Registra os middleware built-in no EventBus fornecido. Deve ser chamado uma vez durante o bootstrap. Também registra
  * os schemas built-in (FAIXA-L18).
  *
- * @param {import('../../core/event-bus.js').EventBus} bus
+ * @param {import('#copilot/events/runtime').EventBus} bus
  * @param {{ rateLimiterWindowMs?: number; rateLimiterMax?: number }} [options]
  */
 export function registerBuiltinMiddleware(bus, options = {}) {

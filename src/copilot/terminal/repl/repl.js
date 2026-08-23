@@ -20,7 +20,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import { ensureDialogLoop, println } from '../dialog/index.js';
 import { setupTerminalHeadlessEventAdapters } from '../events/index.js';

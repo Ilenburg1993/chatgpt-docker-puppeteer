@@ -5,7 +5,7 @@
  * @module copilot/infra/code-analysis/comments
  */
 
-import { iterateTextLines } from '#copilot/infra/internal/platform';
+import { iterateTextLines } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * Extrai os primeiros comentários de bloco ou linha do arquivo.

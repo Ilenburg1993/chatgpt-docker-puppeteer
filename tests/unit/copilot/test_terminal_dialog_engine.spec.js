@@ -95,17 +95,6 @@ vi.mock('#copilot/config', async (importOriginal) => {
         readConfiguredByokSummary: configMocks.readConfiguredByokSummary,
     };
 });
-vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
-    return {
-        ...actual,
-        container: { resolve: vi.fn(() => ({})) },
-        toError: (/** @type {unknown} */ e) => (e instanceof Error ? e : new Error(String(e))),
-        registerShutdownHandler: vi.fn(),
-        runShutdown: vi.fn(async () => []),
-        isShuttingDown: vi.fn(() => false),
-    };
-});
 vi.mock('#copilot/observability', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
@@ -114,7 +103,7 @@ vi.mock('#copilot/observability', async (importOriginal) => {
         METRICS_STORE: Symbol.for('METRICS_STORE'),
     };
 });
-vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
+vi.mock('#copilot/dialog/timeout-policy', () => ({
     resolveOptionalDialogTimeout: vi.fn(() => ({
         timeoutMs: null,
         strategy: 'disabled',
@@ -356,7 +345,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
     });
 
     it('mantém Copilot SDK em watchdog-only e ativa timeout de inatividade para BYOK', async () => {
-        const timeoutPolicy = await import('../../../src/copilot/presentation/dialog-timeout-policy.js');
+        const timeoutPolicy = await import('#copilot/dialog/timeout-policy');
         const resolveMock = vi.mocked(timeoutPolicy.resolveOptionalDialogTimeout);
         resolveMock.mockClear();
 

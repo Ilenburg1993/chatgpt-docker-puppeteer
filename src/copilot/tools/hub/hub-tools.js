@@ -1,6 +1,6 @@
 // @ts-check
 import { LLM_B_TURN_TIMEOUT_MS, resolveHubTurnTimeout } from '#copilot/config';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';

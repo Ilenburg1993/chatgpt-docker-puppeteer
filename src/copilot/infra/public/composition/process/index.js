@@ -1,3 +1,3 @@
 // @ts-check
 /** @module copilot/infra/public/composition/process */
-export { createProcessInfra } from '../../../composition/process/index.js';
+export { PROCESS_SHUTDOWN_PHASE, createProcessInfra } from '../../../composition/process/index.js';

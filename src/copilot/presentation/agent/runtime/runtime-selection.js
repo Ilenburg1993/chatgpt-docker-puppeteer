@@ -16,8 +16,8 @@ import {
     listAgentRuntimes,
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
 } from '#copilot/agent/runtime-registry';
-import { NotFoundError } from '#copilot/core';
 import { normalizeRuntimeId } from '../../routing/targeting.js';
+import { AgentRuntimeNotFoundError } from '../errors.js';
 
 /**
  * @typedef {import('#copilot/agent/always-alive').AlwaysAliveAgent} AgentRuntime
@@ -106,11 +106,11 @@ export function resolveAgentRuntimeSelection(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {NotFoundError}
+ * @returns {AgentRuntimeNotFoundError}
  */
 export function createAgentRuntimeNotFoundError(runtimeId) {
     const normalizedRuntimeId = normalizeRuntimeId(runtimeId) ?? readDefaultAgentRuntimeId();
-    return new NotFoundError(`Runtime '${normalizedRuntimeId}' não encontrado.`, 'AGENT_RUNTIME_NOT_FOUND');
+    return new AgentRuntimeNotFoundError(`Runtime '${normalizedRuntimeId}' não encontrado.`, 'AGENT_RUNTIME_NOT_FOUND');
 }
 
 /**
@@ -149,7 +149,7 @@ export function requireAgentRuntimeSelection(runtimeId) {
  * @returns {boolean}
  */
 export function isAgentRuntimeNotFoundError(error) {
-    return error instanceof NotFoundError && error.code === 'AGENT_RUNTIME_NOT_FOUND';
+    return error instanceof AgentRuntimeNotFoundError && error.code === 'AGENT_RUNTIME_NOT_FOUND';
 }
 
 /**
@@ -187,4 +187,29 @@ export function listKnownAgentRuntimes() {
             agentProfileId,
         };
     });
+}
+
+/** @param {string|null|undefined} [runtimeId] */
+export function readAgentSessionBinding(runtimeId) {
+    return resolveAgentRuntimeSelection(runtimeId).runtime.getSessionBindingSnapshot();
+}
+
+/** @param {string|null} hubSessionId @param {string|null|undefined} [runtimeId] */
+export function setAgentHubSessionId(hubSessionId, runtimeId) {
+    return requireAgentRuntimeSelection(runtimeId).runtime.setHubSessionId(hubSessionId);
+}
+
+/** @param {string|null} sdkSessionId @param {string|null|undefined} [runtimeId] */
+export function setAgentSdkSessionId(sdkSessionId, runtimeId) {
+    return requireAgentRuntimeSelection(runtimeId).runtime.setSdkSessionId(sdkSessionId);
+}
+
+/** @param {string|null|undefined} [runtimeId] */
+export function clearAgentSdkSessionId(runtimeId) {
+    return requireAgentRuntimeSelection(runtimeId).runtime.clearSdkSessionId();
+}
+
+/** @param {string|null|undefined} [runtimeId] */
+export function clearAgentSessionBinding(runtimeId) {
+    return requireAgentRuntimeSelection(runtimeId).runtime.clearSessionBinding();
 }

@@ -1,7 +1,7 @@
 // @ts-check
 /** Progressive byte-line index builder; owns no cache or invalidation state. */
 
-import { toBufferView } from '#copilot/infra/internal/platform';
+import { toBufferView } from '#copilot/infra/internal/platform/buffer';
 import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
 import {

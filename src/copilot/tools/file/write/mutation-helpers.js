@@ -5,7 +5,6 @@
  * @module copilot/tools/file/write/mutation-helpers
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import {
     abortIoChangeSet,
     appendIoChangeSetEntry,
@@ -14,6 +13,7 @@ import {
     completeIoOperationEnvelope,
     failIoOperationEnvelope,
 } from '#copilot/infra/public/operations';
+import { toError } from '#copilot/infra/public/platform/error';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
 import { WORKSPACE_MUTATION_AUDIT, WORKSPACE_ROLLBACK, WORKSPACE_ROLLBACK_POLICY } from '../shared.js';
 import {
@@ -46,7 +46,7 @@ export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
  * }} result
  * @param {{
  *     tool: string;
- *     io?: import('#copilot/core/io-contracts').IoMeta | null;
+ *     io?: import('#copilot/infra/public/operations/contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} auditContext
  */
@@ -66,7 +66,7 @@ export async function completeAndAuditMutation(operation, result, auditContext) 
  * @param {unknown} error
  * @param {{
  *     tool: string;
- *     io?: import('#copilot/core/io-contracts').IoMeta | null;
+ *     io?: import('#copilot/infra/public/operations/contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} auditContext
  */
@@ -84,7 +84,7 @@ export async function failAndAuditMutation(operation, error, auditContext) {
 /**
  * @param {{
  *     capability: string;
- *     riskClass: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass: import('#copilot/infra/public/operations/contracts').IoRiskClass;
  *     traceId?: string | null;
  *     action?: 'write' | 'patch' | 'delete' | 'copy' | 'move';
  *     targets?: string[];

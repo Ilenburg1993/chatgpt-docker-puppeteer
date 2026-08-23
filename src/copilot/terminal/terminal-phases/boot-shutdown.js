@@ -4,7 +4,7 @@
  * @file Registro dos shutdown handlers do terminal.
  */
 
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import { log } from '#copilot/observability';
 import { flushTerminalSseEventArchive, flushTerminalTranscriptArchive } from '../state/index.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
@@ -19,7 +19,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
  *     flushTerminalSseEventArchiveFn?: typeof flushTerminalSseEventArchive;
  *     flushTerminalTranscriptArchiveFn?: typeof flushTerminalTranscriptArchive;
  *     flushModelGatewayRuntimeHealthMirrorFn?: () => Promise<unknown>;
- *     registerShutdownHandlerFn?: typeof registerShutdownHandler;
+ *     registerShutdownHandlerFn?: typeof registerApplicationShutdownHandler;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
  * }} deps
  * @returns {void}
@@ -30,7 +30,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
     const flushTerminalSseEventArchiveFn = deps.flushTerminalSseEventArchiveFn ?? flushTerminalSseEventArchive;
     const flushTerminalTranscriptArchiveFn = deps.flushTerminalTranscriptArchiveFn ?? flushTerminalTranscriptArchive;
     const flushModelGatewayRuntimeHealthMirrorFn = deps.flushModelGatewayRuntimeHealthMirrorFn;
-    const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerShutdownHandler;
+    const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerApplicationShutdownHandler;
     const logFn = deps.logFn ?? log;
 
     registerShutdownHandlerFn(
@@ -39,7 +39,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await flushModelGatewayRuntimeHealthMirrorFn?.();
             logFn('INFO', '[TerminalServer] Model gateway runtime health SQLite mirror drenado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.RUNTIME_STATE_DRAIN,
+        PROCESS_SHUTDOWN_PHASE.STATE_DRAIN,
         { timeoutMs: 10_000 },
     );
 
@@ -49,7 +49,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await rollbackRuntimeListenersPhase();
             logFn('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
+        PROCESS_SHUTDOWN_PHASE.RUNTIME_CRITICAL,
     );
 
     registerShutdownHandlerFn(
@@ -58,7 +58,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await rollbackPinnedContextPhaseFn(ctx);
             logFn('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.TERMINAL_RESOURCE,
+        PROCESS_SHUTDOWN_PHASE.RESOURCE,
     );
 
     registerShutdownHandlerFn(
@@ -67,7 +67,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await rollbackRuntimeListenersPhase();
             logFn('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,
+        PROCESS_SHUTDOWN_PHASE.ACTIVITY,
     );
 
     registerShutdownHandlerFn(
@@ -76,7 +76,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await flushTerminalTranscriptArchiveFn();
             logFn('INFO', '[TerminalServer] Archive de transcript drenado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        PROCESS_SHUTDOWN_PHASE.FINAL,
         { timeoutMs: 10_000 },
     );
 
@@ -86,7 +86,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             await flushTerminalSseEventArchiveFn();
             logFn('INFO', '[TerminalServer] Archive SSE drenado via shutdown handler.');
         },
-        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        PROCESS_SHUTDOWN_PHASE.FINAL,
         { timeoutMs: 10_000 },
     );
 }

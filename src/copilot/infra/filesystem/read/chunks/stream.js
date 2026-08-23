@@ -1,7 +1,7 @@
 // @ts-check
 /** Consistent one-pass physical stream iterator with opportunistic byte-line seed capture. */
 
-import { toBufferView, utf8ByteLength } from '#copilot/infra/internal/platform';
+import { toBufferView, utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
 import { appendPhysicalLineStartsFromBuffer, resolveByteLineSeedStreamHighWaterMark } from '../line-index/index.js';

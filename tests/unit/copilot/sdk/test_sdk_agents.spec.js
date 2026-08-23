@@ -25,23 +25,6 @@ vi.mock('@github/copilot-sdk', () => {
     return { SYSTEM_MESSAGE_SECTIONS: SYSTEM_PROMPT_SECTIONS, SYSTEM_PROMPT_SECTIONS, CopilotClient: vi.fn() };
 });
 
-vi.mock('#copilot/core/errors', () => ({
-    ConfigError: class ConfigError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'ConfigError';
-        }
-    },
-    CopilotError: class CopilotError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'CopilotError';
-        }
-    },
-}));
-
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
     LOG_DIR: '/tmp/test-logs',

@@ -1,12 +1,7 @@
 // @ts-check
-/** JSDoc-only rollback sidecar descriptor contract. */
 /**
- * @typedef {object} IoRollbackSidecar
- * @property {1} version
- * @property {string} path
- * @property {string} contentHash
- * @property {number} bytes
- * @property {number} createdAtMs
- * @property {number} expiresAtMs
+ * Filesystem-local type projection of the neutral rollback sidecar descriptor.
+ * The structural contract is owned by operations/contracts so dependency direction remains contracts -> implementation free.
+ * @typedef {import('#copilot/infra/internal/operations/contracts').IoRollbackSidecar} IoRollbackSidecar
  */
 export {};

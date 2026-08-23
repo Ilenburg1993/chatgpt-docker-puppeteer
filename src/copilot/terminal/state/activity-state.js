@@ -6,7 +6,7 @@
  * compartilhem uma única semântica operacional.
  */
 
-import { redactSecretText } from '#copilot/core';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { EventEmitter } from 'node:events';
 
 const MAX_ACTIVITY_HISTORY = 100;

@@ -10,6 +10,7 @@
 
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import {
     attachSseReplayEventId,
     eventFanout,
@@ -17,7 +18,6 @@ import {
     getSseCriticalClients,
     getTerminalReplayBuffer,
 } from '#copilot/presentation/realtime';
-import { redactSecretRecord } from '../../core/security/redaction.js';
 import { log } from '../../observability/index.js';
 import { CRITICAL_EVENTS, getHubSessionId } from '../../presentation/state/index.js';
 import { recordTerminalSseEventArchive } from '../state/events/index.js';
@@ -84,7 +84,7 @@ export function normalizeSsePayloadForTransport(data) {
  * @param {unknown} value
  * @returns {string}
  */
-function safeJsonStringify(value) {
+function stringifyJsonStrict(value) {
     try {
         return JSON.stringify(normalizeSseValue(value, { depth: 0, seen: new WeakSet() }));
     } catch (error) {
@@ -162,7 +162,7 @@ function writeSseEvent(client, event, data, ctx = {}) {
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
     const enrichedData = { ...data, hubSessionId: ctx.hubSessionId ?? null };
     const eventId = Number.isFinite(ctx.eventId) ? Number(ctx.eventId) : nextSseEventId();
-    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${safeJsonStringify(enrichedData)}\n\n`;
+    const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${stringifyJsonStrict(enrichedData)}\n\n`;
     try {
         return client.write(payload) !== false;
     } catch {

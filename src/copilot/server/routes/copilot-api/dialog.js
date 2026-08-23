@@ -12,10 +12,10 @@
  */
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { resolveOptionalDialogTimeout } from '#copilot/dialog/timeout-policy';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
-import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
     readAgentRuntimeControlStateFromRoute,

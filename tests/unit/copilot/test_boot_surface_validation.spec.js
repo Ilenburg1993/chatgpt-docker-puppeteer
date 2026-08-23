@@ -14,9 +14,9 @@ import {
 
 describe('copilot/boot/surface-validation', () => {
     it('valida os barrels reais usados pelo boot', async () => {
-        const [{ createCopilotBootPlan }, core, sdk, agent, terminal] = await Promise.all([
+        const [{ createCopilotBootPlan }, processRuntime, sdk, agent, terminal] = await Promise.all([
             import('../../../src/copilot/boot/plan.js'),
-            import('#copilot/core'),
+            import('#copilot/boot/process-runtime'),
             import('#copilot/sdk'),
             import('#copilot/agent'),
             import('../../../src/copilot/terminal/index.js'),
@@ -24,7 +24,7 @@ describe('copilot/boot/surface-validation', () => {
         const plan = createCopilotBootPlan();
 
         const report = assertCopilotBootSurfaces({
-            core,
+            processRuntime,
             sdk,
             agent,
             terminal,
@@ -52,7 +52,7 @@ describe('copilot/boot/surface-validation', () => {
         };
 
         const report = validateCopilotBootSurfaces({
-            core: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.core),
+            processRuntime: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.processRuntime),
             sdk: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.sdk),
             agent: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.agent),
             terminal: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.terminal),
@@ -62,7 +62,13 @@ describe('copilot/boot/surface-validation', () => {
 
         expect(report.ok).toBe(true);
         expect(report.missing).toEqual([]);
-        expect(report.groups.map((group) => group.name)).toEqual(['core', 'sdk', 'agent', 'terminal', 'phaseHandlers']);
+        expect(report.groups.map((group) => group.name)).toEqual([
+            'processRuntime',
+            'sdk',
+            'agent',
+            'terminal',
+            'phaseHandlers',
+        ]);
         expect(assertCopilotBootSurfaces({ ...reportInput(plan, phaseHandlers) }).ok).toBe(true);
     });
 
@@ -71,7 +77,7 @@ describe('copilot/boot/surface-validation', () => {
             phases: [{ id: 'observability' }, { id: 'runtime-wiring' }, { id: 'terminal-init' }],
         };
         const input = reportInput(plan, { observability: () => undefined });
-        delete input.core['listActiveTimers'];
+        delete input.processRuntime['listActiveApplicationTimers'];
         delete input.sdk['createCopilotClient'];
         delete input.agent['startRuntime'];
         delete input.terminal['runTerminalHttpServerPhase'];
@@ -81,7 +87,7 @@ describe('copilot/boot/surface-validation', () => {
         expect(report.ok).toBe(false);
         expect(report.missing).toEqual(
             expect.arrayContaining([
-                'core.listActiveTimers',
+                'processRuntime.listActiveApplicationTimers',
                 'sdk.createCopilotClient',
                 'agent.startRuntime',
                 'terminal.runTerminalHttpServerPhase',
@@ -90,7 +96,7 @@ describe('copilot/boot/surface-validation', () => {
             ]),
         );
         expect(() => assertCopilotBootSurfaces(input)).toThrow(
-            /core\.listActiveTimers.*phaseHandlers\.runtime-wiring/s,
+            /processRuntime\.listActiveApplicationTimers.*phaseHandlers\.runtime-wiring/s,
         );
     });
 });
@@ -102,7 +108,7 @@ describe('copilot/boot/surface-validation', () => {
  */
 function reportInput(plan, phaseHandlers) {
     return {
-        core: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.core),
+        processRuntime: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.processRuntime),
         sdk: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.sdk),
         agent: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.agent),
         terminal: buildSurface(COPILOT_BOOT_REQUIRED_SURFACES.terminal),

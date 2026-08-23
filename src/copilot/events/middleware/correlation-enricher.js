@@ -39,7 +39,9 @@ export function getCausationContext() {
 /**
  * Middleware que enriquece todo evento com `correlationId` e `causationId`.
  *
- * @type {import('../../core/event-bus.js').Middleware}
+ * @param {import('../base-events.js').BaseEvent} event
+ * @param {() => void | Promise<void>} next
+ * @returns {void | Promise<void>}
  */
 export function correlationEnricher(event, next) {
     if (!event.correlationId) {

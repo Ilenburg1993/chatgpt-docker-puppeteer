@@ -12,7 +12,7 @@
  */
 
 import { getTerminalInterventionPolicy } from '#copilot/config';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { extractAtReferences } from '../../presentation/files/index.js';

@@ -1,6 +1,6 @@
 // @ts-check
 /** Instance-owned L2 lifecycle, prune timer and initialization circuit breaker. */
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/internal/platform/error';
 import { publishIoLifecycleEvent } from '#copilot/infra/internal/telemetry';
 import { getIoL2CacheConfiguration } from './config.js';
 import { createIoL2SqliteCache } from './sqlite/index.js';

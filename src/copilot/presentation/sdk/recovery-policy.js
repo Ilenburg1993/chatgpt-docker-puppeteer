@@ -8,10 +8,7 @@
  * @module copilot/presentation/sdk-recovery-policy
  */
 
-import {
-    classifySdkError as classifyCoreSdkError,
-    classifySdkRateLimitScope as classifyCoreSdkRateLimitScope,
-} from '#copilot/core';
+import { classifyAgentSdkError, classifyAgentSdkRateLimitScope } from '#copilot/agent/facades';
 
 /** @typedef {'rate_limit' | 'quota_exhausted' | 'account' | 'auth' | 'model_unsupported' | 'network' | 'timeout' | 'unknown'} RuntimeSdkErrorKind */
 /** @typedef {'connection' | 'session'} RuntimeSdkRecoveryScope */
@@ -51,7 +48,7 @@ import {
  * @returns {RuntimeSdkRateLimitScope}
  */
 export function classifyRuntimeSdkRateLimitScope(error) {
-    return classifyCoreSdkRateLimitScope(error);
+    return classifyAgentSdkRateLimitScope(error);
 }
 
 /**
@@ -59,7 +56,7 @@ export function classifyRuntimeSdkRateLimitScope(error) {
  * @returns {RuntimeSdkErrorKind}
  */
 export function classifyRuntimeSdkError(error) {
-    return classifyCoreSdkError(error);
+    return classifyAgentSdkError(error);
 }
 
 /**

@@ -83,7 +83,7 @@ export function isFileResourceLockEnabled() {
 }
 
 /**
- * @param {{ explicit?: boolean; riskClass?: import('#copilot/core/io-contracts').IoRiskClass }} [options]
+ * @param {{ explicit?: boolean; riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass }} [options]
  * @param {ReturnType<typeof readFileResourceLockPolicy>} [policy]
  */
 export function shouldAcquireFileResourceLock(options = {}, policy = undefined) {

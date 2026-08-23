@@ -9,8 +9,8 @@
  * @see module:copilot/agent/dialog/loop-manager
  */
 
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { WATCHDOG_THRESHOLDS } from '#copilot/config/agent';
-import { cancelTimer, registerInterval } from '#copilot/core';
 import { log } from '../../ports/logging/index.js';
 
 /**
@@ -97,7 +97,7 @@ export class DialogWatchdog {
         this.#preStallEmitted = false;
         this.#stallEmitted = false;
         this.#timerId = `agent.dialog.watchdog:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-        this.#timer = registerInterval(
+        this.#timer = registerApplicationInterval(
             this.#timerId,
             () => {
                 const stalledMs = Date.now() - this.#lastActivity;
@@ -142,7 +142,7 @@ export class DialogWatchdog {
      */
     stop() {
         if (this.#timer !== null) {
-            if (this.#timerId) cancelTimer(this.#timerId);
+            if (this.#timerId) cancelApplicationTimer(this.#timerId);
             this.#timer = null;
             this.#timerId = null;
         }

@@ -35,23 +35,6 @@ vi.mock('#copilot/sdk/session', () => ({
     getClient: mockGetClient,
 }));
 
-vi.mock('#copilot/core/errors', () => ({
-    ConfigError: class ConfigError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'ConfigError';
-        }
-    },
-    CopilotError: class CopilotError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'CopilotError';
-        }
-    },
-}));
-
 // ─── Imports ───────────────────────────────────────────────────────────────
 
 import { setModelListClientProvider } from '../../../../src/copilot/sdk/models/client-provider.js';

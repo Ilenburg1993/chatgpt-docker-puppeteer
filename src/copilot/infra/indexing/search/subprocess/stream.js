@@ -1,7 +1,7 @@
 // @ts-check
 /** Bounded line-streaming subprocess execution with early-stop support. */
 
-import { concatBufferViews, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { concatBufferViews, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 import { spawn } from 'node:child_process';
 import {
     makeSearchExitError,

@@ -109,7 +109,7 @@
     {
       "alias": "#copilot/infra/public/composition/workspace/mutation-io",
       "audience": "composition",
-      "costTier": "standard",
+      "costTier": "heavy",
       "metrics": {
         "importMs": 121.641,
         "wallMs": 178.426,
@@ -137,6 +137,17 @@
         "wallMs": 55.662,
         "rssMiB": 56.367,
         "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/concurrency/resilience",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.117,
+        "wallMs": 56.906,
+        "rssMiB": 55.965,
+        "rssDeltaMiB": 0.5
       }
     },
     {
@@ -228,6 +239,17 @@
       }
     },
     {
+      "alias": "#copilot/infra/public/observability/redaction",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.523,
+        "wallMs": 55.289,
+        "rssMiB": 55.965,
+        "rssDeltaMiB": 0.625
+      }
+    },
+    {
       "alias": "#copilot/infra/public/operations",
       "audience": "runtime",
       "costTier": "heavy",
@@ -236,6 +258,17 @@
         "wallMs": 194.398,
         "rssMiB": 119.953,
         "rssDeltaMiB": 64.281
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/operations/contracts",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.986,
+        "wallMs": 55.147,
+        "rssMiB": 55.992,
+        "rssDeltaMiB": 0.5
       }
     },
     {
@@ -283,6 +316,17 @@
       }
     },
     {
+      "alias": "#copilot/infra/public/platform/error",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.911,
+        "wallMs": 55.691,
+        "rssMiB": 56.031,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
       "alias": "#copilot/infra/public/platform/http-response",
       "audience": "runtime",
       "costTier": "micro",
@@ -291,6 +335,28 @@
         "wallMs": 59.345,
         "rssMiB": 56.367,
         "rssDeltaMiB": 0.625
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/json",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 1.866,
+        "wallMs": 55.189,
+        "rssMiB": 56.031,
+        "rssDeltaMiB": 0.5
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/platform/network",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 20.33,
+        "wallMs": 76.825,
+        "rssMiB": 61.461,
+        "rssDeltaMiB": 6.051
       }
     },
     {

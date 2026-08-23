@@ -6,12 +6,8 @@
  */
 
 import { createStaleSnapshotError, sameFileSnapshot } from '#copilot/infra/internal/filesystem/read';
-import {
-    concatBufferViews,
-    nonNegativeIntegerOr,
-    positiveIntegerOr,
-    toBufferView,
-} from '#copilot/infra/internal/platform';
+import { concatBufferViews, toBufferView } from '#copilot/infra/internal/platform/buffer';
+import { nonNegativeIntegerOr, positiveIntegerOr } from '#copilot/infra/internal/platform/config-values';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';

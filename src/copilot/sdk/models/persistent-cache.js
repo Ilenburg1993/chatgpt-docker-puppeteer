@@ -11,8 +11,8 @@
  */
 
 import { resolveBootWorkspaceRoot } from '#copilot/boot';
-import { toError } from '#copilot/core/error-handlers';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { toError } from '#copilot/infra/public/platform/error';
 import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';

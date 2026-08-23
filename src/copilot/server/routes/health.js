@@ -9,8 +9,8 @@
  *   src/copilot/server/routes/health.js
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
 import { Router } from 'express';
-import { toError } from '../../core/error-handlers.js';
 import { handleHubHealth } from '../../presentation/conversation/index.js';
 import { resolveRequestedRuntimeId } from '../../presentation/routing/index.js';
 import { buildAgentHealthHttpResponse } from '../../presentation/runtime/index.js';

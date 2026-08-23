@@ -9,8 +9,8 @@
  */
 
 import { getApplicationWorkspaceInfra } from '#copilot/boot';
+import { toError } from '#copilot/infra/public/platform/error';
 import { relative } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 const TERMINAL_SCOPE_WORKSPACE = getApplicationWorkspaceInfra(process.cwd());

@@ -5,7 +5,7 @@
  * @module copilot/infra/filesystem/read/snapshot/lines
  */
 
-import { splitPhysicalTextLines } from '#copilot/infra/internal/platform';
+import { splitPhysicalTextLines } from '#copilot/infra/internal/platform/text-lines';
 import { readTextFileSnapshot } from './text.js';
 
 /**

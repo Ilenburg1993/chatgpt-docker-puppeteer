@@ -62,7 +62,7 @@ import { wireSessionEvents } from '../wiring/index.js';
  * @property {(() => void)[]} unsubs
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('#copilot/events/runtime').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer

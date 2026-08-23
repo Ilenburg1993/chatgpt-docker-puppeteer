@@ -8,7 +8,7 @@
  * @module copilot/observability/convergence-trace-store
  */
 
-import { redactSecretText } from '../core/security/redaction.js';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { createHistogram } from './metrics-histogram.js';
 
 // ─── Persistência SQLite (opcional, L2) ──────────────────────────────────────
@@ -17,8 +17,9 @@ import { createHistogram } from './metrics-histogram.js';
 let _persistenceDb = null;
 
 /**
- * Inicializa a persistência SQLite do trace-store de convergência. Deve ser chamado uma vez no bootstrap (após
- * `ensureCopilotDbDir` + `getCopilotDb`). Idempotente — chamadas extras com o mesmo banco são ignoradas.
+ * Inicializa a persistência SQLite do trace-store de convergência. Deve ser chamado uma vez no bootstrap, depois que
+ * `ApplicationInfraHost` disponibilizar o `SqliteDatabasePort` application-owned. Idempotente — chamadas extras com o
+ * mesmo banco são ignoradas.
  *
  * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @returns {void}

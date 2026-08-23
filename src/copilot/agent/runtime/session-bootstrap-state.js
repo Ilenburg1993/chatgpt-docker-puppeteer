@@ -7,9 +7,9 @@
  *   → persistida) e restauração de state persistido.
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
 import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/state/index.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state/index.js';
+import { logSwallowed } from '../ports/logging/swallowed.js';
 
 /**
  * @typedef {{

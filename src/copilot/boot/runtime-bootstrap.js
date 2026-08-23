@@ -8,22 +8,18 @@
  * @module copilot/boot/runtime-bootstrap
  */
 
-import { AUDIT_BUS } from '#copilot/audit';
 import {
     assertCopilotBootSurfaces,
     createCopilotBootPlan,
     readCopilotBootConfig,
     runCopilotBootPlan,
 } from '#copilot/boot';
-import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
 import { buildModelGatewayOnListModelsHandler } from '#copilot/model-gateway';
-import { ERROR_TRACKER } from '#copilot/observability';
-import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
+import { defaultErrorTracker } from '#copilot/observability';
 import { createTerminalCopilotClient, defaultBus as defaultHookBus } from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus, runCopilotSdkBootPreflight } from '#copilot/sdk/telemetry';
-import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from '../config/agent.js';
-import { container } from '../core/di-container.js';
 import {
     bootstrapConvergencePersistence,
     bootstrapLateDeps,
@@ -138,7 +134,7 @@ export async function bootCopilot(options) {
         const phaseHandlers = {
             observability: async () => {
                 bootstrapObservability();
-                container.resolve(ERROR_TRACKER).registerGlobalHandlers();
+                defaultErrorTracker.registerGlobalHandlers();
 
                 try {
                     const applicationInfra = await import('./application-infra.js');
@@ -152,21 +148,8 @@ export async function bootCopilot(options) {
                 const { buildTool } = await import('../tools/index.js');
                 bootstrapLateDeps({ buildTool });
 
-                container.register(AUDIT_BUS, () => defaultHookBus, 'singleton');
-
-                const { setAuditBus } = await import('../audit/pipeline-permission.js');
-                setAuditBus(defaultHookBus);
-
-                container.validateRequired([
-                    SHUTDOWN_LOGGER,
-                    EVENT_BUS,
-                    SDK_LOGGER,
-                    TOOLS_BUILDER,
-                    AUDIT_BUS,
-                    HOOKS_LOGGER,
-                    TOOLS_LOGGER,
-                    TOOLS_METRICS,
-                ]);
+                const { bootstrapApplicationAudit } = await import('./application-audit.js');
+                bootstrapApplicationAudit(defaultHookBus);
             },
             'sdk-preflight': async () => {
                 bootState.bootPreflight = await runCopilotSdkBootPreflight({
@@ -178,13 +161,13 @@ export async function bootCopilot(options) {
                 });
             },
             'runtime-wiring': async () => {
-                const [{ wireCopilotRuntimeDI }, { startTodoCleanupJob }] = await Promise.all([
+                const [{ wireCopilotRuntime }, { startTodoCleanupJob }] = await Promise.all([
                     import('../runtime-wiring.js'),
                     import('../tools/todo/store.js'),
                 ]);
 
                 const wireRuntime = () =>
-                    wireCopilotRuntimeDI({
+                    wireCopilotRuntime({
                         broadcastSse: (event, payload) => {
                             const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
                             options.broadcastSse(event, data);
@@ -201,13 +184,13 @@ export async function bootCopilot(options) {
                 });
             },
             'boot-surface-validation': async () => {
-                const [coreSurface, sdkSurface, agentSurface] = await Promise.all([
-                    import('#copilot/core'),
+                const [processRuntimeSurface, sdkSurface, agentSurface] = await Promise.all([
+                    import('#copilot/boot/process-runtime'),
                     import('#copilot/sdk'),
                     import('#copilot/agent'),
                 ]);
                 const report = assertCopilotBootSurfaces({
-                    core: coreSurface,
+                    processRuntime: processRuntimeSurface,
                     sdk: sdkSurface,
                     agent: agentSurface,
                     terminal: terminalSurface,
@@ -283,9 +266,7 @@ export async function bootCopilot(options) {
  * @returns {void}
  */
 function emitBootLifecycleEvent(event) {
-    if (!container.has(EVENT_BUS)) return;
-    const bus = container.resolve(EVENT_BUS);
-    bus?.emit(event);
+    getApplicationEventBus().emit(event);
 }
 
 /**

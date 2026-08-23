@@ -53,7 +53,7 @@ describe('event-bridge-map › contratos declarativos', () => {
         assert.match(alwaysAliveSrc, /runtime\/root-surface\/index\.js/);
         assert.match(singletonSrc, /event-bridge\/index\.js/);
         assert.match(singletonSrc, /ensureAgentEventBusBridge\(/);
-        assert.match(wiringSrc, /wireAgentRuntimeEventBusBridge\(agent, bus\)/);
+        assert.match(wiringSrc, /wireAgentRuntimeEventBusBridge\(agent, agent\.ctx\.eventBus\)/);
         assert.doesNotMatch(wiringSrc, /agent\.ctx\.getDialogLoopManagerSnapshot\(/);
         assert.doesNotMatch(wiringSrc, /agent\.ctx\.getHandoffManagerSnapshot\(/);
     });

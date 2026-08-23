@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { patchTextBatchLocked } from '#copilot/infra/internal/filesystem/mutation';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 
 /** @type {string[]} */
 const tempDirs = [];

@@ -5,7 +5,7 @@
  * @module copilot/infra/code-analysis/json-outline
  */
 
-import { iterateTextLines } from '#copilot/infra/internal/platform';
+import { iterateTextLines } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * Extrai top-level keys de um JSON completo ou da primeira linha JSONL válida.

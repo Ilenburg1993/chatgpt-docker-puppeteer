@@ -1,6 +1,6 @@
 // @ts-check
 /** Process-owned cache for physical workspace path-policy decisions. */
-import { IO_PATH_POLICY_VERSION } from '#copilot/infra/internal/policy';
+import { IO_PATH_POLICY_VERSION } from '#copilot/infra/internal/policy/workspace-path';
 import path from 'node:path';
 
 const DEFAULT_TTL_MS = 250;
@@ -9,7 +9,7 @@ const DEFAULT_MAX_ENTRIES = 2_048;
 const HARD_MAX_ENTRIES = 10_000;
 
 /** @typedef {Readonly<{ttlMs:number;maxEntries:number}>} WorkspacePathPolicyCacheConfig */
-/** @typedef {{ result: import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess; cachedAtMs:number; absolutePath:string; realPath:string }} CacheEntry */
+/** @typedef {{ result: import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicySuccess; cachedAtMs:number; absolutePath:string; realPath:string }} CacheEntry */
 /** @type {Map<string, CacheEntry>} */
 const cache = new Map();
 const stats = {
@@ -104,12 +104,13 @@ export function readWorkspacePathPolicyCacheEntry(key, ttlMs) {
     return { ...entry.result };
 }
 
-/** @param {string} key @param {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} result @param {number} maxEntries */
+/** @param {string} key @param {import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicySuccess} result @param {number} maxEntries */
 export function rememberWorkspacePathPolicyCacheEntry(key, result, maxEntries) {
-    const storedResult = /** @type {import('#copilot/infra/internal/policy').WorkspacePathPolicySuccess} */ ({
-        ...result,
-        blockedSegments: Object.freeze([...result.blockedSegments]),
-    });
+    const storedResult =
+        /** @type {import('#copilot/infra/internal/policy/workspace-path').WorkspacePathPolicySuccess} */ ({
+            ...result,
+            blockedSegments: Object.freeze([...result.blockedSegments]),
+        });
     cache.delete(key);
     cache.set(key, {
         result: storedResult,

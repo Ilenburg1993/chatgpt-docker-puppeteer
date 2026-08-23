@@ -6,7 +6,7 @@ export function createIoMutationStateRuntime() {
     let appliedButUnconfirmed = 0;
     /** @type {Map<string,number>} */ const byOperation = new Map();
     /** @type {{operation:string;phase:string|null;pathCount:number;at:number}|null} */ let last = null;
-    /** @param {import('#copilot/core/io-contracts').IoMeta} io @param {unknown} error */
+    /** @param {import('#copilot/infra/internal/operations/contracts').IoMeta} io @param {unknown} error */
     function record(io, error) {
         const mutation = readMutationAppliedState(error);
         if (!mutation.applied) return;

@@ -10,8 +10,8 @@
  * @module copilot/model-gateway/health/provider-health
  */
 
-import { redactSecretText } from '#copilot/core';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { isAbsolute, join, resolve } from 'node:path';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;

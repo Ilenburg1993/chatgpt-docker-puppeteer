@@ -66,8 +66,12 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { toError } from '#copilot/core/error-handlers';
-import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk/tools';
+import { toError } from '#copilot/infra/public/platform/error';
+import {
+    normalizeToolParametersSchema,
+    createTool as sdkCreateTool,
+    validateToolDefinitionContract,
+} from '#copilot/sdk/tools';
 import { log as toolsLog } from './logger.js';
 import { withToolFailureFeedback } from './tool-feedback.js';
 
@@ -297,45 +301,11 @@ function normalizeParameters(parameters, toolName = 'unknown', failurePolicy = '
  * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>}
  */
 function validateBuiltTool(toolName, tool) {
-    const validation = validateToolDefinitionContractLocal(tool);
+    const validation = validateToolDefinitionContract(tool);
     if (!validation.ok) {
         throw new TypeError(`[tool-factory] Tool '${toolName}' inválida: ${validation.reason}`);
     }
     return tool;
-}
-
-/**
- * Contrato mínimo local para evitar ciclos/TDZ com facades de validação mais altas.
- *
- * @param {unknown} tool
- * @returns {{ ok: true } | { ok: false; reason: string }}
- */
-function validateToolDefinitionContractLocal(tool) {
-    if (!tool || typeof tool !== 'object') {
-        return { ok: false, reason: 'tool (object) obrigatório.' };
-    }
-    const candidate = /** @type {Record<string, unknown>} */ (tool);
-    if (typeof candidate['name'] !== 'string' || candidate['name'].trim() === '') {
-        return { ok: false, reason: 'name (string) obrigatório.' };
-    }
-    if (typeof candidate['description'] !== 'string' || candidate['description'].trim() === '') {
-        return { ok: false, reason: 'description (string) obrigatório.' };
-    }
-    if (typeof candidate['handler'] !== 'function') {
-        return { ok: false, reason: 'handler (function) obrigatório.' };
-    }
-    if (
-        candidate['parameters'] !== undefined &&
-        (typeof candidate['parameters'] !== 'object' ||
-            candidate['parameters'] === null ||
-            Array.isArray(candidate['parameters']))
-    ) {
-        return { ok: false, reason: 'parameters deve ser object quando definido.' };
-    }
-    if (candidate['instructions'] !== undefined && typeof candidate['instructions'] !== 'string') {
-        return { ok: false, reason: 'instructions deve ser string quando definido.' };
-    }
-    return { ok: true };
 }
 
 /**

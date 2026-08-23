@@ -51,10 +51,6 @@ vi.mock('#copilot/testing/config/env', () => ({
     COPILOT_DISABLED_AGENTS: '',
     COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
-vi.mock('#copilot/core/errors', async () => {
-    const actual = await vi.importActual('#copilot/core/errors');
-    return actual;
-});
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
     LOG_DIR: '/tmp/test-logs',

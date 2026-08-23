@@ -302,7 +302,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const shutdownLine = lifecycle.shuttingDown
         ? `${diagnoseText('warn', 'em andamento')} ${diagnoseText('muted', pluralPt(lifecycle.shutdownHandlers.length, 'rotina', 'rotinas'))}`
         : shutdownReport
-          ? `${diagnoseText(shutdownReport.failedCount || shutdownReport.timeoutCount ? 'warn' : 'success', renderDiagnoseLifecycleReason(shutdownReport.reason))} ${diagnoseText('muted', `${shutdownReport.okCount}/${shutdownReport.handlerCount} rotinas · ${shutdownReport.durationMs}ms`)}`
+          ? `${diagnoseText(shutdownReport.failedCount || shutdownReport.timedOutAbortedCount || shutdownReport.timedOutStillRunningCount ? 'warn' : 'success', renderDiagnoseLifecycleReason(shutdownReport.reason))} ${diagnoseText('muted', `${shutdownReport.okCount}/${shutdownReport.handlerCount} rotinas · ${shutdownReport.durationMs}ms`)}`
           : diagnoseText('muted', 'sem amostra');
     const activeTimers = lifecycle.activeTimers ?? [];
     const timerLine =

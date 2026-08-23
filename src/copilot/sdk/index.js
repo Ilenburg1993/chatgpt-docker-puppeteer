@@ -538,4 +538,3 @@ export { emitSdkOperationMetric, setSdkMetricEmitter } from './telemetry/operati
 export { setCustomToolsBuilder } from './tools/custom.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { HOOKS_LOGGER, SDK_CLIENT_MANAGER, SDK_LOGGER, SDK_MODEL_RUNTIME, TOOLS_BUILDER } from './di-tokens.js';

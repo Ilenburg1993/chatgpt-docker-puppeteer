@@ -6,14 +6,17 @@
  *   interactions). Isolates `presentation/runtime/index.js`.
  */
 
+import { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/sdk/models';
 import {
     classifyPermissionDecision,
     classifyUserInputQuestionKind,
     getPendingStructuredUserInputCount,
     getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests,
+    isRuntimeElicitationSchema,
     nextStructuredUserInputRequestId,
     normalizeElicitationCompletedEvent,
+    normalizeElicitationContentWithSchema,
     normalizeElicitationPendingEvent,
     normalizePermissionCompletedEvent,
     normalizePermissionRequestedEvent,
@@ -23,6 +26,7 @@ import {
     registerPendingStructuredUserInputResolver,
     resolveEffectiveUserInputAllowFreeform,
 } from '#copilot/sdk/session';
+import { CANONICAL_LOCAL_FS_TOOL_NAMES } from '#copilot/sdk/tools';
 import {
     compactAgentSdkSession,
     confirmAgentSdkSessionUi,
@@ -118,7 +122,7 @@ export function createTerminalPendingStructuredUserInput(input) {
     const choices = Array.isArray(input.choices)
         ? input.choices.map((choice) => choice.trim()).filter((choice) => choice.length > 0)
         : [];
-    const allowFreeform = resolveEffectiveUserInputAllowFreeform();
+    const allowFreeform = resolveEffectiveUserInputAllowFreeform(input.allowFreeform);
     /** @type {(answer: string) => void} */
     let resolveAnswer = () => {};
     const promise = new Promise((resolve) => {
@@ -202,6 +206,38 @@ export function normalizeTerminalUserInputCompletedEvent(evt) {
  */
 export function classifyTerminalUserInputQuestionKind(question) {
     return classifyUserInputQuestionKind(question);
+}
+
+/** @returns {string[]} */
+export function listTerminalCanonicalLocalFsToolNames() {
+    return [...CANONICAL_LOCAL_FS_TOOL_NAMES];
+}
+
+/**
+ * @param {unknown} schema
+ * @returns {schema is { type: 'object'; properties: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }}
+ */
+export function isTerminalRuntimeElicitationSchema(schema) {
+    return isRuntimeElicitationSchema(schema);
+}
+
+/**
+ * @param {Record<string, string | number | boolean | string[]> | undefined} content
+ * @param {unknown} schema
+ * @returns {ReturnType<typeof normalizeElicitationContentWithSchema>}
+ */
+export function normalizeTerminalElicitationContentWithSchema(content, schema) {
+    return normalizeElicitationContentWithSchema(content, schema);
+}
+
+/** @param {string | null | undefined} model */
+export function isTerminalAutoModelSelector(model) {
+    return isAutoModelSelector(model);
+}
+
+/** @param {Parameters<typeof resolveModelSelectionMismatch>[0]} input */
+export function resolveTerminalModelSelectionMismatch(input) {
+    return resolveModelSelectionMismatch(input);
 }
 
 // ---------------------------------------------------------------------------

@@ -9,11 +9,11 @@
  * @see EventBus
  */
 
-import { SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { sendRuntimeDialogTurnOnActiveLoop } from '#copilot/runtime';
 import { createChunkRetention } from '../channel/chunk-retention.js';
+import { ConversationHubError } from './errors.js';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike
@@ -37,11 +37,11 @@ import { createChunkRetention } from '../channel/chunk-retention.js';
  * @param {string} messageContent - Versão string normalizada
  * @param {CallStrategyContext} ctx
  * @returns {Promise<string>}
- * @throws {SessionError} Se agent não suportar sendDialogTurn
+ * @throws {ConversationHubError} Se agent não suportar sendDialogTurn
  */
 export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     if (!agent.sendDialogTurn) {
-        throw new SessionError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
+        throw new ConversationHubError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
     }
     const content = typeof message === 'string' ? message : messageContent;
     log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${ctx.turnNumber + 1}.`);
@@ -59,7 +59,7 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
             /** @type {Parameters<typeof sendRuntimeDialogTurnOnActiveLoop>[2]} */ (/** @type {unknown} */ (agent)),
         );
         if (reply === null) {
-            throw new SessionError('[HubOrchestrator] sendDialogTurn retornou null', 'ORCH_DIALOG_NULL_REPLY');
+            throw new ConversationHubError('[HubOrchestrator] sendDialogTurn retornou null', 'ORCH_DIALOG_NULL_REPLY');
         }
         return reply;
     } finally {
@@ -78,7 +78,7 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
 export async function callViaStructured(bridge, message, ctx) {
     const legacyRawFallback = createChunkRetention();
     const result = await bridge.chatStructured(
-        /** @type {import('#copilot/core/structured-message').StructuredMessageInput} */ (message),
+        /** @type {import('#copilot/channel/structured-message').StructuredMessageInput} */ (message),
         {
             onDelta: (chunk) => {
                 legacyRawFallback.record(chunk);
@@ -94,7 +94,7 @@ export async function callViaStructured(bridge, message, ctx) {
     );
     const fallback = legacyRawFallback.snapshot();
     if (typeof result.raw !== 'string' && fallback.chunksTruncated) {
-        throw new SessionError(
+        throw new ConversationHubError(
             '[HubOrchestrator] fallback legado de resposta estruturada excedeu o budget',
             'ORCH_STRUCTURED_FALLBACK_TOO_LARGE',
         );

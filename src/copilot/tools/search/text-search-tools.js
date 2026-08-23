@@ -8,7 +8,8 @@
  * @module copilot/tools/search/text-search-tools
  */
 
-import { toError, withIoMeta } from '#copilot/core';
+import { withIoMeta } from '#copilot/infra/public/operations/contracts';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
 import {
     FILE_TOOLS_OUTPUT_POLICY,

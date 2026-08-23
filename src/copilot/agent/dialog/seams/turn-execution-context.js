@@ -6,7 +6,7 @@
  *   Extrai helpers de contexto e listeners da orquestração principal de turn-executor para isolamento semântico.
  */
 
-import { SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import {
     EMITTER_ASSISTANT_MESSAGE,
     EMITTER_ASSISTANT_STREAMING_DELTA,
@@ -218,7 +218,10 @@ export function createInactivityTimeout(emitter, opts) {
     arm();
     const initialHandle = handle;
     if (initialHandle === null && opts.timeout !== null) {
-        throw new SessionError('[DialogLoopManager] Falha ao armar timeout de inatividade.', 'DIALOG_TIMEOUT_SETUP');
+        throw new AgentSessionError(
+            '[DialogLoopManager] Falha ao armar timeout de inatividade.',
+            'DIALOG_TIMEOUT_SETUP',
+        );
     }
 
     return {

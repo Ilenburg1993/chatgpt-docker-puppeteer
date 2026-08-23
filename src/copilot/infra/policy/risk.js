@@ -13,7 +13,7 @@ export const IO_RISK = /** @type {const} */ ({
 
 /**
  * @param {boolean} overwrite
- * @returns {import('#copilot/core/io-contracts').IoRiskClass}
+ * @returns {import('#copilot/infra/internal/operations/contracts').IoRiskClass}
  */
 export function riskForOverwrite(overwrite) {
     return overwrite ? IO_RISK.high : IO_RISK.medium;
@@ -21,8 +21,8 @@ export function riskForOverwrite(overwrite) {
 
 /**
  * @param {boolean} dryRun
- * @param {import('#copilot/core/io-contracts').IoRiskClass} [appliedRisk]
- * @returns {import('#copilot/core/io-contracts').IoRiskClass}
+ * @param {import('#copilot/infra/internal/operations/contracts').IoRiskClass} [appliedRisk]
+ * @returns {import('#copilot/infra/internal/operations/contracts').IoRiskClass}
  */
 export function riskForDryRun(dryRun, appliedRisk = IO_RISK.high) {
     return dryRun ? IO_RISK.low : appliedRisk;

@@ -743,7 +743,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'user_input.requested',
-            expect.objectContaining({ requestId: 'ui-1', allowFreeform: true }),
+            expect.objectContaining({ requestId: 'ui-1', allowFreeform: false }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'user_input.completed',

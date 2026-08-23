@@ -14,7 +14,7 @@
  *
  * @module copilot/tools/infra/logger
  */
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 /**
  * @callback LogFn
  * @param {'DEBUG' | 'INFO' | 'WARN' | 'ERROR'} level

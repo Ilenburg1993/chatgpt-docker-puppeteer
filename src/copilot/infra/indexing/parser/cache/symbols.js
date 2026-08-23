@@ -6,7 +6,7 @@ import {
     readTextFileSnapshot,
     statPathSnapshot,
 } from '#copilot/infra/internal/filesystem/read';
-import { richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 import { normalizeParserPath } from '../foundation/index.js';
 import { parseFileSymbols } from '../parse/index.js';
 

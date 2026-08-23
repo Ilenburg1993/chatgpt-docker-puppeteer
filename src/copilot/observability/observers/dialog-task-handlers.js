@@ -8,8 +8,9 @@
  * @see EventBus
  */
 
-import { TimeoutError, toError } from '#copilot/core';
 import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
+import { OperationTimeoutError } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '../logger.js';
 import { startSpanImmediate, toOtelException } from '../otel.js';
 
@@ -149,7 +150,10 @@ export function attachDialogTaskHandlers(ctx) {
             metrics.recordCounter(`dialog.timeout.${evt?.phase ?? 'unknown'}`);
             if (evt?.turnId) _turnStarts.delete(evt.turnId);
             if (errorTracker) {
-                const err = new TimeoutError(`Dialog turn timeout [phase=${evt?.phase ?? 'unknown'}]`);
+                const err = new OperationTimeoutError(
+                    `dialog-turn:${evt?.phase ?? 'unknown'}`,
+                    Number(evt?.timeoutMs ?? 0),
+                );
                 errorTracker.trackError(err, {
                     source: AGENT_DIALOG_TURN_TIMEOUT,
                     metadata: { phase: evt?.phase, timeoutMs: evt?.timeoutMs, turnId: evt?.turnId },

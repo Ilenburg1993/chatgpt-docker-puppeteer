@@ -9,7 +9,7 @@
  * @see module:copilot/sdk/session
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { modelGetCurrent, modelSwitchTo } from '../rpc/session.js';

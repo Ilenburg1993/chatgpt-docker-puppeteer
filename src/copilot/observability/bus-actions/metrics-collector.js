@@ -8,11 +8,11 @@
  * @module copilot/observability/bus-actions/metrics-collector
  */
 
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '../logger.js';
 
 /**
- * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  *
  * @typedef {import('../metrics.js').MetricsStore} MetricsStore
  */

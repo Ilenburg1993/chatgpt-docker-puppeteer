@@ -21,7 +21,8 @@
  * @see EventBus
  */
 
-import { redactSecretRecord, toError } from '#copilot/core';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 

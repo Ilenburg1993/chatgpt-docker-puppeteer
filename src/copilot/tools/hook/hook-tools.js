@@ -1,7 +1,8 @@
 // @ts-check
 import { getAuditTail } from '#copilot/audit';
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
-import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
+import { normalizeUserInputBridgeContract } from '#copilot/sdk/session';
 import { execFile } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -357,9 +358,7 @@ const requestUserInputTool = buildTool({
             .boolean()
             .optional()
             .default(false)
-            ['describe'](
-                'Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido',
-            ),
+            ['describe']('Quando true, exige que a resposta corresponda a uma das choices fornecidas.'),
     }),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
@@ -375,7 +374,7 @@ const requestUserInputTool = buildTool({
                 ? context.slice(0, MAX_CONTEXT_CHARS).replace(/\n{3,}/g, '\n\n')
                 : undefined;
         const fullQuestion = safeContext ? `${question}\n\n**Contexto**: ${safeContext}` : question;
-        const allowFreeform = resolveEffectiveUserInputAllowFreeform();
+        const allowFreeform = resolveEffectiveUserInputAllowFreeform(requires_selection === true ? false : undefined);
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
@@ -413,7 +412,7 @@ const requestUserInputTool = buildTool({
                     data: {
                         source: 'request_user_input',
                         requires_selection_requested: requires_selection === true,
-                        effective_policy: 'freeform_always',
+                        effective_policy: allowFreeform ? 'freeform_allowed' : 'selection_required',
                     },
                 },
             );

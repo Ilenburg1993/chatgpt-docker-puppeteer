@@ -8,14 +8,16 @@
  *   projete metadados diferentes.
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import {
-    container,
-    getHubSessionId,
-    getSharedSdkSessionId,
-    getSharedSessionBinding,
-    setSharedSdkSessionId,
-} from '#copilot/core';
+import { conversationStore } from '#copilot/conversation-hub';
+import { getAgentRuntimeOrDefault, getDefaultAgentRuntime } from '../agent/runtime/runtime-selection.js';
+/**
+ * @typedef {{
+ *   sessionId?: string | null;
+ *   ctx: { sessionBinding: ReturnType<typeof import('../../agent/session/state/binding-runtime.js').createAgentSessionBindingRuntime> };
+ *   getSessionBindingSnapshot: () => ReturnType<ReturnType<typeof import('../../agent/session/state/binding-runtime.js').createAgentSessionBindingRuntime>['snapshot']>;
+ * }} SessionBindingAgent
+ */
+
 import {
     clearSharedSdkSessionOwnership,
     readAgentStatusSnapshot,
@@ -29,11 +31,7 @@ import {
  * @returns {{ updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null}
  */
 function getConversationStoreMaybe() {
-    return container.has(CONVERSATION_STORE)
-        ? /** @type {{ updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void }} */ (
-              container.resolve(CONVERSATION_STORE)
-          )
-        : null;
+    return conversationStore;
 }
 
 /**
@@ -41,10 +39,11 @@ function getConversationStoreMaybe() {
  *
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean }}
  */
-export function getSdkSessionBindingProjection() {
-    const binding = getSharedSessionBinding();
+export function getSdkSessionBindingProjection(/** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime()) {
+    const binding = agent.getSessionBindingSnapshot();
     return {
-        ...binding,
+        hubSessionId: binding.hubSessionId,
+        sdkSessionId: binding.sdkSessionId,
         isBound: Boolean(binding.hubSessionId && binding.sdkSessionId),
     };
 }
@@ -61,8 +60,12 @@ export function getSdkSessionBindingProjection() {
  *     boundHubSessionId: string | null;
  * }}
  */
-export function attachSdkSessionOwnership(payload, sessionId) {
-    const sharedBinding = getSdkSessionBindingProjection();
+export function attachSdkSessionOwnership(
+    payload,
+    sessionId,
+    /** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime(),
+) {
+    const sharedBinding = getSdkSessionBindingProjection(agent);
     const isSharedSdkSession = Boolean(sessionId && sharedBinding.sdkSessionId === sessionId);
     return {
         ...payload,
@@ -79,10 +82,12 @@ export function attachSdkSessionOwnership(payload, sessionId) {
  * @param {string | null} sdkSessionId
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; persistedToStore: boolean }}
  */
-export function rememberSdkSessionOwnership(sdkSessionId) {
+export function rememberSdkSessionOwnership(
+    sdkSessionId,
+    /** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime(),
+) {
     return syncSharedSdkSessionOwnership(sdkSessionId, {
-        getHubSessionId,
-        setSharedSdkSessionId,
+        sessionBinding: agent.ctx.sessionBinding,
         conversationStore: getConversationStoreMaybe(),
     });
 }
@@ -93,11 +98,14 @@ export function rememberSdkSessionOwnership(sdkSessionId) {
  * @param {string} sessionId
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; isBound?: boolean }}
  */
-export function forgetSdkSessionOwnership(sessionId) {
-    if (getSharedSdkSessionId() !== sessionId) {
-        return getSdkSessionBindingProjection();
+export function forgetSdkSessionOwnership(
+    sessionId,
+    /** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime(),
+) {
+    if (agent.getSessionBindingSnapshot().sdkSessionId !== sessionId) {
+        return getSdkSessionBindingProjection(agent);
     }
-    const cleared = clearSharedSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
+    const cleared = clearSharedSdkSessionOwnership({ sessionBinding: agent.ctx.sessionBinding });
     return {
         ...cleared,
         isBound: Boolean(cleared.hubSessionId && cleared.sdkSessionId),
@@ -121,12 +129,15 @@ export function forgetSdkSessionOwnership(sessionId) {
  *     sharedBinding: { hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean };
  * }>}
  */
-export async function resolveSdkSessionRouteMeta(client) {
+export async function resolveSdkSessionRouteMeta(
+    client,
+    /** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime(),
+) {
     const [foregroundSessionId, lastSessionId] = await Promise.all([
         client.getForegroundSessionId(),
         client.getLastSessionId(),
     ]);
-    const sharedBinding = getSdkSessionBindingProjection();
+    const sharedBinding = getSdkSessionBindingProjection(agent);
     return {
         foregroundSessionId: foregroundSessionId ?? null,
         lastSessionId: lastSessionId ?? null,
@@ -138,9 +149,7 @@ export async function resolveSdkSessionRouteMeta(client) {
 /**
  * Resolve a projeção canônica de runtime/ownership da sessão SDK para bordas de inspeção.
  *
- * @param {{
- *     sessionId?: string | null;
- * }} agent
+ * @param {SessionBindingAgent & { getStatusSnapshot?:()=>unknown }} agent
  * @param {{
  *     getForegroundSessionId?: () => Promise<string | null | undefined>;
  *     getLastSessionId?: () => Promise<string | null | undefined>;
@@ -157,20 +166,25 @@ export async function resolveSdkSessionRouteMeta(client) {
  * }>}
  */
 export async function resolveSdkRuntimeProjection(agent, client, connectionState) {
-    const sharedBinding = getSdkSessionBindingProjection();
+    const sharedBinding = getSdkSessionBindingProjection(agent);
     const runtimeStatus =
         typeof (/** @type {{ getStatusSnapshot?: unknown }} */ (agent).getStatusSnapshot) === 'function'
-            ? readAgentStatusSnapshot(/** @type {import('#copilot/agent/types').IAlwaysAliveAgent} */ (agent))
+            ? readAgentStatusSnapshot(
+                  /** @type {import('#copilot/agent/types').IAlwaysAliveAgent} */ (/** @type {unknown} */ (agent)),
+              )
             : /** @type {Record<string, unknown>} */ (agent);
     const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
     let foregroundSessionId = null;
     let lastSessionId = null;
 
     if (client?.getForegroundSessionId && client?.getLastSessionId) {
-        const meta = await resolveSdkSessionRouteMeta({
-            getForegroundSessionId: client.getForegroundSessionId.bind(client),
-            getLastSessionId: client.getLastSessionId.bind(client),
-        });
+        const meta = await resolveSdkSessionRouteMeta(
+            {
+                getForegroundSessionId: client.getForegroundSessionId.bind(client),
+                getLastSessionId: client.getLastSessionId.bind(client),
+            },
+            agent,
+        );
         foregroundSessionId = meta.foregroundSessionId;
         lastSessionId = meta.lastSessionId;
     }
@@ -212,17 +226,21 @@ export async function resolveSdkRuntimeProjection(agent, client, connectionState
  * }>}
  */
 export async function resolveSdkRuntimeProjectionForRuntime(runtimeId, client, connectionState) {
-    const sharedBinding = getSdkSessionBindingProjection();
+    const runtime = getAgentRuntimeOrDefault(runtimeId);
+    const sharedBinding = getSdkSessionBindingProjection(runtime);
     const runtimeStatus = readAgentStatusSnapshotForRuntime(runtimeId);
     const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
     let foregroundSessionId = null;
     let lastSessionId = null;
 
     if (client?.getForegroundSessionId && client?.getLastSessionId) {
-        const meta = await resolveSdkSessionRouteMeta({
-            getForegroundSessionId: client.getForegroundSessionId.bind(client),
-            getLastSessionId: client.getLastSessionId.bind(client),
-        });
+        const meta = await resolveSdkSessionRouteMeta(
+            {
+                getForegroundSessionId: client.getForegroundSessionId.bind(client),
+                getLastSessionId: client.getLastSessionId.bind(client),
+            },
+            runtime,
+        );
         foregroundSessionId = meta.foregroundSessionId;
         lastSessionId = meta.lastSessionId;
     }
@@ -248,8 +266,8 @@ export async function resolveSdkRuntimeProjectionForRuntime(runtimeId, client, c
  *
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean }}
  */
-export function clearSdkRuntimeBinding() {
-    const cleared = clearSharedSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
+export function clearSdkRuntimeBinding(/** @type {SessionBindingAgent} */ agent = getDefaultAgentRuntime()) {
+    const cleared = clearSharedSdkSessionOwnership({ sessionBinding: agent.ctx.sessionBinding });
     return {
         ...cleared,
         isBound: Boolean(cleared.hubSessionId && cleared.sdkSessionId),

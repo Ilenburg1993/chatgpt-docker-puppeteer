@@ -17,10 +17,13 @@
  */
 
 import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
-import { SessionError, cancelTimer, logSwallowed, registerInterval, toError } from '#copilot/core';
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { v4 as uuidv4 } from 'uuid';
+import { ConversationHubError } from './errors.js';
 import { initTurnsFts, migrateFts5Tokenizer } from './store-helpers.js';
 import {
     deleteMemory as _deleteMemory,
@@ -97,7 +100,7 @@ export class ConversationStore {
             // em sessões de longa duração. O checkpoint passivo (PASSIVE) não bloqueia readers.
             let _checkpointErrors = 0;
             this.#checkpointTimerId = `conversation-hub.store.checkpoint:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-            const checkpointTimer = registerInterval(
+            const checkpointTimer = registerApplicationInterval(
                 this.#checkpointTimerId,
                 () => {
                     try {
@@ -128,11 +131,14 @@ export class ConversationStore {
      * Garante que o store foi inicializado antes de qualquer operação.
      *
      * @returns {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort}
-     * @throws {SessionError} Se init() não foi chamado
+     * @throws {ConversationHubError} Se init() não foi chamado
      */
     #getDb() {
         if (!this.#db || !this.#initialized) {
-            throw new SessionError('[ConversationStore] store.init() não foi chamado.', 'STORE_NOT_INITIALIZED');
+            throw new ConversationHubError(
+                '[ConversationStore] store.init() não foi chamado.',
+                'STORE_NOT_INITIALIZED',
+            );
         }
         return this.#db;
     }
@@ -148,7 +154,7 @@ export class ConversationStore {
      */
     close() {
         if (this.#checkpointTimer !== null) {
-            if (this.#checkpointTimerId) cancelTimer(this.#checkpointTimerId);
+            if (this.#checkpointTimerId) cancelApplicationTimer(this.#checkpointTimerId);
             this.#checkpointTimer = null;
             this.#checkpointTimerId = null;
         }
@@ -415,7 +421,7 @@ export class ConversationStore {
                 }
             }
             /* c8 ignore next */
-            throw new SessionError(
+            throw new ConversationHubError(
                 '[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)',
                 'STORE_WRITE_FAILED',
             );

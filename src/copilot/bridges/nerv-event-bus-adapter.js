@@ -15,7 +15,7 @@ import { EVENTBUS_TO_NERV, NERV_COMMAND_RECEIVED, NERV_COMMAND_TO_EVENTBUS } fro
 import { log } from '#copilot/observability';
 
 /**
- * @typedef {import('../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  */
 
 /**

@@ -8,8 +8,8 @@
  * @module copilot/infra/operations/audit-log
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { createJsonlFileWriter } from '#copilot/infra/internal/persistence/jsonl';
+import { toError } from '#copilot/infra/internal/platform/error';
 
 const IO_MUTATION_AUDIT_SCHEMA_VERSION = 1;
 
@@ -17,7 +17,7 @@ const IO_MUTATION_AUDIT_SCHEMA_VERSION = 1;
  * @param {import('./operation.js').IoOperationEnvelope} envelope
  * @param {{
  *     tool?: string;
- *     io?: import('#copilot/core/io-contracts').IoMeta | null;
+ *     io?: import('#copilot/infra/internal/operations/contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} [context]
  * @returns {Record<string, unknown>}
@@ -79,7 +79,7 @@ export function createIoMutationAuditRuntime(options = {}) {
 
     /**
      * @param {import('./operation.js').IoOperationEnvelope} envelope
-     * @param {{tool?:string;io?:import('#copilot/core/io-contracts').IoMeta|null;result?:Record<string,unknown>}} [context]
+     * @param {{tool?:string;io?:import('#copilot/infra/internal/operations/contracts').IoMeta|null;result?:Record<string,unknown>}} [context]
      * @returns {Promise<{ enabled:boolean; path:string|null; written:boolean; error?:string }>}
      */
     async function record(envelope, context = {}) {

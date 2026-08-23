@@ -1,6 +1,6 @@
 // @ts-check
 import { COPILOT_PACKAGE_ROOT, WORKSPACE_ROOT } from '#copilot/boot';
-import { toExecError } from '#copilot/core/error-handlers';
+import { toExecError } from '#copilot/infra/public/platform/error';
 import { resolveExecutable } from '#copilot/infra/public/platform/process/executable';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';

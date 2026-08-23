@@ -5,7 +5,7 @@
  * @module copilot/terminal/commands/events
  */
 
-import { redactSecretRecord } from '../../core/security/redaction.js';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import {
     classifyRuntimeSdkRateLimitScope,
     describeSdkRecoveryPolicy,

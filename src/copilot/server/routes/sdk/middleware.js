@@ -8,25 +8,32 @@
  * @see EventBus
  */
 
-import { CopilotError, redactSecretText, toError } from '#copilot/core';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 import { buildSdkMissingRuntimeRouteMeta, resolveSdkRequestedRuntimeId } from './deps.js';
 
 /**
- * F245.3: Mapa de CopilotError subclasses → HTTP status codes.
+ * Stable error-name fallback map for domain errors without an explicit numeric status.
  *
  * @type {ReadonlyMap<string, number>}
  */
 const ERROR_STATUS_MAP = new Map([
     ['ValidationError', 400],
     ['ConfigError', 400],
+    ['SdkConfigError', 400],
     ['NotFoundError', 404],
+    ['AgentRuntimeNotFoundError', 404],
     ['ToolError', 422],
+    ['ToolRuntimeError', 422],
     ['SessionError', 409],
+    ['AgentSessionError', 409],
+    ['ConversationHubError', 409],
     ['TimeoutError', 504],
     ['CircuitOpenError', 503],
     ['BridgeError', 502],
+    ['ChannelError', 502],
     ['StateTransitionError', 409],
 ]);
 
@@ -37,14 +44,10 @@ const ERROR_STATUS_MAP = new Map([
  * @returns {number}
  */
 function resolveHttpStatus(err) {
-    if (err instanceof CopilotError) {
-        return ERROR_STATUS_MAP.get(err.name) ?? 500;
-    }
     const status = /** @type {{ status?: unknown }} */ (/** @type {unknown} */ (err)).status;
-    if (typeof status === 'number' && Number.isFinite(status)) {
-        return status;
-    }
-    return 500;
+    if (typeof status === 'number' && Number.isFinite(status)) return status;
+    const name = /** @type {{name?:unknown}} */ (/** @type {unknown} */ (err)).name;
+    return typeof name === 'string' ? (ERROR_STATUS_MAP.get(name) ?? 500) : 500;
 }
 
 /**
@@ -54,9 +57,6 @@ function resolveHttpStatus(err) {
  * @returns {string}
  */
 function resolveErrorCode(err) {
-    if (err instanceof CopilotError && typeof err.code === 'string') {
-        return err.code;
-    }
     const code = /** @type {{ code?: unknown }} */ (/** @type {unknown} */ (err)).code;
     if (typeof code === 'string') {
         return code;

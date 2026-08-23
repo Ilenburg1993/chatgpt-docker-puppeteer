@@ -1,9 +1,9 @@
 // @ts-check
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLocks } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';
 import { moveFileUnlocked } from '#copilot/infra/internal/filesystem/write';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import { assertExpectedSha256Digest, assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

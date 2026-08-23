@@ -26,7 +26,7 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
             readTerminalRuntimeStateFn: () => ({ dialogLoopActive: false, queueSize: 0 }),
             sendTurnFn,
             logFn,
-            registerTimerFn: vi.fn(),
+            adoptApplicationTimerFn: vi.fn(),
             setIntervalFn: (/** @type {() => void} */ fn, /** @type {number} */ _delay) => {
                 captured = fn;
                 return { unref() {} };
@@ -42,7 +42,7 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
         let captured = /** @type {null | (() => void)} */ (null);
         const sendTurnFn = vi.fn(async () => null);
         const clearIntervalFn = vi.fn();
-        const cancelTimerFn = vi.fn();
+        const cancelApplicationTimerFn = vi.fn();
         const logFn = /** @type {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void} */ (
             /** @type {unknown} */ (vi.fn())
         );
@@ -52,7 +52,7 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
             readTerminalRuntimeStateFn: () => ({ dialogLoopActive: true, queueSize: 0 }),
             sendTurnFn,
             logFn,
-            registerTimerFn: vi.fn(),
+            adoptApplicationTimerFn: vi.fn(),
             setIntervalFn: (/** @type {() => void} */ fn, /** @type {number} */ _delay) => {
                 captured = fn;
                 return { unref() {} };
@@ -66,9 +66,9 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
         const firstCall = sendTurnFn.mock.calls[0] ?? [];
         assert.equal(firstCall[1], 'llm-a');
 
-        stopReflectionLoop({ clearIntervalFn, cancelTimerFn });
+        stopReflectionLoop({ clearIntervalFn, cancelApplicationTimerFn });
         assert.equal(clearIntervalFn.mock.calls.length, 1);
-        assert.deepEqual(cancelTimerFn.mock.calls[0], ['terminal.reflection']);
+        assert.deepEqual(cancelApplicationTimerFn.mock.calls[0], ['terminal.reflection']);
     });
 
     it('registra falha síncrona sem derrubar o timer periódico', async () => {
@@ -84,7 +84,7 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
                 throw new Error('sdk indisponível');
             },
             logFn,
-            registerTimerFn: vi.fn(),
+            adoptApplicationTimerFn: vi.fn(),
             setIntervalFn: (/** @type {() => void} */ fn, /** @type {number} */ _delay) => {
                 captured = fn;
                 return { unref() {} };

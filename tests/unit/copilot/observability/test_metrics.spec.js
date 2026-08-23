@@ -33,19 +33,19 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../../src/copilot/core/error-handlers.js', async (importOriginal) => {
-    const actual = /** @type {typeof import('../../../../src/copilot/core/error-handlers.js')} */ (
-        await importOriginal()
-    );
+vi.mock('#copilot/observability/swallowed', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/observability/swallowed')} */ (await importOriginal());
     return {
         ...actual,
         logSwallowed: vi.fn(),
     };
 });
 
-vi.mock('../../../../src/copilot/core/timer-registry.js', () => ({
-    registerTimer: vi.fn(),
-    cancel: vi.fn(),
+vi.mock('#copilot/boot/process-runtime', () => ({
+    PROCESS_SHUTDOWN_PHASE: Object.freeze({ FINAL: 'final' }),
+    registerApplicationShutdownHandler: vi.fn(() => () => {}),
+    registerApplicationInterval: vi.fn((id) => ({ id, unref: vi.fn() })),
+    cancelApplicationTimer: vi.fn(),
 }));
 
 // ─── Suite ────────────────────────────────────────────────────────────────────

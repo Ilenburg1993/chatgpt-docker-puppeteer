@@ -18,12 +18,16 @@
  * @module copilot/terminal/dev-watch
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import {
+    PROCESS_SHUTDOWN_PHASE,
+    isApplicationShuttingDown,
+    registerApplicationShutdownHandler,
+    runApplicationShutdown,
+} from '#copilot/boot/process-runtime';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { toError } from '#copilot/infra/public/platform/error';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
-import { isShuttingDown, registerShutdownHandler, runShutdown } from '../core/shutdown.js';
 import { log } from '../observability/logger.js';
 
 /**
@@ -133,7 +137,7 @@ async function _startNotifyWatcher(watchPath, debounceMs) {
     let debounceTimer = null;
 
     const watcher = await DEV_WATCH_IO.watchPath(watchPath, { recursive: true }, (_eventType, filename) => {
-        if (isShuttingDown()) return;
+        if (isApplicationShuttingDown()) return;
         const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
         pendingFiles.add(rel);
 
@@ -169,14 +173,14 @@ async function _startAutoWatcher(watchPath, debounceMs) {
     log('WARN', '[dev-watch] Modo AUTO activo — mudanças em src/copilot/** reiniciarão o processo.');
 
     const watcher = await DEV_WATCH_IO.watchPath(watchPath, { recursive: true }, (eventType, filename) => {
-        if (triggered || isShuttingDown()) return;
+        if (triggered || isApplicationShuttingDown()) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            if (triggered || isShuttingDown()) return;
+            if (triggered || isApplicationShuttingDown()) return;
             triggered = true;
             const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
             log('INFO', `[dev-watch] Mudança detectada (${eventType}: ${rel}) — graceful restart.`);
-            runShutdown('dev_watch_reload')
+            runApplicationShutdown('dev_watch_reload')
                 .catch(() => {})
                 .finally(() => process.exit(0));
         }, debounceMs);
@@ -222,13 +226,13 @@ function _recordChanges(files, watchPath) {
  * @param {() => void} fn
  */
 function _registerCleanup(fn) {
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'dev-watch-cleanup',
         async () => {
             fn();
             log('DEBUG', '[dev-watch] Watcher fechado.');
         },
-        SHUTDOWN_PRIORITY.DEFAULT,
+        PROCESS_SHUTDOWN_PHASE.DEFAULT,
     );
 }
 

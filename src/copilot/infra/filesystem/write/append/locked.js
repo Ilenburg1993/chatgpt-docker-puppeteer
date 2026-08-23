@@ -1,9 +1,9 @@
 // @ts-check
 /** Locked append operations, including detached inherited append descriptors. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,
@@ -35,7 +35,7 @@ import { appendFileUnlocked } from './unlocked.js';
  *     bytesWritten: number;
  *     lockWaitMs: number;
  *     durability: Awaited<ReturnType<typeof appendFileUnlocked>>;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  * }>}
  * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
@@ -114,7 +114,7 @@ export async function appendTextLocked(filePath, content, options = {}, invalida
  * @param {{
  *     mode?: number;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  *     traceId?: string;
  *     advisoryLimits?: Record<string, unknown>;
  * }} [options]

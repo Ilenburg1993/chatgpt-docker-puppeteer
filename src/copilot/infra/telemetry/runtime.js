@@ -22,7 +22,7 @@ export function createIoTelemetryRuntime(options = {}) {
         latency,
         durability,
         mutationState,
-        /** @param {import('#copilot/core/io-contracts').IoMeta} io @param {{success:boolean;error?:unknown}} opts */
+        /** @param {import('#copilot/infra/internal/operations/contracts').IoMeta} io @param {{success:boolean;error?:unknown}} opts */
         recordOperation(io, opts) {
             latency.record(io.operation, io.durationMs);
             durability.record(io);

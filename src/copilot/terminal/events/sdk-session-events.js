@@ -763,7 +763,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     requestId: input.requestId,
                     toolCallId: input.toolCallId ?? null,
                     choices,
-                    allowFreeform: true,
+                    allowFreeform: input.allowFreeform !== false,
                     terminalInteractionKind: 'ask_user',
                     terminalInteractionPhase: 'requested',
                 },
@@ -1166,7 +1166,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     ) => {
         const question = evt?.question ?? '(sem pergunta)';
         const choices = Array.isArray(evt?.choices) ? evt.choices : [];
-        const allowFreeform = true;
+        const allowFreeform = evt?.allowFreeform !== false;
         const requestId = evt?.requestId ?? null;
         const kind = DialogProtocol.classify(question);
         const tracked = recordTerminalUserInputRequested(evt);

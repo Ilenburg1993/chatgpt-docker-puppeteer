@@ -2,7 +2,7 @@
 /** File-context projection, bounded windowing and content-addressed context cache. */
 
 import { buildOutline, extractTopComments } from '#copilot/infra/internal/code-analysis';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { normalizeParserPath } from '../foundation/index.js';
 import { parseFileSymbols } from '../parse/index.js';
 

@@ -9,7 +9,7 @@
  */
 
 import { loadGitignoreMatcher } from '#copilot/infra/internal/indexing/scanner';
-import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 import { relative, resolve } from 'node:path';
 import {
     createIndexAutoRefreshDomain,

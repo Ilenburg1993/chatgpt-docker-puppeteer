@@ -1,7 +1,7 @@
 // @ts-check
 /** Instance-owned text hashing counters. @module copilot/infra/filesystem/read/cache/hash-runtime */
 
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 
 /** @typedef {'full' | 'returned' | 'none'} TextHashMode */
 

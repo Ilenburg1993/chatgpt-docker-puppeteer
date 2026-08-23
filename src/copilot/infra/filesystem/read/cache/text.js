@@ -1,14 +1,10 @@
 // @ts-check
 /** Cached L1/L2 UTF-8 text read service and line projection. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
-import {
-    bufferIsUtf8,
-    isBufferValue,
-    slicePhysicalTextLines,
-    splitPhysicalTextLines,
-} from '#copilot/infra/internal/platform';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { bufferIsUtf8, isBufferValue } from '#copilot/infra/internal/platform/buffer';
+import { slicePhysicalTextLines, splitPhysicalTextLines } from '#copilot/infra/internal/platform/text-lines';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

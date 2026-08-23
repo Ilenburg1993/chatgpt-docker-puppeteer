@@ -1,6 +1,6 @@
 // @ts-check
-import { ConfigError } from '#copilot/core';
 import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS, COPILOT_OPERATIONAL_PROFILE } from './env.js';
+import { ConfigError } from './errors.js';
 import { resolveOperationalAgentSelection } from './operational-profiles.js';
 /**
  * src/copilot/config/custom-agents.js

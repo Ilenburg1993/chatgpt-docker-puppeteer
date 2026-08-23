@@ -28,10 +28,10 @@ import {
     COPILOT_OTEL_EXPORTER_TYPE,
     COPILOT_OTEL_SOURCE_NAME,
 } from '#copilot/config';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { toError } from '../core/error-handlers.js';
-import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
 
 const __otel_dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__otel_dirname, '..', '..', '..');

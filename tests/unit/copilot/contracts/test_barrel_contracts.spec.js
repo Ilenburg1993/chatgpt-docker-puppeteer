@@ -5,7 +5,7 @@
  * Valida que:
  *
  * 1. tools/index.js exporta as ferramentas esperadas (allTools, buildTool, withSkipPermission)
- * 2. core/index.js exporta contratos fundamentais (CopilotError, ConfigError, etc.)
+ * 2. contratos transversais saem apenas por owners semânticos exatos; Core não existe
  * 3. bridges/ não importa diretamente de agent/ (violação de camada L3→L4)
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -16,7 +16,7 @@ vi.mock('@github/copilot-sdk', () => ({
     SYSTEM_MESSAGE_SECTIONS: Object.freeze({ identity: 'identity' }),
     SYSTEM_PROMPT_SECTIONS: Object.freeze({ identity: 'identity' }),
     CopilotClient: vi.fn(),
-    defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {}, handler: async () => ({}) })),
+    defineTool: vi.fn((/** @type {Record<string, unknown>} */ definition) => definition),
     approveAll: vi.fn(),
 }));
 
@@ -44,49 +44,33 @@ describe('FG-3 — tools barrel contract', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 2. core barrel contract
+// 2. semantic owner contracts; no horizontal Core facade
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('FG-3 — core barrel contract', () => {
-    it('exports fundamental error classes', async () => {
-        const barrel = await import('#copilot/core');
-        const expected = [
-            'CopilotError',
-            'ConfigError',
-            'BridgeError',
-            'TimeoutError',
-            'SessionError',
-            'ToolError',
-            'ValidationError',
-        ];
-        for (const name of expected) {
-            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
+describe('FG-3 — semantic owner contracts', () => {
+    it('exports resilience and process lifecycle from exact semantic owners', async () => {
+        const [resilience, processRuntime] = await Promise.all([
+            import('#copilot/infra/public/concurrency/resilience'),
+            import('#copilot/boot/process-runtime'),
+        ]);
+        for (const name of ['OperationTimeoutError', 'sleep', 'withRetry', 'withTimeout']) {
+            expect(
+                /** @type {Record<string, unknown>} */ (resilience)[name],
+                `missing resilience: ${name}`,
+            ).toBeDefined();
         }
-    });
-
-    it('exports resilience utilities', async () => {
-        const barrel = await import('#copilot/core');
-        const expected = ['withRetry', 'withTimeout', 'CircuitBreaker', 'wrapAsync'];
-        for (const name of expected) {
-            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
-        }
-    });
-
-    it('exports shutdown management', async () => {
-        const barrel = await import('#copilot/core');
-        const expected = [
-            'registerShutdownHandler',
-            'runShutdown',
-            'isShuttingDown',
-            'getLastShutdownReport',
-            'getShutdownLifecycleMetrics',
-            'listShutdownHandlers',
-            'listActiveTimers',
-            'SHUTDOWN_PRIORITY',
-            'setShutdownEventEmitter',
-        ];
-        for (const name of expected) {
-            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
+        for (const name of [
+            'PROCESS_SHUTDOWN_PHASE',
+            'registerApplicationShutdownHandler',
+            'runApplicationShutdown',
+            'isApplicationShuttingDown',
+            'listApplicationShutdownHandlers',
+            'listActiveApplicationTimers',
+        ]) {
+            expect(
+                /** @type {Record<string, unknown>} */ (processRuntime)[name],
+                `missing process runtime: ${name}`,
+            ).toBeDefined();
         }
     });
 });

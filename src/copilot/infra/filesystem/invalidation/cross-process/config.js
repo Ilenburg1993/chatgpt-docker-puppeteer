@@ -1,6 +1,6 @@
 // @ts-check
 /** Cross-process invalidation runtime configuration. */
-import { booleanValueOr, boundedIntegerOr } from '#copilot/infra/internal/platform';
+import { booleanValueOr, boundedIntegerOr } from '#copilot/infra/internal/platform/config-values';
 
 export const DEFAULT_CROSS_PROCESS_POLL_MS = 125;
 const DEFAULT_BATCH_MAX = 256;

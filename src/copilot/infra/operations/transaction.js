@@ -28,7 +28,7 @@ function assertOpen(changeSet) {
 /**
  * @param {{
  *     capability: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  *     targets?: readonly string[];
  *     traceId?: string | null;
  *     evidence?: Record<string, unknown>;

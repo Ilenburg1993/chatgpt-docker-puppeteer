@@ -28,7 +28,7 @@
  * @see EventBus
  */
 
-import { toError } from '../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { EMITTER_TO_BUS_TYPE } from './observers/event-name-map.js';
@@ -59,7 +59,7 @@ import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observer
  * @typedef {object} AgentEventObserver
  * @property {(agent: import('node:events').EventEmitter) => void} attach Registra todos os listeners no EventEmitter do
  *   agente (legado).
- * @property {(bus: import('../core/event-bus.js').EventBus) => void} attachToBus Registra todos os listeners no
+ * @property {(bus: import('#copilot/events/runtime').EventBus) => void} attachToBus Registra todos os listeners no
  *   EventBus centralizado (FAIXA-L14).
  * @property {() => void} detach Remove todos os listeners previamente registrados e reseta estado.
  */
@@ -100,7 +100,7 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
      * Cria função _on para modo EventBus. O primeiro arg (emitter) é ignorado — o listener é registrado no bus usando a
      * constante SSOT mapeada.
      *
-     * @param {import('../core/event-bus.js').EventBus} bus
+     * @param {import('#copilot/events/runtime').EventBus} bus
      * @returns {(
      *     emitter: import('node:events').EventEmitter | null,
      *     event: string,
@@ -190,7 +190,7 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
      * Os handlers recebem o mesmo payload structure que via agent EventEmitter (o bridgeEmitter espalha o payload
      * original), portanto a mesma lógica de handlers funciona sem alteração.
      *
-     * @param {import('../core/event-bus.js').EventBus} bus
+     * @param {import('#copilot/events/runtime').EventBus} bus
      * @returns {void}
      */
     function attachToBus(bus) {

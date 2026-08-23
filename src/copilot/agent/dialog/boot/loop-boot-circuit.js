@@ -4,7 +4,7 @@
  * @file Governança de circuit breaker do boot do dialog loop.
  */
 
-import { SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import { log } from '../../ports/logging/index.js';
 
 const BOOT_FAILURE_CIRCUIT_WINDOW_MS = 120_000;
@@ -26,13 +26,13 @@ export class DialogBootCircuit {
 
     /**
      * @returns {void}
-     * @throws {SessionError}
+     * @throws {AgentSessionError}
      */
     assertClosed() {
         const now = Date.now();
         if (this.#openUntil > now) {
             const waitMs = this.#openUntil - now;
-            throw new SessionError(
+            throw new AgentSessionError(
                 `[DialogLoopManager] Circuit breaker de boot aberto por ${waitMs}ms após ${BOOT_FAILURE_CIRCUIT_MAX_FAILURES} falhas recentes.`,
                 'DIALOG_BOOT_CIRCUIT_OPEN',
             );

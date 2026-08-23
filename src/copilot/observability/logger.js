@@ -14,15 +14,14 @@
  * @see EventBus
  */
 
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { toError } from '#copilot/infra/public/platform/error';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '../config/env.js';
-import { toError } from '../core/error-handlers.js';
-import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
-import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
-import { registerShutdownHandler } from '../core/shutdown.js';
 
 /** @type {boolean} */
 let _stdoutUnavailable = false;
@@ -165,7 +164,7 @@ export async function flushObservabilityLogs() {
     if (rejected?.status === 'rejected') throw rejected.reason;
 }
 
-registerShutdownHandler('observability.logger.flush', flushObservabilityLogs, SHUTDOWN_PRIORITY.AUDIT_FINALIZER, {
+registerApplicationShutdownHandler('observability.logger.flush', flushObservabilityLogs, PROCESS_SHUTDOWN_PHASE.FINAL, {
     timeoutMs: 10_000,
 });
 

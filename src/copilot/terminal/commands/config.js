@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { resolveModelSelectionMismatch, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
 import * as terminalFrontend from '../frontend/index.js';
 import {
@@ -18,6 +18,7 @@ import {
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     readTerminalRuntimeState,
+    resolveTerminalModelSelectionMismatch,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
@@ -134,7 +135,7 @@ function resolveObservedModelState(state) {
     const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
     const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
-    const modelMismatch = resolveModelSelectionMismatch({
+    const modelMismatch = resolveTerminalModelSelectionMismatch({
         configuredModel,
         billedModel,
         effectiveModel,

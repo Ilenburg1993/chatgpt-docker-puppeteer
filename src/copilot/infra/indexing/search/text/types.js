@@ -33,8 +33,8 @@
  * @property {true} countsPostSanitization
  * @property {boolean} [indexFallback]
  * @property {string | null} [indexFallbackReason]
- * @property {import('#copilot/core/io-contracts').IoMeta} io
+ * @property {import('#copilot/infra/internal/operations/contracts').IoMeta} io
  *
- * @typedef {(engine: string, bytesRead: number, extra?: Record<string, unknown>) => import('#copilot/core/io-contracts').IoMeta} BuildSearchIo
+ * @typedef {(engine: string, bytesRead: number, extra?: Record<string, unknown>) => import('#copilot/infra/internal/operations/contracts').IoMeta} BuildSearchIo
  */
 export {};

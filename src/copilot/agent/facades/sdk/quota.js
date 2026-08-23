@@ -7,7 +7,12 @@
  * @module copilot/agent/facades/sdk/quota
  */
 
-import { getSdkRecoveryPolicy, isSdkQuotaOrRateLimitError } from '#copilot/sdk/errors';
+import {
+    classifySdkError,
+    classifySdkRateLimitScope,
+    getSdkRecoveryPolicy,
+    isSdkQuotaOrRateLimitError,
+} from '#copilot/sdk/errors';
 import { accountGetQuota } from '#copilot/sdk/rpc';
 import { usageGetMetrics } from '#copilot/sdk/rpc/experimental';
 import { createQuotaMonitor } from '#copilot/sdk/telemetry';
@@ -49,6 +54,16 @@ export function startAgentSdkQuotaMonitor(options) {
  */
 export function startAgentSdkBootQuotaBridge(options) {
     return startAgentSdkQuotaMonitor(options);
+}
+
+/** @param {unknown} error */
+export function classifyAgentSdkError(error) {
+    return classifySdkError(error);
+}
+
+/** @param {unknown} error */
+export function classifyAgentSdkRateLimitScope(error) {
+    return classifySdkRateLimitScope(error);
 }
 
 /**

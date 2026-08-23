@@ -3,13 +3,16 @@
  * Helpers compartilhados das projection families do terminal frontend.
  */
 
-import { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/core';
 import { buildRuntimeFallbackWarning } from '../../../presentation/routing/index.js';
 import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
 } from '../../../presentation/runtime/index.js';
-import { readTerminalSessionBinding } from '../gateways/index.js';
+import {
+    isTerminalAutoModelSelector,
+    readTerminalSessionBinding,
+    resolveTerminalModelSelectionMismatch,
+} from '../gateways/index.js';
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection
@@ -85,7 +88,7 @@ export function normalizeContextWindowProjection(raw) {
  */
 export function readTerminalRuntimeBase(runtimeId) {
     const runtime = readAgentRuntimeOverviewProjection(runtimeId);
-    const binding = readTerminalSessionBinding();
+    const binding = readTerminalSessionBinding(runtimeId);
     const runtimeFallbackWarning = buildRuntimeFallbackWarning(runtime);
     return {
         ...runtime,
@@ -104,14 +107,14 @@ export function normalizeTerminalModelBillingProjection(lastPrInfo, fallbackMode
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
     const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
     const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
-    const mismatch = resolveModelSelectionMismatch({
+    const mismatch = resolveTerminalModelSelectionMismatch({
         configuredModel,
         billedModel,
         effectiveModel,
         explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
     });
     const displayModel =
-        configuredModel && !isAutoModelSelector(configuredModel)
+        configuredModel && !isTerminalAutoModelSelector(configuredModel)
             ? configuredModel
             : (fallbackModel ?? configuredModel ?? effectiveModel ?? billedModel ?? '-');
     return {

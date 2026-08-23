@@ -36,7 +36,7 @@ describe('infra/io-observability bounds', () => {
     it('agrega metadata de durabilidade com cardinalidade fixa e projeta alerta de falha', () => {
         const before = runtime.telemetry.durability.stats();
         publishIoOperation(
-            /** @type {import('../../../../src/copilot/core/io-contracts.js').IoMeta} */ ({
+            /** @type {import('#copilot/infra/public/operations/contracts').IoMeta} */ ({
                 operation: 'copy',
                 target: '/tmp/source -> /tmp/destination',
                 targetKind: 'file',

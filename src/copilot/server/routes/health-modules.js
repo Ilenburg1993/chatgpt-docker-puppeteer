@@ -8,8 +8,8 @@
  * @module copilot/server/routes/health-modules
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
 import { Router } from 'express';
-import { toError } from '../../core/error-handlers.js';
 import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 
 /**

@@ -6,7 +6,7 @@
  * @typedef {object} IoOperationEnvelope
  * @property {string} operationId
  * @property {string} capability
- * @property {import('#copilot/core/io-contracts').IoRiskClass} riskClass
+ * @property {import('./io/index.js').IoRiskClass} riskClass
  * @property {string[]} targets
  * @property {IoOperationStatus} status
  * @property {number} startedAtMs
@@ -15,6 +15,14 @@
  * @property {string | null} traceId
  * @property {Record<string, unknown>} evidence
  * @property {string | null} error
+ *
+ * @typedef {object} IoRollbackSidecar
+ * @property {1} version
+ * @property {string} path
+ * @property {string} contentHash
+ * @property {number} bytes
+ * @property {number} createdAtMs
+ * @property {number} expiresAtMs
  *
  * @typedef {'write' | 'patch' | 'delete' | 'copy' | 'move'} IoChangeAction
  * @typedef {object} IoRollbackHint
@@ -26,7 +34,7 @@
  * @property {string | null} [contentHash]
  * @property {number | null} [bytes]
  * @property {string | null} [snapshotBase64]
- * @property {import('#copilot/infra/internal/filesystem/transaction').IoRollbackSidecar | null} [snapshotSidecar]
+ * @property {IoRollbackSidecar | null} [snapshotSidecar]
  *
  * @typedef {object} IoChangeSetEntry
  * @property {string} entryId

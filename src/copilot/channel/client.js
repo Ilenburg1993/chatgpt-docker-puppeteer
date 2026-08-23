@@ -8,7 +8,6 @@
  * @see module:copilot/channel/inject
  */
 
-import { BridgeError, sleepMs } from '#copilot/core';
 import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TASK_DELTA,
@@ -17,9 +16,11 @@ import {
     EMITTER_TASK_STARTED,
     EMITTER_TOOL_EXECUTION_PROGRESS,
 } from '#copilot/events';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
-import { logSwallowed, toError } from '../core/error-handlers.js';
 import { createChunkRetention } from './chunk-retention.js';
 import {
     dialogTurnDetailed as _dialogTurnDetailed,
@@ -28,6 +29,7 @@ import {
 } from './client-dialog.js';
 import { getLastNPairs as _getLastNPairs } from './client-history.js';
 import { chatStructured as _chatStructured } from './client-structured.js';
+import { ChannelError } from './errors.js';
 
 /**
  * Interface mínima do AlwaysAliveAgent usada pelo LlmBridgeClient.
@@ -84,7 +86,7 @@ export function resetBridgeAgentForTests() {
  */
 function requireAgent() {
     if (!_agent)
-        throw new BridgeError(
+        throw new ChannelError(
             '[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.',
             'BRIDGE_NOT_INITIALIZED',
         );
@@ -239,14 +241,14 @@ export class LlmBridgeClient {
                 if (isRetryable && attempt < retries) {
                     const waitMs = retryDelayMs * Math.pow(2, attempt);
                     log('DEBUG', `[LlmBridgeClient] chat() retry ${attempt + 1}/${retries} após ${waitMs}ms: ${msg}`);
-                    await sleepMs(waitMs, { id: `channel.client.chat-retry:${attempt + 1}`, unref: true });
+                    await sleep(waitMs);
                     continue;
                 }
                 throw err;
             }
         }
         // Nunca alcançado (loop sempre re-throw na última iteração), mas satisfaz o tipo
-        throw new BridgeError('[LlmBridgeClient] Falha inesperada após retries', 'BRIDGE_RETRY_EXHAUSTED');
+        throw new ChannelError('[LlmBridgeClient] Falha inesperada após retries', 'BRIDGE_RETRY_EXHAUSTED');
     }
 
     /**
@@ -281,7 +283,7 @@ export class LlmBridgeClient {
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
-            throw new BridgeError(
+            throw new ChannelError(
                 '[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.',
                 'BRIDGE_AGENT_STOPPED',
             );
@@ -439,9 +441,9 @@ export class LlmBridgeClient {
     /**
      * Envia uma mensagem estruturada (protocolo Sprint A) para LLM-B e tenta parsear a resposta.
      *
-     * @param {import('#copilot/core/structured-message').StructuredMessageInput} input
+     * @param {import('./protocol/structured-message.js').StructuredMessageInput} input
      * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts]
-     * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>}
+     * @returns {Promise<import('./protocol/structured-message.js').StructuredChatResult>}
      */
     async chatStructured(input, opts = {}) {
         const sessionId = requireAgent().sessionId ?? undefined;

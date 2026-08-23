@@ -8,10 +8,11 @@
  */
 
 import { getInjectInterventionPolicy } from '#copilot/config';
-import { container, sleepMs, toError } from '#copilot/core';
+import { resolveOptionalDialogTimeout } from '#copilot/dialog/timeout-policy';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
-import { log, METRICS_STORE } from '#copilot/observability';
-import { resolveOptionalDialogTimeout } from '../../dialog-timeout-policy.js';
+import { toError } from '#copilot/infra/public/platform/error';
+import { defaultMetrics, log } from '#copilot/observability';
 import { readRuntimeIdFromParams } from '../../routing/index.js';
 import {
     abortAgentRuntimeCurrentMessage,
@@ -263,7 +264,7 @@ function createInjectTraceId() {
  */
 function resolveMetricsStoreSafe() {
     try {
-        return container.resolve(METRICS_STORE);
+        return defaultMetrics;
     } catch {
         return null;
     }
@@ -438,10 +439,7 @@ export async function handlePipeline(params = {}) {
         const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
 
         if (waitMs > 0) {
-            await sleepMs(waitMs, {
-                id: `presentation.agent.control.pipeline:${runtimeId}:${i + 1}`,
-                unref: true,
-            });
+            await sleep(waitMs);
         }
 
         const t0 = Date.now();

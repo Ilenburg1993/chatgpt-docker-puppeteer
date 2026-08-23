@@ -9,8 +9,8 @@
  */
 
 import { resolveToolName } from '#copilot/config';
+import { introspectToolTargets } from '#copilot/observability/tool-target-introspection';
 import path from 'node:path';
-import { introspectToolTargets } from '../../core/tool-target-introspection.js';
 
 const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(read|view|open|cat|show)\b/i, operation: 'read', label: 'lendo arquivo' },
@@ -925,7 +925,7 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const toolArgs = extractTerminalToolArgsPayload(evt);
     const toolResult = extractTerminalToolResultPayload(evt);
     const presentationHint = extractToolPresentationHint(toolResult);
-    const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
+    const meta = introspectToolTargets({ toolName, args: toolArgs, result: toolResult });
     const fileTargets = uniqueOperatorPaths(meta.fileTargets);
     const directoryTargets = uniqueNonEmptyStrings(meta.directoryTargets);
     const urlTargets = uniqueNonEmptyStrings(meta.urlTargets);

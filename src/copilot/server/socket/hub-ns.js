@@ -15,9 +15,10 @@
  */
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config';
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { HUB_EVENTS } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '../../config/auth.js';

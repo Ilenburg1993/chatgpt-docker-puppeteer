@@ -15,7 +15,8 @@
  * @see EventBus
  */
 
-import { redactSecretRecord, redactSecretText, toError } from '#copilot/core';
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from './logger.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

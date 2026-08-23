@@ -11,7 +11,7 @@
  */
 
 import { cleanupRollbackSidecars, listRollbackSidecars } from '#copilot/infra/internal/filesystem/transaction';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import { executeAuthenticatedIoRollbackToken } from './executor.js';

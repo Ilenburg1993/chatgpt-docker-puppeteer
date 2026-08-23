@@ -11,9 +11,8 @@
 
 import { globalAuditTrail } from '#copilot/audit';
 import { BRIDGE_ADMIN_TOKEN } from '#copilot/config';
-import { sanitizeToolNames as sanitizePermissionToolNames } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
@@ -22,6 +21,7 @@ import {
     buildAgentStatusHttpPayloadFromRoute,
     buildCopilotApiHealthHttpResponseFromRoute,
     readAgentRuntimeControlStateFromRoute,
+    sanitizeRuntimePermissionToolNames,
 } from '../../../presentation/runtime/index.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
@@ -256,7 +256,7 @@ function _handleSetPermissions(req, res, deps) {
                 return { ok: false, error: `Campo "${label}" deve conter apenas strings.` };
             }
         }
-        const value = sanitizePermissionToolNames(names);
+        const value = sanitizeRuntimePermissionToolNames(names);
         if (
             value.length !== new Set(names.map((n) => n.trim().toLowerCase())).size &&
             names.some((n) => n.trim() === '' || !/^[a-zA-Z0-9_]+$/.test(n.trim()))

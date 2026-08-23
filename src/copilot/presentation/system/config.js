@@ -20,8 +20,7 @@ import {
     updateSkillsConfig,
 } from '#copilot/config';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
-import { METRICS_STORE } from '#copilot/observability';
+import { defaultMetrics } from '#copilot/observability';
 import { getSseClients, getSseCriticalClients } from '../realtime/index.js';
 import { readRuntimeIdFromParams } from '../routing/index.js';
 import {
@@ -82,7 +81,7 @@ export function handleHealth(params = {}) {
             : null;
     const metricsSummary = (() => {
         try {
-            return container.resolve(METRICS_STORE).getSummary();
+            return defaultMetrics.getSummary();
         } catch {
             return {
                 tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },

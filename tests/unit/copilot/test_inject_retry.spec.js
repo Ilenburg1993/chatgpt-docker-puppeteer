@@ -7,7 +7,7 @@
  * Cobertura:
  *
  * - injectToLlmB() aceita opts.retries e opts.retryDelayMs
- * - Retry é executado em caso de BridgeError com code === 'LLM_B_BUSY'
+ * - Retry é executado em caso de ChannelError com code === 'LLM_B_BUSY'
  * - Sem retry em caso de erros que não sejam LLM_B_BUSY
  * - Após esgotar retries, erro é relançado
  * - Análise estrutural do source de inject.js
@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, it } from 'vitest';
 
-import { BridgeError } from '../../../src/copilot/core/index.js';
+import { ChannelError } from '../../../src/copilot/channel/errors.js';
 
 // ─── Suite 1: análise estrutural do source ─────────────────────────────────
 
@@ -50,7 +50,7 @@ describe('channel/inject.js › INJECT-01: análise estrutural', async () => {
     it('deve verificar err.code === LLM_B_BUSY antes de retomar o loop', () => {
         assert.ok(
             source.includes("LLM_B_BUSY'"),
-            "injectToLlmB deve verificar BridgeError com code 'LLM_B_BUSY' para decidir retry",
+            "injectToLlmB deve verificar ChannelError com code 'LLM_B_BUSY' para decidir retry",
         );
     });
 
@@ -88,7 +88,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
         async function fakeDoInject() {
             callCount++;
             if (callCount === 1) {
-                throw new BridgeError('LLM-B ocupada', 'LLM_B_BUSY');
+                throw new ChannelError('LLM-B ocupada', 'LLM_B_BUSY');
             }
             return { ok: true, reply: 'sucesso', durationMs: 100, from: 'llm-a' };
         }
@@ -122,7 +122,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
 
         async function fakeDoInjectOtherError() {
             callCount++;
-            throw new BridgeError('Timeout', 'LLM_B_TIMEOUT');
+            throw new ChannelError('Timeout', 'LLM_B_TIMEOUT');
         }
 
         const maxRetries = 3;
@@ -145,7 +145,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
                 }
             },
             (err) => {
-                assert.ok(err instanceof BridgeError, 'deve lançar BridgeError');
+                assert.ok(err instanceof ChannelError, 'deve lançar ChannelError');
                 assert.equal(/** @type {any} */ (err).code, 'LLM_B_TIMEOUT', 'deve preservar o código original');
                 return true;
             },
@@ -162,7 +162,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
 
         async function alwaysBusy() {
             callCount++;
-            throw new BridgeError('LLM-B ocupada', 'LLM_B_BUSY');
+            throw new ChannelError('LLM-B ocupada', 'LLM_B_BUSY');
         }
 
         await assert.rejects(
@@ -182,7 +182,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
                 }
             },
             (err) => {
-                assert.ok(err instanceof BridgeError, 'deve lançar BridgeError');
+                assert.ok(err instanceof ChannelError, 'deve lançar ChannelError');
                 assert.equal(/** @type {any} */ (err).code, 'LLM_B_BUSY');
                 return true;
             },
@@ -198,7 +198,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
 
         async function busyOnce() {
             callCount++;
-            throw new BridgeError('LLM-B ocupada', 'LLM_B_BUSY');
+            throw new ChannelError('LLM-B ocupada', 'LLM_B_BUSY');
         }
 
         await assert.rejects(
@@ -218,7 +218,7 @@ describe('channel/inject.js › INJECT-01: comportamento de retry', () => {
                 }
             },
             (err) => {
-                assert.ok(err instanceof BridgeError);
+                assert.ok(err instanceof ChannelError);
                 return true;
             },
         );

@@ -8,9 +8,13 @@
  * @see EventBus
  */
 
-import { buildStructuredRequest, parseStructuredResponse, serializeStructuredMessage } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { mergeChunkRetentions } from './chunk-retention.js';
+import {
+    buildStructuredRequest,
+    parseStructuredResponse,
+    serializeStructuredMessage,
+} from './protocol/structured-message.js';
 
 /**
  * @typedef {import('./client.js').ChatResult} ChatResult
@@ -25,9 +29,9 @@ import { mergeChunkRetentions } from './chunk-retention.js';
  *     chat: (msg: string, opts?: ChatOptions) => Promise<ChatResult>;
  *     getSessionId: () => string | undefined;
  * }} deps
- * @param {import('#copilot/core/structured-message').StructuredMessageInput} input
+ * @param {import('./protocol/structured-message.js').StructuredMessageInput} input
  * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts]
- * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>}
+ * @returns {Promise<import('./protocol/structured-message.js').StructuredChatResult>}
  */
 export async function chatStructured(deps, input, opts = {}) {
     const { turnNumber, sessionId, ...chatOpts } = opts;

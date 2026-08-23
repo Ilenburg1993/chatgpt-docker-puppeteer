@@ -1,21 +1,54 @@
 // @ts-check
 /**
- * @module copilot/presentation/runtime-file-routing
- * @file Ponte de presentation para a política canônica SDK workspace ↔ FS local.
+ * Presentation-owned decision for choosing the visible filesystem route.
  *
- *   Bordas de UI/terminal consomem esta superfície em vez de importar `core` diretamente. A decisão permanece única no
- *   core; esta camada só estabiliza o contrato para projections e rotas.
+ * SDK Tools owns capability/surface membership. Presentation owns how those capabilities are projected into an
+ * operator-facing routing decision.
+ *
+ * @module copilot/presentation/files/routing
  */
 
-import { decideSdkFsRouting } from '../../core/sdk-fs-routing.js';
-
+/** @typedef {'local-fs-primary' | 'sdk-workspace-only' | 'degraded'} SdkFsRoutingMode */
 /**
- * @typedef {import('../../core/sdk-fs-routing.js').SdkFsRoutingDecision} SdkFsRoutingDecision
+ * @typedef {object} SdkFsRoutingDecision
+ * @property {boolean} canonicalFsReady
+ * @property {boolean} sdkWorkspaceAvailable
+ * @property {SdkFsRoutingMode} mode
+ * @property {string} reason
  */
 
 /**
- * Decide o modo operacional recomendado entre workspace SDK e filesystem local.
- *
+ * @param {{ canonicalFsReady: boolean; sdkWorkspaceAvailable: boolean }} input
+ * @returns {SdkFsRoutingDecision}
+ */
+export function decideSdkFsRouting(input) {
+    const canonicalFsReady = input.canonicalFsReady === true;
+    const sdkWorkspaceAvailable = input.sdkWorkspaceAvailable === true;
+    if (canonicalFsReady) {
+        return {
+            canonicalFsReady,
+            sdkWorkspaceAvailable,
+            mode: 'local-fs-primary',
+            reason: 'FS local canônico disponível; SDK workspace é superfície auxiliar/virtual.',
+        };
+    }
+    if (sdkWorkspaceAvailable) {
+        return {
+            canonicalFsReady,
+            sdkWorkspaceAvailable,
+            mode: 'sdk-workspace-only',
+            reason: 'File-tools locais indisponíveis; operações de arquivo devem usar workspace SDK.',
+        };
+    }
+    return {
+        canonicalFsReady,
+        sdkWorkspaceAvailable,
+        mode: 'degraded',
+        reason: 'Sem FS canônico e sem workspace SDK; investigar boot/load de tools e sessão.',
+    };
+}
+
+/**
  * @param {{ canonicalFsReady: boolean; sdkWorkspaceAvailable: boolean }} input
  * @returns {SdkFsRoutingDecision}
  */

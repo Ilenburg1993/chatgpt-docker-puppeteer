@@ -1,39 +1,31 @@
 // @ts-check
+import {
+    configureApplicationShutdownObservability,
+    PROCESS_SHUTDOWN_PHASE,
+    registerApplicationShutdownHandler,
+} from '#copilot/boot/process-runtime';
 /**
  * src/copilot/observability/bootstrap.js
  *
- * Inicializa as dependências de observabilidade em módulos de camada inferior (`core/`).
+ * Inicializa as integrações de observabilidade da aplicação.
  *
- * Esse arquivo é o único ponto de crossing intencional entre `observability/` e `core/`: ao invés de `core/` importar
- * `observability/` (inversão de camada), o bootstrap injeta as dependências via `registerErrorHandlerDeps()`.
- *
- * Deve ser chamado UMA VEZ, no bootstrap da aplicação (`src/main.js` ou equivalente), antes de qualquer uso de
- * `logSwallowed` / `wrapAsync` em runtime.
+ * O reporting de erros silenciados pertence a Observability e não depende de setters globais de Core.
  *
  * @module copilot/observability/bootstrap
  */
 
-import { AUDIT_LOGGER } from '#copilot/audit';
-import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
 import { defaultBus as defaultHookBus, setHooksLogger } from '#copilot/sdk/session';
 import { setSdkMetricEmitter } from '#copilot/sdk/telemetry';
 import { setCustomToolsBuilder } from '#copilot/sdk/tools';
-import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools/observability';
+import { setToolsLogger, setToolsMetrics } from '#copilot/tools/observability';
 import { channel } from 'node:diagnostics_channel';
-import { setAuditLogger } from '../audit/logger.js';
-import { container } from '../core/di-container.js';
-import { registerErrorHandlerDeps } from '../core/error-handlers.js';
-import { createEventBus } from '../core/event-bus.js';
-import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
-import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } from '../core/shutdown.js';
+import { setAuditErrorReporter, setAuditLogger } from '../audit/logger.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
-import { setSdkLogger } from '../sdk/logger.js';
+import { setSdkErrorReporter, setSdkLogger } from '../sdk/logger.js';
 import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
-import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './event-bus-runtime.js';
-import { defaultEventCollector } from './event-collector.js';
 import { log, LOG_DIR } from './logger.js';
 import { defaultMetrics } from './metrics.js';
 import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
@@ -49,7 +41,10 @@ const ioOperationChannel = channel('copilot.io.operation');
  */
 function recordIoOperationMetric(message) {
     if (!message || typeof message !== 'object') return;
-    const payload = /** @type {{ success?: unknown; io?: import('../core/io-contracts.js').IoMeta }} */ (message);
+    const payload =
+        /** @type {{ success?: unknown; io?: import('#copilot/infra/public/operations/contracts').IoMeta }} */ (
+            message
+        );
     const io = payload.io;
     if (!io || typeof io !== 'object') return;
 
@@ -77,7 +72,7 @@ function recordIoOperationMetric(message) {
  * @returns {void}
  */
 function emitSdkMetric(metric) {
-    const bus = container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null;
+    const bus = getApplicationEventBus();
     projectSdkOperationMetric(metric, {
         metrics: defaultMetrics,
         bus,
@@ -90,16 +85,12 @@ function emitSdkMetric(metric) {
  * @returns {void}
  */
 function emitShutdownLifecycleEvent(event) {
-    if (!container.has(EVENT_BUS)) return;
-    const bus = container.resolve(EVENT_BUS);
-    bus?.emit(event);
+    getApplicationEventBus().emit(event);
 }
 
 /**
- * Conecta `core/error-handlers`, `core/shutdown`, `db/sqlite`, `sdk/` e `audit/` às implementações reais de log e
+ * Conecta ProcessInfra lifecycle, SQLite, `sdk/` e `audit/` às implementações reais de log e
  * tracking. Idempotente — chamadas subsequentes são ignoradas com log de aviso.
- *
- * Também registra os tokens DI correspondentes no container global para consumo via DI.
  *
  * @returns {void}
  */
@@ -109,40 +100,10 @@ export function bootstrapObservability() {
         return;
     }
     _obsBooted = true;
-    registerErrorHandlerDeps({
-        log,
-        tracker: defaultErrorTracker,
-    });
     setSdkMetricEmitter(emitSdkMetric);
 
-    // DI container — registrar as dependências como tokens
-    container.register(SHUTDOWN_LOGGER, () => log, 'singleton');
-    container.register(DB_LOGGER, () => log, 'singleton');
-    container.register(SDK_LOGGER, () => log, 'singleton');
-    container.register(AUDIT_LOGGER, () => log, 'singleton');
-    container.register(HOOKS_LOGGER, () => log, 'singleton');
-    container.register(TOOLS_LOGGER, () => log, 'singleton');
-    container.register(
-        TOOLS_METRICS,
-        () => ({
-            getSummary: () => defaultMetrics.getSummary(),
-            getToolStats,
-            recordToolCall,
-        }),
-        'singleton',
-    );
-
-    // Observability singletons — disponíveis via DI para consumers futuros
-    container.register(METRICS_STORE, () => defaultMetrics, 'singleton');
-    container.register(ERROR_TRACKER, () => defaultErrorTracker, 'singleton');
-    container.register(EVENT_COLLECTOR, () => defaultEventCollector, 'singleton');
-    container.register(CONVERGENCE_TRACE_STORE, () => defaultConvergenceTraceStore, 'singleton');
-
-    // Event Bus global — singleton cross-module
-    container.register(EVENT_BUS, () => createEventBus(), 'singleton');
-
     // FAIXA-L1: bridge HookBus → EventBus (fix bug GAP-EVENTS-01)
-    const bus = container.resolve(EVENT_BUS);
+    const bus = getApplicationEventBus();
     if (bus) defaultHookBus.setEventBus(bus);
 
     // FAIXA-L6: middleware pipeline (enricher → validator → rate-limiter)
@@ -151,55 +112,48 @@ export function bootstrapObservability() {
     // Runtime canônico de observabilidade sobre EventBus.
     if (bus) attachObservabilityBusRuntime({ bus, metrics: defaultMetrics });
     ioOperationChannel.subscribe(recordIoOperationMetric);
-    setShutdownEventEmitter(emitShutdownLifecycleEvent);
+    configureApplicationShutdownObservability({ emit: emitShutdownLifecycleEvent });
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'observability.metricsSnapshot.flush',
         async () => {
             defaultMetrics.stopPeriodicSnapshot();
             await defaultMetrics.flushPeriodicSnapshot();
         },
-        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        PROCESS_SHUTDOWN_PHASE.FINAL,
         { timeoutMs: 10_000 },
     );
 
-    registerShutdownHandler(
-        'eventbus.dispose',
-        async () => {
-            const bus = container.resolve(EVENT_BUS);
-            if (bus?.dispose) bus.dispose();
-        },
-        SHUTDOWN_PRIORITY.OBSERVABILITY_BUS,
-    );
-
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'error-tracker.destroy',
         async () => {
             defaultErrorTracker.destroy();
         },
-        SHUTDOWN_PRIORITY.OBSERVABILITY_TRACKER,
+        PROCESS_SHUTDOWN_PHASE.OBSERVABILITY_TRACKER,
     );
 
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'observability.busRuntime.detach',
         async () => {
             detachObservabilityBusRuntime();
         },
-        SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
+        PROCESS_SHUTDOWN_PHASE.OBSERVABILITY_DETACH,
     );
 
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'observability.ioMetrics.detach',
         async () => {
             ioOperationChannel.unsubscribe(recordIoOperationMetric);
         },
-        SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
+        PROCESS_SHUTDOWN_PHASE.OBSERVABILITY_DETACH,
     );
 
-    setShutdownLogger(log);
+    configureApplicationShutdownObservability({ log, emit: emitShutdownLifecycleEvent });
     setSdkLogger(log);
+    setSdkErrorReporter((error, context) => defaultErrorTracker.trackError(error, { source: `sdk:${context}` }));
     setAuditLogger(log, LOG_DIR);
+    setAuditErrorReporter((error, context) => defaultErrorTracker.trackError(error, { source: `audit:${context}` }));
     setHooksLogger(log);
     setToolsLogger(log);
     setToolsMetrics({
@@ -219,7 +173,6 @@ export function bootstrapObservability() {
  */
 export function bootstrapLateDeps(deps) {
     if (deps.buildTool) {
-        container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
         setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (deps.buildTool));
     }
 }

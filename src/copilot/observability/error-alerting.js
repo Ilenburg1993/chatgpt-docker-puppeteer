@@ -17,7 +17,8 @@
  * @see EventBus
  */
 
-import { cancelTimer, redactSecretRecord, registerInterval } from '#copilot/core';
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import { log } from './logger.js';
 
 const WEBHOOK_TIMEOUT_MS = 5_000;
@@ -221,7 +222,7 @@ export function createErrorAlerter(tracker, config = {}) {
 
     function destroy() {
         if (_interval) {
-            if (_intervalId) cancelTimer(_intervalId);
+            if (_intervalId) cancelApplicationTimer(_intervalId);
             _interval = null;
             _intervalId = null;
         }
@@ -231,7 +232,7 @@ export function createErrorAlerter(tracker, config = {}) {
     // F39.5: Check periódico automático (a cada 30s)
     /** @type {string | null} */
     let _intervalId = `observability.errorAlerting:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    _interval = registerInterval(_intervalId, check, 30_000);
+    _interval = registerApplicationInterval(_intervalId, check, 30_000);
     if (typeof _interval === 'object' && 'unref' in _interval) {
         _interval.unref();
     }

@@ -70,7 +70,7 @@ function isDuplicateIoOperation(operation, targets, fallbackTarget, variant = ''
  * @typedef {{
  *     ts?: number;
  *     success?: boolean;
- *     io?: import('../../core/io-contracts.js').IoMeta;
+ *     io?: import('#copilot/infra/public/operations/contracts').IoMeta;
  *     error?: { name?: string; message?: string };
  * }} TerminalIoOperationMessage
  *
@@ -160,7 +160,7 @@ function isPlainObject(value) {
 }
 
 /**
- * @param {import('../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/infra/public/operations/contracts').IoMeta} io
  * @returns {boolean}
  */
 function isDryRunIoOperation(io) {
@@ -232,7 +232,7 @@ function formatBytes(bytes) {
 }
 
 /**
- * @param {import('../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/infra/public/operations/contracts').IoMeta} io
  * @returns {string[]}
  */
 function extractTouchedTargets(io) {

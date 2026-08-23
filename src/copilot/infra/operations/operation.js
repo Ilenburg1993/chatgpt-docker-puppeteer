@@ -5,7 +5,7 @@
  * @module copilot/infra/operations/operation
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/internal/platform/error';
 import { randomUUID } from 'node:crypto';
 
 /** @typedef {import('./contracts/index.js').IoOperationStatus} IoOperationStatus */
@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 /**
  * @param {{
  *     capability: string;
- *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ *     riskClass?: import('#copilot/infra/internal/operations/contracts').IoRiskClass;
  *     targets?: readonly string[];
  *     traceId?: string | null;
  *     evidence?: Record<string, unknown>;

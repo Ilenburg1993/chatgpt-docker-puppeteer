@@ -2,14 +2,13 @@
 /**
  * Process-scoped IO health projection.
  *
- * This surface owns diagnostics that are intrinsically process-global: lock kernels, Core process policy, path-policy
+ * This surface owns diagnostics that are intrinsically process-global: lock kernels, ProcessInfra policy, path-policy
  * cache, stateless search defaults/subprocess environment and lifetime aggregate workspace-authority counters. Every
  * globally sourced facet is attributed only after its active owner `processId` matches the supplied ProcessInfra.
  *
  * @module copilot/infra/observability/process/service
  */
 
-import { getCoreProcessPolicySnapshot } from '#copilot/core/process-policy';
 import { getIoLockStats } from '#copilot/infra/internal/concurrency/locks';
 import {
     getValidatedMutableWorkspacePathStats,
@@ -43,7 +42,6 @@ export function readIoProcessHealthSnapshot(processInfra) {
     const processId = processInfra.processId;
     const lifecycle = processInfra.lifecycleSnapshot();
     const lockOwner = lifecycle.locks.owner;
-    const corePolicy = getCoreProcessPolicySnapshot();
     const pathPolicy = getWorkspacePathPolicyCacheStats();
     const searchBudget = getActiveProcessBudgetOwnerSnapshot();
     const searchExec = getSearchSubprocessProcessSnapshot();
@@ -52,7 +50,7 @@ export function readIoProcessHealthSnapshot(processInfra) {
     const facetOwnership = Object.freeze({
         locks: isOwnedBy(lockOwner.active === true, lockOwner.processId, processId),
         compileCache: isOwnedBy(compileCache.owner.active === true, compileCache.owner.processId, processId),
-        corePolicy: isOwnedBy(corePolicy.active === true, corePolicy.processId, processId),
+        processConfig: true,
         pathPolicy: ownerProcessId(pathPolicy.ownerProcessId) === processId,
         searchBudget: isOwnedBy(searchBudget.active === true, searchBudget.processId, processId),
         searchSubprocess: isOwnedBy(searchExec.active === true, searchExec.processId, processId),
@@ -107,9 +105,7 @@ export function readIoProcessHealthSnapshot(processInfra) {
         }),
         ownership,
         policies: Object.freeze({
-            core: facetOwnership.corePolicy
-                ? Object.freeze({ owned: true, ownerProcessId: processId, config: corePolicy.config })
-                : Object.freeze({ owned: false, ownerProcessId: ownerProcessId(corePolicy.processId) }),
+            eventBus: Object.freeze({ owned: true, ownerProcessId: processId, config: lifecycle.config.eventBus }),
             pathPolicy: facetOwnership.pathPolicy
                 ? Object.freeze({ owned: true, ...pathPolicy })
                 : Object.freeze({ owned: false, ownerProcessId: ownerProcessId(pathPolicy.ownerProcessId) }),

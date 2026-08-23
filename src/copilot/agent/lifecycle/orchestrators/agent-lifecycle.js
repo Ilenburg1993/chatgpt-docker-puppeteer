@@ -12,6 +12,8 @@
  * @see EventBus
  */
 
+import { AgentSessionError } from '#copilot/agent/errors';
+import { isApplicationShuttingDown } from '#copilot/boot/process-runtime';
 import {
     EMITTER_BEFORE_STOP,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -21,23 +23,14 @@ import {
     EMITTER_STATUS,
     EMITTER_STOPPED,
 } from '#copilot/events';
-import {
-    buildTelemetryConfig,
-    container,
-    defaultErrorTracker,
-    defaultMetrics,
-    EVENT_BUS,
-    getHubSessionId,
-    initEventCollector,
-    isShuttingDown,
-    logSwallowed,
-    resolveAgentMcpCapability,
-    SessionError,
-    setSharedSdkSessionId,
-    startSpan,
-    toError,
-} from '../../ports/legacy-runtime/index.js';
+import { toError } from '#copilot/infra/public/platform/error';
+import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
+import { initEventCollector } from '../../ports/event-observer-port.js';
 import { log } from '../../ports/logging/index.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
+import { resolveAgentMcpCapability } from '../../ports/mcp-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { buildTelemetryConfig, startSpan } from '../../ports/tracing-port.js';
 
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '#copilot/config/agent';
 import {
@@ -63,7 +56,7 @@ import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSid
  */
 async function resolveConversationStoreLazy() {
     const { resolveConversationStore } = await import('../../ports/conversation-port.js');
-    return resolveConversationStore(container);
+    return resolveConversationStore();
 }
 
 /**
@@ -125,8 +118,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
     const ownershipSync = await syncActiveSessionOwnershipWithPolicy(
         session.sessionId,
         {
-            getHubSessionId,
-            setSharedSdkSessionId,
+            sessionBinding: ctx.sessionBinding,
             conversationStore: await resolveConversationStoreLazy(),
         },
         { label: options.ownershipLabel ?? 'agent.session.ownership.sync' },
@@ -167,7 +159,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         ctx.clearSessionEventUnsubscribers();
     }
 
-    const eventBus = container.resolve(EVENT_BUS) ?? undefined;
+    const eventBus = ctx.eventBus ?? undefined;
     const bootResult = await performBootWiring(
         client,
         session,
@@ -211,7 +203,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
             mcpBridge: ctx.getMcpBridgeSnapshot(),
             getMcpBridgeSnapshot: () => ctx.getMcpBridgeSnapshot(),
         },
-        { eventBus },
+        eventBus ? { eventBus } : {},
     );
     ctx.setBootReport(bootResult.bootReport);
     ctx.setSessionEventUnsubscribers(bootResult.unsubs);
@@ -249,7 +241,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         if (convStore) {
             void ctx.trackBackgroundTask(
                 syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
-                    getHubSessionId,
+                    getHubSessionId: () => ctx.sessionBinding.snapshot().hubSessionId,
                     conversationStore: convStore,
                 }),
                 {
@@ -296,7 +288,7 @@ async function rollbackFailedAgentStart(ctx, host, cause) {
     }
 
     const remainingTasks = ctx.drainMessageQueue(
-        new SessionError('[AlwaysAlive] Agente falhou durante startup.', 'AGENT_START_FAILED'),
+        new AgentSessionError('[AlwaysAlive] Agente falhou durante startup.', 'AGENT_START_FAILED'),
     );
     if (remainingTasks.length > 0) {
         log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no rollback de start.`);
@@ -310,10 +302,7 @@ async function rollbackFailedAgentStart(ctx, host, cause) {
     });
 
     const clearedOwnership = await clearActiveSdkSessionOwnershipWithPolicy(
-        {
-            getHubSessionId,
-            setSharedSdkSessionId,
-        },
+        { sessionBinding: ctx.sessionBinding },
         { label: 'agent.start.rollback.ownership.clear' },
     );
     if (!clearedOwnership.ok) {
@@ -577,7 +566,7 @@ export async function agentStop(
         ctx.setStatus('stopped', host);
 
         const remainingTasks = ctx.drainMessageQueue(
-            new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
+            new AgentSessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
         );
         ctx.invalidateStatusSnapshot();
         if (remainingTasks.length > 0) {
@@ -592,10 +581,7 @@ export async function agentStop(
         });
 
         const clearedOwnership = await clearActiveSdkSessionOwnershipWithPolicy(
-            {
-                getHubSessionId,
-                setSharedSdkSessionId,
-            },
+            { sessionBinding: ctx.sessionBinding },
             { label: 'agent.stop.ownership.clear' },
         );
         if (!clearedOwnership.ok) {
@@ -616,7 +602,7 @@ export async function agentStop(
  * @returns {Promise<boolean>}
  */
 export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
-    if (isShuttingDown()) {
+    if (isApplicationShuttingDown()) {
         log('INFO', '[AlwaysAlive] Reconexão ignorada: processo em shutdown.');
         return false;
     }
@@ -648,7 +634,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
                         emitReady: false,
                     }),
             },
-            { ...opts, shouldAbort: isShuttingDown },
+            { ...opts, shouldAbort: isApplicationShuttingDown },
         );
     } finally {
         ctx.setReconnectState(false);

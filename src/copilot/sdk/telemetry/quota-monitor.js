@@ -13,7 +13,8 @@
  * @see module:copilot/sdk/health
  */
 
-import { cancelTimer, registerInterval, toError } from '#copilot/core';
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
+import { toError } from '#copilot/infra/public/platform/error';
 import { accountGetQuota } from '../rpc/server.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ export function createQuotaMonitor(opts) {
                     onError(toError(err));
                 }
             });
-            _timer = registerInterval(
+            _timer = registerApplicationInterval(
                 _timerId,
                 () => {
                     _fetch().catch((err) => {
@@ -149,7 +150,7 @@ export function createQuotaMonitor(opts) {
 
         stop() {
             if (_timer !== null) {
-                cancelTimer(_timerId);
+                cancelApplicationTimer(_timerId);
                 _timer = null;
             }
         },

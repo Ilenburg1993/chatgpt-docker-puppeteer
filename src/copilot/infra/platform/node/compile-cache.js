@@ -9,7 +9,7 @@
  * @module copilot/infra/platform/node/compile-cache
  */
 
-import { readEnvBoolean } from '#copilot/infra/internal/platform';
+import { readEnvBoolean } from '#copilot/infra/internal/platform/env';
 import { enableCompileCache, flushCompileCache, getCompileCacheDir, constants as moduleConstants } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';

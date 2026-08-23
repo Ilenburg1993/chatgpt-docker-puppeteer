@@ -8,7 +8,7 @@
  * @module copilot/terminal/commands/fs
  */
 
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
     renderTerminalFilePreview,
     renderTerminalMarkdownPreview,

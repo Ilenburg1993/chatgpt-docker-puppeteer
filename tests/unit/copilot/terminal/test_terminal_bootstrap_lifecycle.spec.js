@@ -17,7 +17,7 @@ describe('terminal/bootstrap-lifecycle', () => {
     it('registra SIGTERM e SIGINT em modo headless', async () => {
         /** @type {Record<string, (...args: unknown[]) => void>} */
         const listeners = {};
-        const runShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
+        const runApplicationShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
         const exit = vi.fn((/** @type {number | undefined} */ _code) => {});
 
         registerTerminalShutdownSignals({
@@ -28,7 +28,7 @@ describe('terminal/bootstrap-lifecycle', () => {
                 },
                 exit: /** @type {(code?: number) => never} */ (/** @type {unknown} */ (exit)),
             },
-            runShutdownFn,
+            runApplicationShutdownFn,
             logFn: vi.fn(),
         });
 
@@ -39,7 +39,7 @@ describe('terminal/bootstrap-lifecycle', () => {
         await Promise.resolve();
         await Promise.resolve();
 
-        assert.equal(runShutdownFn.mock.calls[0]?.[0], 'SIGTERM');
+        assert.equal(runApplicationShutdownFn.mock.calls[0]?.[0], 'SIGTERM');
         assert.equal(exit.mock.calls[0]?.[0], 0);
     });
 
@@ -57,7 +57,7 @@ describe('terminal/bootstrap-lifecycle', () => {
                     /** @type {unknown} */ (vi.fn((/** @type {number | undefined} */ _code) => {}))
                 ),
             },
-            runShutdownFn: vi.fn(async () => {}),
+            runApplicationShutdownFn: vi.fn(async () => {}),
             logFn: vi.fn(),
         });
 
@@ -66,14 +66,14 @@ describe('terminal/bootstrap-lifecycle', () => {
     });
 
     it('executa shutdown central antes de sair em falha fatal de boot', async () => {
-        const runShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
+        const runApplicationShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
         const errorFn = vi.fn();
         const exitFn = vi.fn((/** @type {number | undefined} */ _code) => {});
 
         await assert.rejects(
             () =>
                 handleTerminalBootFailure(new Error('boot failed'), {
-                    runShutdownFn,
+                    runApplicationShutdownFn,
                     errorFn,
                     logFn: vi.fn(),
                     exitFn: /** @type {(code?: number) => never} */ (/** @type {unknown} */ (exitFn)),
@@ -82,7 +82,7 @@ describe('terminal/bootstrap-lifecycle', () => {
         );
 
         assert.equal(errorFn.mock.calls.length, 1);
-        assert.equal(runShutdownFn.mock.calls[0]?.[0], 'boot_failure');
+        assert.equal(runApplicationShutdownFn.mock.calls[0]?.[0], 'boot_failure');
         assert.equal(exitFn.mock.calls[0]?.[0], 1);
     });
 });

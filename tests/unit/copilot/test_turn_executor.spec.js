@@ -2,43 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
-vi.mock('#copilot/core/errors', () => {
-    class SessionError extends Error {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg);
-            this.code = code;
-            this.name = 'SessionError';
-        }
-    }
-    class CopilotError extends Error {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg);
-            this.code = code;
-            this.name = 'CopilotError';
-        }
-    }
-    return { SessionError, CopilotError };
-});
-
-vi.mock('#copilot/core', async (importOriginal) => {
-    class SessionError extends Error {
-        /** @param {string} msg @param {string} code */
-        constructor(msg, code) {
-            super(msg);
-            this.code = code;
-            this.name = 'SessionError';
-        }
-    }
-    return {
-        ...(await importOriginal()),
-        SessionError,
-        container: {
-            resolve: vi.fn(() => ({ recordDialogTurn: vi.fn() })),
-        },
-    };
-});
 
 vi.mock('#copilot/observability', () => ({
     METRICS_STORE: Symbol('METRICS_STORE_TEST'),

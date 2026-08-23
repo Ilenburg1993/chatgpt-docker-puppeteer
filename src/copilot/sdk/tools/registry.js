@@ -1,7 +1,7 @@
 // @ts-check
-import { ConfigError } from '#copilot/core';
-import { validateToolDefinitionContract } from '#copilot/core/tool-contracts';
+import { SdkConfigError } from '#copilot/sdk/errors';
 import { log } from '../logger.js';
+import { validateToolDefinitionContract } from './contracts.js';
 /**
  * src/copilot/sdk/tools-registry.js
  *
@@ -36,6 +36,20 @@ import { log } from '../logger.js';
 /**
  * @typedef {object} ToolRegistry
  * @property {Map<string, ToolEntry>} entries - Mapa de nome → ToolEntry
+ */
+
+/**
+ * Public structural adapter for the SDK tool registry.
+ * @typedef {object} ToolRegistryAdapter
+ * @property {Map<string, ToolEntry>} entries
+ * @property {(tool: unknown, meta?: { category?: string; tags?: string[]; readOnly?: boolean }) => void} register
+ * @property {(category: string) => unknown[]} getByCategory
+ * @property {(tag: string) => unknown[]} getByTag
+ * @property {(names: string[]) => ToolRegistryAdapter} filter
+ * @property {() => unknown[]} list
+ * @property {() => { total: number; byCategory: Record<string, number> }} stats
+ * @property {(other: ToolRegistryAdapter | ToolRegistry) => ToolRegistryAdapter} merge
+ * @property {(names: string[]) => ToolRegistryAdapter} exclude
  */
 
 /**
@@ -110,14 +124,14 @@ export function createRegistry() {
  * @param {string[]} [meta.tags=[]] Tags adicionais. Default is `[]`
  * @param {boolean} [meta.readOnly=false] Se a ferramenta é somente-leitura. Default is `false`
  * @returns {void}
- * @throws {ConfigError} Se tool ou tool.name for inválido
+ * @throws {SdkConfigError} Se tool ou tool.name for inválido
  * @see createRegistry
  */
 export function registerTool(registry, tool, meta = {}) {
-    if (!registry || !registry.entries) throw new ConfigError('[sdk/tools-registry] registry inválido.');
+    if (!registry || !registry.entries) throw new SdkConfigError('[sdk/tools-registry] registry inválido.');
     const validation = validateToolDefinitionContract(tool);
     if (!validation.ok) {
-        throw new ConfigError(`[sdk/tools-registry] registerTool: ${validation.reason}`);
+        throw new SdkConfigError(`[sdk/tools-registry] registerTool: ${validation.reason}`);
     }
     const { category = 'uncategorized', tags = [], readOnly = false } = meta;
     const safeTool = ensureToolInstructions(/** @type {Tool} */ (tool), { category, tags, readOnly });
@@ -321,11 +335,10 @@ export function inspectRegistry(registry) {
 // ─── IToolRegistry adapter (Faixa 3.2 — AC-5-04) ────────────────────────────
 
 /**
- * Cria um adapter OOP sobre o registry funcional, implementando a interface
- * {@link import('#copilot/core/interfaces').IToolRegistry IToolRegistry}.
+ * Cria um adapter OOP sobre o registry funcional, preservando o contrato estrutural do próprio domínio SDK Tools.
  *
  * @param {ToolRegistry} [inner] - Registry interno. Se omitido, cria um novo vazio.
- * @returns {import('#copilot/core/interfaces').IToolRegistry}
+ * @returns {ToolRegistryAdapter}
  */
 export function createToolRegistryAdapter(inner) {
     const reg = inner ?? createRegistry();
@@ -344,7 +357,7 @@ export function createToolRegistryAdapter(inner) {
          * Une este registry com outro, retornando um novo adapter (secundário sobrescreve primário).
          *
          * @param {any} other - Outro adapter ou ToolRegistry
-         * @returns {import('#copilot/core/interfaces').IToolRegistry}
+         * @returns {ToolRegistryAdapter}
          */
         merge: (other) => {
             const otherReg = other && typeof other === 'object' && other.entries ? other : createRegistry();
@@ -355,7 +368,7 @@ export function createToolRegistryAdapter(inner) {
          * Exclui ferramentas com nomes específicos, retornando um novo adapter.
          *
          * @param {string[]} names - Nomes das ferramentas a excluir
-         * @returns {import('#copilot/core/interfaces').IToolRegistry}
+         * @returns {ToolRegistryAdapter}
          */
         exclude: (names) => createToolRegistryAdapter(excludeByNames(reg, names)),
     };

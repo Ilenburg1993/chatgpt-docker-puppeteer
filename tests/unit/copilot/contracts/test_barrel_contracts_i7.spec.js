@@ -13,7 +13,7 @@ vi.mock('@github/copilot-sdk', () => ({
     SYSTEM_MESSAGE_SECTIONS: Object.freeze({ identity: 'identity' }),
     SYSTEM_PROMPT_SECTIONS: Object.freeze({ identity: 'identity' }),
     CopilotClient: vi.fn(),
-    defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {}, handler: async () => ({}) })),
+    defineTool: vi.fn((/** @type {Record<string, unknown>} */ definition) => definition),
     approveAll: vi.fn(),
 }));
 

@@ -96,6 +96,11 @@ export {
 } from './client.js';
 
 export {
+    isRuntimeElicitationSchema,
+    normalizeElicitationContentWithSchema,
+    normalizeElicitationResultWithSchema,
+} from './elicitation-schema.js';
+export {
     createQueuedElicitationHandler,
     normalizeElicitationCompletedEvent,
     normalizeElicitationPendingEvent,
@@ -269,3 +274,5 @@ export {
     sendSessionAndWait,
     setSessionModel,
 } from './runtime.js';
+
+export { normalizeUserInputBridgeContract } from './user-input.js';

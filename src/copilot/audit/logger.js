@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
 import path, { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,4 +64,31 @@ export function log(level, msg, meta) {
  */
 export function getLogDir() {
     return _logDir;
+}
+
+/** @type {((error: unknown, context: string) => void) | null} */
+let _reportError = null;
+
+/** @param {(error: unknown, context: string) => void} reporter */
+export function setAuditErrorReporter(reporter) {
+    _reportError = typeof reporter === 'function' ? reporter : null;
+}
+
+/**
+ * Best-effort reporting owned by Audit. The concrete tracker is injected by application composition.
+ * @param {unknown} error
+ * @param {string} context
+ */
+export function logAuditSwallowed(error, context) {
+    const normalized = toError(error);
+    try {
+        log('DEBUG', `[swallowed:${context}] ${normalized.message}`);
+    } catch {
+        /* reporting never changes control flow */
+    }
+    try {
+        _reportError?.(error, context);
+    } catch {
+        /* reporting never changes control flow */
+    }
 }

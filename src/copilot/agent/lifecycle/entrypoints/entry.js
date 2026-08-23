@@ -25,7 +25,9 @@ import {
     PING_TIMEOUT_MS,
     RESTART_DELAY_MS,
 } from '#copilot/config/agent';
-import { EVENT_BUS, bridgeEmitter, container, logSwallowed, toError, withRetry } from '#copilot/core';
+import { bridgeEmitter } from '#copilot/events/runtime';
+import { withRetry } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import {
     EMITTER_ERROR,
@@ -39,9 +41,10 @@ import {
     HOOK_SESSION_START,
 } from '../../../events/index.js';
 import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/sdk-access.js';
-import { ERROR_TRACKER } from '../../ports/error-tracking-port.js';
+import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
 import { getDefaultHookBus } from '../../ports/hook-port.js';
 import { log } from '../../ports/logging/index.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
 import { runCopilotSdkBootPreflight } from '../../ports/sdk-preflight-port.js';
 import { getAgent } from '../../singleton/index.js';
 import {
@@ -76,9 +79,8 @@ export async function startAgentLoop() {
     });
 
     // FAIXA-2A: bridge HookBus → EventBus central para observabilidade cross-module
-    const _bus = container.resolve(EVENT_BUS);
-    if (_bus) {
-        bridgeEmitter(getDefaultHookBus(), _bus, {
+    if (agent.ctx.eventBus) {
+        bridgeEmitter(getDefaultHookBus(), agent.ctx.eventBus, {
             pre_tool_use: HOOK_PRE_TOOL_USE,
             post_tool_use: HOOK_POST_TOOL_USE,
             prompt_submitted: HOOK_PROMPT_SUBMITTED,
@@ -130,7 +132,7 @@ export async function startAgentLoop() {
     // ─── Handlers de erros não tratados ──────────────────────────────────────────
     // Delegado ao error-tracker singleton que já implementa trackError + log.
     // Evita duplicação de handlers (FAIXA-0 Quick Win #2).
-    container.resolve(ERROR_TRACKER).registerGlobalHandlers();
+    defaultErrorTracker.registerGlobalHandlers();
 
     // ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
     registerRuntimeIpcHost({

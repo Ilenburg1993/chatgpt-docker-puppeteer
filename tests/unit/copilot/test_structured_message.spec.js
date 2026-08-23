@@ -27,7 +27,7 @@ import {
     isStructuredMessage,
     parseStructuredResponse,
     serializeStructuredMessage,
-} from '#copilot/core/structured-message';
+} from '#copilot/channel/structured-message';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -267,7 +267,7 @@ describe('serializeStructuredMessage', () => {
 // ─── parseStructuredResponse ─────────────────────────────────────────────────
 
 describe('parseStructuredResponse', () => {
-    /** @param {Partial<import('#copilot/core/structured-message').StructuredMessage>} extra */
+    /** @param {Partial<import('#copilot/channel/structured-message').StructuredMessage>} extra */
     function validJsonStr(extra = {}) {
         return JSON.stringify({
             version: '1.0',
@@ -304,6 +304,20 @@ describe('parseStructuredResponse', () => {
         const raw = `Olá! Aqui está o resultado: ${validJsonStr()} Espero que ajude.`;
         const result = parseStructuredResponse(raw);
         assert.ok(result !== null, 'Deve parsear JSON embutido em texto');
+    });
+
+    it('isola objetos JSON vizinhos e seleciona apenas o StructuredMessage válido', () => {
+        const raw = `telemetria={"noise":true} resposta=${validJsonStr({ output: 'ok' })} trailer={"x":1}`;
+        const result = parseStructuredResponse(raw);
+        assert.ok(result !== null);
+        assert.equal(result.output, 'ok');
+    });
+
+    it('não quebra balanceamento com braces dentro de strings JSON', () => {
+        const raw = `prefixo ${validJsonStr({ output: 'objeto { interno } e "quote"' })} sufixo`;
+        const result = parseStructuredResponse(raw);
+        assert.ok(result !== null);
+        assert.equal(result.output, 'objeto { interno } e "quote"');
     });
 
     it('retorna null para texto puro sem JSON', () => {

@@ -15,7 +15,7 @@ vi.mock('#copilot/observability', () => ({
     log: vi.fn(),
 }));
 
-vi.mock('../../../src/copilot/core/error-handlers.js', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: vi.fn(),
 }));
 

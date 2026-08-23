@@ -7,7 +7,6 @@
  */
 
 export {
-    METRICS_STORE,
     abortCurrentMessage,
     agentStart,
     agentStop,
@@ -16,6 +15,7 @@ export {
     compactSdkSession,
     confirmSdkSessionUi,
     createSdkWorkspaceFile,
+    defaultMetrics,
     deleteSdkPlan,
     deleteSdkSession,
     deselectSdkAgent,

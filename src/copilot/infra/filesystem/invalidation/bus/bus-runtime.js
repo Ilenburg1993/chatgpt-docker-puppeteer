@@ -1,6 +1,5 @@
 // @ts-check
 /** Instance-owned synchronous local coherence bus plus debounced cross-process replication. */
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
 import { invalidateWorkspacePathPolicyCache } from '../../workspace/path-policy/index.js';
 import { normalizeIoInvalidationEvent } from './events.js';
 /** @typedef {import('./events.js').IoInvalidationEvent} IoInvalidationEvent */
@@ -12,7 +11,6 @@ import { normalizeIoInvalidationEvent } from './events.js';
  *   crossProcess:{publish:(filePath:string,event?:IoInvalidationEvent)=>boolean;start:(hook:(filePath:string,event:{recursive:boolean;source:string;sequence:number;createdAtMs:number})=>void)=>()=>void;stop:()=>void;stats:()=>Record<string,unknown>};
  *   runtimeId?:string;
  *   debounceMs?:number;
- *   registerProcessShutdown?:boolean;
  * }} options
  */
 export function createIoInvalidationBusRuntime(options) {
@@ -34,7 +32,6 @@ export function createIoInvalidationBusRuntime(options) {
     };
     /** @type {NodeJS.Timeout|null} */ let timer = null;
     /** @type {(()=>void)|null} */ let stopConsumer = null;
-    let shutdownRegistered = false;
     let disposed = false;
     const MAX_RECENT = 2048;
 
@@ -92,19 +89,9 @@ export function createIoInvalidationBusRuntime(options) {
             dispatchLocal(filePath, normalizeIoInvalidationEvent(event));
         });
     }
-    function ensureShutdown() {
-        if (!options.registerProcessShutdown || shutdownRegistered) return;
-        shutdownRegistered = true;
-        registerShutdownHandler(
-            `copilot-infra.invalidation.${runtimeId}.flush-stop`,
-            async () => api.dispose(),
-            SHUTDOWN_PRIORITY.CACHE_PERSISTENCE,
-        );
-    }
     /** @param {string} filePath @param {IoInvalidationEvent} [event] */
     function publish(filePath, event = {}) {
         if (disposed) return;
-        ensureShutdown();
         ensureConsumer();
         const normalized = normalizeIoInvalidationEvent(event);
         dispatchLocal(filePath, normalized);
@@ -124,7 +111,6 @@ export function createIoInvalidationBusRuntime(options) {
     /** @param {(filePath:string,event:ReturnType<typeof normalizeIoInvalidationEvent>)=>void} hook */
     function registerHook(hook) {
         if (disposed) throw new Error(`IoInvalidationBusRuntime(${runtimeId}) is disposed.`);
-        ensureShutdown();
         ensureConsumer();
         hooks.push(hook);
         return () => {
@@ -140,7 +126,6 @@ export function createIoInvalidationBusRuntime(options) {
             pendingReplications: pending.size,
             timerPending: timer !== null,
             consumerStarted: stopConsumer !== null,
-            shutdownRegistered,
             debounceMs,
             ...stats,
             crossProcess: options.crossProcess.stats(),

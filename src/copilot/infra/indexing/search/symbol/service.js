@@ -1,8 +1,8 @@
 // @ts-check
 /** Workspace symbol search via registry index with ripgrep fallback. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { hasNullByte } from '#copilot/infra/internal/policy';
 import { elapsedIoMs, nowIoMs, publishIoOperationResult } from '#copilot/infra/internal/telemetry';
 import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from '../projection/index.js';
@@ -52,7 +52,7 @@ import { acquireSearchSubprocessCapability, streamSearchFile } from '../subproce
  *     countsPostSanitization: true;
  *     scopedIndex?: boolean;
  *     caseSensitiveEffective?: boolean;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  * }>}
  */
 export async function searchWorkspaceSymbols(targetPath, options, context = {}) {

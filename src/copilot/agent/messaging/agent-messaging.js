@@ -12,8 +12,8 @@
  * @see EventBus
  */
 
+import { AgentSessionError } from '#copilot/agent/errors';
 import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '#copilot/config/agent';
-import { SessionError } from '#copilot/core';
 import {
     EMITTER_QUESTION_ANSWERED,
     EMITTER_STEERING_SENT,
@@ -279,7 +279,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, reques
         }
         if (ctx.isDialogLoopActive()) {
             reject(
-                new SessionError(
+                new AgentSessionError(
                     '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
                     'DIALOG_ACTIVE',
                 ),
@@ -520,7 +520,7 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     signal?.throwIfAborted();
     const session = ctx.getSessionSnapshot();
     if (!session) {
-        throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
+        throw new AgentSessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
     return startSpan('copilot.agent.steer', { model: ctx.getModelSnapshot(), actor: 'agent' }, async () => {
         const messageId = await sendAgentSdkSession(session, { prompt, mode: 'immediate' });

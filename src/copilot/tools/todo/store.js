@@ -1,8 +1,10 @@
 // @ts-check
 import { resolveHooksStateFile } from '#copilot/boot';
 import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
-import { logSwallowed, registerInterval, toError } from '#copilot/core';
+import { registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { runSqliteTransaction } from '#copilot/infra/public/database/sqlite';
+import { toError } from '#copilot/infra/public/platform/error';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { log } from '../infra/logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
 /**
@@ -584,7 +586,7 @@ export function startTodoCleanupJob(opts = {}) {
     );
 
     const timerId = `todo.store.cleanup:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    const timer = registerInterval(
+    const timer = registerApplicationInterval(
         timerId,
         () => {
             cleanupExpiredTasks(maxAgeDays).catch((e) =>

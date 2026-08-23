@@ -4,7 +4,8 @@
 import { makeBytesKey, makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
 import { readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
 import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser/cache';
-import { sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { stat as fsStat } from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import { primeIoL1Entry, resolvePrefetchL1Cache, warmCacheForPaths } from './cache-warm.js';

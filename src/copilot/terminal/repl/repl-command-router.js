@@ -11,11 +11,12 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
+import { runApplicationShutdown } from '#copilot/boot/process-runtime';
 import { getTerminalInterventionPolicy, LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
-import { EVENT_BUS, runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
-import { container } from '../../core/di-container.js';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import {
     clearRuntimeInterventionMailbox,
     consumeRuntimeInterventionMailbox,
@@ -179,7 +180,7 @@ function renderInterventionModeLabel(value) {
  * @typedef {{
  *     hubSessionId: string | null;
  *     injectPort: number;
- *     eventBus: import('../../core/event-bus.js').EventBus | null;
+ *     eventBus: import('#copilot/events/runtime').EventBus | null;
  * }} CmdCtx
  */
 
@@ -811,10 +812,10 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     println(terminalThemeRow('Sessão', 'encerrando terminal', { role: 'muted' }));
     cleanup();
     try {
-        // Hard timeout: se runShutdown não completar em QUIT_SHUTDOWN_TIMEOUT_MS, sai mesmo assim.
+        // Hard timeout: se runApplicationShutdown não completar em QUIT_SHUTDOWN_TIMEOUT_MS, sai mesmo assim.
         // Evita travamento de /quit quando o dialog loop está em estado degradado (ex.: after freeze).
         await Promise.race([
-            runShutdown('terminal.quit'),
+            runApplicationShutdown('terminal.quit'),
             new Promise((_, reject) =>
                 setTimeout(
                     () => reject(new Error(`Shutdown timeout após ${QUIT_SHUTDOWN_TIMEOUT_MS}ms`)),
@@ -1023,7 +1024,7 @@ export async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
         println,
         hubSessionId: getHubSessionId(),
         injectPort: activeInjectPort,
-        eventBus: container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null,
+        eventBus: getApplicationEventBus(),
     };
     const handler = _cmdRouteMap.get(cmd?.toLowerCase() ?? '');
     if (handler) {

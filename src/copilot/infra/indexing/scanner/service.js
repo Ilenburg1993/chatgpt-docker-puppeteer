@@ -8,9 +8,9 @@
  * @module copilot/infra/indexing/scanner/service
  */
 
-import { toError } from '#copilot/core/error-handlers';
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { evaluateWorkspacePathPolicyAsync } from '#copilot/infra/internal/filesystem/workspace';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { toError } from '#copilot/infra/internal/platform/error';
 import {
     DEFAULT_BLOCKED_PATH_SEGMENTS,
     assertValidIoFilePath,
@@ -78,7 +78,7 @@ const DEFAULT_SCAN_HARD_MAX_ENTRIES = 20_000;
  *     entries: IoScanEntry[];
  *     scannedEntries: number;
  *     blockedEntries: number;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  * }>}
  */
 export async function scanDirectory(rootPath, options = {}) {

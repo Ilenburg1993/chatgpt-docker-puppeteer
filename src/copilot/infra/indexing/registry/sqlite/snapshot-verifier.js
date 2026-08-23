@@ -6,7 +6,7 @@
  */
 
 import { statPathSnapshot } from '#copilot/infra/internal/filesystem/read';
-import { richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 
 /** @param {string} filePath @param {number} attempts */
 export function createStaleIndexSnapshotError(filePath, attempts) {

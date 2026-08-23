@@ -9,9 +9,9 @@
  * @module copilot/infra/database/sqlite/better-sqlite3/runtime
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { applyCopilotSqlitePragmas } from '#copilot/infra/internal/database/sqlite';
 import { migrateCopilotSqliteDatabase } from '#copilot/infra/internal/database/sqlite/application';
+import { toError } from '#copilot/infra/internal/platform/error';
 import Database from 'better-sqlite3';
 import { adaptBetterSqliteDatabase } from './adapter.js';
 

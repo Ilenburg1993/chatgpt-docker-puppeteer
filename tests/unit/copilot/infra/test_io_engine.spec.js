@@ -31,7 +31,7 @@ import {
 import { createOrReplaceFileAtomic, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/internal/filesystem/write';
 import { scanDirectory } from '#copilot/infra/internal/indexing';
 import { searchText, searchWorkspaceSymbols } from '#copilot/infra/internal/indexing/search';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 
 /** @type {string[]} */

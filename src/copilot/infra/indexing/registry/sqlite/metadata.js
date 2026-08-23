@@ -6,7 +6,7 @@
  */
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { extname } from 'node:path';
 import { SYMBOL_EXTENSIONS } from './content.js';
 

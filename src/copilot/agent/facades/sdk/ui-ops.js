@@ -19,12 +19,26 @@ import { mcpOauthLogin } from '#copilot/sdk/rpc/experimental';
 import {
     getSessionCapabilities,
     isSessionUiElicitationAvailable,
+    normalizeElicitationResultWithSchema,
     sessionUiConfirm,
     sessionUiElicitation,
     sessionUiInput,
     sessionUiSelect,
 } from '#copilot/sdk/session';
 import { getSdkElicitationRef, requireSession } from './core/index.js';
+
+/**
+ * @param {unknown} value
+ * @param {unknown} schema
+ * @param {{ context?: string }} [options]
+ */
+export function normalizeAgentSdkElicitationResult(value, schema, options) {
+    return normalizeElicitationResultWithSchema(
+        value,
+        /** @type {Parameters<typeof normalizeElicitationResultWithSchema>[1]} */ (schema),
+        options,
+    );
+}
 
 /**
  * @param {unknown} ctx

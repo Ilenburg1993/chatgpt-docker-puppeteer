@@ -107,17 +107,13 @@ check('C3', 'EventBus adoption ≥ 80%', 10, () => {
     return { score, detail: `${ebFiles}/${totalFiles} = ${pct.toFixed(1)}% (meta: ≥80%)` };
 });
 
-// ─── C4: DI tokens ≥ 40 ─────────────────────────────────────────────────────
-check('C4', 'DI tokens ≥ 40', 8, () => {
-    let tokens = 0;
-    try {
-        const json = JSON.parse(sh('node scripts/arch-health.mjs --json 2>/dev/null'));
-        tokens = json.diTokens ?? 0;
-    } catch {
-        tokens = parseInt(sh("grep -c 'Symbol(' src/copilot/core/di-tokens.js 2>/dev/null || echo 0")) || 0;
-    }
-    const score = tokens >= 40 ? 8 : tokens >= 25 ? 4 : tokens >= 13 ? 2 : 0;
-    return { score, detail: `${tokens} tokens (meta: ≥40)` };
+// ─── C4: service-locator extinction ──────────────────────────────────────────
+check('C4', 'Zero generic service locator in src/copilot', 8, () => {
+    const matches = sh(
+        "rg -n '\\bcontainer\\.(resolve|register|has|validateRequired)\\b|createContainer|createToken' src/copilot --glob='*.js' 2>/dev/null || true",
+    );
+    const count = matches.trim() ? matches.trim().split('\n').length : 0;
+    return { score: count === 0 ? 8 : 0, detail: `${count} service-locator occurrence(s) (meta: 0)` };
 });
 
 // ─── C5: Exact package-import governance ───────────────────────────────────

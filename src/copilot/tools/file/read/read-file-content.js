@@ -7,8 +7,10 @@
  * @module copilot/tools/file/read/read-file-content
  */
 
-import { sanitizeIoTextOutput, toError, withIoMeta } from '#copilot/core';
+import { sanitizeIoTextOutput } from '#copilot/infra/public/observability/redaction';
+import { withIoMeta } from '#copilot/infra/public/operations/contracts';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';

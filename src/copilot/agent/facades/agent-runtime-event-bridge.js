@@ -4,7 +4,7 @@
  * @file Façade semântica para wiring dos emitters internos do runtime vivo no EventBus.
  */
 
-import { bridgeEmitter } from '#copilot/core';
+import { bridgeEmitter } from '#copilot/events/runtime';
 import { AGENT_EVENT_BRIDGE_MAP, DIALOG_LOOP_EVENT_BRIDGE_MAP, HANDOFF_EVENT_BRIDGE_MAP } from '../event-bridge-map.js';
 
 /**
@@ -43,7 +43,7 @@ export function readAgentRuntimeEventBridgeSources(agent) {
  * Conecta os emitters oficiais do runtime vivo ao EventBus central.
  *
  * @param {AgentRuntimeEventBridgeHost} agent
- * @param {import('../../core/event-bus.js').EventBus} bus
+ * @param {import('#copilot/events/runtime').EventBus} bus
  * @param {{ bridge?: typeof bridgeEmitter }} [options]
  * @returns {ReturnType<typeof bridgeEmitter>[]}
  */

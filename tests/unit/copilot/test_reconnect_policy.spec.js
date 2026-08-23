@@ -325,31 +325,16 @@ describe('reconnect-policy › dialog loop ativo durante reconexão', () => {
 describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
     it('delay deve ser base * 2^(attempt-1) quando jitterFn retorna 0', async () => {
         const delays = /** @type {number[]} */ ([]);
-        const origSetTimeout = globalThis.setTimeout;
-        // Mock setTimeout para capturar delays sem aguardar
-        globalThis.setTimeout = /** @type {any} */ (
-            (/** @type {() => void} */ fn, /** @type {number} */ delay) => {
-                delays.push(delay);
-                return origSetTimeout(fn, 0); // executa imediatamente
-            }
-        );
+        const cbs = makeCallbacks();
 
-        const cbs = makeCallbacks({
-            initSession: async () => {
-                if (delays.length === 0) throw new Error('still waiting for first timeout');
-                return { session: { sessionId: 's' }, isResumed: false };
+        await tryReconnect(new Error('e'), {}, 'idle', cbs, {
+            baseDelayMs: 100,
+            jitterFn: () => 0,
+            maxAttempts: 3,
+            sleepFn: async (/** @type {number} */ delay) => {
+                delays.push(delay);
             },
         });
-
-        try {
-            await tryReconnect(new Error('e'), {}, 'idle', cbs, {
-                baseDelayMs: 100,
-                jitterFn: () => 0,
-                maxAttempts: 3,
-            });
-        } finally {
-            globalThis.setTimeout = origSetTimeout;
-        }
 
         // delay da tentativa 1: 100 * 2^0 + 0 = 100ms
         assert.ok(delays.length >= 1, 'Pelo menos 1 setTimeout deve ter sido chamado');
@@ -360,14 +345,6 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
 
     it('usa backoff mínimo ditado pela policy SDK quando maior que o baseDelay local', async () => {
         const delays = /** @type {number[]} */ ([]);
-        const origSetTimeout = globalThis.setTimeout;
-        globalThis.setTimeout = /** @type {any} */ (
-            (/** @type {() => void} */ fn, /** @type {number} */ delay) => {
-                delays.push(delay);
-                return origSetTimeout(fn, 0);
-            }
-        );
-
         let attempts = 0;
         const cbs = makeCallbacks({
             initSession: async () => {
@@ -377,15 +354,14 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
             },
         });
 
-        try {
-            await tryReconnect(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }), {}, 'idle', cbs, {
-                baseDelayMs: 100,
-                jitterFn: () => 0,
-                maxAttempts: 3,
-            });
-        } finally {
-            globalThis.setTimeout = origSetTimeout;
-        }
+        await tryReconnect(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }), {}, 'idle', cbs, {
+            baseDelayMs: 100,
+            jitterFn: () => 0,
+            maxAttempts: 3,
+            sleepFn: async (/** @type {number} */ delay) => {
+                delays.push(delay);
+            },
+        });
 
         assert.ok(delays.length >= 1, 'Pelo menos 1 setTimeout deve ter sido chamado');
         const firstDelay = delays[0];

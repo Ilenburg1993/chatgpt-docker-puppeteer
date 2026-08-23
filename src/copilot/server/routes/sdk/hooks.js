@@ -15,7 +15,7 @@
  * @see EventBus
  */
 
-import { redactSecretRecord } from '#copilot/core';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import { Router } from 'express';
 import {
     deleteSdkHooksRuntimeState,

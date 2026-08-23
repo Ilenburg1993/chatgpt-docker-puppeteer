@@ -1,6 +1,6 @@
 // @ts-check
 
-import { createEventBus, getCoreProcessPolicySnapshot, validateWebhookUrl } from '#copilot/core';
+import { createEventBus } from '#copilot/events/runtime';
 import { getWorkspacePathPolicyCacheStats } from '#copilot/infra/internal/filesystem/workspace';
 import { getActiveIoSearchBudget } from '#copilot/infra/internal/policy';
 import { createProcessInfra } from '#copilot/infra/public/composition/process';
@@ -40,7 +40,6 @@ function installEnvA() {
     vi.stubEnv('IO_SEARCH_TIMEOUT_MS', '1234');
     vi.stubEnv('IO_SEARCH_MAX_BUFFER_BYTES', '4096');
     vi.stubEnv('COPILOT_EVENT_BUS_MAX_COUNTERS', '2');
-    vi.stubEnv('WEBHOOK_ALLOW_PRIVATE_HOSTS', 'true');
     vi.stubEnv('PATH', '/generation-a/bin:/usr/bin');
 }
 
@@ -57,7 +56,6 @@ function installEnvB() {
     process.env['IO_SEARCH_TIMEOUT_MS'] = '5678';
     process.env['IO_SEARCH_MAX_BUFFER_BYTES'] = '8192';
     process.env['COPILOT_EVENT_BUS_MAX_COUNTERS'] = '4';
-    process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] = 'false';
     process.env['PATH'] = '/generation-b/bin:/usr/bin';
 }
 
@@ -75,10 +73,8 @@ describe('Infra 2.1 configuration ownership', () => {
         const processA = createProcessInfra({ processId: 'config-owner-process-a' });
         processInfras.push(processA);
         const runtimeDefaultsA = processA.config.runtimeDefaults;
-        expect(processA.config.core).toEqual({
-            eventBus: { maxCounters: 2 },
-            urlSecurity: { allowPrivateWebhookHosts: true },
-        });
+        expect(processA.config.eventBus).toEqual({ maxCounters: 2 });
+        expect('network' in processA.config).toBe(false);
         expect(processA.config.pathPolicyCache).toEqual({ ttlMs: 111, maxEntries: 222 });
         expect(processA.config.compileCache.disabled).toBe(true);
         expect(processA.config.search.budget).toEqual({ timeoutMs: 1234, maxBufferBytes: 4096 });
@@ -140,10 +136,7 @@ describe('Infra 2.1 configuration ownership', () => {
         // A newly-created process generation explicitly snapshots the current B environment and therefore sees B.
         const processB = createProcessInfra({ processId: 'config-owner-process-b' });
         processInfras.push(processB);
-        expect(processB.config.core).toEqual({
-            eventBus: { maxCounters: 4 },
-            urlSecurity: { allowPrivateWebhookHosts: false },
-        });
+        expect(processB.config.eventBus).toEqual({ maxCounters: 4 });
         expect(processB.config.pathPolicyCache).toEqual({ ttlMs: 777, maxEntries: 888 });
         expect(processB.config.compileCache.disabled).toBe(false);
         expect(processB.config.search.budget).toEqual({ timeoutMs: 5678, maxBufferBytes: 8192 });
@@ -179,7 +172,7 @@ describe('Infra 2.1 configuration ownership', () => {
         scopeB.close();
     });
 
-    it('binds process policies to one owner and restores deterministic defaults on dispose', async () => {
+    it('binds process policies explicitly to one owner without mutable Core globals', async () => {
         const processA = createProcessInfra({
             processId: 'path-policy-owner-a',
             env: {
@@ -188,22 +181,14 @@ describe('Infra 2.1 configuration ownership', () => {
                 IO_SEARCH_TIMEOUT_MS: '4321',
                 IO_SEARCH_MAX_BUFFER_BYTES: '16384',
                 COPILOT_EVENT_BUS_MAX_COUNTERS: '2',
-                WEBHOOK_ALLOW_PRIVATE_HOSTS: 'true',
                 PATH: '/owned-search/bin:/usr/bin',
             },
             activateProcessPolicies: true,
         });
         processInfras.push(processA);
-        expect(getCoreProcessPolicySnapshot()).toMatchObject({
-            active: true,
-            processId: 'path-policy-owner-a',
-            config: {
-                eventBus: { maxCounters: 2 },
-                urlSecurity: { allowPrivateWebhookHosts: true },
-            },
-        });
-        expect(() => validateWebhookUrl('http://localhost:8080')).not.toThrow();
-        const eventBusA = createEventBus();
+        expect(processA.config.eventBus).toEqual({ maxCounters: 2 });
+        expect('network' in processA.config).toBe(false);
+        const eventBusA = createEventBus({ maxCounters: processA.config.eventBus.maxCounters });
         eventBusA.emit({ type: 'owner:a' });
         eventBusA.emit({ type: 'owner:b' });
         eventBusA.emit({ type: 'owner:c' });
@@ -226,28 +211,15 @@ describe('Infra 2.1 configuration ownership', () => {
         process.env['IO_SEARCH_TIMEOUT_MS'] = '9999';
         process.env['IO_SEARCH_MAX_BUFFER_BYTES'] = '999999';
         process.env['COPILOT_EVENT_BUS_MAX_COUNTERS'] = '99';
-        process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] = 'false';
         process.env['PATH'] = '/mutated-live/bin';
-        expect(getCoreProcessPolicySnapshot().config).toEqual({
-            eventBus: { maxCounters: 2 },
-            urlSecurity: { allowPrivateWebhookHosts: true },
-        });
-        expect(() => validateWebhookUrl('http://localhost:8080')).not.toThrow();
+        expect(processA.config.eventBus).toEqual({ maxCounters: 2 });
         expect(getWorkspacePathPolicyCacheStats()).toMatchObject({ ttlMs: 123, maxEntries: 321 });
         expect(getActiveIoSearchBudget()).toEqual({ timeoutMs: 4321, maxBufferBytes: 16384 });
         expect(getSearchSubprocessProcessSnapshot().path).toBe('/owned-search/bin:/usr/bin');
 
         await processA.dispose();
         processInfras.splice(processInfras.indexOf(processA), 1);
-        expect(getCoreProcessPolicySnapshot()).toMatchObject({
-            active: false,
-            processId: null,
-            config: {
-                eventBus: { maxCounters: 1000 },
-                urlSecurity: { allowPrivateWebhookHosts: false },
-            },
-        });
-        expect(() => validateWebhookUrl('http://localhost:8080')).toThrow(/Host privado/);
+        expect(processA.lifecycleSnapshot().state).toBe('disposed');
         eventBusA.emit({ type: 'owner:d' });
         expect(Object.keys(eventBusA.stats())).toEqual(['owner:c', 'owner:d']);
         eventBusA.dispose();

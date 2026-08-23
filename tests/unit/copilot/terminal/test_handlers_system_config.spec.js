@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 // ─── Mock singletons ─────────────────────────────────────────────────────────
 
 const defaultRuntime = /** @type {any} */ ({
+    getSessionBindingSnapshot: () => ({ hubSessionId: 'hub-system', sdkSessionId: 'sdk-system', isBound: true }),
     model: 'test-model',
     reasoningEffort: 'high',
     dialogLoopActive: false,
@@ -147,6 +148,8 @@ vi.mock('#copilot/observability/metrics', () => ({
             tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
             tasks: { completed: 0, failed: 0 },
             dialog: { turnsTotal: 0, turnsSuccess: 0 },
+            sdkDialog: { turnsTotal: 0, turnsSuccess: 0 },
+            inject: { attemptsTotal: 0, successTotal: 0, timeoutsTotal: 0, errorsTotal: 0 },
         }),
     },
 }));

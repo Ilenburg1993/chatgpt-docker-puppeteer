@@ -7,8 +7,9 @@
  *   continua funcional sem persistência.
  */
 
-import { getSharedSdkSessionId, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
+import { readAgentSessionBinding } from '#copilot/presentation/agent/runtime';
 import { setHubSessionId } from '../../presentation/state/index.js';
 import { createTerminalHubSession, initTerminalConversationHub } from '../frontend/gateways/index.js';
 import { recordTerminalActivity } from '../state/boot/index.js';
@@ -21,7 +22,7 @@ export async function runTerminalConversationHubPhase(ctx) {
     try {
         recordTerminalActivity('boot', 'Inicializando hub da conversa', { source: 'terminal', recordHistory: false });
         await initTerminalConversationHub();
-        const sdkSessionId = getSharedSdkSessionId();
+        const sdkSessionId = readAgentSessionBinding().sdkSessionId;
         const hubSessionId = createTerminalHubSession({
             title: 'Terminal Permanente LLM-B',
             ...(sdkSessionId ? { sdkSessionId } : {}),

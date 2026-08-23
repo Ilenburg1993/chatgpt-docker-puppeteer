@@ -8,7 +8,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import { broadcastSse as defaultBroadcastSse } from './dialog/index.js';
 import { startRepl } from './repl/index.js';

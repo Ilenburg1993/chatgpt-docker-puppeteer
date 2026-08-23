@@ -15,9 +15,12 @@
  */
 
 import { DRAIN_WRITES_TIMEOUT_MS } from '#copilot/config/agent';
-import { AliveAgentStateSchema, logSwallowed, safeJsonParse, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { log } from '../../ports/logging/index.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
+import { AliveAgentStateSchema } from '../../state/schemas/index.js';
 import {
     readStateFileIfExists,
     removeStateFileIfExists,
@@ -340,7 +343,7 @@ export async function readStateAsync() {
             return null;
         }
         try {
-            const parseResult = safeJsonParse(raw, '[PersistentSession/readStateAsync]');
+            const parseResult = parseJsonResult(raw, '[PersistentSession/readStateAsync]');
             if (!parseResult.ok) {
                 log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
                 try {

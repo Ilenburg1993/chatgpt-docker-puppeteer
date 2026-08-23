@@ -15,7 +15,7 @@ import {
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent/facades';
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../files/index.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './controls.js';

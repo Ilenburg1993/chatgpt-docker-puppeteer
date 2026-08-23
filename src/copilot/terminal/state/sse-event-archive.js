@@ -9,10 +9,10 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { redactSecretRecord } from '#copilot/infra/public/observability/redaction';
 import { createBoundJsonlFileWriter, createBoundJsonlTailReader } from '#copilot/infra/public/persistence/jsonl';
+import { toError } from '#copilot/infra/public/platform/error';
 import { join, resolve } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
-import { redactSecretRecord } from '../../core/security/redaction.js';
 
 const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;

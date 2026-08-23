@@ -1,6 +1,6 @@
 // @ts-check
 /** Bounded configuration policy for the best-effort external filesystem watcher. */
-import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 
 const DEFAULT_DEBOUNCE_MS = 125;
 const DEFAULT_MAX_BATCH = 256;

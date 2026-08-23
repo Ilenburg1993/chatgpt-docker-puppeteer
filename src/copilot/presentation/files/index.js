@@ -7,3 +7,5 @@
 
 export * from './context.js';
 export * from './routing.js';
+
+export { buildRuntimeSdkFsRoutingProjection, decideSdkFsRouting } from './routing.js';

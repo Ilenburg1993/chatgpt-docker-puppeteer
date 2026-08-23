@@ -615,7 +615,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
                 requestId: 'ui-1',
                 question: 'Escolha?',
                 choices: ['A', 'B'],
-                allowFreeform: true,
+                allowFreeform: false,
                 toolCallId: 'tool-1',
             }),
         );

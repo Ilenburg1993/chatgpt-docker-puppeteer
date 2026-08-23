@@ -4,7 +4,7 @@
  * @file Runner executável do plano de boot Copilot, com relatório, timeout e rollback best-effort.
  */
 
-import { toError } from '../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 
 /**
  * @typedef {'ok' | 'skipped' | 'failed' | 'timeout'} BootPhaseStatus

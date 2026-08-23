@@ -1,7 +1,7 @@
 // @ts-check
 /** Pure process-scoped lock configuration projection. @module copilot/infra/concurrency/locks/process/config */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 import { readFileResourceLockPolicy } from '../file/index.js';
 
 /**

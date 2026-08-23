@@ -7,8 +7,13 @@
  * @module copilot/agent/facades/sdk/tools
  */
 
-import { createRegistry, getToolsConfig, loadToolsConfigAsync } from '#copilot/sdk/tools';
+import { createRegistry, getToolsConfig, loadToolsConfigAsync, sanitizeToolNames } from '#copilot/sdk/tools';
 import { pickDefined } from '#copilot/sdk/utils';
+
+/** @param {unknown[]} names @returns {string[]} */
+export function sanitizeAgentSdkToolNames(names) {
+    return sanitizeToolNames(names);
+}
 
 /**
  * @returns {import('#copilot/sdk/types').ToolRegistry}

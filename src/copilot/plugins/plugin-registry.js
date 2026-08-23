@@ -8,8 +8,8 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./index.js').CopilotPlugin} CopilotPlugin
@@ -18,7 +18,7 @@ import { toError } from '../core/error-handlers.js';
 /**
  * Registry de plugins copilot.
  *
- * Gerencia registro, listagem e instalação de plugins via DI container.
+ * Gerencia registro, listagem e instalação de plugins com contexto explícito de capabilities.
  */
 export class PluginRegistry {
     /** @type {Map<string, CopilotPlugin>} */
@@ -45,13 +45,13 @@ export class PluginRegistry {
     }
 
     /**
-     * Instala um plugin registrado, passando o DI container.
+     * Instala um plugin registrado, passando apenas o contexto explícito fornecido pela composição.
      *
      * @param {string} name
-     * @param {import('../core/di.js').Container} container
+     * @param {Readonly<Record<string, unknown>>} [context]
      * @returns {Promise<void>}
      */
-    async install(name, container) {
+    async install(name, context = Object.freeze({})) {
         const plugin = this.#plugins.get(name);
         if (!plugin) {
             throw new Error(`[PluginRegistry] plugin "${name}" not found`);
@@ -68,7 +68,7 @@ export class PluginRegistry {
                 }
             }
         }
-        await plugin.install(container);
+        await plugin.install(context);
         this.#installed.add(name);
         log('INFO', `[PluginRegistry] instalado: ${name}`);
     }
@@ -76,13 +76,13 @@ export class PluginRegistry {
     /**
      * Instala todos os plugins registrados.
      *
-     * @param {import('../core/di.js').Container} container
+     * @param {Readonly<Record<string, unknown>>} [context]
      * @returns {Promise<void>}
      */
-    async installAll(container) {
+    async installAll(context = Object.freeze({})) {
         for (const name of this.#plugins.keys()) {
             if (!this.#installed.has(name)) {
-                await this.install(name, container);
+                await this.install(name, context);
             }
         }
     }
@@ -204,13 +204,13 @@ export async function discoverPlugins(baseDir, registry) {
  * `undefined` ou `null`, instala todos (comportamento padrão).
  *
  * @param {PluginRegistry} registry - Registry com plugins já registrados.
- * @param {import('../core/di.js').Container} container - Container DI.
+ * @param {Readonly<Record<string, unknown>>} [context] - Explicit plugin capabilities.
  * @param {string[] | null | undefined} [enabledNames] - Nomes dos plugins a ativar. Se omitido, ativa todos.
  * @returns {Promise<string[]>} Nomes dos plugins efetivamente instalados.
  */
-export async function activatePlugins(registry, container, enabledNames) {
+export async function activatePlugins(registry, context = Object.freeze({}), enabledNames) {
     if (!enabledNames) {
-        await registry.installAll(container);
+        await registry.installAll(context);
         return registry
             .list()
             .filter((p) => p.installed)
@@ -220,7 +220,7 @@ export async function activatePlugins(registry, container, enabledNames) {
     const activated = [];
     for (const name of enabledNames) {
         if (registry.has(name)) {
-            await registry.install(name, container);
+            await registry.install(name, context);
             activated.push(name);
         } else {
             log('WARN', `[activatePlugins] plugin "${name}" configurado mas não encontrado no registry`);

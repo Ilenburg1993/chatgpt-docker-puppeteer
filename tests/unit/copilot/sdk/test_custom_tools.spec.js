@@ -38,7 +38,7 @@ vi.mock('#copilot/tools', async (importOriginal) => {
         buildTool: mockBuildTool,
     };
 });
-vi.mock('#copilot/core/error-handlers', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: mockLogSwallowed,
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
@@ -49,8 +49,8 @@ vi.mock('#copilot/infra/public/composition/filesystem/configured', () => ({
         writeFileAtomic: mockWriteFileAtomicConfigured,
     })),
 }));
-vi.mock('#copilot/core/safe-json', () => ({
-    safeJsonParse: vi.fn((raw) => {
+vi.mock('#copilot/infra/public/platform/json', () => ({
+    parseJsonResult: vi.fn((raw) => {
         try {
             return { ok: true, data: JSON.parse(raw) };
         } catch {
@@ -58,7 +58,7 @@ vi.mock('#copilot/core/safe-json', () => ({
         }
     }),
 }));
-vi.mock('#copilot/core/schemas', () => ({
+vi.mock('../../../../src/copilot/sdk/tools/schemas.js', () => ({
     CustomToolsFileSchema: {
         safeParse: vi.fn((data) => {
             if (Array.isArray(data)) return { success: true, data };

@@ -10,10 +10,10 @@
  *   - Emitir evento `terminal.started` via SSE
  */
 
+import { adoptApplicationTimer, cancelApplicationTimer } from '#copilot/boot/process-runtime';
 import { getMcpStatus } from '#copilot/bridges';
 import { installByokProviderHealthSqliteMirror, SqliteModelGatewayCatalogStore } from '#copilot/model-gateway';
 import { log } from '#copilot/observability';
-import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
 import { broadcastSse } from '../dialog/index.js';
 import { attachTerminalHubSocketIO, isTerminalHubReady, readTerminalRuntimeState } from '../frontend/gateways/index.js';
@@ -112,12 +112,12 @@ export function shouldRegisterTerminalSighupHandler(platform = process.platform)
  */
 export async function rollbackTerminalRuntimeListenersPhase(ctx) {
     stopReflectionLoop({
-        cancelTimerFn: cancelTimer,
+        cancelApplicationTimerFn: cancelApplicationTimer,
         clearIntervalFn: (timer) => clearInterval(/** @type {ReturnType<typeof setInterval>} */ (timer)),
     });
     if (ctx.todoCleanupTimer !== null) {
         clearInterval(ctx.todoCleanupTimer);
-        cancelTimer('terminal.todoCleanup');
+        cancelApplicationTimer('terminal.todoCleanup');
         ctx.todoCleanupTimer = null;
     }
     if (ctx.terminalActivityChangedHandler) {
@@ -160,7 +160,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
     const todoCleanupTimer = ctx.startTodoCleanupJob();
     if (typeof todoCleanupTimer.unref === 'function') todoCleanupTimer.unref();
     ctx.todoCleanupTimer = todoCleanupTimer;
-    registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
+    adoptApplicationTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
     registerTerminalShutdownHandlers(ctx, {
         rollbackRuntimeListenersPhase: () => rollbackTerminalRuntimeListenersPhase(ctx),

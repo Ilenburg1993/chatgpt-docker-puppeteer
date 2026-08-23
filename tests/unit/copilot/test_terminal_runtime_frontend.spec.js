@@ -1,6 +1,8 @@
 // @ts-check
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 
 const stopDialogMode = vi.fn(async () => {});
 const startDialogMode = vi.fn(async () => {});
@@ -69,7 +71,15 @@ const altReadSdkPlan = vi.fn(async () => ({ path: '/tmp/alt-plan.md', content: '
 const altUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
 const altDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
 
+const defaultSessionBinding = createAgentSessionBindingRuntime();
+const altSessionBinding = createAgentSessionBindingRuntime();
+
 const defaultRuntime = /** @type {any} */ ({
+    ctx: { sessionBinding: defaultSessionBinding },
+    getSessionBindingSnapshot: () => defaultSessionBinding.snapshot(),
+    setHubSessionId: (/** @type {string|null|undefined} */ id) => defaultSessionBinding.setHubSessionId(id),
+    setSdkSessionId: (/** @type {string|null|undefined} */ id) => defaultSessionBinding.setSdkSessionId(id),
+    clearSessionBinding: () => defaultSessionBinding.clear(),
     model: 'gpt-5',
     reasoningEffort: 'high',
     status: 'idle',
@@ -118,6 +128,11 @@ const defaultRuntime = /** @type {any} */ ({
 });
 
 const altRuntime = /** @type {any} */ ({
+    ctx: { sessionBinding: altSessionBinding },
+    getSessionBindingSnapshot: () => altSessionBinding.snapshot(),
+    setHubSessionId: (/** @type {string|null|undefined} */ id) => altSessionBinding.setHubSessionId(id),
+    setSdkSessionId: (/** @type {string|null|undefined} */ id) => altSessionBinding.setSdkSessionId(id),
+    clearSessionBinding: () => altSessionBinding.clear(),
     model: 'gpt-5-mini',
     reasoningEffort: 'medium',
     status: 'processing',
@@ -377,15 +392,21 @@ vi.mock('#copilot/conversation-hub', () => ({
 
 /** @type {typeof import('../../../src/copilot/terminal/frontend/index.js')} */
 let runtime;
-/** @type {typeof import('../../../src/copilot/core/shared-state.js')} */
-let sharedState;
 /** @type {typeof import('../../../src/copilot/terminal/state/index.js')} */
 let transcriptState;
 
 beforeAll(async () => {
+    clearAgentRuntimeRegistry();
+    registerAgentRuntime(defaultRuntime, 'default');
+    registerAgentRuntime(altRuntime, 'alt');
     runtime = await import('../../../src/copilot/terminal/frontend/index.js');
-    sharedState = await import('../../../src/copilot/core/shared-state.js');
     transcriptState = await import('../../../src/copilot/terminal/state/index.js');
+});
+
+afterAll(() => {
+    clearAgentRuntimeRegistry();
+    defaultSessionBinding.dispose();
+    altSessionBinding.dispose();
 });
 
 beforeEach(() => {
@@ -403,7 +424,8 @@ beforeEach(() => {
     getAgentStatus.mockClear();
     clearHistory.mockClear();
     transcriptState.clearTerminalTranscriptTurns();
-    sharedState.clearSharedSessionBinding();
+    defaultSessionBinding.clear();
+    altSessionBinding.clear();
 });
 
 describe('terminal/frontend/index', () => {
@@ -482,8 +504,8 @@ describe('terminal/frontend/index', () => {
     });
 
     it('sincroniza lazy timeline bridge_only para o Hub sem criar pending user espúrio', async () => {
-        sharedState.setSharedHubSessionId('hub-sync-bridge-only');
-        sharedState.setSharedSdkSessionId('sdk-sync-bridge-only');
+        defaultRuntime.setHubSessionId('hub-sync-bridge-only');
+        defaultRuntime.setSdkSessionId('sdk-sync-bridge-only');
         liveHistory.length = 0;
         liveHistory.push(
             { role: 'user', content: 'pergunta viva', timestamp: 1710000000000 },
@@ -532,8 +554,8 @@ describe('terminal/frontend/index', () => {
     });
 
     it('inclui transcript local da LLM-B na timeline e no sync lazy', async () => {
-        sharedState.setSharedHubSessionId('hub-transcript');
-        sharedState.setSharedSdkSessionId('sdk-transcript');
+        defaultRuntime.setHubSessionId('hub-transcript');
+        defaultRuntime.setSdkSessionId('sdk-transcript');
         liveHistory.length = 0;
         transcriptState.appendTerminalTranscriptTurn({
             role: 'assistant',
@@ -608,8 +630,8 @@ describe('terminal/frontend/index', () => {
     });
 
     it('retenta falha transitória do sync lazy e expõe telemetria', async () => {
-        sharedState.setSharedHubSessionId('hub-sync-retry');
-        sharedState.setSharedSdkSessionId('sdk-sync-retry');
+        defaultRuntime.setHubSessionId('hub-sync-retry');
+        defaultRuntime.setSdkSessionId('sdk-sync-retry');
         liveHistory.length = 0;
         liveHistory.push({ role: 'assistant', content: 'turno com retry', timestamp: 1710000002000 });
         writeTurn.mockImplementationOnce(async () => {

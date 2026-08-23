@@ -8,6 +8,5 @@
  * @module copilot/tools/observability
  */
 
-export { TOOLS_LOGGER, TOOLS_METRICS } from './infra/di-tokens.js';
 export { setToolsLogger } from './infra/logger.js';
 export { setToolsMetrics } from './infra/metrics-proxy.js';

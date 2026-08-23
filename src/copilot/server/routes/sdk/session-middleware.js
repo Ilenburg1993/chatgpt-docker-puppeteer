@@ -8,9 +8,9 @@
  * @see EventBus
  */
 
-import { redactSecretText } from '#copilot/core';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../../../core/error-handlers.js';
 import {
     deleteSdkSessionRateLimitWindow,
     getSdkSessionRateLimitWindow,

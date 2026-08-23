@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildIoMeta, toIoError } from '../../../../src/copilot/core/index.js';
+import { buildIoMeta, toIoError } from '#copilot/infra/public/operations/contracts';
 
 describe('contracts/io-contracts', () => {
     it('toIoError normaliza erros nativos para códigos estáveis', () => {

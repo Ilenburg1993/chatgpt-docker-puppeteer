@@ -20,7 +20,8 @@
 /** @typedef {import('./metrics-histogram.js').StreamingMetrics} StreamingMetrics */
 /** @typedef {import('./metrics-histogram.js').QuestionMetrics} QuestionMetrics */
 /** @typedef {import('./metrics-histogram.js').MetricsSummary} MetricsSummary */
-import { cancelTimer, registerInterval } from '#copilot/core';
+
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stats.js';
 
 /**
@@ -67,8 +68,8 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createBoundJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { join as _join, resolve as _resolve } from 'node:path';
-import { logSwallowed } from '../core/error-handlers.js';
 import { createHistogram } from './metrics-histogram.js';
 
 const DEFAULT_METRICS_SNAPSHOT_FILE = _resolve(_join(COPILOT_LOG_DIR || './var/logs/copilot', 'metrics.jsonl'));
@@ -427,7 +428,7 @@ export function createMetricsStore(options = {}) {
         });
         const writer = _snapshotWriter;
         _snapshotTimerId = `metrics.snapshot:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-        _snapshotTimer = registerInterval(
+        _snapshotTimer = registerApplicationInterval(
             _snapshotTimerId,
             () => {
                 const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
@@ -445,7 +446,7 @@ export function createMetricsStore(options = {}) {
      */
     function stopPeriodicSnapshot() {
         if (_snapshotTimer) {
-            if (_snapshotTimerId) cancelTimer(_snapshotTimerId);
+            if (_snapshotTimerId) cancelApplicationTimer(_snapshotTimerId);
             _snapshotTimer = null;
             _snapshotTimerId = null;
         }
@@ -600,8 +601,6 @@ export function createMetricsStore(options = {}) {
 
 /**
  * Singleton global de métricas para src/copilot.
- *
- * Implementa {@link import('../core/interfaces.js').IMetricsCollector IMetricsCollector} (Faixa 3.2 — AC-5-07).
  *
  * @type {MetricsStore}
  */

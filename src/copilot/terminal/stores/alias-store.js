@@ -9,12 +9,14 @@
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
 import { log } from '#copilot/observability';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import os from 'node:os';
 import path from 'node:path';
-import { logSwallowed } from '../../core/error-handlers.js';
-import { safeJsonParse } from '../../core/safe-json.js';
-import { AliasConfigSchema } from '../../core/schemas.js';
+import { z } from 'zod';
+
+const AliasConfigSchema = z.record(z.string(), z.string());
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
@@ -76,7 +78,7 @@ export async function loadAliasesAsync() {
     try {
         await _saveQueue;
         const raw = (await ALIASES_IO.readTextFresh(ALIASES_FILE)).content;
-        const jsonResult = safeJsonParse(raw, '[alias-store/loadAliasesAsync]');
+        const jsonResult = parseJsonResult(raw, '[alias-store/loadAliasesAsync]');
         if (!jsonResult.ok) {
             _aliases = { ...BUILTIN_ALIASES };
             return;

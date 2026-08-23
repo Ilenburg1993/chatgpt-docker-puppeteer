@@ -10,8 +10,8 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
-import { container, toError } from '#copilot/core';
-import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
+import { toError } from '#copilot/infra/public/platform/error';
+import { defaultErrorTracker, defaultMetrics, getStatsByCategory, getToolStats } from '#copilot/observability';
 import { getSseClients } from '../../realtime/index.js';
 import { readRuntimeIdFromParams } from '../../routing/index.js';
 import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from '../../runtime/index.js';
@@ -101,7 +101,7 @@ export function handleMetrics(params = {}) {
         );
     }
 
-    const summary = container.resolve(METRICS_STORE).getSummary();
+    const summary = defaultMetrics.getSummary();
     lines.push(
         '# HELP llmb_dialog_turns_total Total de turns do dialog loop executados',
         '# TYPE llmb_dialog_turns_total counter',
@@ -248,8 +248,8 @@ export function handleMetrics(params = {}) {
  * @returns {HandlerResult}
  */
 export function handleGetErrors() {
-    const stats = container.resolve(ERROR_TRACKER).getStats();
-    const recent = container.resolve(ERROR_TRACKER).getErrors(20);
+    const stats = defaultErrorTracker.getStats();
+    const recent = defaultErrorTracker.getErrors(20);
     return {
         status: 200,
         cors: true,
@@ -425,7 +425,7 @@ export function handleGetThinkingEntry({ id = 'latest' } = {}) {
  */
 export function handleSystemReset() {
     clearRateLimiters();
-    container.resolve(ERROR_TRACKER).clearErrors();
+    defaultErrorTracker.clearErrors();
     return { status: 200, body: { ok: true, message: 'Rate limiters e error tracker resetados.' } };
 }
 

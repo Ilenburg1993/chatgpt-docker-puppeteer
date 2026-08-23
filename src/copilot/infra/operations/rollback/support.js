@@ -4,7 +4,8 @@ import {
     readBinaryMutationSnapshot,
     readVerifiedRollbackSidecar,
 } from '#copilot/infra/internal/filesystem/transaction';
-import { decodeBase64ToOwnedBuffer, sha256 } from '#copilot/infra/internal/platform';
+import { decodeBase64ToOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 /** @typedef {import('./token.js').IoRollbackStep} IoRollbackStep */
 /** @typedef {import('./types.js').RollbackPathState} RollbackPathState */
 

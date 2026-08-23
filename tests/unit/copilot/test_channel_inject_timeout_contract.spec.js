@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
-import { BridgeError } from '../../../src/copilot/core/index.js';
+import { ChannelError } from '../../../src/copilot/channel/errors.js';
 
 /**
  * @param {number} statusCode
@@ -66,7 +66,7 @@ describe('channel/inject.js — timeout contract', () => {
         await assert.rejects(
             () => injectToLlmB('timeout-408', { port, retries: 0, timeoutMs: 15_000 }),
             (error) => {
-                assert.ok(error instanceof BridgeError);
+                assert.ok(error instanceof ChannelError);
                 assert.equal(error.code, 'LLM_B_TIMEOUT');
                 return true;
             },
@@ -81,7 +81,7 @@ describe('channel/inject.js — timeout contract', () => {
         await assert.rejects(
             () => injectToLlmB('timeout-504', { port, retries: 0, timeoutMs: 15_000 }),
             (error) => {
-                assert.ok(error instanceof BridgeError);
+                assert.ok(error instanceof ChannelError);
                 assert.equal(error.code, 'LLM_B_TIMEOUT');
                 return true;
             },
@@ -94,7 +94,7 @@ describe('channel/inject.js — timeout contract', () => {
         await assert.rejects(
             () => injectToLlmB('error-500', { port, retries: 0, timeoutMs: 15_000 }),
             (error) => {
-                assert.ok(error instanceof BridgeError);
+                assert.ok(error instanceof ChannelError);
                 assert.equal(error.code, 'LLM_B_ERROR');
                 return true;
             },
@@ -117,7 +117,7 @@ describe('channel/inject.js — timeout contract', () => {
         await assert.rejects(
             () => injectToLlmB('oversized', { port, retries: 0, timeoutMs: 15_000 }),
             (error) => {
-                assert.ok(error instanceof BridgeError);
+                assert.ok(error instanceof ChannelError);
                 assert.equal(error.code, 'LLM_B_RESPONSE_TOO_LARGE');
                 return true;
             },

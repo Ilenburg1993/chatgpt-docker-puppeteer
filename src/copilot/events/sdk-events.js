@@ -11,6 +11,7 @@
  * @module copilot/events/sdk-events
  */
 
+export { resolveModelSelectionMismatch } from '#copilot/sdk/models';
 export {
     ALL_EVENT_TYPES,
     getSessionCapabilities,

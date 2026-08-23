@@ -72,20 +72,20 @@ describe('ESLint effective Copilot architecture rules', () => {
         const config = await configFor('src/copilot/sdk/telemetry/quota-monitor.js');
         const syntaxRule = config.rules?.['no-restricted-syntax'];
 
-        assert.match(ruleText(syntaxRule), /Use registerInterval from #copilot\/core/);
+        assert.match(ruleText(syntaxRule), /Use registerApplicationInterval from #copilot\/boot\/process-runtime/);
     });
 
     it('bloqueia setInterval cru no todo store canonizado', async () => {
         const config = await configFor('src/copilot/tools/todo/store.js');
         const syntaxRule = config.rules?.['no-restricted-syntax'];
 
-        assert.match(ruleText(syntaxRule), /Use registerInterval from #copilot\/core/);
+        assert.match(ruleText(syntaxRule), /Use registerApplicationInterval from #copilot\/boot\/process-runtime/);
     });
 
     it('bloqueia await-setTimeout manual no handler de controle do agente', async () => {
         const config = await configFor('src/copilot/presentation/agent/control/handlers.js');
         const syntaxRule = config.rules?.['no-restricted-syntax'];
 
-        assert.match(ruleText(syntaxRule), /Use sleepMs from #copilot\/core/);
+        assert.match(ruleText(syntaxRule), /Use sleep from #copilot\/infra\/public\/concurrency\/resilience/);
     });
 });

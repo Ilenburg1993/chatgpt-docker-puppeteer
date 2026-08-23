@@ -7,7 +7,8 @@
  */
 
 import { getWorkspaceContext } from '#copilot/boot';
-import { sleepMs, toError } from '#copilot/core';
+import { sleep as sleepDelay } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime/index.js';
 import {
     clearTerminalHistoryFeed,
@@ -15,7 +16,6 @@ import {
     countTerminalHubTurns,
     readTerminalHistoryFeed,
     readTerminalHubTurns,
-    readTerminalSessionBinding,
     readTerminalTranscriptFeed,
     seedTerminalHistoryFeed,
     writeTerminalHubTimelineTurn,
@@ -172,10 +172,7 @@ function refreshTimelineSyncGauges() {
  * @returns {Promise<void>}
  */
 function sleep(ms) {
-    return sleepMs(ms, {
-        id: 'terminal.timeline.projection.sleep',
-        unref: true,
-    });
+    return sleepDelay(ms);
 }
 
 /**
@@ -784,7 +781,7 @@ export function readTerminalTimelineProjection({
     syncPolicy = 'lazy',
 } = {}) {
     const base = readTerminalRuntimeBase(runtimeId);
-    const binding = readTerminalSessionBinding();
+    const binding = base.binding;
     const hubSessionId = binding.hubSessionId ?? base.binding.hubSessionId ?? null;
     const limitTurns = Math.max(1, Math.trunc(limitPairs * 2));
     const policy = normalizeTimelineSyncPolicy(syncPolicy);

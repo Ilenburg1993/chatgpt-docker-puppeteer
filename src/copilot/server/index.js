@@ -10,7 +10,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import { log } from '#copilot/observability';
 import http from 'node:http';
 import { createCopilotApp, registerErrorHandler } from './app.js';
@@ -112,12 +112,12 @@ export async function startCopilotServer(opts) {
     let closeInFlight = null;
 
     // Graceful shutdown
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'copilot.server',
         async () => {
             await closeServer();
         },
-        SHUTDOWN_PRIORITY.NETWORK,
+        PROCESS_SHUTDOWN_PHASE.NETWORK,
     );
 
     /**

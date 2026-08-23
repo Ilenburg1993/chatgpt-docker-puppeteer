@@ -82,15 +82,15 @@ vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
 }));
 
 // Mock core utilities (used transitively by custom-tools.js)
-vi.mock('#copilot/core/safe-json', () => ({
-    safeJsonParse: vi.fn(() => ({ success: false })),
+vi.mock('#copilot/infra/public/platform/json', () => ({
+    parseJsonResult: vi.fn(() => ({ ok: false, error: new SyntaxError('mock invalid JSON') })),
 }));
 
-vi.mock('#copilot/core/schemas', () => ({
+vi.mock('../../../../src/copilot/sdk/tools/schemas.js', () => ({
     CustomToolsFileSchema: { safeParse: vi.fn(() => ({ success: true, data: { tools: [] } })) },
 }));
 
-vi.mock('#copilot/core/error-handlers', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: vi.fn(),
 }));
 

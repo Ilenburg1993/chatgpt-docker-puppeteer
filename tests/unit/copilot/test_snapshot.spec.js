@@ -38,12 +38,12 @@ vi.mock('../../../src/copilot/agent/lifecycle/state/index.js', () => ({
     readState: stateMocks.readState,
 }));
 
-vi.mock('#copilot/core/error-handlers', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/core/safe-json', () => ({
-    safeJsonParse: vi.fn((raw) => {
+vi.mock('#copilot/infra/public/platform/json', () => ({
+    parseJsonResult: vi.fn((raw) => {
         try {
             return { ok: true, data: JSON.parse(raw) };
         } catch {
@@ -52,7 +52,7 @@ vi.mock('#copilot/core/safe-json', () => ({
     }),
 }));
 
-vi.mock('#copilot/core/schemas', () => ({
+vi.mock('../../../src/copilot/agent/state/schemas/index.js', () => ({
     SessionSnapshotDataSchema: { safeParse: vi.fn((d) => ({ success: true, data: d })) },
     SnapshotListItemSchema: { safeParse: vi.fn((d) => ({ success: true, data: d })) },
 }));

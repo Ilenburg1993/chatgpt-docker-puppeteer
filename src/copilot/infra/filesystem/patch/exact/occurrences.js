@@ -1,6 +1,6 @@
 // @ts-check
 /** Exact-string occurrence scanning and bounded line evidence. */
-import { lineNumberAtTextOffset } from '#copilot/infra/internal/platform';
+import { lineNumberAtTextOffset } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * @param {string} content

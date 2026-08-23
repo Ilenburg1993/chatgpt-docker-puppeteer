@@ -1,7 +1,7 @@
 // @ts-check
 /** Read-only rollback sidecar inventory projection. */
 
-import { positiveIntegerOr } from '#copilot/infra/internal/platform';
+import { positiveIntegerOr } from '#copilot/infra/internal/platform/config-values';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { SIDECAR_FILE_PATTERN } from './format.js';

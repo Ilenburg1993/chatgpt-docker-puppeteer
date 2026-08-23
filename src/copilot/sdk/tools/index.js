@@ -9,6 +9,16 @@
  */
 
 export { AgentToolPolicy } from './agent-policy.js';
+export { TOOL_NAME_RE, sanitizeToolNames, validateToolDefinitionContract } from './contracts.js';
+export {
+    CANONICAL_LOCAL_EXEC_TOOL_NAMES,
+    CANONICAL_LOCAL_FS_TOOL_NAMES,
+    SDK_LOCAL_FS_TOOL_NAMES,
+    SDK_SHELL_TOOL_NAMES,
+    buildCanonicalLocalSurfaceExcludedTools,
+    hasCanonicalLocalExecTools,
+    hasCanonicalLocalFsTools,
+} from './local-surface-policy.js';
 
 export {
     BuiltInTools,

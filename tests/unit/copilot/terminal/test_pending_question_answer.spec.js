@@ -58,13 +58,13 @@ describe('terminal/pending-question-answer', () => {
         expect(runtimeMocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('prod', null);
     });
 
-    it('aceita resposta livre mesmo quando chamada legada envia allowFreeform=false', () => {
+    it('rejeita texto livre quando allowFreeform=false sem abrir novo turno', () => {
         const result = tryAnswerTerminalPendingQuestionInput('stage', null);
 
-        expect(result).toMatchObject({ routed: true, ok: true, reason: 'answered', answer: 'stage' });
+        expect(result).toMatchObject({ routed: true, ok: false, reason: 'selection_required', answer: 'stage' });
         expect(result.pendingQuestionChoices).toEqual(['dev', 'prod']);
         expect(shouldConsumeTerminalPendingAnswerInput(result)).toBe(true);
-        expect(runtimeMocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('stage', null);
+        expect(runtimeMocks.answerTerminalPendingQuestion).not.toHaveBeenCalled();
     });
 
     it('aceita choice com diferenca de caixa quando o match e inequivoco', () => {
@@ -135,7 +135,7 @@ describe('terminal/pending-question-answer', () => {
         expect(runtimeMocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('verde', null);
     });
 
-    it('roteia texto livre de request_user_input legado com choices sem abrir turno novo', () => {
+    it('rejeita texto livre de request_user_input constrained sem abrir turno novo', () => {
         runtimeMocks.readTerminalRuntimeState.mockReturnValue({
             runtimeId: 'default',
             pendingQuestionKind: null,
@@ -158,9 +158,9 @@ describe('terminal/pending-question-answer', () => {
 
         const result = tryAnswerTerminalPendingQuestionInput('vermelho', null);
 
-        expect(result).toMatchObject({ routed: true, ok: true, reason: 'answered', answer: 'vermelho' });
+        expect(result).toMatchObject({ routed: true, ok: false, reason: 'selection_required', answer: 'vermelho' });
         expect(shouldConsumeTerminalPendingAnswerInput(result)).toBe(true);
-        expect(runtimeMocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('vermelho', null);
+        expect(runtimeMocks.answerTerminalPendingQuestion).not.toHaveBeenCalled();
     });
 
     it('mantém mensagem como turno normal quando não há ask_user nem request_user_input pendentes', () => {

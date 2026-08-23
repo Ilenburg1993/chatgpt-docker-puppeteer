@@ -1,31 +1,22 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 import {
     clearActiveSdkSessionOwnership,
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnership,
     syncActiveSessionOwnershipWithPolicy,
 } from '../../../src/copilot/agent/session/state/ownership.js';
-import {
-    clearSharedSessionBinding,
-    getHubSessionId,
-    getSharedSdkSessionId,
-    getSharedSessionBinding,
-    setSharedHubSessionId,
-    setSharedSdkSessionId,
-} from '../../../src/copilot/core/index.js';
 
 describe('session ownership SSOT', () => {
-    it('sincroniza sdkSessionId compartilhado e persiste vínculo no store quando houver hub ativo', () => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-1');
-
-        /** @type {{ calls: any[] }} */
+    it('sincroniza sdkSessionId no binding do runtime e persiste vínculo no store quando houver hub ativo', () => {
+        const sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-1' });
+        /** @type {{ calls: {hubSessionId:string;sdkSessionId:string}[] }} */
         const tracker = { calls: [] };
+
         const result = syncActiveSessionOwnership('sdk-1', {
-            getHubSessionId,
-            setSharedSdkSessionId,
+            sessionBinding,
             conversationStore: {
                 updateSdkSession(hubSessionId, sdkSessionId) {
                     tracker.calls.push({ hubSessionId, sdkSessionId });
@@ -33,36 +24,48 @@ describe('session ownership SSOT', () => {
             },
         });
 
-        assert.equal(getSharedSdkSessionId(), 'sdk-1');
-        assert.deepEqual(getSharedSessionBinding(), { hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' });
+        assert.deepEqual(sessionBinding.snapshot(), {
+            hubSessionId: 'hub-1',
+            sdkSessionId: 'sdk-1',
+            revision: 1,
+            disposed: false,
+        });
         assert.deepEqual(tracker.calls, [{ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }]);
         assert.equal(result.persistedToStore, true);
     });
 
-    it('limpa apenas sdkSessionId preservando hubSessionId', () => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-2');
-        setSharedSdkSessionId('sdk-2');
+    it('limpa apenas sdkSessionId preservando hubSessionId do mesmo runtime', () => {
+        const sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-2', sdkSessionId: 'sdk-2' });
 
-        const result = clearActiveSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
+        const result = clearActiveSdkSessionOwnership({ sessionBinding });
 
         assert.deepEqual(result, { hubSessionId: 'hub-2', sdkSessionId: null });
-        assert.equal(getHubSessionId(), 'hub-2');
-        assert.equal(getSharedSdkSessionId(), null);
+        assert.equal(sessionBinding.snapshot().hubSessionId, 'hub-2');
+        assert.equal(sessionBinding.snapshot().sdkSessionId, null);
+    });
+
+    it('bindings de runtimes distintos não contaminam ownership entre si', () => {
+        const first = createAgentSessionBindingRuntime({ hubSessionId: 'hub-a' });
+        const second = createAgentSessionBindingRuntime({ hubSessionId: 'hub-b', sdkSessionId: 'sdk-b' });
+
+        syncActiveSessionOwnership('sdk-a', { sessionBinding: first });
+
+        assert.equal(first.snapshot().sdkSessionId, 'sdk-a');
+        assert.deepEqual(second.snapshot(), {
+            hubSessionId: 'hub-b',
+            sdkSessionId: 'sdk-b',
+            revision: 0,
+            disposed: false,
+        });
     });
 
     it('syncActiveSessionOwnershipWithPolicy retorna sucesso explícito quando o vínculo é persistido', async () => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-3');
-
+        const sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-3' });
         const result = await syncActiveSessionOwnershipWithPolicy(
             'sdk-3',
             {
-                getHubSessionId,
-                setSharedSdkSessionId,
-                conversationStore: {
-                    updateSdkSession() {},
-                },
+                sessionBinding,
+                conversationStore: { updateSdkSession() {} },
             },
             { label: 'test.ownership.sync' },
         );
@@ -75,14 +78,11 @@ describe('session ownership SSOT', () => {
     });
 
     it('syncActiveSessionOwnershipWithPolicy classifica falha do store sem quebrar o contrato do wrapper', async () => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-4');
-
+        const sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-4' });
         const result = await syncActiveSessionOwnershipWithPolicy(
             'sdk-4',
             {
-                getHubSessionId,
-                setSharedSdkSessionId,
+                sessionBinding,
                 conversationStore: {
                     updateSdkSession() {
                         throw new Error('db down');
@@ -100,20 +100,13 @@ describe('session ownership SSOT', () => {
     });
 
     it('clearActiveSdkSessionOwnershipWithPolicy retorna sucesso explícito ao limpar o binding', async () => {
-        clearSharedSessionBinding();
-        setSharedHubSessionId('hub-5');
-        setSharedSdkSessionId('sdk-5');
-
+        const sessionBinding = createAgentSessionBindingRuntime({ hubSessionId: 'hub-5', sdkSessionId: 'sdk-5' });
         const result = await clearActiveSdkSessionOwnershipWithPolicy(
-            { getHubSessionId, setSharedSdkSessionId },
-            {
-                label: 'test.ownership.clear',
-            },
+            { sessionBinding },
+            { label: 'test.ownership.clear' },
         );
 
         assert.equal(result.ok, true);
-        if (result.ok) {
-            assert.deepEqual(result.value, { hubSessionId: 'hub-5', sdkSessionId: null });
-        }
+        if (result.ok) assert.deepEqual(result.value, { hubSessionId: 'hub-5', sdkSessionId: null });
     });
 });

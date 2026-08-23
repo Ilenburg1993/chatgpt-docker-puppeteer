@@ -4,7 +4,7 @@
  *
  * Responsabilidades:
  *
- * - normalizar resultados de elicitation com base no schema do `core`;
+ * - normalizar resultados de elicitation com base no schema SDK;
  * - normalizar eventos `elicitation.pending` / `elicitation.completed` em contrato estável;
  * - prover a fila assíncrona provider-side usada pelo agent/runtime.
  *
@@ -13,7 +13,7 @@
  * @module copilot/sdk/session/elicitation
  */
 
-import { normalizeElicitationResultWithSchema } from '#copilot/core/elicitation-schema';
+import { normalizeElicitationResultWithSchema } from './elicitation-schema.js';
 
 /**
  * @typedef {import('../types.js').ElicitationContext} ElicitationContext

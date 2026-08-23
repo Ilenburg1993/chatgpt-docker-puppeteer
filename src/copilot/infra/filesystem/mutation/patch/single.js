@@ -1,12 +1,13 @@
 // @ts-check
 /** Single exact-text locked patch with atomic publish, preview and rollback evidence. */
 
-import { buildIoMeta, createIoTraceId } from '#copilot/core/io-contracts';
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { buildSimpleTextDiffAroundLineRange, computeTextPatch } from '#copilot/infra/internal/filesystem/patch';
 import { writeAtomicFileUnlocked } from '#copilot/infra/internal/filesystem/write';
-import { decodeUtf8Buffer, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { buildIoMeta, createIoTraceId } from '#copilot/infra/internal/operations/contracts';
+import { decodeUtf8Buffer, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { assertExpectedSha256, assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,

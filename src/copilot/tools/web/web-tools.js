@@ -21,15 +21,15 @@ import { buildTool } from '../infra/tool-factory.js';
  * @see module:copilot/lib/url-validator
  */
 
+import { sanitizeIoTextOutput } from '#copilot/infra/public/observability/redaction';
+import { buildIoMeta, withIoMeta } from '#copilot/infra/public/operations/contracts';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
-    buildIoMeta,
-    evaluateIoUrlPolicy,
+    evaluatePublicHttpUrlPolicy,
+    fetchPublicHttp,
     IO_URL_MAX_REDIRECTS,
-    logSwallowed,
-    sanitizeIoTextOutput,
-    toError,
-    withIoMeta,
-} from '#copilot/core';
+} from '#copilot/infra/public/platform/network';
+import { logSwallowed } from '#copilot/observability/swallowed';
 
 // ─── SSRF Protection (via lib/url-validator.js) ──────────────────────────────
 
@@ -205,7 +205,7 @@ async function readCompleteWebTextResponse(response, maxBytes, label) {
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
- * Segue redirects HTTP manualmente, validando cada URL intermediária com `evaluateIoUrlPolicy`. Respeita o limite
+ * Segue redirects HTTP manualmente, validando cada URL intermediária com `evaluatePublicHttpUrlPolicy`. Respeita o limite
  * canônico de redirects em vez de delegar ao `fetch(redirect:'follow')` sem controle.
  *
  * @param {string} startUrl
@@ -225,9 +225,8 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects, request, opts = {
             throw new Error('Redirect para métodos não-GET não é suportado por política de segurança.');
         }
 
-        const response = await fetch(currentUrl, {
+        const response = await fetchPublicHttp(currentUrl, {
             method: request.method,
-            redirect: 'manual',
             headers: baseHeaders,
             ...(request.body !== undefined ? { body: request.body } : {}),
             ...(opts.signal ? { signal: opts.signal } : {}),
@@ -244,7 +243,7 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects, request, opts = {
             }
             // Resolve relative locations
             const resolvedUrl = new URL(location, currentUrl).toString();
-            const check = evaluateIoUrlPolicy({ input: resolvedUrl });
+            const check = evaluatePublicHttpUrlPolicy({ input: resolvedUrl });
             if (!check.ok || !check.url) {
                 throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${resolvedUrl})`);
             }
@@ -257,7 +256,7 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects, request, opts = {
 
         const responseUrl = typeof response.url === 'string' && response.url ? response.url : currentUrl;
         if (responseUrl !== currentUrl) {
-            const check = evaluateIoUrlPolicy({ input: responseUrl });
+            const check = evaluatePublicHttpUrlPolicy({ input: responseUrl });
             if (!check.ok || !check.url) {
                 throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${responseUrl})`);
             }
@@ -328,7 +327,7 @@ const webFetchTool = buildTool({
             );
         }
 
-        const inputUrlDecision = evaluateIoUrlPolicy({ input: url });
+        const inputUrlDecision = evaluatePublicHttpUrlPolicy({ input: url });
         if (!inputUrlDecision.ok || !inputUrlDecision.url) {
             log('WARN', `[copilot/web_fetch] URL bloqueada: ${inputUrlDecision.reason} (${url})`);
             return { success: false, error: `URL bloqueada por política de segurança: ${inputUrlDecision.reason}` };
@@ -519,9 +518,8 @@ const webSearchTool = buildTool({
 
         try {
             // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para que redirecionamentos inesperados lancem erro
-            const response = await fetch(jsonUrl, {
+            const response = await fetchPublicHttp(jsonUrl, {
                 method: 'GET',
-                redirect: 'error',
                 headers: {
                     'User-Agent': 'github-copilot-agent/1.0',
                     Accept: 'application/json',
@@ -597,7 +595,7 @@ const webSearchTool = buildTool({
                     // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (JSON API)
                     const safeResults = results.filter((r) => {
                         try {
-                            return evaluateIoUrlPolicy({ input: r.url }).ok;
+                            return evaluatePublicHttpUrlPolicy({ input: r.url }).ok;
                         } catch {
                             return false;
                         }
@@ -651,9 +649,8 @@ const webSearchTool = buildTool({
 
         try {
             // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para evitar SSRF por redirect
-            const response = await fetch(searchUrl, {
+            const response = await fetchPublicHttp(searchUrl, {
                 method: 'GET',
-                redirect: 'error',
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (compatible; github-copilot-agent/1.0)',
                     Accept: 'text/html',
@@ -714,7 +711,7 @@ const webSearchTool = buildTool({
             // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (HTML scraping)
             const safeHtmlResults = results.filter((r) => {
                 try {
-                    return evaluateIoUrlPolicy({ input: r.url }).ok;
+                    return evaluatePublicHttpUrlPolicy({ input: r.url }).ok;
                 } catch {
                     return false;
                 }

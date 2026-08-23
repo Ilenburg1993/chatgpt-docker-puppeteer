@@ -1,6 +1,6 @@
 // @ts-check
 /** Declarative L2 cache profile/configuration policy. */
-import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 
 const PROFILE_DEFAULTS = Object.freeze({
     experimental: Object.freeze({ ttlMs: 60_000, maxEntries: 10_000, pruneMs: 60_000, minBytes: 0 }),

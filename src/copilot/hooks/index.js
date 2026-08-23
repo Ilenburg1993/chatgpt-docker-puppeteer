@@ -157,7 +157,6 @@ export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditB
 export { clearHooksLogger, setHooksLogger } from './logger.js';
 
 // ─── DI Tokens ───────────────────────────────────────────────────────────────
-export { HOOKS_LOGGER } from './di-tokens.js';
 
 // ─── Tool Filter (Faixa E — filtering estático → SDK nativo) ─────────────────
 export { extractStaticFilters, isDynamicOnly, mergeStaticFilters } from './tool-filter.js';

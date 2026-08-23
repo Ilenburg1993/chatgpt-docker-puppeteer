@@ -1,7 +1,8 @@
 // @ts-check
 import { defaultAuditLog } from '#copilot/audit';
-import { ConfigError, toError } from '#copilot/core';
+import { toError } from '#copilot/infra/public/platform/error';
 import { z } from 'zod';
+import { ToolRuntimeError } from '../errors.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 /**
@@ -58,10 +59,11 @@ export function setPermissionAgent(agent, options = {}) {
 
 /**
  * @returns {PermissionAgent}
- * @throws {ConfigError} Se o agent não foi injetado via `setPermissionAgent()`.
+ * @throws {ToolRuntimeError} Se o agent não foi injetado via `setPermissionAgent()`.
  */
 function requireAgent() {
-    if (!_agent) throw new ConfigError('[permission-tools] agent não injetado — chamar setPermissionAgent() antes.');
+    if (!_agent)
+        throw new ToolRuntimeError('[permission-tools] agent não injetado — chamar setPermissionAgent() antes.');
     return _agent;
 }
 

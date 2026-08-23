@@ -6,7 +6,7 @@
  * um bloco canônico que ajude a LLM a corrigir a próxima chamada sem adivinhar.
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 
 const MAX_STRING_PREVIEW = 240;
 const MAX_ARRAY_PREVIEW = 20;

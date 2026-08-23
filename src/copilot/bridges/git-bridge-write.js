@@ -8,8 +8,8 @@
  * @see EventBus
  */
 
-import { container, toError } from '#copilot/core';
-import { METRICS_STORE, startSpanImmediate, toOtelException } from '#copilot/observability';
+import { toError } from '#copilot/infra/public/platform/error';
+import { defaultMetrics, startSpanImmediate, toOtelException } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,7 +48,7 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('duration_ms', elapsed);
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, true);
+        defaultMetrics.recordToolCall(`bridge.git.${method}`, elapsed, true);
         return stdout.trim();
     } catch (err) {
         const elapsed = Date.now() - t0;
@@ -56,8 +56,8 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: toError(err).message });
         span?.recordException(toOtelException(err));
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, false);
-        container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
+        defaultMetrics.recordToolCall(`bridge.git.${method}`, elapsed, false);
+        defaultMetrics.recordCounter('copilot.bridge.errors_total');
         throw err;
     } finally {
         span?.end();

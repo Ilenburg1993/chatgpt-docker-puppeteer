@@ -6,7 +6,7 @@ import {
     prepareSiblingTempPath,
     readBinaryMutationSnapshot,
 } from '#copilot/infra/internal/filesystem/transaction';
-import { toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 import {
     normalizeIoDurability,
     shouldFlushFile,

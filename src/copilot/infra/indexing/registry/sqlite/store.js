@@ -10,7 +10,7 @@
  */
 
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
-import { richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 import { createIoIndexDirectoryBuilder } from './directory-builder.js';
 import { createIoIndexMetadataPolicy } from './metadata.js';
 import { normalizeIndexPath } from './path/index.js';

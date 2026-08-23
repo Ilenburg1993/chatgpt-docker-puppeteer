@@ -9,7 +9,6 @@
  */
 
 // Funções puras de listagem, filtragem e seleção de modelos
-export { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/core';
 export {
     COPILOT_AUTO_MODEL_EXCLUDED_CLASSES,
     COPILOT_AUTO_MODEL_PUBLIC_CRITERIA,
@@ -17,6 +16,7 @@ export {
     describeAutoModelPolicy,
     readAutoModelPreference,
 } from './auto-policy.js';
+export { isAutoModelSelector, resolveModelSelectionMismatch } from './selection-policy.js';
 
 export {
     buildReasoningConfig,

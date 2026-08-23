@@ -1,18 +1,13 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import {
-    clearSharedSessionBinding,
-    container,
-    getSharedSdkSessionId,
-    setSharedHubSessionId,
-    setSharedSdkSessionId,
-} from '#copilot/core';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
+import { conversationStore } from '#copilot/conversation-hub';
 import { _injectClientForTest, _resetClientState } from '#copilot/sdk';
 import express from 'express';
 import request from 'supertest';
 
+import { createAgentSessionBindingRuntime } from '../../../src/copilot/agent/session/state/binding-runtime.js';
 import { registerActiveSdkSession } from '../../../src/copilot/sdk/session/session-registry.js';
 import sessionsRouter from '../../../src/copilot/server/routes/sdk/sessions.js';
 
@@ -68,11 +63,8 @@ function createApp() {
 }
 
 describe('sdk routes session ownership SSOT', () => {
-    /** @type {unknown} */
-    let previousConversationStore;
-
-    /** @type {boolean} */
-    let hadConversationStore = false;
+    /** @type {ReturnType<typeof createAgentSessionBindingRuntime>} */
+    let sessionBinding;
 
     /** @type {string | null} */
     let foregroundSessionId = null;
@@ -94,8 +86,31 @@ describe('sdk routes session ownership SSOT', () => {
     let resumedConfigs;
 
     beforeEach(() => {
-        hadConversationStore = container.has(CONVERSATION_STORE);
-        previousConversationStore = hadConversationStore ? container.resolve(CONVERSATION_STORE) : undefined;
+        clearAgentRuntimeRegistry();
+        sessionBinding = createAgentSessionBindingRuntime();
+        registerAgentRuntime(
+            /** @type {any} */ ({
+                ctx: { sessionBinding },
+                status: 'idle',
+                sessionId: null,
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: false,
+                dialogPaused: false,
+                queueSize: 0,
+                getSessionBindingSnapshot: () => sessionBinding.snapshot(),
+                setHubSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setHubSessionId(id),
+                setSdkSessionId: (/** @type {string|null|undefined} */ id) => sessionBinding.setSdkSessionId(id),
+                clearSessionBinding: () => sessionBinding.clear(),
+                getStatusSnapshot: () => ({
+                    status: 'idle',
+                    sessionId: null,
+                    model: 'gpt-5',
+                    reasoningEffort: 'high',
+                }),
+            }),
+            'default',
+        );
         foregroundSessionId = null;
         lastSessionId = null;
         listSessionsSpy = vi.fn(async () => []);
@@ -103,21 +118,9 @@ describe('sdk routes session ownership SSOT', () => {
         persistedBindings = [];
         createdConfigs = [];
         resumedConfigs = [];
-        clearSharedSessionBinding();
-
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                /** @type {any} */ ({
-                    updateSdkSession(/** @type {string} */ hubSessionId, /** @type {string} */ sdkSessionId) {
-                        persistedBindings.push({ hubSessionId, sdkSessionId });
-                    },
-                    createHubSession: () => 'hub-test',
-                    getHubSession: () => null,
-                    closeHubSession: () => {},
-                }),
-            'singleton',
-        );
+        vi.spyOn(conversationStore, 'updateSdkSession').mockImplementation((hubSessionId, sdkSessionId) => {
+            persistedBindings.push({ hubSessionId, sdkSessionId });
+        });
 
         _resetClientState();
         _injectClientForTest(
@@ -149,25 +152,15 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     afterEach(() => {
-        clearSharedSessionBinding();
         _resetClientState();
-        container.register(
-            CONVERSATION_STORE,
-            () =>
-                hadConversationStore
-                    ? previousConversationStore
-                    : {
-                          createHubSession: () => 'fallback',
-                          getHubSession: () => null,
-                          closeHubSession: () => {},
-                      },
-            'singleton',
-        );
+        vi.restoreAllMocks();
+        sessionBinding.dispose();
+        clearAgentRuntimeRegistry();
     });
 
     it('GET /sessions/binding prioriza a SSOT compartilhada sobre foreground/last', async () => {
-        setSharedHubSessionId('hub-shared');
-        setSharedSdkSessionId('sdk-shared');
+        sessionBinding.setHubSessionId('hub-shared');
+        sessionBinding.setSdkSessionId('sdk-shared');
         foregroundSessionId = 'sdk-foreground';
         lastSessionId = 'sdk-last';
 
@@ -184,12 +177,12 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions sincroniza sdkSessionId compartilhado e persiste o binding no store', async () => {
-        setSharedHubSessionId('hub-1');
+        sessionBinding.setHubSessionId('hub-1');
 
         const res = await request(createApp()).post('/sessions').send({ model: 'gpt-4.1' }).expect(201);
 
         assert.equal(res.body.sessionId, 'sdk-created');
-        assert.equal(getSharedSdkSessionId(), 'sdk-created');
+        assert.equal(sessionBinding.snapshot().sdkSessionId, 'sdk-created');
         assert.equal(res.body.isSharedSdkSession, true);
         assert.equal(res.body.boundHubSessionId, 'hub-1');
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-1', sdkSessionId: 'sdk-created' }]);
@@ -281,12 +274,12 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('PUT /sessions/foreground/:id promove a sessão para a SSOT compartilhada', async () => {
-        setSharedHubSessionId('hub-2');
+        sessionBinding.setHubSessionId('hub-2');
 
         const res = await request(createApp()).put('/sessions/foreground/sdk-foreground').expect(200);
 
         assert.equal(res.body.foregroundSessionId, 'sdk-foreground');
-        assert.equal(getSharedSdkSessionId(), 'sdk-foreground');
+        assert.equal(sessionBinding.snapshot().sdkSessionId, 'sdk-foreground');
         assert.equal(res.body.boundHubSessionId, 'hub-2');
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-2', sdkSessionId: 'sdk-foreground' }]);
     });
@@ -344,12 +337,12 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions/:id/resume sincroniza a sessão retomada na SSOT compartilhada', async () => {
-        setSharedHubSessionId('hub-3');
+        sessionBinding.setHubSessionId('hub-3');
 
         const res = await request(createApp()).post('/sessions/sdk-resume/resume').send({}).expect(200);
 
         assert.equal(res.body.sessionId, 'sdk-resume');
-        assert.equal(getSharedSdkSessionId(), 'sdk-resume');
+        assert.equal(sessionBinding.snapshot().sdkSessionId, 'sdk-resume');
         assert.equal(res.body.boundHubSessionId, 'hub-3');
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-3', sdkSessionId: 'sdk-resume' }]);
     });
@@ -448,13 +441,13 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions/:id/disconnect limpa somente o sdkSessionId compartilhado quando a sessão era a ativa', async () => {
-        setSharedHubSessionId('hub-4');
-        setSharedSdkSessionId('sdk-disc');
+        sessionBinding.setHubSessionId('hub-4');
+        sessionBinding.setSdkSessionId('sdk-disc');
         registerActiveSdkSession(makeSession('sdk-disc'), { model: 'gpt-4.1' });
 
         const res = await request(createApp()).post('/sessions/sdk-disc/disconnect').expect(200);
 
-        assert.equal(getSharedSdkSessionId(), null);
+        assert.equal(sessionBinding.snapshot().sdkSessionId, null);
         assert.deepEqual(res.body.sharedBinding, {
             hubSessionId: 'hub-4',
             sdkSessionId: null,
@@ -475,8 +468,8 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions/:id/model expõe projection e repassa reasoningEffort/modelCapabilities', async () => {
-        setSharedHubSessionId('hub-5');
-        setSharedSdkSessionId('sdk-msg');
+        sessionBinding.setHubSessionId('hub-5');
+        sessionBinding.setSdkSessionId('sdk-msg');
         /** @type {any[]} */
         const modelCalls = [];
         const session = makeSession('sdk-msg');
@@ -527,8 +520,8 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions/:id/log expõe CopilotSession.log()', async () => {
-        setSharedHubSessionId('hub-6');
-        setSharedSdkSessionId('sdk-log');
+        sessionBinding.setHubSessionId('hub-6');
+        sessionBinding.setSdkSessionId('sdk-log');
         /** @type {any[]} */
         const logCalls = [];
         const session = makeSession('sdk-log');
@@ -547,8 +540,8 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('GET /sessions/:id/ui/capabilities projeta capabilities e disponibilidade de elicitation', async () => {
-        setSharedHubSessionId('hub-ui');
-        setSharedSdkSessionId('sdk-ui');
+        sessionBinding.setHubSessionId('hub-ui');
+        sessionBinding.setSdkSessionId('sdk-ui');
         registerActiveSdkSession(makeSession('sdk-ui'), { model: 'gpt-4.1' });
 
         const res = await request(createApp()).get('/sessions/sdk-ui/ui/capabilities').expect(200);
@@ -559,8 +552,8 @@ describe('sdk routes session ownership SSOT', () => {
     });
 
     it('POST /sessions/:id/ui/elicitation|confirm|select|input delega para session.ui.*', async () => {
-        setSharedHubSessionId('hub-ui-actions');
-        setSharedSdkSessionId('sdk-ui-actions');
+        sessionBinding.setHubSessionId('hub-ui-actions');
+        sessionBinding.setSdkSessionId('sdk-ui-actions');
         /** @type {any[]} */
         const uiCalls = [];
         const session = makeSession('sdk-ui-actions');

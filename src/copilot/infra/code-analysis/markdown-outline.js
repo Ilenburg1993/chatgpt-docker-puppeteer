@@ -5,7 +5,7 @@
  * @module copilot/infra/code-analysis/markdown-outline
  */
 
-import { iterateTextLines } from '#copilot/infra/internal/platform';
+import { iterateTextLines } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * Extrai headings H1-H4 de Markdown.

@@ -40,7 +40,7 @@ import {
  *
  * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteBinding} RuntimeRouteBinding
  *
- * @typedef {import('#copilot/core').AgentEventName} AgentEventName
+ * @typedef {import('../../../events/agent-events.js').AgentEventName} AgentEventName
  */
 
 /**

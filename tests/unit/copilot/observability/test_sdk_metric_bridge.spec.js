@@ -2,7 +2,7 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { createEventBus } from '../../../../src/copilot/core/event-bus.js';
+import { createEventBus } from '#copilot/events/runtime';
 import { createConvergenceTraceStore } from '../../../../src/copilot/observability/convergence-trace-store.js';
 import { createObservabilityBusRuntime } from '../../../../src/copilot/observability/event-bus-runtime.js';
 import { createMetricsStore } from '../../../../src/copilot/observability/metrics.js';

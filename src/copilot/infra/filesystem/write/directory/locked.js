@@ -1,10 +1,10 @@
 // @ts-check
 /** Locked directory creation and namespace-durability orchestration. */
 
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core/io-contracts';
 import { withIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
 import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation/coherence';
 import { mkdirPathUnlocked } from '#copilot/infra/internal/filesystem/transaction';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/infra/internal/operations/contracts';
 import { assertValidIoFilePath } from '#copilot/infra/internal/policy';
 import {
     elapsedIoMs,
@@ -30,7 +30,7 @@ import {
  *     path: string;
  *     created: boolean;
  *     createdPath: string | undefined;
- *     io: import('#copilot/core/io-contracts').IoMeta;
+ *     io: import('#copilot/infra/internal/operations/contracts').IoMeta;
  *     lockWaitMs: number;
  *     durability: Awaited<ReturnType<typeof mkdirPathUnlocked>>['durability'];
  * }>}

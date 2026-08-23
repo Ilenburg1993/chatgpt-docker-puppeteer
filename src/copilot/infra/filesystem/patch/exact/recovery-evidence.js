@@ -1,6 +1,6 @@
 // @ts-check
 /** Bounded diagnostic evidence for exact patch misses; never authorizes a mutation. */
-import { lineNumberAtTextOffset } from '#copilot/infra/internal/platform';
+import { lineNumberAtTextOffset } from '#copilot/infra/internal/platform/text-lines';
 import { findOccurrenceOffsets } from './occurrences.js';
 
 const PATCH_RECOVERY_MAX_SCAN_CHARS = 4 * 1024 * 1024;

@@ -8,20 +8,14 @@
  */
 
 import { alwaysAliveAgent, getAgent } from '#copilot/agent/always-alive';
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens';
 import { configureHookTools } from '#copilot/agent/ports';
-import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
-import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { configureDefaultUserInputContext } from '#copilot/sdk/session';
 import { setHub, setModelGatewayRuntimeControl, setPermissionAgent } from '#copilot/tools';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
-import { conversationStore } from './conversation-hub/store.js';
-import { container } from './core/di-container.js';
-import { SHUTDOWN_PRIORITY } from './core/shutdown-priorities.js';
-import { registerShutdownHandler } from './core/shutdown.js';
 import { log } from './observability/logger.js';
 import { readRuntimeCapabilitiesProjection } from './presentation/runtime/capabilities.js';
 import {
@@ -31,16 +25,16 @@ import {
 } from './presentation/runtime/models.js';
 
 /** @type {boolean} */
-let _runtimeDiWired = false;
+let _runtimeWired = false;
 
 /**
- * Registra tokens DI do agent/tools stack e aplica as injeções explícitas de composição necessárias.
+ * Aplica as capabilities explícitas de composição necessárias ao runtime Agent/Tools/Channel/Hub.
  *
  * @param {{ broadcastSse: (event: string, payload?: unknown) => void }} deps
  * @returns {void}
  */
-export function wireCopilotRuntimeDI({ broadcastSse }) {
-    if (_runtimeDiWired) return;
+export function wireCopilotRuntime({ broadcastSse }) {
+    if (_runtimeWired) return;
 
     // P2-2: unificar estado de user-input com o ToolSessionContext do agente principal.
     // `alwaysAliveAgent` é um Proxy lazy — acessar getToolSessionContext() aqui cria
@@ -50,14 +44,6 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
     if (toolSessionContext) {
         configureDefaultUserInputContext(toolSessionContext);
     }
-
-    container.register(ALWAYS_ALIVE_AGENT, () => getAgent(), 'singleton');
-    container.register(HUB, () => conversationHub, 'singleton');
-    container.register(CONVERSATION_STORE, () => conversationStore, 'singleton');
-    container.register(PERMISSION_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(FALLBACK_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
 
     setHub(conversationHub);
     setModelGatewayRuntimeControl({
@@ -70,17 +56,7 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
     setFallbackAgent(alwaysAliveAgent);
     setBridgeAgent(alwaysAliveAgent);
 
-    container.validateRequired([
-        ALWAYS_ALIVE_AGENT,
-        HUB,
-        CONVERSATION_STORE,
-        PERMISSION_AGENT,
-        FALLBACK_AGENT,
-        BRIDGE_AGENT,
-        NERV_BRIDGE_AGENT,
-    ]);
-
-    registerShutdownHandler(
+    registerApplicationShutdownHandler(
         'copilot.agent.stop',
         async () => {
             const agent = getAgent();
@@ -88,9 +64,9 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
             await agent.stop({ preserveDialogLoopIntent: true });
             log('INFO', '[runtime-wiring] AlwaysAliveAgent parado com intenção de dialog loop preservada.');
         },
-        SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
+        PROCESS_SHUTDOWN_PHASE.RUNTIME_CRITICAL,
         { timeoutMs: 30_000 },
     );
 
-    _runtimeDiWired = true;
+    _runtimeWired = true;
 }

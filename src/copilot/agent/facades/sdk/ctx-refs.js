@@ -8,7 +8,7 @@
  * @module copilot/agent/facades/sdk/ctx-refs
  */
 
-import { SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 
 /**
  * @param {unknown} value
@@ -81,7 +81,7 @@ export function getToolRegistryRef(ctx) {
 export function requireClient(ctx, caller) {
     const client = getClientRef(ctx);
     if (!client) {
-        throw new SessionError(`[AlwaysAlive] ${caller}: client SDK indisponível.`, 'SDK_CLIENT_UNAVAILABLE');
+        throw new AgentSessionError(`[AlwaysAlive] ${caller}: client SDK indisponível.`, 'SDK_CLIENT_UNAVAILABLE');
     }
     return client;
 }
@@ -94,7 +94,7 @@ export function requireClient(ctx, caller) {
 export function requireSession(ctx, caller) {
     const session = getSessionRef(ctx);
     if (!session) {
-        throw new SessionError(`[AlwaysAlive] ${caller}: sessão SDK indisponível.`, 'SDK_SESSION_UNAVAILABLE');
+        throw new AgentSessionError(`[AlwaysAlive] ${caller}: sessão SDK indisponível.`, 'SDK_SESSION_UNAVAILABLE');
     }
     return session;
 }

@@ -213,8 +213,9 @@ describe('copilot/channel/inject.js — structural', () => {
         assert.ok(SRC.includes('SseEvent') || SSE_SRC.includes('@typedef {Object} SseEvent'));
     });
 
-    it('deve importar BridgeError do core', () => {
-        assert.ok(SRC.includes('BridgeError') && SRC.includes('#copilot/core'));
+    it('deve usar ChannelError do owner local do protocolo', () => {
+        assert.ok(SRC.includes('ChannelError') && SRC.includes("from './errors.js'"));
+        assert.ok(!SRC.includes('#copilot/core'));
     });
 
     it('porta default deve ser configurável via LLM_B_TERMINAL_PORT', () => {

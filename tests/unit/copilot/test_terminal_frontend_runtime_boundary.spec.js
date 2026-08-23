@@ -45,6 +45,6 @@ test('projections/now.js e timeline.js cruzam fronteiras via barrels do frontend
     expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/agent'/);
     expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/channel'/);
     expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/conversation-hub'/);
-    // timeline pode usar utilidades transversais puras do core (ex.: sleepMs/toError) sem quebrar a fronteira,
+    // timeline pode usar primitives puras do owner semântico (ex.: resilience/sleep e error normalization),
     // desde que não atravesse para agent/channel/hub diretamente.
 });

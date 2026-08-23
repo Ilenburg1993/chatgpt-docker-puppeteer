@@ -9,7 +9,6 @@
  */
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { resolveModelSelectionMismatch } from '#copilot/core';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
 import { humanizeTerminalToolSurfaceText } from '../events/presenters/tools/index.js';
@@ -17,6 +16,7 @@ import {
     getTerminalPendingStructuredUserInputCount,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
+    resolveTerminalModelSelectionMismatch,
 } from '../frontend/gateways/index.js';
 import {
     formatTerminalTimeLabel,
@@ -446,7 +446,7 @@ function resolvePromptModelProjection(state) {
     const telemetryMatchesActiveConfig = !observedConfiguredModel || observedConfiguredModel === activeModel;
     const mismatch =
         telemetryMatchesActiveConfig &&
-        resolveModelSelectionMismatch({
+        resolveTerminalModelSelectionMismatch({
             configuredModel: activeModel,
             billedModel,
             effectiveModel,

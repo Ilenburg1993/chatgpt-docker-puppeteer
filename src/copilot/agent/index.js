@@ -150,17 +150,14 @@ export {
     bootstrapTools,
     buildAuditingPermissionHandler,
     buildStatusSnapshot,
-    checkResolvedIp,
     configureHookTools,
     executeTask,
     isHighRiskTool,
-    isPrivateIp,
     logToolAudit,
     setExperimentalSession,
     setHub,
     setPermissionAgent,
     setSessionRpc,
-    validateWebhookUrl,
 } from './infra/index.js';
 export {
     LIFECYCLE_MODULE_LAYOUT,
@@ -217,4 +214,3 @@ export {
 export { getStatusSnapshot, listenerDiagnostics } from './state/index.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { ALWAYS_ALIVE_AGENT } from './di-tokens.js';

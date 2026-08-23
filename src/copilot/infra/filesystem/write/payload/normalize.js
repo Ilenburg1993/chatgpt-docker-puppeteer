@@ -1,6 +1,6 @@
 // @ts-check
 /** Owned payload normalization shared by locked append/write orchestration. */
-import { toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
  * @param {BufferEncoding} [encoding]

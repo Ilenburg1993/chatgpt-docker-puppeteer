@@ -78,7 +78,7 @@ export function createIoDurabilityRuntime() {
         }
         if (observed) state.atomicWritePhases.observed += 1;
     }
-    /** @param {import('#copilot/core/io-contracts').IoMeta} io */
+    /** @param {import('#copilot/infra/internal/operations/contracts').IoMeta} io */
     function record(io) {
         state.operationsObserved += 1;
         const advisory = io.advisoryLimits;

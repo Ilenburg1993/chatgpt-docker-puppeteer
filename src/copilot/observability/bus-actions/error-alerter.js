@@ -7,14 +7,14 @@
  * @module copilot/observability/bus-actions/error-alerter
  */
 
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '../logger.js';
 
 const RECOVERABLE_HOOK_ALERT_THROTTLE_MS = 30_000;
 const MAX_RECOVERABLE_ALERT_KEYS = 512;
 
 /**
- * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  *
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  */

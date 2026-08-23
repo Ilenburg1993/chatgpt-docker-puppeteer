@@ -1,4 +1,5 @@
 // @ts-check
+import { getApplicationEventBus } from '#copilot/boot/application-events';
 import { log } from '#core/logger';
 import { resolveDbPath } from '#infra/db/sqlite';
 import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
@@ -226,12 +227,7 @@ async function getDiskHealth(_req, res) {
  */
 async function getEventsHealth(_req, res) {
     try {
-        const { container, EVENT_BUS } = await import('#copilot/core');
-        const bus = container.resolve(EVENT_BUS);
-        if (!bus || typeof bus.diagnostics !== 'function') {
-            res.json({ status: 'unavailable', message: 'EventBus not registered or lacks diagnostics()' });
-            return;
-        }
+        const bus = getApplicationEventBus();
         const diag = bus.diagnostics();
         const byNs = typeof bus.statsByNamespace === 'function' ? bus.statsByNamespace() : {};
         const channels = typeof bus.channels === 'function' ? bus.channels() : [];

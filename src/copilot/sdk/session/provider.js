@@ -11,8 +11,8 @@
  * @see EventBus
  */
 
+import { redactSecretRecord, redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { readBoundedResponseJson } from '#copilot/infra/public/platform/http-response';
-import { redactSecretRecord, redactSecretText } from '../../core/index.js';
 import { PROVIDER_TYPES } from '../constants.js';
 import { log } from '../logger.js';
 

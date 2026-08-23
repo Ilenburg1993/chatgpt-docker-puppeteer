@@ -11,7 +11,7 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { logSwallowed, SessionError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import { DialogProtocol } from '#copilot/dialog';
 import {
     EMITTER_LOOP_CHANGED,
@@ -29,6 +29,7 @@ import {
     readAgentRuntimeDialogPersistedState,
 } from '../../facades/agent-runtime-state.js';
 import { log } from '../../ports/logging/index.js';
+import { logSwallowed } from '../../ports/logging/swallowed.js';
 import { startSpanImmediate } from '../../ports/tracing-port.js';
 import { createDialogLoopRuntimeKit, DialogBootCircuit, runDialogLoopBoot } from '../boot/index.js';
 import { executeTurnImpl } from '../executors/index.js';
@@ -261,11 +262,11 @@ export class DialogLoopManager extends EventEmitter {
      *
      * @param {string} [bootPrompt] - Prompt de inicialização (default: DialogProtocol.buildBootPrompt())
      * @returns {Promise<void>}
-     * @throws {SessionError} Se não vinculado a um host (NOT_ATTACHED) ou dialog loop já ativo (DIALOG_ALREADY_ACTIVE)
+     * @throws {AgentSessionError} Se não vinculado a um host (NOT_ATTACHED) ou dialog loop já ativo (DIALOG_ALREADY_ACTIVE)
      */
     async start(bootPrompt) {
         if (!this.#host) {
-            throw new SessionError(
+            throw new AgentSessionError(
                 '[DialogLoopManager] Não vinculado a um host. Chame attach() primeiro.',
                 'NOT_ATTACHED',
             );
@@ -274,7 +275,7 @@ export class DialogLoopManager extends EventEmitter {
 
         // F42.6: permitir start() durante resume (Estratégia B) mas bloquear duplicatas externas
         if (this.#state.active) {
-            throw new SessionError(
+            throw new AgentSessionError(
                 '[DialogLoopManager] Dialog loop já está ativo. Chame stop() primeiro.',
                 'DIALOG_ALREADY_ACTIVE',
             );
@@ -334,7 +335,7 @@ export class DialogLoopManager extends EventEmitter {
      */
     async startResumedSession() {
         if (!this.#host) {
-            throw new SessionError(
+            throw new AgentSessionError(
                 '[DialogLoopManager] Não vinculado a um host. Chame attach() primeiro.',
                 'NOT_ATTACHED',
             );
@@ -392,7 +393,7 @@ export class DialogLoopManager extends EventEmitter {
     sendTurnDetailed(message, { timeout = null, signal, traceId } = {}) {
         if (!this.#state.canSendTurn) {
             return Promise.reject(
-                new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
+                new AgentSessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
             );
         }
 
@@ -741,7 +742,7 @@ export class DialogLoopManager extends EventEmitter {
     #executeTurn(message, { timeout, signal, traceId }) {
         const host = this.#host;
         if (!host) {
-            return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
+            return Promise.reject(new AgentSessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
         }
         return executeTurnImpl(
             this,

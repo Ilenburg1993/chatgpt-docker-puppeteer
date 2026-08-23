@@ -7,7 +7,6 @@
  */
 
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#copilot/audit';
-export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
 export { executeTask } from '../messaging/agent-messaging.js';
 export { PermissionController } from '../ports/permission-port.js';
 export { buildStatusSnapshot } from '../ports/snapshot-port.js';

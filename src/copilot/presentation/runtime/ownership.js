@@ -12,8 +12,7 @@ import { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from 
 /**
  * @param {string | null} sdkSessionId
  * @param {{
- *     getHubSessionId: () => string | null;
- *     setSharedSdkSessionId: (id: string | null) => void;
+ *     sessionBinding: { snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null}; setSdkSessionId:(id:string|null)=>unknown; clearSdkSessionId:()=>unknown };
  *     conversationStore?: { updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null;
  * }} deps
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; persistedToStore: boolean }}
@@ -23,7 +22,7 @@ export function syncSharedSdkSessionOwnership(sdkSessionId, deps) {
 }
 
 /**
- * @param {{ setSharedSdkSessionId: (id: string | null) => void; getHubSessionId: () => string | null }} deps
+ * @param {{ sessionBinding:{snapshot:()=>{hubSessionId:string|null;sdkSessionId:string|null};clearSdkSessionId:()=>unknown} }} deps
  * @returns {{ hubSessionId: string | null; sdkSessionId: null }}
  */
 export function clearSharedSdkSessionOwnership(deps) {

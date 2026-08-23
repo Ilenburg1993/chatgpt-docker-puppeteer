@@ -10,9 +10,9 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { persistAgentRuntimePendingQuestionState } from '../../facades/agent-runtime-state.js';
 import { log } from '../../ports/logging/index.js';
 import { resolveAgentUserInputAllowFreeform } from '../../ports/user-input-policy-port.js';
@@ -119,15 +119,11 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
  * @param {string} rawAnswer
  * @param {string[] | undefined} choices
  * @param {boolean} allowFreeform
- * @returns {{
- *     ok: true;
- *     answer: string;
- *     wasFreeform: boolean;
- * }}
+ * @returns {{ ok: true; answer: string; wasFreeform: boolean } | { ok: false; answer: string; wasFreeform: true }}
  */
 function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
     const answer = rawAnswer.trim();
-    resolveAgentUserInputAllowFreeform(allowFreeform);
+    const effectiveAllowFreeform = resolveAgentUserInputAllowFreeform(allowFreeform);
     if (Array.isArray(choices) && choices.length > 0) {
         const numericIndex = Number(answer);
         if (Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= choices.length) {
@@ -142,7 +138,7 @@ function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
             return { ok: true, answer: normalizedMatches[0] ?? answer, wasFreeform: false };
         }
     }
-    return { ok: true, answer, wasFreeform: true };
+    return effectiveAllowFreeform ? { ok: true, answer, wasFreeform: true } : { ok: false, answer, wasFreeform: true };
 }
 
 /**
@@ -227,6 +223,16 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
             ...(choices !== undefined && { choices }),
             resolve: (/** @type {string} */ answer) => {
                 const normalized = normalizeUserInputAnswer(answer, choices, effectiveAllowFreeform);
+                if (!normalized.ok) {
+                    ctx.emit('question.answer_rejected', {
+                        question,
+                        answer: normalized.answer,
+                        choices: choices ?? [],
+                        allowFreeform: effectiveAllowFreeform,
+                        reason: 'selection_required',
+                    });
+                    return false;
+                }
                 ctx.setStatus('processing');
                 resolve({ answer: normalized.answer, wasFreeform: normalized.wasFreeform });
                 return true;

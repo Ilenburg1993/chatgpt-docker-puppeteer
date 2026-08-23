@@ -2,7 +2,7 @@
 /** SQLite L2 cache state machine: read/admit/batch/invalidate/prune over prepared storage. */
 
 import { runSqliteTransactionOrDirect } from '#copilot/infra/internal/database/transaction/optional';
-import { isBufferValue, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { isBufferValue, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 import { performance } from 'node:perf_hooks';
 import { createIoL2CacheMetrics } from './metrics.js';
 import { normalizeL2Path, normalizeL2TimestampMs, resolveIoL2CachePolicy } from './policy.js';

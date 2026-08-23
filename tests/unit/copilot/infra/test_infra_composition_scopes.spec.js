@@ -258,7 +258,7 @@ describe('infra 2.0 composition scopes', () => {
             paths: [filePath],
         });
         first.telemetry.recordOperation(
-            /** @type {import('../../../../src/copilot/core/io-contracts.js').IoMeta} */ ({
+            /** @type {import('#copilot/infra/public/operations/contracts').IoMeta} */ ({
                 operation: 'write',
                 target: filePath,
                 targetKind: 'file',

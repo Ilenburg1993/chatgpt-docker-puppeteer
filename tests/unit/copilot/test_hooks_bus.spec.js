@@ -72,7 +72,7 @@ describe('HookBus — emissão e escuta', () => {
 
     it('enriquece hook:error_occurred no EventBus com mensagem normalizada', async () => {
         const { HookBus } = await import('../../../src/copilot/hooks/bus.js');
-        const { createEventBus } = await import('../../../src/copilot/core/event-bus.js');
+        const { createEventBus } = await import('#copilot/events/runtime');
         const bus = new HookBus();
         const eventBus = createEventBus();
         /** @type {any[]} */

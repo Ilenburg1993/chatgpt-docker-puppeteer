@@ -12,7 +12,7 @@
 /**
  * @typedef {import('../sdk/types.js').SdkOperationMetric} SdkOperationMetric
  *
- * @typedef {import('../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  *
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
  *

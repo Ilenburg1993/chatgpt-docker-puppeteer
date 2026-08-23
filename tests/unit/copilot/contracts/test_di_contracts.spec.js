@@ -1,64 +1,59 @@
 // @ts-check
-/**
- * tests/unit/copilot/contracts/test_di_contracts.spec.js
- *
- * FK-7 — Contract tests — DI container exports e tokens.
- *
- * Garante que:
- *
- * 1. O barrel core/index.js exporta createContainer, createToken, container
- * 2. Todos os tokens DI canônicos estão exportados
- * 3. Cada token tem nome e _id symbol
- */
-
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
-import * as core from '../../../../src/copilot/core/index.js';
+const ROOT = resolve(import.meta.dirname, '../../../..');
+const EXTINCT_FILES = [
+    'src/copilot/core/di.js',
+    'src/copilot/core/di-container.js',
+    'src/copilot/core/di-tokens.js',
+    'src/copilot/core/event-bus.js',
+    'src/copilot/sdk/di-tokens.js',
+    'src/copilot/hooks/di-tokens.js',
+    'src/copilot/agent/di-tokens.js',
+    'src/copilot/bridges/di-tokens.js',
+    'src/copilot/audit/di-tokens.js',
+    'src/copilot/tools/infra/di-tokens.js',
+    'src/copilot/channel/di-tokens.js',
+    'src/copilot/plugins/di-tokens.js',
+];
 
-// ─── K-7a: DI container exports ──────────────────────────────────────────────
-
-describe('FK-7 — core barrel DI exports', () => {
-    it('exporta createContainer', () => {
-        assert.equal(typeof core.createContainer, 'function');
+describe('service-locator extinction governance', () => {
+    it('keeps deleted DI/token implementations physically absent', () => {
+        for (const file of EXTINCT_FILES) assert.equal(existsSync(resolve(ROOT, file)), false, file);
     });
 
-    it('exporta createToken', () => {
-        assert.equal(typeof core.createToken, 'function');
+    it('keeps package aliases free of Core DI and old EventBus paths', () => {
+        const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+        const keys = Object.keys(pkg.imports ?? {});
+        assert.equal(
+            keys.some((key) => /#copilot\/core\/(?:di|di-tokens|event-bus)/u.test(key)),
+            false,
+        );
+        assert.equal(keys.includes('#copilot/sdk/di'), false);
+        assert.equal(pkg.imports?.['#copilot/events/runtime'], './src/copilot/events/runtime/index.js');
     });
 
-    it('exporta container singleton', () => {
-        assert.ok(core.container);
-        assert.equal(typeof core.container.register, 'function');
-        assert.equal(typeof core.container.resolve, 'function');
-        assert.equal(typeof core.container.has, 'function');
-        assert.equal(typeof core.container.fork, 'function');
-        assert.equal(typeof core.container.dispose, 'function');
-        assert.equal(typeof core.container.tokens, 'function');
+    it('keeps the former Core owner physically absent instead of retaining an empty facade', () => {
+        assert.equal(existsSync(resolve(ROOT, 'src/copilot/core')), false);
     });
 
-    it('exporta EventBus e createEventBus', () => {
-        assert.equal(typeof core.EventBus, 'function');
-        assert.equal(typeof core.createEventBus, 'function');
-    });
-});
-
-// ─── K-7b: DI token exports ─────────────────────────────────────────────────
-
-const EXPECTED_TOKENS = ['SHUTDOWN_LOGGER', 'DB_LOGGER', 'EVENT_BUS'];
-
-describe('FK-7 — DI tokens canônicos', () => {
-    for (const tokenName of EXPECTED_TOKENS) {
-        it(`exporta token ${tokenName} com nome e _id`, () => {
-            const token = /** @type {Record<string, any>} */ (core)[tokenName];
-            assert.ok(token, `Token ${tokenName} não encontrado no barrel core`);
-            assert.equal(token.name, tokenName);
-            assert.equal(typeof token._id, 'symbol');
-        });
-    }
-
-    it('todos tokens são distintos (sem colisão de _id)', () => {
-        const ids = new Set(EXPECTED_TOKENS.map((n) => /** @type {Record<string, any>} */ (core)[n]._id));
-        assert.equal(ids.size, EXPECTED_TOKENS.length);
+    it('keeps runtime source free of generic service-locator vocabulary', () => {
+        const result = spawnSync(
+            'rg',
+            [
+                '-n',
+                String.raw`\bcontainer\.(?:resolve|register|has|validateRequired)\b|createContainer|createToken`,
+                'src/copilot',
+                '--glob',
+                '*.js',
+            ],
+            { cwd: ROOT, encoding: 'utf8' },
+        );
+        assert.ok(result.status === 0 || result.status === 1);
+        assert.equal(String(result.stdout ?? '').trim(), '');
     });
 });

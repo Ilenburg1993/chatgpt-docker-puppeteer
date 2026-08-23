@@ -9,7 +9,7 @@
  * 1. Módulos públicos top-level têm barrel; infra deliberadamente não possui mega-barrel
  * 2. Barrels essenciais exportam símbolos mínimos esperados
  * 3. Não há violações de camada em imports críticos (bridges não importa agent)
- * 4. DI tokens existem para todos os 13 serviços registrados
+ * 4. O owner horizontal Core permanece fisicamente ausente
  * 5. Fronteiras sensíveis agent/SDK/event-handlers permanecem owner-governed; package imports globais são exatos.
  */
 
@@ -76,7 +76,6 @@ const EXPECTED_MODULES = [
     'channel',
     'config',
     'conversation-hub',
-    'core',
     'event-handlers',
     'events',
     'hooks',
@@ -108,10 +107,8 @@ it('infra não possui mega-barrel raiz; capabilities são os boundaries público
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('W4-9 — barrel exports: símbolos mínimos', () => {
-    it('core barrel exporta CopilotError e container', async () => {
-        const mod = await import('#copilot/core');
-        assert.ok(mod.CopilotError, 'CopilotError deve existir');
-        assert.ok(mod.container, 'container deve existir');
+    it('não recria owner horizontal Core', () => {
+        assert.equal(existsSync(copilotPath('core')), false, 'src/copilot/core deve permanecer ausente');
     });
 
     it('observability barrel exporta log', async () => {
@@ -1055,18 +1052,18 @@ describe('W86.8 — dialog loop boot lifecycle seam extraído', () => {
     });
 });
 
-describe('W87.1 — agent lifecycle consome core via porta local', () => {
-    it('agent-lifecycle não importa core/container/error-handlers diretamente', () => {
+describe('W87.1 — agent lifecycle não recria aggregate compatibility ports', () => {
+    it('lifecycle usa capabilities exatas e os antigos ports agregadores não existem', () => {
         const lifecycle = readSrc('agent/lifecycle/orchestrators/agent-lifecycle.js');
-        const port = readSrc('agent/ports/core-runtime-port.js');
-
-        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/legacy-runtime\/index\.js['"]/);
-        assert.match(port, /from ['"]#copilot\/core['"]/);
-        assert.doesNotMatch(port, /from ['"]\.\.\/\.\.\/core\/(?:di-container|error-handlers)\.js['"]/);
-
-        assert.doesNotMatch(lifecycle, /from ['"]#copilot\/core['"]/);
-        assert.doesNotMatch(lifecycle, /from ['"]\.\.\/\.\.\/core\/di-container\.js['"]/);
-        assert.doesNotMatch(lifecycle, /from ['"]\.\.\/\.\.\/core\/error-handlers\.js['"]/);
+        const swallowedLoggingPort = readSrc('agent/ports/logging/swallowed.js');
+        assert.throws(() => readSrc('agent/ports/core-runtime-port.js'), /ENOENT/);
+        assert.throws(() => readSrc('agent/ports/legacy-runtime/index.js'), /ENOENT/);
+        assert.match(lifecycle, /#copilot\/boot\/process-runtime/);
+        assert.match(lifecycle, /#copilot\/infra\/public\/platform\/error/);
+        assert.match(lifecycle, /ports\/logging\/swallowed\.js/);
+        assert.doesNotMatch(lifecycle, /#copilot\/observability\/swallowed/);
+        assert.match(swallowedLoggingPort, /#copilot\/observability\/swallowed/);
+        assert.doesNotMatch(lifecycle, /ports\/(?:core-runtime-port|legacy-runtime)/);
     });
 });
 
@@ -1079,41 +1076,19 @@ describe('W87.2 — session snapshot delega IO/schema para snapshot-store', () =
         assert.match(facade, /saveSnapshotFileAsync/);
         assert.match(facade, /loadSnapshotFileAsync/);
         assert.match(facade, /normalizeSnapshotRecord/);
-        assert.match(store, /safeJsonParse/);
+        assert.match(store, /parseJsonResult/);
         assert.match(store, /SessionSnapshotDataSchema/);
         assert.match(store, /SnapshotListItemSchema/);
         assert.match(store, /writeFile/);
 
         assert.doesNotMatch(facade, /from ['"]node:fs\/promises['"]/);
-        assert.doesNotMatch(facade, /safeJsonParse/);
+        assert.doesNotMatch(facade, /parseJsonResult/);
         assert.doesNotMatch(facade, /SessionSnapshotDataSchema/);
         assert.doesNotMatch(facade, /SnapshotListItemSchema/);
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 4. DI tokens: 13 tokens canônicos disponíveis no core barrel
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const EXPECTED_DI_TOKENS = ['SHUTDOWN_LOGGER', 'DB_LOGGER', 'EVENT_BUS'];
-
-describe('W4-9 — DI tokens: todos os 13 tokens canônicos', () => {
-    it('di-tokens.js exporta todos os tokens esperados', async () => {
-        const tokens = await import('../../../../src/copilot/core/di-tokens.js');
-        const missing = EXPECTED_DI_TOKENS.filter((t) => !(t in tokens));
-        assert.deepEqual(missing, [], `Tokens DI ausentes: ${missing.join(', ')}`);
-    });
-
-    it('cada token tem _id Symbol e name', async () => {
-        const tokens = await import('../../../../src/copilot/core/di-tokens.js');
-        for (const name of EXPECTED_DI_TOKENS) {
-            const token = tokens[/** @type {keyof typeof tokens} */ (name)];
-            assert.ok(token, `Token ${name} deve existir`);
-            assert.ok(typeof token._id === 'symbol', `${name}._id deve ser symbol`);
-            assert.equal(token.name, name, `${name}.name deve ser '${name}'`);
-        }
-    });
-});
+// DI/service-locator extinction is governed by test_di_contracts.spec.js.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 5. Deep imports permitidos: sdk/types e observability/logger não são proibidos

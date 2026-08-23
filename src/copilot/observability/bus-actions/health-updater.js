@@ -11,7 +11,7 @@
 import { log } from '../logger.js';
 
 /**
- * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/events/runtime').EventBus} EventBus
  */
 
 /**

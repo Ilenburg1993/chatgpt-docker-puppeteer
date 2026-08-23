@@ -1,4 +1,4 @@
-import { sleepMs } from '#copilot/core';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
 
 // @ts-check
 /**
@@ -39,10 +39,7 @@ const DEFAULT_CONFIG = Object.freeze({
  * @returns {Promise<void>}
  */
 async function waitMs(ms) {
-    await sleepMs(ms, {
-        id: `sdk.model-switch.verify:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-        unref: true,
-    });
+    await sleep(ms);
 }
 
 /**

@@ -14,7 +14,7 @@ const runtimeMocks = vi.hoisted(() => {
                 requestId: 'request-user-input-sim-1',
                 question: input.question,
                 choices: input.choices ?? [],
-                allowFreeform: true,
+                allowFreeform: input.allowFreeform === true,
                 createdAt: Date.now(),
                 sessionId: 'sdk-1',
                 toolCallId: null,
@@ -478,7 +478,7 @@ describe('terminal/commands/sdk', () => {
             expect.objectContaining({
                 question: 'Continuar teste visual?',
                 choices: ['sim', 'nao'],
-                allowFreeform: true,
+                allowFreeform: false,
             }),
         );
         expect(ctx.output()).toContain('Pergunta humana estruturada');
@@ -500,7 +500,7 @@ describe('terminal/commands/sdk', () => {
             expect.objectContaining({
                 question: 'Alias legado funciona?',
                 choices: ['sim', 'nao'],
-                allowFreeform: true,
+                allowFreeform: false,
             }),
         );
         expect(ctx.output()).toContain('Pergunta humana estruturada');

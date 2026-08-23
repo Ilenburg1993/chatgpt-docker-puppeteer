@@ -12,13 +12,13 @@
  * @see EventBus
  */
 
+import { AgentSessionError } from '#copilot/agent/errors';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config/agent';
-import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { switchModelTransactional } from '../../facades/agent-model-config.js';
 import { log } from '../../ports/logging/index.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,
@@ -84,7 +84,7 @@ async function runDialogOperationWithPolicy(label, operation) {
 function startKeepaliveIfPossible(ctx, host) {
     ctx.startKeepalive({
         onKeepalive: (/** @type {{ ts: number; strategy: 'client.ping' | 'session.send' }} */ info) => {
-            container.resolve(METRICS_STORE).recordKeepalivePing();
+            defaultMetrics.recordKeepalivePing();
             host.emit(EMITTER_SESSION_KEEPALIVE, { ts: info.ts, strategy: info.strategy });
         },
     });
@@ -106,7 +106,7 @@ export async function dialogStart(ctx, host, bootPrompt, opts = {}) {
         return;
     }
     if (!ctx.isIdle()) {
-        throw new SessionError(
+        throw new AgentSessionError(
             `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.getRuntimeStatus()}'`,
             'INVALID_STATE',
         );
@@ -116,7 +116,7 @@ export async function dialogStart(ctx, host, bootPrompt, opts = {}) {
     if (contextState) {
         const utilization = contextState.utilization ?? 0;
         if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
-            throw new SessionError(
+            throw new AgentSessionError(
                 `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
                 'CONTEXT_EXHAUSTED',
             );
@@ -279,7 +279,7 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
  */
 export async function dialogResume(ctx) {
     if (!ctx.isIdle() && !ctx.isWaitingForInput()) {
-        throw new SessionError(
+        throw new AgentSessionError(
             `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.getRuntimeStatus()}'`,
             'INVALID_STATE',
         );

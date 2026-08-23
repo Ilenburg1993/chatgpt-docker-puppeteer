@@ -9,7 +9,7 @@
  * @module copilot/event-handlers/usage-classifier
  */
 
-import { resolveModelSelectionMismatch } from '#copilot/core';
+import { resolveModelSelectionMismatch } from '#copilot/events/sdk-events';
 
 export const LLM_USAGE_CLASSIFICATIONS = Object.freeze({
     USER_TURN: 'user_turn',

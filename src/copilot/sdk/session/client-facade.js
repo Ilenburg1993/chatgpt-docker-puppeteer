@@ -12,7 +12,7 @@
  * @see module:copilot/sdk/config
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
+import { logSdkSwallowed } from '../logger.js';
 import { forceStopClient, getClient, getClientState, stopClient } from './client.js';
 import { createSession, deleteSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
 
@@ -128,11 +128,11 @@ function withCleanupTimeout(promise, timeoutMs, label) {
  * @returns {Promise<void>}
  */
 async function forceStopAfterEphemeralCleanupFailure(error, context) {
-    logSwallowed(error, context);
+    logSdkSwallowed(error, context);
     try {
         await forceStopClient();
     } catch (forceStopError) {
-        logSwallowed(forceStopError, `${context}.forceStopClient`);
+        logSdkSwallowed(forceStopError, `${context}.forceStopClient`);
     }
 }
 

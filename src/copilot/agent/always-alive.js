@@ -7,7 +7,6 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { EventEmitter } from 'node:events';
 
@@ -59,6 +58,7 @@ import {
     listPendingSdkPermissions,
     listSdkAgents,
     listSdkWorkspaceFiles,
+    logSwallowed,
     loginSdkMcpOauth,
     msgAnswer,
     msgProcessQueue,
@@ -101,10 +101,7 @@ import {
 /**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
- * Implementa {@link import('../../core/interfaces.js').IAgent IAgent} (Faixa 3.2 — AC-5-01).
- *
  * @extends EventEmitter
- * @see module:copilot/core/interfaces
  */
 export class AlwaysAliveAgent extends EventEmitter {
     /**
@@ -137,7 +134,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     #healthFacade;
 
     /**
-     * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
+     * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; eventBus?: import('#copilot/events/runtime').EventBus | null }} [options]
      */
     constructor(options = {}) {
         super();
@@ -214,6 +211,29 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     getToolSessionContext() {
         return this.#permissionToolsFacade.getToolSessionContext();
+    }
+
+    /** @returns {ReturnType<AgentContext['sessionBinding']['snapshot']>} */
+    getSessionBindingSnapshot() {
+        return this.ctx.sessionBinding.snapshot();
+    }
+
+    /** @param {string|null} id */
+    setHubSessionId(id) {
+        return this.ctx.sessionBinding.setHubSessionId(id);
+    }
+
+    /** @param {string|null} id */
+    setSdkSessionId(id) {
+        return this.ctx.sessionBinding.setSdkSessionId(id);
+    }
+
+    clearSdkSessionId() {
+        return this.ctx.sessionBinding.clearSdkSessionId();
+    }
+
+    clearSessionBinding() {
+        return this.ctx.sessionBinding.clear();
     }
 
     /**
@@ -418,7 +438,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Retorna o sumário de métricas da sessão atual (compatibilidade — use container.resolve(METRICS_STORE)
+     * Retorna o sumário de métricas da sessão atual (compatibilidade — métricas são projetadas pela capability do runtime
      * diretamente).
      *
      * @returns {object}

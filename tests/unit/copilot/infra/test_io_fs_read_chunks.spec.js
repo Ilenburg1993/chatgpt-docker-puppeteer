@@ -20,7 +20,7 @@ import {
     readBinaryMutationSnapshot,
     readIoRollbackPolicy,
 } from '#copilot/infra/internal/filesystem/transaction';
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { createInfraRuntime } from '#copilot/infra/public/composition/runtime';
 
 /** @type {string[]} */

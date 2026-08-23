@@ -9,7 +9,7 @@
  * @module copilot/infra/filesystem/read/cache/line-offset-runtime
  */
 
-import { collectPhysicalLineStarts, slicePhysicalTextLines } from '#copilot/infra/internal/platform';
+import { collectPhysicalLineStarts, slicePhysicalTextLines } from '#copilot/infra/internal/platform/text-lines';
 import { normalizePathResourceKey } from '#copilot/infra/internal/policy';
 import path from 'node:path';
 

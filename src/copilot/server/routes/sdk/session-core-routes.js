@@ -8,7 +8,6 @@
  * `answerPendingQuestion`.
  */
 
-import { resolveModelSelectionMismatch } from '#copilot/core';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withRuntimeMeta, withSessionRuntimeMeta } from './session-route-helpers.js';
@@ -181,7 +180,7 @@ export function registerSessionCoreRoutes(router) {
             );
 
             const effectiveModel = verification.effectiveModel ?? safeModel;
-            const modelMismatch = resolveModelSelectionMismatch({
+            const modelMismatch = routeDeps.sdkModelPolicy.resolveModelSelectionMismatch({
                 configuredModel: verification.requestedModel,
                 effectiveModel: verification.effectiveModel,
             });

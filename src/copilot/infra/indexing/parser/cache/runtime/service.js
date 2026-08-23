@@ -1,7 +1,7 @@
 // @ts-check
 /** Runtime-owned parser symbol/file-context caches. @module copilot/infra/indexing/parser/cache/runtime/service */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 import { LRUCache } from 'lru-cache';
 import * as nodePath from 'node:path';
 import { DEFAULT_PARSER_PROCESS_CONFIG, normalizeParserPath } from '../../foundation/index.js';

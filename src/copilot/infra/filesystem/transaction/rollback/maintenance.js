@@ -2,7 +2,7 @@
 /** Retention, expiration, quota enforcement and purge lifecycle for rollback sidecars. */
 
 import { acquireIoResourceLock } from '#copilot/infra/internal/concurrency/locks';
-import { positiveIntegerOr } from '#copilot/infra/internal/platform';
+import { positiveIntegerOr } from '#copilot/infra/internal/platform/config-values';
 import { assertSuccessfulSync, syncParentDirectoryBestEffort } from '#copilot/infra/internal/platform/node/filesystem';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';

@@ -9,8 +9,8 @@
  * @internal
  */
 
-import { toError } from '#copilot/core/error-handlers';
-import { runShutdown } from '../core/shutdown.js';
+import { runApplicationShutdown } from '#copilot/boot/process-runtime';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '../observability/logger.js';
 
 /** @type {boolean} */
@@ -27,7 +27,7 @@ let terminalShutdownSignalsRegistered = false;
 /**
  * @param {{
  *     processLike?: ProcessLike;
- *     runShutdownFn?: (reason?: string) => Promise<void>;
+ *     runApplicationShutdownFn?: (reason?: string) => Promise<void>;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
  * }} [deps]
  * @returns {void}
@@ -35,7 +35,7 @@ let terminalShutdownSignalsRegistered = false;
 export function registerTerminalShutdownSignals(deps = {}) {
     if (terminalShutdownSignalsRegistered) return;
     const processLike = deps.processLike ?? process;
-    const runShutdownFn = deps.runShutdownFn ?? runShutdown;
+    const runApplicationShutdownFn = deps.runApplicationShutdownFn ?? runApplicationShutdown;
     const logFn = deps.logFn ?? log;
 
     /**
@@ -44,7 +44,7 @@ export function registerTerminalShutdownSignals(deps = {}) {
      */
     const shutdown = (signal) => {
         logFn('INFO', `[terminal/bootstrap] ${signal} recebido — executando shutdown central.`);
-        void runShutdownFn(signal).finally(() => {
+        void runApplicationShutdownFn(signal).finally(() => {
             processLike.exit(0);
         });
     };
@@ -61,7 +61,7 @@ export function registerTerminalShutdownSignals(deps = {}) {
  *
  * @param {unknown} error
  * @param {{
- *     runShutdownFn?: (reason?: string) => Promise<void>;
+ *     runApplicationShutdownFn?: (reason?: string) => Promise<void>;
  *     errorFn?: (...args: unknown[]) => void;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
  *     exitFn?: (code?: number) => never;
@@ -69,14 +69,14 @@ export function registerTerminalShutdownSignals(deps = {}) {
  * @returns {Promise<never>}
  */
 export async function handleTerminalBootFailure(error, deps = {}) {
-    const runShutdownFn = deps.runShutdownFn ?? runShutdown;
+    const runApplicationShutdownFn = deps.runApplicationShutdownFn ?? runApplicationShutdown;
     const errorFn = deps.errorFn ?? console.error;
     const logFn = deps.logFn ?? log;
     const exitFn = deps.exitFn ?? ((code = 1) => process.exit(code));
 
     errorFn('[terminal/bootstrap] Falha fatal no boot:', error);
     try {
-        await runShutdownFn('boot_failure');
+        await runApplicationShutdownFn('boot_failure');
     } catch (shutdownError) {
         logFn(
             'WARN',

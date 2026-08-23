@@ -17,7 +17,26 @@
  */
 
 import { normalizeAgentToolList, resolveToolName } from '#copilot/config';
-import { SdkCustomAgentConfigSchema } from '#copilot/core';
+import { z } from 'zod';
+
+const SdkCustomAgentConfigSchema = z.object({
+    name: z.string().min(1),
+    displayName: z.string().optional(),
+    description: z.string().min(1).optional(),
+    tools: z.array(z.string()).nullable().optional(),
+    toolTiers: z
+        .object({
+            must: z.array(z.string()).optional(),
+            should: z.array(z.string()).optional(),
+            optional: z.array(z.string()).optional(),
+        })
+        .optional(),
+    prompt: z.string().min(1),
+    mcpServers: z.record(z.string(), z.unknown()).optional(),
+    infer: z.boolean().optional(),
+    skills: z.array(z.string().min(1)).optional(),
+    priority: z.enum(['maestro']).optional(),
+});
 
 /**
  * Valida contratos de ferramentas de agentes na inicialização de sessão.

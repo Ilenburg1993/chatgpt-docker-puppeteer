@@ -8,8 +8,8 @@
  * @see EventBus
  */
 
-import { container, toError } from '#copilot/core';
-import { METRICS_STORE, startSpanImmediate, toOtelException } from '#copilot/observability';
+import { toError } from '#copilot/infra/public/platform/error';
+import { defaultMetrics, startSpanImmediate, toOtelException } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,9 +34,9 @@ const ADVISORY_GIT_DEFAULT_TIMEOUT_MS = 10_000;
  */
 function recordGitMetricBestEffort(method, elapsed, ok) {
     try {
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, ok);
+        defaultMetrics.recordToolCall(`bridge.git.${method}`, elapsed, ok);
         if (!ok) {
-            container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
+            defaultMetrics.recordCounter('copilot.bridge.errors_total');
         }
     } catch {
         // Observability indisponível neste contexto — não bloquear bridge read-only.

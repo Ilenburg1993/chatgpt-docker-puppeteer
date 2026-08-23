@@ -5,7 +5,8 @@
  * @module copilot/infra/indexing/registry/sqlite/content
  */
 
-import { countPhysicalTextLines, iterateTextLines, sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
+import { countPhysicalTextLines, iterateTextLines } from '#copilot/infra/internal/platform/text-lines';
 import { extname } from 'node:path';
 
 export { DEFAULT_INDEX_EXTENSIONS } from '../extensions/index.js';

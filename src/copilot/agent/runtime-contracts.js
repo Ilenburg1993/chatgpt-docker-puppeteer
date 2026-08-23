@@ -10,9 +10,10 @@
  * @module copilot/agent/runtime-contracts
  */
 
-import { SessionError, toError } from '#copilot/core';
-import { setSessionModel } from './ports/core-runtime-port.js';
+import { AgentSessionError } from '#copilot/agent/errors';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from './ports/logging/index.js';
+import { setAgentSessionModel } from './ports/session-runtime-port.js';
 
 /**
  * @typedef {import('./types.js').AgentEventHost} AgentEventHost
@@ -27,7 +28,7 @@ import { log } from './ports/logging/index.js';
  * @param {T | null | undefined} host
  * @param {string} [label='AgentHost'] Default is `'AgentHost'`
  * @returns {T & Required<Pick<AgentEventHost, 'on' | 'once' | 'off'>>}
- * @throws {SessionError}
+ * @throws {AgentSessionError}
  */
 export function assertEmitterHost(host, label = 'AgentHost') {
     const maybeOn = host && (typeof host === 'object' || typeof host === 'function') ? Reflect.get(host, 'on') : null;
@@ -41,7 +42,7 @@ export function assertEmitterHost(host, label = 'AgentHost') {
         typeof maybeOnce !== 'function' ||
         typeof maybeOff !== 'function'
     ) {
-        throw new SessionError(`[${label}] Host não implementa EventEmitter mínimo.`, 'INVALID_HOST');
+        throw new AgentSessionError(`[${label}] Host não implementa EventEmitter mínimo.`, 'INVALID_HOST');
     }
     return /** @type {T & Required<Pick<AgentEventHost, 'on' | 'once' | 'off'>>} */ (host);
 }
@@ -76,7 +77,7 @@ export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive
     }
 
     try {
-        const maybeResult = setSessionModel(
+        const maybeResult = setAgentSessionModel(
             /** @type {CopilotSession} */ (session),
             modelId,
             options?.reasoningEffort

@@ -789,7 +789,6 @@ describe('copilot MCP tools', () => {
             await writeFile(
                 importerPath,
                 [
-                    "import '#copilot/sdk/di';",
                     "import '#copilot/sdk/agents';",
                     "import '#copilot/sdk/session-runtime';",
                     "await import('#copilot/infra/public/cache/keys');",
@@ -808,7 +807,7 @@ describe('copilot MCP tools', () => {
             assert.equal(aliases.structuredContent?.['trueOrphanCount'], 0);
             assert.equal(aliases.structuredContent?.['protectedCount'], 0);
             assert.equal(aliases.structuredContent?.['aliasResolutionGapCount'], 0);
-            assert.equal(aliases.structuredContent?.['checkedImports'], 4);
+            assert.equal(aliases.structuredContent?.['checkedImports'], 3);
 
             const protectedResult = await orphanImportsTool.handler({
                 path: 'src/copilot/model-gateway/registry/env-byok-compat-importer.js',

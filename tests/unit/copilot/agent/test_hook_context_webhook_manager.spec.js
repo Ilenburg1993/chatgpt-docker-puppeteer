@@ -14,13 +14,32 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     log: vi.fn(),
     logSwallowed: vi.fn(),
-    validateWebhookUrl: vi.fn(),
-    checkResolvedIp: vi.fn(),
+    validateUrlString: vi.fn(
+        (/** @type {string} */ _input, /** @type {{allowPrivate?:boolean}} */ _options = {}) =>
+            /** @type {{safe:boolean;reason?:string;parsed:URL|null}} */ ({
+                safe: true,
+                parsed: new URL('https://example.com'),
+            }),
+    ),
+    fetchPublicHttp: vi.fn(
+        async (
+            /** @type {string|URL} */ _input,
+            /** @type {RequestInit} */ _init = {},
+            /** @type {{allowPrivate?:boolean}} */ _policy = {},
+        ) => ({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            body: null,
+            url: 'https://example.com/',
+        }),
+    ),
     defaultMetrics: {
         getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })),
     },
     readTodoStore: vi.fn(async () => ({ tasks: {} })),
-    safeJsonParse: vi.fn((/** @type {string} */ raw) => {
+    parseJsonResult: vi.fn((/** @type {string} */ raw) => {
         try {
             return { ok: true, data: JSON.parse(raw) };
         } catch {
@@ -37,23 +56,7 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {any} */ (await importOriginal());
-    return {
-        ...actual,
-        container: {
-            ...actual.container,
-            resolve: vi.fn(() => ({
-                getSummary: mocks.defaultMetrics.getSummary,
-            })),
-        },
-        logSwallowed: mocks.logSwallowed,
-        validateWebhookUrl: mocks.validateWebhookUrl,
-        checkResolvedIp: mocks.checkResolvedIp,
-        toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
-    };
-});
-vi.mock('#copilot/core/error-handlers', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: mocks.logSwallowed,
     toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
 }));
@@ -91,6 +94,15 @@ vi.mock('../../../../src/copilot/agent/ports/tool-port.js', () => ({
 }));
 
 vi.mock('#copilot/boot/application-infra', () => ({
+    getApplicationInfraHost: () => ({
+        processInfra: {
+            processId: 'test-process',
+            config: { eventBus: { maxCounters: 1000 } },
+            shutdown: {
+                register: vi.fn(() => () => {}),
+            },
+        },
+    }),
     getApplicationWorkspaceInfra: () => ({
         readIo: {
             readBytesRangeFresh: mocks.readBytesRangeFresh,
@@ -102,13 +114,9 @@ vi.mock('#copilot/infra/public/filesystem/skills', () => ({
     readConfiguredSkillCatalog: mocks.readSkillCatalog,
 }));
 
-// webhook-manager.js importa de #copilot/core (barrel) — mockar o sub-módulo real
-vi.mock('#copilot/core/security/url-validator', () => ({
-    validateWebhookUrl: mocks.validateWebhookUrl,
-    checkResolvedIp: mocks.checkResolvedIp,
-    validateUrl: vi.fn(),
-    validateUrlString: vi.fn(),
-    isPrivateIp: vi.fn(() => false),
+vi.mock('#copilot/infra/public/platform/network', () => ({
+    validateUrlString: mocks.validateUrlString,
+    fetchPublicHttp: mocks.fetchPublicHttp,
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -334,7 +342,15 @@ describe('F44 — WebhookManager', () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        mocks.validateWebhookUrl.mockImplementation(() => {});
+        mocks.validateUrlString.mockReturnValue({ safe: true, parsed: new URL('https://example.com') });
+        mocks.fetchPublicHttp.mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            body: null,
+            url: 'https://example.com/',
+        });
         const mod = await import('#copilot/testing/agent/infra/webhook-manager');
         wm = new mod.WebhookManager();
     });
@@ -346,11 +362,9 @@ describe('F44 — WebhookManager', () => {
             expect(entry.url).toBe('https://example.com/hook');
         });
 
-        it('register propaga erro de validateWebhookUrl', () => {
-            mocks.validateWebhookUrl.mockImplementation(() => {
-                throw new Error('invalid');
-            });
-            expect(() => wm.register('not-a-url')).toThrow('invalid');
+        it('register rejeita decisão URL unsafe', () => {
+            mocks.validateUrlString.mockReturnValue({ safe: false, reason: 'invalid', parsed: null });
+            expect(() => wm.register('not-a-url')).toThrow(/invalid/u);
         });
 
         it('unregister retorna true para id existente', () => {
@@ -383,20 +397,18 @@ describe('F44 — WebhookManager', () => {
     describe('emit + sanitize', () => {
         it('emit() não faz nada sem webhooks registrados', async () => {
             await expect(wm.emit('test', {})).resolves.not.toThrow();
+            expect(mocks.fetchPublicHttp).not.toHaveBeenCalled();
         });
 
         it('emit() redacts task.delta payload completamente', async () => {
             wm.register('https://example.com/hook');
-            const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
             await wm.emit('task.delta', { content: 'sensitive delta content', other: 'data' });
-            const body = JSON.parse(/** @type {string} */ (fetchSpy.mock.calls[0]?.[1]?.body));
+            const body = JSON.parse(/** @type {string} */ (mocks.fetchPublicHttp.mock.calls[0]?.[1]?.body));
             expect(body.payload).toEqual({ redacted: true });
-            fetchSpy.mockRestore();
         });
 
         it('emit() redacts campo token/secret/password/key/auth/content/answer/message', async () => {
             wm.register('https://example.com/hook');
-            const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
             await wm.emit('session.start', {
                 sessionId: 'abc',
                 token: 'leaked',
@@ -406,47 +418,57 @@ describe('F44 — WebhookManager', () => {
                 answer: 'leaked5',
                 message: 'leaked6',
             });
-            const body = JSON.parse(/** @type {string} */ (fetchSpy.mock.calls[0]?.[1]?.body));
+            const body = JSON.parse(/** @type {string} */ (mocks.fetchPublicHttp.mock.calls[0]?.[1]?.body));
             expect(body.payload.sessionId).toBe('abc');
             expect(body.payload.token).toBe('[redacted]');
             expect(body.payload.secretKey).toBe('[redacted]');
             expect(body.payload.password).toBe('[redacted]');
             expect(body.payload.content).toBe('[redacted]');
-            fetchSpy.mockRestore();
         });
 
-        it('emit() verifica DNS rebinding quando WEBHOOK_ALLOW_PRIVATE_HOSTS=false', async () => {
+        it('emit() usa a capability network segura como única borda de conexão', async () => {
             wm.register('https://example.com/hook');
-            mocks.checkResolvedIp.mockRejectedValue(new Error('private IP'));
-            const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
+            mocks.fetchPublicHttp.mockRejectedValueOnce(new Error('DNS/SSRF bloqueado'));
             await wm.emit('test.event', { a: 1 });
-            // fetch should NOT be called because DNS check failed
-            expect(fetchSpy).not.toHaveBeenCalled();
-            expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('DNS rebinding'));
-            fetchSpy.mockRestore();
+            expect(mocks.fetchPublicHttp).toHaveBeenCalled();
+            expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('retry'));
         });
 
         it('emit() entrega com retry em 5xx', async () => {
             wm.register('https://example.com/hook');
-            mocks.checkResolvedIp.mockResolvedValue(undefined);
-            const fetchSpy = vi
-                .spyOn(globalThis, 'fetch')
-                .mockResolvedValueOnce(new Response('error', { status: 500 }))
-                .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+            mocks.fetchPublicHttp
+                .mockResolvedValueOnce({
+                    ok: false,
+                    status: 500,
+                    statusText: 'Internal Server Error',
+                    headers: new Headers(),
+                    body: null,
+                    url: 'https://example.com/',
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    headers: new Headers(),
+                    body: null,
+                    url: 'https://example.com/',
+                });
             await wm.emit('test.event', { a: 1 });
-            expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
-            fetchSpy.mockRestore();
+            expect(mocks.fetchPublicHttp.mock.calls.length).toBeGreaterThanOrEqual(2);
         });
 
         it('emit() não retria em 4xx (erro permanente)', async () => {
             wm.register('https://example.com/hook');
-            mocks.checkResolvedIp.mockResolvedValue(undefined);
-            const fetchSpy = vi
-                .spyOn(globalThis, 'fetch')
-                .mockResolvedValue(new Response('bad request', { status: 400 }));
+            mocks.fetchPublicHttp.mockResolvedValue({
+                ok: false,
+                status: 400,
+                statusText: 'Bad Request',
+                headers: new Headers(),
+                body: null,
+                url: 'https://example.com/',
+            });
             await wm.emit('test.event', { a: 1 });
-            expect(fetchSpy).toHaveBeenCalledTimes(1);
-            fetchSpy.mockRestore();
+            expect(mocks.fetchPublicHttp).toHaveBeenCalledTimes(1);
         });
     });
 });

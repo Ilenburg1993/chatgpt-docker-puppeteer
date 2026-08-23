@@ -1,7 +1,9 @@
 // @ts-check
 /** Durable rollback sidecar publication and verified read. */
 
-import { positiveIntegerOr, sha256, toBufferView, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { toBufferView, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { positiveIntegerOr } from '#copilot/infra/internal/platform/config-values';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { assertSuccessfulSync, syncParentDirectoryBestEffort } from '#copilot/infra/internal/platform/node/filesystem';
 import { markMutationAppliedError } from '#copilot/infra/internal/policy';
 import { randomUUID } from 'node:crypto';

@@ -17,7 +17,9 @@ const _pid = process.pid;
 /**
  * Middleware que enriquece todo evento com metadados de origem.
  *
- * @type {import('../../core/event-bus.js').Middleware}
+ * @param {import('../base-events.js').BaseEvent} event
+ * @param {() => void | Promise<void>} next
+ * @returns {void | Promise<void>}
  */
 export function timestampEnricher(event, next) {
     if (!event.timestamp) {

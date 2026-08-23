@@ -8,8 +8,8 @@
  * @see EventBus
  */
 
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { MAX_SSE_CLIENTS } from '#copilot/config';
-import { cancelTimer, registerInterval } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
 import { createGzip } from 'node:zlib';
 
@@ -192,7 +192,7 @@ export function createSseWriter(req, res, opts = {}) {
     let heartbeatTimerId = null;
     if (heartbeatMs > 0) {
         heartbeatTimerId = `sse.heartbeat:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-        const _heartbeatTimer = registerInterval(
+        const _heartbeatTimer = registerApplicationInterval(
             heartbeatTimerId,
             () => send('heartbeat', { ts: Date.now() }, { skipBuffer: true }),
             heartbeatMs,
@@ -223,7 +223,7 @@ export function createSseWriter(req, res, opts = {}) {
     const cleanup = () => {
         if (_cleaned) return;
         _cleaned = true;
-        if (heartbeatTimerId) cancelTimer(heartbeatTimerId);
+        if (heartbeatTimerId) cancelApplicationTimer(heartbeatTimerId);
         if (lifetimeTimer) clearTimeout(lifetimeTimer);
         if (gzStream && !gzStream.destroyed) gzStream.destroy();
         tracker?.decrement();

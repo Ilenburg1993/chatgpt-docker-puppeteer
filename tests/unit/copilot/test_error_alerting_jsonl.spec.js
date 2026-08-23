@@ -11,8 +11,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const timerMocks = vi.hoisted(() => ({
-    registerInterval: vi.fn((id, _fn) => ({ id, unref: vi.fn() })),
-    cancelTimer: vi.fn(),
+    registerApplicationInterval: vi.fn((id, _fn) => ({ id, unref: vi.fn() })),
+    cancelApplicationTimer: vi.fn(),
 }));
 
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
@@ -23,13 +23,12 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-vi.mock('#copilot/core', async (importOriginal) => ({
-    .../** @type {any} */ (await importOriginal()),
-    registerInterval: timerMocks.registerInterval,
-    cancelTimer: timerMocks.cancelTimer,
+vi.mock('#copilot/boot/process-runtime', () => ({
+    registerApplicationInterval: timerMocks.registerApplicationInterval,
+    cancelApplicationTimer: timerMocks.cancelApplicationTimer,
 }));
 
-vi.mock('#copilot/core/error-handlers', () => ({
+vi.mock('#copilot/observability/swallowed', () => ({
     logSwallowed: vi.fn(),
 }));
 
@@ -45,8 +44,8 @@ describe('F49 — createErrorAlerter', () => {
 
     beforeEach(async () => {
         vi.useFakeTimers({ shouldAdvanceTime: false });
-        timerMocks.registerInterval.mockClear();
-        timerMocks.cancelTimer.mockClear();
+        timerMocks.registerApplicationInterval.mockClear();
+        timerMocks.cancelApplicationTimer.mockClear();
         tracker = { getErrors: vi.fn(() => []) };
         const { createErrorAlerter } = await import('#copilot/testing/observability/error-alerting');
         alerter = createErrorAlerter(/** @type {any} */ (tracker), {
@@ -156,7 +155,9 @@ describe('F49 — createErrorAlerter', () => {
 
     it('destroy() cancela timer e reseta', async () => {
         alerter.destroy();
-        expect(timerMocks.cancelTimer).toHaveBeenCalledWith(expect.stringMatching(/^observability\.errorAlerting:/u));
+        expect(timerMocks.cancelApplicationTimer).toHaveBeenCalledWith(
+            expect.stringMatching(/^observability\.errorAlerting:/u),
+        );
         expect(alerter.getLastAlert()).toBeNull();
     });
 });

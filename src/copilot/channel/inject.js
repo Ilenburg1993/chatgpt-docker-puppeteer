@@ -11,22 +11,26 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
+import { cancelApplicationTimer, registerApplicationInterval } from '#copilot/boot/process-runtime';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import {
-    BridgeError,
-    cancelTimer,
-    registerInterval,
-    resolveOptionalDialogTimeout,
-    resolveOptionalTransportTimeout,
-    sleepMs,
-    toError,
-} from '#copilot/core';
+import { resolveOptionalDialogTimeout, resolveOptionalTransportTimeout } from '#copilot/dialog/timeout-policy';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
 import { createBoundedProcessOutputCapture } from '#copilot/infra/public/platform/process-output';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
-import { HealthResponseSchema } from '../core/schemas.js';
+import { z } from 'zod';
+import { ChannelError } from './errors.js';
 import { subscribeSse } from './sse-client.js';
+
+const HealthResponseSchema = z.object({
+    ok: z.boolean(),
+    dialogLoopActive: z.boolean().optional(),
+    busy: z.boolean().optional(),
+    hubSessionId: z.string().nullable().optional(),
+    agentStatus: z.string().optional(),
+});
 
 /** Porta padrão do terminal LLM-B via boot config (`LLM_B_TERMINAL_PORT`). GAP-CHAN-002: validação de range. */
 const DEFAULT_PORT = (() => {
@@ -198,7 +202,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
                 const contentLength = Number(res.headers['content-length'] ?? 0);
                 if (Number.isFinite(contentLength) && contentLength > LLM_B_HTTP_RESPONSE_MAX_BYTES) {
                     req.destroy(
-                        new BridgeError(
+                        new ChannelError(
                             `Resposta da LLM-B excede ${LLM_B_HTTP_RESPONSE_MAX_BYTES} bytes`,
                             'LLM_B_RESPONSE_TOO_LARGE',
                         ),
@@ -208,7 +212,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
                 res.on('data', (/** @type {Buffer} */ chunk) => {
                     if (capture.append(chunk).truncated) {
                         req.destroy(
-                            new BridgeError(
+                            new ChannelError(
                                 `Resposta da LLM-B excede ${LLM_B_HTTP_RESPONSE_MAX_BYTES} bytes`,
                                 'LLM_B_RESPONSE_TOO_LARGE',
                             ),
@@ -222,7 +226,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
                             body: capture.toString({ fatal: true, label: 'LLM-B response' }),
                         });
                     } catch {
-                        reject(new BridgeError('Resposta da LLM-B contém UTF-8 inválido', 'LLM_B_INVALID_RESPONSE'));
+                        reject(new ChannelError('Resposta da LLM-B contém UTF-8 inválido', 'LLM_B_INVALID_RESPONSE'));
                     }
                 });
             },
@@ -230,7 +234,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
 
         if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
             req.setTimeout(timeoutMs, () => {
-                req.destroy(new BridgeError(`Timeout após ${timeoutMs}ms aguardando LLM-B`, 'LLM_B_TIMEOUT'));
+                req.destroy(new ChannelError(`Timeout após ${timeoutMs}ms aguardando LLM-B`, 'LLM_B_TIMEOUT'));
             });
         }
 
@@ -279,7 +283,7 @@ export async function checkLlmBHealth(opts = {}) {
  * @param {string} message - Mensagem a enviar para LLM-B
  * @param {InjectOpts} [opts]
  * @returns {Promise<InjectResult>}
- * @throws {BridgeError} Se o terminal não estiver ativo, LLM-B ocupada após todas as tentativas, ou timeout excedido
+ * @throws {ChannelError} Se o terminal não estiver ativo, LLM-B ocupada após todas as tentativas, ou timeout excedido
  */
 export async function injectToLlmB(message, opts = {}) {
     const maxRetries = opts.retries ?? 3;
@@ -301,7 +305,7 @@ export async function injectToLlmB(message, opts = {}) {
                     'INFO',
                     `[inject-llmb] Tentativa ${attempt + 1}/${maxRetries} (${isBusy ? 'BUSY' : 'BOOTING'}) — aguardando ${waitMs}ms...`,
                 );
-                await sleepMs(waitMs, { id: `channel.inject.retry:${attempt + 1}`, unref: true });
+                await sleep(waitMs);
                 continue;
             }
             throw err;
@@ -309,7 +313,7 @@ export async function injectToLlmB(message, opts = {}) {
     }
     // TypeScript safety — loop acima sempre retorna ou lança
     /* c8 ignore next */
-    throw new BridgeError('[inject-llmb] Falha inesperada após retries', 'LLM_B_BUSY');
+    throw new ChannelError('[inject-llmb] Falha inesperada após retries', 'LLM_B_BUSY');
 }
 /**
  * Implementação interna de uma única tentativa de injeção. Não deve ser chamada diretamente.
@@ -317,7 +321,7 @@ export async function injectToLlmB(message, opts = {}) {
  * @param {string} message
  * @param {InjectOpts} opts
  * @returns {Promise<InjectResult>}
- * @throws {BridgeError} Se a resposta for inválida, LLM-B ocupada, indisponível ou retornar erro
+ * @throws {ChannelError} Se a resposta for inválida, LLM-B ocupada, indisponível ou retornar erro
  */
 async function _doInjectToLlmB(message, opts) {
     const port = opts.port ?? DEFAULT_PORT;
@@ -364,7 +368,7 @@ async function _doInjectToLlmB(message, opts) {
     const trimmedBody = body.trim();
 
     if (statusCode === 408 || statusCode === 504) {
-        const e = new BridgeError(
+        const e = new ChannelError(
             `[inject-llmb] Timeout aguardando resposta da LLM-B (HTTP ${statusCode})`,
             'LLM_B_TIMEOUT',
         );
@@ -374,21 +378,21 @@ async function _doInjectToLlmB(message, opts) {
 
     if (!trimmedBody) {
         if (statusCode === 409) {
-            throw new BridgeError(
+            throw new ChannelError(
                 '[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.',
                 'LLM_B_BUSY',
             );
         }
 
         if (statusCode === 503) {
-            throw new BridgeError(
+            throw new ChannelError(
                 '[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b',
                 'LLM_B_UNAVAILABLE',
             );
         }
 
         if (statusCode >= 500) {
-            const e = new BridgeError(
+            const e = new ChannelError(
                 `[inject-llmb] Terminal respondeu HTTP ${statusCode} sem corpo JSON`,
                 'LLM_B_ERROR',
             );
@@ -402,14 +406,14 @@ async function _doInjectToLlmB(message, opts) {
         parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
         if (statusCode === 408 || statusCode === 504) {
-            const e = new BridgeError(
+            const e = new ChannelError(
                 `[inject-llmb] Timeout aguardando resposta da LLM-B (HTTP ${statusCode})`,
                 'LLM_B_TIMEOUT',
             );
             recordToolCall('channel.inject', Date.now() - _startMs, false);
             throw e;
         }
-        const e = new BridgeError(
+        const e = new ChannelError(
             `[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`,
             'LLM_B_INVALID_RESPONSE',
         );
@@ -419,21 +423,21 @@ async function _doInjectToLlmB(message, opts) {
 
     if (statusCode === 409) {
         // Não registrar 409 como erro — é condição esperada de backpressure
-        throw new BridgeError(
+        throw new ChannelError(
             '[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.',
             'LLM_B_BUSY',
         );
     }
 
     if (statusCode === 503) {
-        throw new BridgeError(
+        throw new ChannelError(
             '[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b',
             'LLM_B_UNAVAILABLE',
         );
     }
 
     if (!parsed['ok']) {
-        const e = new BridgeError(`[inject-llmb] Erro: ${parsed['error'] ?? 'desconhecido'}`, 'LLM_B_ERROR');
+        const e = new ChannelError(`[inject-llmb] Erro: ${parsed['error'] ?? 'desconhecido'}`, 'LLM_B_ERROR');
         recordToolCall('channel.inject', Date.now() - _startMs, false);
         throw e;
     }
@@ -479,7 +483,7 @@ async function _doInjectToLlmB(message, opts) {
  *
  * @param {{ maxWaitMs?: number | null; pollIntervalMs?: number; port?: number }} [opts]
  * @returns {Promise<void>}
- * @throws {BridgeError} Se o terminal não ficar pronto dentro do tempo máximo
+ * @throws {ChannelError} Se o terminal não ficar pronto dentro do tempo máximo
  */
 export async function waitForLlmBReady(opts = {}) {
     const maxWaitMs =
@@ -499,7 +503,7 @@ export async function waitForLlmBReady(opts = {}) {
         const settle = (error) => {
             if (settled) return;
             settled = true;
-            cancelTimer(timerId);
+            cancelApplicationTimer(timerId);
             if (error !== undefined) {
                 reject(toError(error));
             } else {
@@ -518,7 +522,7 @@ export async function waitForLlmBReady(opts = {}) {
                 }
                 if (Date.now() >= deadline) {
                     settle(
-                        new BridgeError(
+                        new ChannelError(
                             `[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`,
                             'LLM_B_NOT_READY',
                         ),
@@ -532,7 +536,7 @@ export async function waitForLlmBReady(opts = {}) {
         };
 
         void tick();
-        const timer = registerInterval(
+        const timer = registerApplicationInterval(
             timerId,
             () => {
                 void tick();
@@ -609,7 +613,7 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
  * @param {PipelineStep[]} steps
  * @param {{ from?: string; port?: number; timeoutMs?: number }} [opts]
  * @returns {Promise<PipelineResult>}
- * @throws {BridgeError} Se a resposta for inválida, LLM-B ocupada ou terminal indisponível
+ * @throws {ChannelError} Se a resposta for inválida, LLM-B ocupada ou terminal indisponível
  */
 export async function injectPipeline(steps, opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
@@ -631,21 +635,21 @@ export async function injectPipeline(steps, opts = {}) {
     try {
         parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
-        throw new BridgeError(
+        throw new ChannelError(
             `[inject-llmb] Resposta inválida do pipeline (status ${statusCode}): ${body.slice(0, 200)}`,
             'LLM_B_INVALID_RESPONSE',
         );
     }
 
     if (statusCode === 409) {
-        throw new BridgeError(
+        throw new ChannelError(
             '[inject-llmb] LLM-B ocupada — pipeline abortado. Resultados parciais em parsed.results.',
             'LLM_B_BUSY',
         );
     }
 
     if (statusCode === 503) {
-        throw new BridgeError(
+        throw new ChannelError(
             '[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b',
             'LLM_B_UNAVAILABLE',
         );

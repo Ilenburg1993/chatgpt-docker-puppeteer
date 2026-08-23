@@ -1,6 +1,6 @@
 // @ts-check
 /** Stateless text hashing policy. Counters belong to an injected IoReadRuntime. @module copilot/infra/filesystem/read/cache/hash-policy */
-import { sha256 } from '#copilot/infra/internal/platform';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 
 /** @typedef {'full' | 'returned' | 'none'} TextHashMode */
 /** @param {unknown} value @returns {TextHashMode} */

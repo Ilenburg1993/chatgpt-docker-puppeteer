@@ -47,14 +47,15 @@ describe('F18 — Migração defineTool → createTool (estática)', () => {
         }
     });
 
-    describe('Consumidores diretos do SDK importam createTool de #copilot/sdk', () => {
+    describe('Consumidores diretos do SDK importam createTool da surface exata #copilot/sdk/tools', () => {
         for (const file of SDK_DIRECT_CONSUMERS) {
-            it(`${file} importa createTool de #copilot/sdk`, () => {
+            it(`${file} importa createTool de #copilot/sdk/tools`, () => {
                 const src = readSource(file);
-                const hasCreateToolImport = src
-                    .split('\n')
-                    .some((line) => /import\s.*createTool/.test(line) && /#copilot\/sdk/.test(line));
-                expect(hasCreateToolImport, `Import de createTool não encontrado em ${file}`).toBe(true);
+                const hasCreateToolImport =
+                    /import\s*\{[\s\S]*?\bcreateTool\s+as\s+sdkCreateTool[\s\S]*?\}\s*from\s*['"]#copilot\/sdk\/tools['"]/u.test(
+                        src,
+                    );
+                expect(hasCreateToolImport, `Import exato de createTool não encontrado em ${file}`).toBe(true);
             });
         }
     });

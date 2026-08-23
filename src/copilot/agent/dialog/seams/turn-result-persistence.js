@@ -7,15 +7,16 @@
  * @internal K86.7.3
  */
 
-import { SessionError, container, toError } from '#copilot/core';
+import { AgentSessionError } from '#copilot/agent/errors';
 import {
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
 } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '../../ports/logging/index.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 
 /**
  * Constrói os event handlers principais de resolução/rejeição de um turno.
@@ -84,7 +85,9 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
                 'WARN',
                 `[DialogLoopManager] sendTurn inactivity timeout (${traceLabel(traceId)}, timeout=${timeout}ms)`,
             );
-            reject(new SessionError(`[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`, 'DIALOG_TIMEOUT'));
+            reject(
+                new AgentSessionError(`[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`, 'DIALOG_TIMEOUT'),
+            );
         },
     });
 
@@ -95,7 +98,7 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
         log('INFO', `[DialogLoopManager] reply resolved (${traceLabel(traceId)}, source=loop.reply)`);
         finalizeTurnReply(turnStart, evt.reply, {
             emit: (/** @type {string} */ event, /** @type {object} */ payload) => emitter.emit(event, payload),
-            metrics: container.resolve(METRICS_STORE),
+            metrics: defaultMetrics,
         });
         resolve(evt.reply);
     });
@@ -115,7 +118,7 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
         emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
         emitter.off(EMITTER_LOOP_READY, handlers.ready);
         if (stopEvt?.authorized) {
-            reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
+            reject(new AgentSessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
         } else {
             log(
                 'INFO',
@@ -241,7 +244,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                     finalizeTurnReply?.(turnStart, reply, {
                         emit: (/** @type {string} */ event, /** @type {object} */ payload) =>
                             emitter.emit(event, payload),
-                        metrics: container.resolve(METRICS_STORE),
+                        metrics: defaultMetrics,
                     });
                     resolve(reply);
                 }
@@ -301,7 +304,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                         `[DialogLoopManager] sendTurn inactivity timeout after question.pending (${traceLabel(traceId)}, timeout=${timeout}ms)`,
                     );
                     reject(
-                        new SessionError(
+                        new AgentSessionError(
                             `[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`,
                             'DIALOG_TIMEOUT',
                         ),
@@ -320,7 +323,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                 }
                 finalizeTurnReply?.(turnStart, evt.reply, {
                     emit: (/** @type {string} */ event, /** @type {object} */ payload) => emitter.emit(event, payload),
-                    metrics: container.resolve(METRICS_STORE),
+                    metrics: defaultMetrics,
                 });
                 resolve(evt.reply);
             });
@@ -345,7 +348,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                     onAbortInner = null;
                 }
                 if (stopEvt2?.authorized) {
-                    reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
+                    reject(new AgentSessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
                 } else {
                     waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
                 }

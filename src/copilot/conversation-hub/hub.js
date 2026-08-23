@@ -12,14 +12,8 @@
  * @see module:copilot/bridges/nerv-event-bus-adapterbus-adapter
  */
 
-import {
-    bridgeEmitter,
-    EVENT_BUS,
-    logSwallowed,
-    registerShutdownHandler,
-    SessionError,
-    SHUTDOWN_PRIORITY,
-} from '#copilot/core';
+import { getApplicationEventBus } from '#copilot/boot/application-events';
+import { PROCESS_SHUTDOWN_PHASE, registerApplicationShutdownHandler } from '#copilot/boot/process-runtime';
 import {
     HUB_EVENTS,
     HUB_SESSION_CLOSED,
@@ -28,9 +22,11 @@ import {
     HUB_TURN_SENT,
     HUB_USER_INJECTED,
 } from '#copilot/events';
+import { bridgeEmitter } from '#copilot/events/runtime';
 import { log } from '#copilot/observability';
-import { container } from '../core/di-container.js';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { setCopilotNamespace } from './broadcast.js';
+import { ConversationHubError } from './errors.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { conversationStore } from './store.js';
 
@@ -66,15 +62,23 @@ export class ConversationHub {
 
     /** @type {import('./store.js').ConversationStore} */
     #store;
+    /** @type {import('#copilot/events/runtime').EventBus | null} */
+    #eventBus;
+    /** @type {(() => void) | null} */
+    #disposeEventBusBridge = null;
 
     /** @type {boolean} */
     #initialized = false;
 
     /**
-     * @param {import('./store.js').ConversationStore} [store]
+     * @param {{
+     *   store?: import('./store.js').ConversationStore;
+     *   eventBus?: import('#copilot/events/runtime').EventBus | null;
+     * }} [options]
      */
-    constructor(store = conversationStore) {
-        this.#store = store;
+    constructor(options = {}) {
+        this.#store = options.store ?? conversationStore;
+        this.#eventBus = options.eventBus ?? null;
     }
 
     // ─── Inicialização ─────────────────────────────────────────────────────────
@@ -132,7 +136,7 @@ export class ConversationHub {
      *
      * @param {import('socket.io').Server} io
      * @returns {void}
-     * @throws {SessionError} Se hub não inicializado
+     * @throws {ConversationHubError} Se hub não inicializado
      */
     /**
      * Conecta Socket.IO ao hub já inicializado via função de montagem injetável. Permite iniciar sem io e fazer upgrade
@@ -147,11 +151,11 @@ export class ConversationHub {
      *   - Função de montagem injetada pelo server layer. Se omitida, namespace já deve estar montado.
      *
      * @returns {void}
-     * @throws {SessionError} Se hub não inicializado
+     * @throws {ConversationHubError} Se hub não inicializado
      */
     attachSocketIO(io, mountFn) {
         if (!this.#initialized || !this.#orchestrator) {
-            throw new SessionError(
+            throw new ConversationHubError(
                 '[ConversationHub] Não inicializado. Chame init() antes de attachSocketIO().',
                 'HUB_NOT_INITIALIZED',
             );
@@ -176,7 +180,10 @@ export class ConversationHub {
      */
     get orchestrator() {
         if (!this.#orchestrator) {
-            throw new SessionError('[ConversationHub] Não inicializado. Chame init() primeiro.', 'HUB_NOT_INITIALIZED');
+            throw new ConversationHubError(
+                '[ConversationHub] Não inicializado. Chame init() primeiro.',
+                'HUB_NOT_INITIALIZED',
+            );
         }
         return this.#orchestrator;
     }
@@ -267,6 +274,8 @@ export class ConversationHub {
      * @returns {void}
      */
     stop() {
+        this.#disposeEventBusBridge?.();
+        this.#disposeEventBusBridge = null;
         if (this.#orchestrator) {
             this.#orchestrator.destroy();
             this.#orchestrator = null;
@@ -319,21 +328,17 @@ export class ConversationHub {
      * eventos hub via EventBus (use constantes de `#copilot/events`).
      */
     #bridgeToEventBus() {
-        if (!this.#orchestrator) return;
-        try {
-            const bus = container.resolve(EVENT_BUS);
-            if (!bus) return;
-            bridgeEmitter(this.#orchestrator, bus, {
-                [HUB_EVENTS.SESSION_CREATED]: HUB_SESSION_CREATED,
-                [HUB_EVENTS.SESSION_CLOSED]: HUB_SESSION_CLOSED,
-                [HUB_EVENTS.TURN_SENT]: HUB_TURN_SENT,
-                [HUB_EVENTS.TURN_COMPLETE]: HUB_TURN_COMPLETE,
-                [HUB_EVENTS.USER_INJECTED]: HUB_USER_INJECTED,
-            });
-            log('DEBUG', '[ConversationHub] Bridge EventBus vinculado.');
-        } catch {
-            // EventBus não registrado no DI — ignorar
-        }
+        this.#disposeEventBusBridge?.();
+        this.#disposeEventBusBridge = null;
+        if (!this.#orchestrator || !this.#eventBus) return;
+        this.#disposeEventBusBridge = bridgeEmitter(this.#orchestrator, this.#eventBus, {
+            [HUB_EVENTS.SESSION_CREATED]: HUB_SESSION_CREATED,
+            [HUB_EVENTS.SESSION_CLOSED]: HUB_SESSION_CLOSED,
+            [HUB_EVENTS.TURN_SENT]: HUB_TURN_SENT,
+            [HUB_EVENTS.TURN_COMPLETE]: HUB_TURN_COMPLETE,
+            [HUB_EVENTS.USER_INJECTED]: HUB_USER_INJECTED,
+        });
+        log('DEBUG', '[ConversationHub] Bridge EventBus vinculado.');
     }
 
     /** @param {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} nerv */
@@ -372,13 +377,13 @@ export class ConversationHub {
  *
  * @type {ConversationHub}
  */
-export const conversationHub = new ConversationHub();
+export const conversationHub = new ConversationHub({ store: conversationStore, eventBus: getApplicationEventBus() });
 
 // FAIXA-0: graceful shutdown — fechar sessions e orchestrator
-registerShutdownHandler(
+registerApplicationShutdownHandler(
     'hub.close',
     async () => {
         await conversationHub.close();
     },
-    SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
+    PROCESS_SHUTDOWN_PHASE.RUNTIME_CRITICAL,
 );

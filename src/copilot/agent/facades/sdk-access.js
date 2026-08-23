@@ -61,9 +61,12 @@ export {
     getAgentSdkToolsConfig,
     loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions,
+    sanitizeAgentSdkToolNames,
 } from './sdk/index.js';
 
 export {
+    classifyAgentSdkError,
+    classifyAgentSdkRateLimitScope,
     createAgentSdkQuotaMonitor,
     getAgentSdkRecoveryPolicy,
     getSdkQuota,
@@ -114,6 +117,7 @@ export {
     listPendingSdkElicitations,
     listPendingSdkPermissions,
     loginSdkMcpOauth,
+    normalizeAgentSdkElicitationResult,
     requestSdkElicitation,
     resetSdkSessionApprovals,
     resolvePendingSdkElicitation,

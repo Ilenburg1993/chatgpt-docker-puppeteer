@@ -1,8 +1,9 @@
 // @ts-check
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
+import { toError } from '#copilot/infra/public/platform/error';
+import { logSwallowed } from '#copilot/observability/swallowed';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { z } from 'zod';

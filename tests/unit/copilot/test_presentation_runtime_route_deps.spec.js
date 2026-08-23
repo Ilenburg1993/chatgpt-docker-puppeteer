@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     agent: { status: 'idle' },
-    metrics: { name: 'metrics-store' },
+    metrics: {
+        name: 'metrics-store',
+        getSummary: vi.fn(() => ({ tools: {}, tokens: {}, sessions: {}, gauges: {}, counters: {} })),
+    },
     allTools: [{ name: 'grep' }],
     getClient: vi.fn(),
     getClientState: vi.fn(),
@@ -18,31 +21,6 @@ const mocks = vi.hoisted(() => ({
     sessionUiInput: vi.fn(),
     sessionUiSelect: vi.fn(),
 }));
-
-vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {any} */ (await importOriginal());
-    return {
-        ...actual,
-        container: { resolve: mocks.resolve },
-        DEFAULT_BLOCKED_READ_PATH_PATTERNS: actual.DEFAULT_BLOCKED_READ_PATH_PATTERNS ?? [],
-        DEFAULT_BLOCKED_WRITE_PATH_PATTERNS: actual.DEFAULT_BLOCKED_WRITE_PATH_PATTERNS ?? [],
-        evaluateIoPathPolicyAsync:
-            actual.evaluateIoPathPolicyAsync ??
-            vi.fn(async () => ({
-                ok: true,
-                absolutePath: process.cwd(),
-                relativePath: '.',
-                workspaceRoot: process.cwd(),
-                policyVersion: 'test',
-                blockedSegments: [],
-                realPath: process.cwd(),
-                symlinkResolved: false,
-            })),
-        registerShutdownHandler: vi.fn(),
-        runShutdown: vi.fn(async () => []),
-        isShuttingDown: vi.fn(() => false),
-    };
-});
 
 vi.mock('#copilot/audit', () => ({
     defaultAuditLog: {
@@ -81,9 +59,7 @@ vi.mock('#copilot/observability', () => ({
         getErrors: vi.fn(() => []),
         getStats: vi.fn(() => ({ total: 0, buffered: 0 })),
     },
-    defaultMetrics: {
-        getSummary: vi.fn(() => ({ tools: {}, tokens: {}, sessions: {}, gauges: {}, counters: {} })),
-    },
+    defaultMetrics: mocks.metrics,
     defaultConvergenceTraceStore: {
         clear: vi.fn(),
         getSnapshot: vi.fn(() => ({
@@ -336,7 +312,7 @@ describe('server/routes/sdk/deps.js', () => {
         expect(deps.agent).toBe(mocks.agent);
         expect(deps.runtimeId).toBe('default');
         expect(deps.runtimeFound).toBe(true);
-        expect(deps.metrics).toEqual({ name: 'metrics-store' });
+        expect(deps.metrics).toBe(mocks.metrics);
         expect(deps.allTools).toEqual([{ name: 'grep' }]);
         expect(deps.getClient).toBe(mocks.getClient);
         expect(deps.getClientState).toBe(mocks.getClientState);

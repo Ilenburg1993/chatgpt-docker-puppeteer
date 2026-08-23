@@ -189,13 +189,20 @@ describe('infra barrel governance', () => {
             ),
         ).toBe(true);
         expect(
-            internalAliases.every(
-                ([, target]) =>
-                    typeof target === 'string' &&
-                    target.startsWith('./src/copilot/infra/') &&
-                    !target.startsWith('./src/copilot/infra/public/') &&
-                    target.endsWith('/index.js'),
-            ),
+            internalAliases.every(([alias, target]) => {
+                if (
+                    typeof target !== 'string' ||
+                    !target.startsWith('./src/copilot/infra/') ||
+                    target.startsWith('./src/copilot/infra/public/')
+                ) {
+                    return false;
+                }
+                if (target.endsWith('/index.js')) return true;
+                if (!target.endsWith('.js')) return false;
+                const aliasSuffix = alias.slice('#copilot/infra/internal/'.length);
+                const targetSuffix = target.slice('./src/copilot/infra/'.length, -'.js'.length);
+                return aliasSuffix === targetSuffix;
+            }),
         ).toBe(true);
         expect(publicAliases.map(([key]) => key)).toEqual(
             expect.arrayContaining([

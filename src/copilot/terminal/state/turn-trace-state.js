@@ -507,7 +507,7 @@ export function recordTerminalTurnUserInputActivity({
     kind = 'question',
     question = '',
     choices = [],
-    allowFreeform: _ = true,
+    allowFreeform = true,
     status = 'requested',
     answerPreview = null,
     source = 'sdk',
@@ -541,7 +541,7 @@ export function recordTerminalTurnUserInputActivity({
             kind: normalizeUserInputKind(kind),
             question: normalizedQuestion,
             choices: normalizeChoices(choices),
-            allowFreeform: true,
+            allowFreeform: allowFreeform !== false,
             status: normalizedStatus,
             answerPreview: normalizedAnswerPreview,
             source: normalizedSource,
@@ -554,7 +554,7 @@ export function recordTerminalTurnUserInputActivity({
             existing.status = normalizedStatus;
             existing.answerPreview = normalizedAnswerPreview ?? existing.answerPreview;
             existing.choices = existing.choices.length > 0 ? existing.choices : normalizeChoices(choices);
-            existing.allowFreeform = true;
+            existing.allowFreeform = allowFreeform !== false;
             existing.count += 1;
             existing.updatedAt = timestamp;
         }

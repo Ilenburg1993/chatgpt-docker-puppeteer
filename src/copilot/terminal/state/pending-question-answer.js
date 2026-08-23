@@ -13,7 +13,7 @@ import {
 import { recordTerminalUserInputAnswerEchoGuard } from './sdk-interactions.js';
 
 /**
- * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled'} TerminalPendingAnswerReason
+ * @typedef {'answered' | 'answer_failed' | 'selection_required' | 'empty' | 'no_pending' | 'protocol_controlled'} TerminalPendingAnswerReason
  *
  *
  * @typedef {{
@@ -33,7 +33,7 @@ import { recordTerminalUserInputAnswerEchoGuard } from './sdk-interactions.js';
 /**
  * @param {string} answer
  * @param {{ choices?: string[]; allowFreeform?: boolean }} pending
- * @returns {{ ok: true; answer: string }}
+ * @returns {{ ok: true; answer: string } | { ok: false; answer: string }}
  */
 function normalizePendingQuestionAnswer(answer, pending) {
     const choices = Array.isArray(pending.choices) ? pending.choices : [];
@@ -52,7 +52,7 @@ function normalizePendingQuestionAnswer(answer, pending) {
     if (normalizedMatches.length === 1) {
         return { ok: true, answer: normalizedMatches[0] ?? answer };
     }
-    return { ok: true, answer };
+    return pending.allowFreeform === false ? { ok: false, answer } : { ok: true, answer };
 }
 
 /**
@@ -99,6 +99,15 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
                 pendingQuestionText: structuredInput.question,
                 pendingQuestionChoices: structuredInput.choices,
             };
+            if (!normalized.ok) {
+                return {
+                    ...structuredBase,
+                    answer: normalized.answer,
+                    routed: true,
+                    ok: false,
+                    reason: 'selection_required',
+                };
+            }
             const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
             if (ok) {
                 recordTerminalUserInputAnswerEchoGuard({
@@ -121,6 +130,9 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
     }
 
     const normalized = normalizePendingQuestionAnswer(answer, pending);
+    if (!normalized.ok) {
+        return { ...resultBase, answer: normalized.answer, routed: true, ok: false, reason: 'selection_required' };
+    }
     const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
     if (ok) {
         recordTerminalUserInputAnswerEchoGuard({

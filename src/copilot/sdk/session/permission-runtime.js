@@ -5,7 +5,7 @@
  * @module copilot/sdk/session/permission-runtime
  */
 
-export { TOOL_NAME_RE, sanitizeToolNames } from '#copilot/core';
+export { TOOL_NAME_RE, sanitizeToolNames } from '#copilot/sdk/tools';
 
 /** @type {ReadonlyArray<'approve_all' | 'audit_only' | 'selective'>} */
 export const PERMISSION_MODES = Object.freeze(['approve_all', 'audit_only', 'selective']);

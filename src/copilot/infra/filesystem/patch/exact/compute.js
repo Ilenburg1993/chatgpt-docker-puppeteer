@@ -5,7 +5,8 @@
  * @module copilot/infra/filesystem/patch/exact/compute
  */
 
-import { countPhysicalTextLines, lineNumberAtTextOffset, utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
+import { countPhysicalTextLines, lineNumberAtTextOffset } from '#copilot/infra/internal/platform/text-lines';
 
 /**
  * @typedef {{

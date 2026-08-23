@@ -8,7 +8,7 @@
  * @module copilot/infra/persistence/jsonl/bound/writer
  */
 
-import { markMutationAppliedError } from '#copilot/infra/internal/policy';
+import { markMutationAppliedError } from '#copilot/infra/internal/policy/mutation-state';
 import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { createJsonlBatchQueue } from '../queue/index.js';

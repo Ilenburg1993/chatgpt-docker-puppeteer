@@ -11,7 +11,7 @@
  * @module copilot/infra/filesystem/workspace/authority/service
  */
 
-import { IO_PATH_POLICY_VERSION } from '#copilot/infra/internal/policy';
+import { IO_PATH_POLICY_VERSION } from '#copilot/infra/internal/policy/workspace-path';
 import path from 'node:path';
 import { evaluateWorkspacePathPolicyAsync } from '../path-policy/index.js';
 

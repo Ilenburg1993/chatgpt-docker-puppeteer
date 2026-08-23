@@ -5,7 +5,7 @@
  * @module copilot/infra/filesystem/read/snapshot/bytes
  */
 
-import { richFingerprintMatches } from '#copilot/infra/internal/platform';
+import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 import * as fs from 'node:fs/promises';
 
 const DEFAULT_SNAPSHOT_RETRIES = 2;

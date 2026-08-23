@@ -1,7 +1,7 @@
 // @ts-check
 /** Materialized bounded line windows resolved through the progressive byte-line index. */
 
-import { toBufferView, utf8ByteLength } from '#copilot/infra/internal/platform';
+import { toBufferView, utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
 import { chunkSnapshotMatchesStats, createStaleChunkSnapshotError, sameFileSnapshot } from '../snapshot/index.js';

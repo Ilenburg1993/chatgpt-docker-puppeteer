@@ -4,15 +4,15 @@
  * @file Wrapper do CopilotClient com circuit breaker para operações de conexão.
  */
 
-import { sleepMs } from '#copilot/core';
-import { CircuitBreaker } from '#copilot/core/circuit-breaker';
-import { logSwallowed, toError } from '#copilot/core/error-handlers';
+import { sleep } from '#copilot/infra/public/concurrency/resilience';
+import { toError } from '#copilot/infra/public/platform/error';
 import { CopilotClient } from '@github/copilot-sdk';
 import { CONNECTION_STATES } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
-import { log } from '../logger.js';
+import { log, logSdkSwallowed } from '../logger.js';
 import { setModelListClientProvider } from '../models/client-provider.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
+import { CircuitBreaker } from './circuit-breaker.js';
 import {
     buildCopilotClientOptionsFromEnv,
     buildServerCopilotClientOptions,
@@ -77,10 +77,7 @@ export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', 
  * @returns {Promise<void>}
  */
 async function wait(ms) {
-    await sleepMs(ms, {
-        id: `sdk.session.client.wait:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-        unref: true,
-    });
+    await sleep(ms);
 }
 
 /**
@@ -91,7 +88,7 @@ async function clearModelsCacheBestEffort() {
         const { clearModelsCacheAsync } = await import('../models/helpers.js');
         await clearModelsCacheAsync();
     } catch (error) {
-        logSwallowed(error, 'sdk.client.clearModelsCache');
+        logSdkSwallowed(error, 'sdk.client.clearModelsCache');
     }
 }
 
@@ -117,7 +114,7 @@ function readCompatClientState(client) {
             return state;
         }
     } catch (error) {
-        logSwallowed(error, 'sdk.client.readCompatClientState');
+        logSdkSwallowed(error, 'sdk.client.readCompatClientState');
     }
     return undefined;
 }
@@ -507,7 +504,7 @@ export class CopilotClientManager {
             try {
                 await entry.session.disconnect();
             } catch (e) {
-                logSwallowed(e, 'sdk.client.disconnect');
+                logSdkSwallowed(e, 'sdk.client.disconnect');
             }
             this.#registry.remove(sessionId);
             if (this.#registry.count() === 0) this.#registryHasActiveSessions = false;

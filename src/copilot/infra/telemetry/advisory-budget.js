@@ -1,7 +1,7 @@
 // @ts-check
 /** Instance-owned advisory IO pressure budget. @module copilot/infra/telemetry/advisory-budget */
 
-import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
+import { readEnvPositiveInt } from '#copilot/infra/internal/platform/env';
 
 /** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env] */
 export function readIoAdvisoryBudgetConfig(env = {}) {

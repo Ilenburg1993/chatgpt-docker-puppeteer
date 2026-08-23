@@ -5,7 +5,7 @@
  * @module copilot/infra/cache/keys/service
  */
 
-import { normalizePathResourceKey } from '#copilot/infra/internal/policy';
+import { normalizePathResourceKey } from '#copilot/infra/internal/policy/path-resource';
 
 /**
  * Normaliza um path para uso como chave de cache. NÃO faz I/O.

@@ -1,6 +1,7 @@
 // @ts-check
 /** Rich fingerprint/hash verification of one L1 cache entry against current filesystem state. */
-import { fingerprintMatches, richFingerprintMatches, sha256 } from '#copilot/infra/internal/platform';
+import { fingerprintMatches, richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import * as fs from 'node:fs/promises';
 /** @typedef {import('../contracts/index.js').IoCacheEntry} IoCacheEntry */
 /**

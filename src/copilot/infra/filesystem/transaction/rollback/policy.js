@@ -1,7 +1,7 @@
 // @ts-check
 /** Pure rollback configuration projection. No operational function in this module reads process.env. */
 
-import { booleanValueOr, positiveIntegerOr } from '#copilot/infra/internal/platform';
+import { booleanValueOr, positiveIntegerOr } from '#copilot/infra/internal/platform/config-values';
 import path from 'node:path';
 
 export const DEFAULT_ROLLBACK_TTL_MS = 24 * 60 * 60 * 1000;

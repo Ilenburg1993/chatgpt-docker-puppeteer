@@ -2,24 +2,24 @@
 /**
  * Politica canônica de input humano para a LLM-B.
  *
- * Choices são sugestões e atalhos. O operador sempre pode responder com texto livre, mesmo quando chamadas antigas
- * pedem `allowFreeform=false` ou `requires_selection=true`.
+ * Texto livre é permitido por padrão. Quando o caller declara `allowFreeform=false`, choices passam a ser restrição
+ * semântica e a policy preserva essa decisão em todas as projections.
  *
  * @module copilot/sdk/session/user-input-policy
  */
 
 export const USER_INPUT_FREEFORM_POLICY = Object.freeze({
-    mode: 'freeform_always',
-    choicesAreSuggestions: true,
-    requiredSelectionIsLegacy: true,
+    mode: 'caller_controlled_default_true',
+    choicesAreSuggestionsByDefault: true,
+    explicitFalseRequiresSelection: true,
 });
 
 /**
- * @param {unknown} [_]
- * @returns {true}
+ * @param {unknown} [requested]
+ * @returns {boolean}
  */
-export function resolveEffectiveUserInputAllowFreeform(_) {
-    return true;
+export function resolveEffectiveUserInputAllowFreeform(requested = undefined) {
+    return requested !== false;
 }
 
 /**

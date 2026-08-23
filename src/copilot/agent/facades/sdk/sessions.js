@@ -7,7 +7,7 @@
  * @module copilot/agent/facades/sdk/sessions
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { toError } from '#copilot/infra/public/platform/error';
 import {
     createSession,
     deleteSession,

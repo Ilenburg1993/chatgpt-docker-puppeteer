@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { hasCanonicalLocalFsTools } from '#copilot/sdk/tools';
 import express from 'express';
 import request from 'supertest';
+import { decideSdkFsRouting } from '../../../src/copilot/presentation/files/index.js';
 
 import createObservabilityRouter from '../../../src/copilot/server/routes/sdk/observability.js';
 
@@ -76,6 +78,8 @@ function makeDeps(overrides = {}) {
         sdkSessionRpc: {
             workspaceReadFile: async () => ({ content: 'ok' }),
         },
+        sdkToolSurfacePolicy: { hasCanonicalLocalFsTools },
+        sdkFileRouting: { decideSdkFsRouting },
         ...overrides,
     };
 }

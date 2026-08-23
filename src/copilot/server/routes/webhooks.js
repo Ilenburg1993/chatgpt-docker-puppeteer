@@ -13,7 +13,7 @@
  * @module copilot/server/routes/webhooks
  */
 
-import { validateUrlString } from '#copilot/core';
+import { validateUrlString } from '#copilot/infra/public/platform/network';
 import { Router } from 'express';
 import { z } from 'zod';
 

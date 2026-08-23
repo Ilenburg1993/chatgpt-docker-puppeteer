@@ -6,12 +6,12 @@
 
 import { getBootLifecycleMetrics, getLastBootLifecycleReport, readCopilotBootConfig } from '#copilot/boot';
 import {
-    getLastShutdownReport,
-    getShutdownLifecycleMetrics,
-    isShuttingDown,
-    listActiveTimers,
-    listShutdownHandlers,
-} from '#copilot/core';
+    getApplicationShutdownMetrics,
+    getLastApplicationShutdownReport,
+    isApplicationShuttingDown,
+    listActiveApplicationTimers,
+    listApplicationShutdownHandlers,
+} from '#copilot/boot/process-runtime';
 
 /**
  * @typedef {{
@@ -19,10 +19,10 @@ import {
  *     lastBootReport: ReturnType<typeof getLastBootLifecycleReport>;
  *     bootMetrics: ReturnType<typeof getBootLifecycleMetrics>;
  *     bootConfig: ReturnType<typeof readCopilotBootConfig>;
- *     shutdownHandlers: ReturnType<typeof listShutdownHandlers>;
- *     lastShutdownReport: ReturnType<typeof getLastShutdownReport>;
- *     shutdownMetrics: ReturnType<typeof getShutdownLifecycleMetrics>;
- *     activeTimers: ReturnType<typeof listActiveTimers>;
+ *     shutdownHandlers: ReturnType<typeof listApplicationShutdownHandlers>;
+ *     lastShutdownReport: ReturnType<typeof getLastApplicationShutdownReport>;
+ *     shutdownMetrics: ReturnType<typeof getApplicationShutdownMetrics>;
+ *     activeTimers: ReturnType<typeof listActiveApplicationTimers>;
  * }} RuntimeLifecycleSnapshot
  *
  *
@@ -54,7 +54,7 @@ import {
  *     } | null;
  *     registeredShutdownHandlers: number;
  *     activeTimerCount: number;
- *     oldestActiveTimer: { id: string; type: 'timeout' | 'interval'; ageMs: number } | null;
+ *     oldestActiveTimer: { id: string; type: 'timeout' | 'interval' | 'external-timeout' | 'external-interval' | 'sleep'; ageMs: number } | null;
  *     capabilities: {
  *         canonicalEntrypoint: string;
  *         serverUrl: string;
@@ -76,14 +76,14 @@ import {
  */
 export function readRuntimeLifecycleSnapshot() {
     return {
-        shuttingDown: isShuttingDown(),
+        shuttingDown: isApplicationShuttingDown(),
         lastBootReport: getLastBootLifecycleReport(),
         bootMetrics: getBootLifecycleMetrics(),
         bootConfig: readCopilotBootConfig(),
-        shutdownHandlers: listShutdownHandlers(),
-        lastShutdownReport: getLastShutdownReport(),
-        shutdownMetrics: getShutdownLifecycleMetrics(),
-        activeTimers: listActiveTimers(),
+        shutdownHandlers: listApplicationShutdownHandlers(),
+        lastShutdownReport: getLastApplicationShutdownReport(),
+        shutdownMetrics: getApplicationShutdownMetrics(),
+        activeTimers: listActiveApplicationTimers(),
     };
 }
 
@@ -150,13 +150,18 @@ export function buildRuntimeLifecycleSummary(lifecycle = readRuntimeLifecycleSna
             : null,
         shutdown: shutdown
             ? {
-                  status: shutdown.failedCount > 0 || shutdown.timeoutCount > 0 ? 'failed' : 'ok',
+                  status:
+                      shutdown.failedCount > 0 ||
+                      shutdown.timedOutAbortedCount > 0 ||
+                      shutdown.timedOutStillRunningCount > 0
+                          ? 'failed'
+                          : 'ok',
                   reason: shutdown.reason,
                   handlers: `${shutdown.okCount}/${shutdown.handlerCount}`,
                   handlerCount: shutdown.handlerCount,
                   okCount: shutdown.okCount,
                   failedCount: shutdown.failedCount,
-                  timeoutCount: shutdown.timeoutCount,
+                  timeoutCount: shutdown.timedOutAbortedCount + shutdown.timedOutStillRunningCount,
                   failedHandler: failedShutdownHandler?.name ?? null,
                   durationMs: shutdown.durationMs,
               }

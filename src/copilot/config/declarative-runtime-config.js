@@ -9,7 +9,7 @@
 
 import { resolvePersistentConfigFile } from '#copilot/boot';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { safeJsonParse } from '../core/safe-json.js';
+import { parseJsonResult } from '#copilot/infra/public/platform/json';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
@@ -62,7 +62,7 @@ function readStringArray(value) {
 export async function readSkillsConfig() {
     try {
         const raw = (await SKILLS_FS.readTextFresh(SKILLS_PATH)).content;
-        const result = safeJsonParse(raw, '[config/declarative-runtime-config.readSkillsConfig]');
+        const result = parseJsonResult(raw, '[config/declarative-runtime-config.readSkillsConfig]');
         return result.ok ? /** @type {SkillsConfig} */ (result.data) : { paths: [] };
     } catch {
         return { paths: [] };

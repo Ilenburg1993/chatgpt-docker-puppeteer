@@ -1,4 +1,5 @@
 // @ts-check
+import { readAgentSessionBinding } from '#copilot/presentation/agent/runtime';
 /**
  * @file Gateway: agent-runtime.
  *
@@ -6,7 +7,6 @@
  *   and snapshot I/O. Isolates `presentation/runtime/index.js` and `presentation/runtime/index.js`.
  */
 
-import { getSharedSessionBinding } from '#copilot/core';
 import {
     abortAgentRuntimeCurrentMessage,
     answerAgentPendingQuestion,
@@ -276,10 +276,12 @@ export function readTerminalAgentRuntimeEventHost(runtimeId) {
 /**
  * Binding canônico entre runtime, sessão SDK e hub conversacional.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null }}
  */
-export function readTerminalSessionBinding() {
-    return getSharedSessionBinding();
+export function readTerminalSessionBinding(runtimeId) {
+    const binding = readAgentSessionBinding(runtimeId);
+    return { hubSessionId: binding.hubSessionId, sdkSessionId: binding.sdkSessionId };
 }
 
 /**

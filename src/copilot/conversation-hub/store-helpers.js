@@ -11,8 +11,8 @@
  * @see module:copilot/conversation-hub/store
  */
 
+import { toError } from '#copilot/infra/public/platform/error';
 import { log } from '#copilot/observability';
-import { toError } from '../core/error-handlers.js';
 
 // ─── Typedefs (re-exportadas por store.js) ────────────────────────────────────
 

@@ -10,8 +10,9 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { getApplicationWorkspaceInfra } from '#copilot/boot/application-infra';
-import { redactSecretText, toError } from '#copilot/core';
+import { redactSecretText } from '#copilot/infra/public/observability/redaction';
 import { utf8ByteLength } from '#copilot/infra/public/platform/buffer';
+import { toError } from '#copilot/infra/public/platform/error';
 import { IO_PATH_POLICY_VERSION } from '#copilot/infra/public/policy';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';

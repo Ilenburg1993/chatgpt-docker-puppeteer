@@ -229,6 +229,7 @@ const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<
  *     dialogPaused?: boolean;
  *     queueSize?: number;
  *     sessionId: string | null;
+ *     getSessionBindingSnapshot: () => { hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean };
  *     getHealthSnapshot: () => TestAgentHealthSnapshot;
  *     getStatusSnapshot: () => TestAgentStatusSnapshot;
  *     dialogPrMetrics: RuntimePrBudgetSnapshot['prMetrics'] | null;
@@ -267,6 +268,7 @@ const defaultRuntime = /** @type {TestAgentRuntime} */ ({
     reasoningEffort: 'high',
     dialogLoopActive: false,
     sessionId: 'test-session-id',
+    getSessionBindingSnapshot: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-current', isBound: true }),
     getHealthSnapshot: () => ({
         ok: true,
         healthy: true,
@@ -307,6 +309,7 @@ const altRuntime = /** @type {TestAgentRuntime} */ ({
     reasoningEffort: 'medium',
     dialogLoopActive: true,
     sessionId: 'alt-session-id',
+    getSessionBindingSnapshot: () => ({ hubSessionId: 'hub-alt', sdkSessionId: 'sdk-alt', isBound: true }),
     getHealthSnapshot: () => ({
         ok: true,
         healthy: true,
@@ -527,14 +530,6 @@ vi.mock('#copilot/agent/facades', () => ({
             : null,
     ),
 }));
-
-vi.mock('#copilot/core', async () => {
-    const actual = await vi.importActual('#copilot/core');
-    return {
-        ...actual,
-        getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
-    };
-});
 
 vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {

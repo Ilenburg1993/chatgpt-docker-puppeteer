@@ -16,3 +16,10 @@ export {
     DialogProtocol,
     MESSAGE_KIND,
 } from './protocol.js';
+
+export {
+    computeAdaptiveDialogTimeout,
+    computeAdaptiveTransportTimeout,
+    resolveOptionalDialogTimeout,
+    resolveOptionalTransportTimeout,
+} from './timeout-policy.js';

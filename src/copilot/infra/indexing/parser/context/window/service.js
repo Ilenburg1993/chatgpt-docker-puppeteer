@@ -1,7 +1,7 @@
 // @ts-check
 /** Pure FileContext bounded projection. @module copilot/infra/indexing/parser/context/window/service */
 
-import { utf8ByteLength } from '#copilot/infra/internal/platform';
+import { utf8ByteLength } from '#copilot/infra/internal/platform/buffer';
 
 /** @typedef {import('../../foundation/index.js').FileContext} FileContext */
 

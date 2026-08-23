@@ -17,7 +17,6 @@
  */
 
 export * from './conversation-port.js';
-export * from './core-runtime-port.js';
 export * from './error-tracking-port.js';
 export * from './event-observer-port.js';
 export * from './hook-port.js';
@@ -30,5 +29,8 @@ export * from './sdk-preflight-port.js';
 export * from './snapshot-port.js';
 export * from './todo-port.js';
 export * from './tool-port.js';
+export * from './tool-surface-policy-port.js';
 export * from './tracing-port.js';
 export * from './user-input-policy-port.js';
+
+export { setAgentSessionModel } from './session-runtime-port.js';

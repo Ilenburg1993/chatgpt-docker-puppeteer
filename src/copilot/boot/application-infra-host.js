@@ -9,9 +9,8 @@
  * @module copilot/boot/application-infra-host
  */
 
-import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core/shutdown';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { createProcessInfra } from '#copilot/infra/public/composition/process';
+import { PROCESS_SHUTDOWN_PHASE, createProcessInfra } from '#copilot/infra/public/composition/process';
 import { dirname, resolve, sep } from 'node:path';
 
 const DEFAULT_SHUTDOWN_HANDLER_NAME = 'copilot.application-infra.dispose';
@@ -39,7 +38,6 @@ let hostSequence = 0;
  *   shutdownHandlerName?: string;
  *   shutdownTimeoutMs?: number;
  *   loadSqliteProvider?: () => Promise<ApplicationInfraSqliteProvider>;
- *   registerShutdownHandlerFn?: typeof registerShutdownHandler;
  * }} [options]
  */
 export function createApplicationInfraHost(options = {}) {
@@ -64,6 +62,8 @@ export function createApplicationInfraHost(options = {}) {
     /** @type {(() => void | Promise<void>) | null} */
     let sqliteDispose = null;
     let shutdownRegistered = false;
+    /** @type {(() => void) | null} */
+    let unregisterShutdown = null;
 
     function assertActive() {
         if (state !== 'active') throw new Error(`ApplicationInfraHost(${hostId}) is ${state}.`);
@@ -127,6 +127,8 @@ export function createApplicationInfraHost(options = {}) {
     function dispose() {
         if (disposePromise) return disposePromise;
         state = 'disposing';
+        unregisterShutdown?.();
+        unregisterShutdown = null;
         disposePromise = (async () => {
             const pendingBootstrap = sqliteBootstrap;
             if (pendingBootstrap) {
@@ -166,11 +168,10 @@ export function createApplicationInfraHost(options = {}) {
     });
 
     if (options.registerProcessShutdown === true) {
-        const register = options.registerShutdownHandlerFn ?? registerShutdownHandler;
-        register(
+        unregisterShutdown = processInfra.shutdown.register(
             options.shutdownHandlerName?.trim() || DEFAULT_SHUTDOWN_HANDLER_NAME,
             async () => dispose(),
-            SHUTDOWN_PRIORITY.APPLICATION_INFRA,
+            PROCESS_SHUTDOWN_PHASE.APPLICATION_INFRA,
             { timeoutMs: normalizeShutdownTimeout(options.shutdownTimeoutMs) },
         );
         shutdownRegistered = true;

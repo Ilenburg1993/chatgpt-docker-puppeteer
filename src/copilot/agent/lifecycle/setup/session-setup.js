@@ -30,7 +30,6 @@ import {
     resolveToolName,
     SessionConfigBuilder,
 } from '#copilot/config';
-import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
 import {
     AgentToolPolicy,
     bindAgentInfoProvider,
@@ -38,13 +37,14 @@ import {
     bindAgentSessionTools,
     bootstrapAgentTools,
     buildAgentBusHooks,
+    defaultMetrics,
     hydrateAgentCustomTools,
     isAgentToolDisabled,
     log,
-    METRICS_STORE,
     readAgentMcpCapabilitySnapshot,
     withAgentRuntimeToolPolicy,
 } from '../../ports/session-setup/index.js';
+import { buildCanonicalLocalSurfaceExcludedTools } from '../../ports/tool-surface-policy-port.js';
 
 import { DialogProtocol } from '#copilot/dialog';
 import { handleUserInputRequest } from '../../dialog/wiring/index.js';
@@ -242,16 +242,7 @@ export async function buildSessionTools(ctx) {
  * @returns {{ busHooks: NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']> }}
  */
 export function buildSessionHooks(ctx, host) {
-    /** @type {{ recordSessionStart: () => void; recordSessionEnd: () => void }} */
-    let metricsStore = {
-        recordSessionStart: () => {},
-        recordSessionEnd: () => {},
-    };
-    try {
-        metricsStore = container.resolve(METRICS_STORE);
-    } catch {
-        // fallback no-op para testes unitários que não registram o token no container
-    }
+    const metricsStore = defaultMetrics;
 
     const busHooks = buildAgentBusHooks({
         emitWebhook: async (event, payload) => {
@@ -439,7 +430,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             {
                 question: input.question,
                 ...(input.choices !== undefined && { choices: input.choices }),
-                allowFreeform: true,
+                allowFreeform: input.allowFreeform !== false,
             },
             {
                 isDialogLoopActive: () => ctx.isDialogLoopActive(),

@@ -1,4 +1,15 @@
 // @ts-check
+
+export class SdkConfigError extends Error {
+    /** @param {string} message @param {string} [code='SDK_CONFIG_ERROR'] */
+    constructor(message, code = 'SDK_CONFIG_ERROR') {
+        super(message);
+        this.name = 'SdkConfigError';
+        this.code = code;
+        this.status = 400;
+    }
+}
+
 /**
  * @module copilot/sdk/errors
  * @file Classificacao pura de erros emitidos pelo GitHub Copilot SDK/CLI.
@@ -9,11 +20,11 @@
  */
 
 import {
-    classifySdkError as classifyCoreSdkError,
-    classifySdkRateLimitScope as classifyCoreSdkRateLimitScope,
-    getSdkErrorFingerprint as getCoreSdkErrorFingerprint,
-    isAutoModelSelector,
-} from '#copilot/core';
+    classifySdkError as classifySdkErrorTaxonomy,
+    classifySdkRateLimitScope as classifySdkRateLimitScopeTaxonomy,
+    getSdkErrorFingerprint as getSdkErrorFingerprintTaxonomy,
+} from './error-taxonomy.js';
+import { isAutoModelSelector } from './models/selection-policy.js';
 
 /** @typedef {'rate_limit' | 'quota_exhausted' | 'account' | 'auth' | 'model_unsupported' | 'network' | 'timeout' | 'unknown'} SdkErrorKind */
 /** @typedef {'session' | 'weekly_model' | 'unknown'} SdkRateLimitScope */
@@ -31,7 +42,7 @@ import {
  * @returns {{ code: string; errorType: string; message: string; status: number | null }}
  */
 export function getSdkErrorFingerprint(error) {
-    return getCoreSdkErrorFingerprint(error);
+    return getSdkErrorFingerprintTaxonomy(error);
 }
 
 /**
@@ -41,7 +52,7 @@ export function getSdkErrorFingerprint(error) {
  * @returns {SdkRateLimitScope}
  */
 export function classifySdkRateLimitScope(error) {
-    return classifyCoreSdkRateLimitScope(error);
+    return classifySdkRateLimitScopeTaxonomy(error);
 }
 
 /**
@@ -128,7 +139,7 @@ export function decideModelCallErrorHandling(input) {
  * @returns {SdkErrorKind}
  */
 export function classifySdkError(error) {
-    return classifyCoreSdkError(error);
+    return classifySdkErrorTaxonomy(error);
 }
 
 /**

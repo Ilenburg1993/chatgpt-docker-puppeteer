@@ -28,4 +28,10 @@ export { createAuditPostToolHandler, getAuditTail, globalAuditBuffer } from './p
 
 export { createAuditLog, defaultAuditLog } from './pipeline-audit-log.js';
 
-export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit, setAuditBus } from './pipeline-permission.js';
+export {
+    buildAuditingPermissionHandler,
+    flushPermissionAudit,
+    isHighRiskTool,
+    logToolAudit,
+    setAuditBus,
+} from './pipeline-permission.js';

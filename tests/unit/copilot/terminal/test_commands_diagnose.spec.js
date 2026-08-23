@@ -3,6 +3,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const defaultRuntime = /** @type {any} */ ({
+    getSessionBindingSnapshot: () => ({
+        hubSessionId: 'hub-diagnose-123456789012345',
+        sdkSessionId: 'sdk-diagnose-123456789012345',
+    }),
     status: 'processing',
     model: 'gpt-5',
     reasoningEffort: 'high',
@@ -35,6 +39,11 @@ const defaultRuntime = /** @type {any} */ ({
 });
 
 const altRuntime = /** @type {any} */ ({
+    getSessionBindingSnapshot: () => ({
+        hubSessionId: 'hub-diagnose-alt',
+        sdkSessionId: 'sdk-diagnose-alt',
+        isBound: true,
+    }),
     status: 'idle',
     model: 'gpt-4.1-mini',
     reasoningEffort: 'medium',
@@ -209,17 +218,6 @@ vi.mock('#copilot/observability', () => ({
         report_intent_local: { calls: 2, errors: 0, avgLatencyMs: 40 },
     }),
 }));
-
-vi.mock('#copilot/core', async () => {
-    const actual = await vi.importActual('#copilot/core');
-    return {
-        ...actual,
-        getSharedSessionBinding: () => ({
-            hubSessionId: 'hub-diagnose-123456789012345',
-            sdkSessionId: 'sdk-diagnose-123456789012345',
-        }),
-    };
-});
 
 vi.mock('../../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
     ...(await importOriginal()),

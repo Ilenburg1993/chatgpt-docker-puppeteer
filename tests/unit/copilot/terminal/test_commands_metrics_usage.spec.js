@@ -1,12 +1,12 @@
 // @ts-check
 
 import { describe, expect, it, vi } from 'vitest';
-import {
-    clearRuntimeInjectHistory,
-    recordRuntimeInjectHistory,
-} from '../../../../src/copilot/presentation/state/index.js';
 
 const defaultRuntime = /** @type {any} */ ({
+    getSessionBindingSnapshot: () => ({
+        hubSessionId: 'hub-4567890123456789012345',
+        sdkSessionId: 'sdk-4567890123456789012345',
+    }),
     sessionId: 'runtime-4567890123456789012345',
     dialogLoopActive: true,
     dialogPrMetrics: null,
@@ -33,6 +33,11 @@ const defaultRuntime = /** @type {any} */ ({
 });
 
 const altRuntime = /** @type {any} */ ({
+    getSessionBindingSnapshot: () => ({
+        hubSessionId: 'hub-alt',
+        sdkSessionId: 'sdk-alt',
+        isBound: true,
+    }),
     sessionId: 'runtime-alt',
     dialogLoopActive: false,
     dialogPrMetrics: null,
@@ -203,14 +208,6 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-vi.mock('#copilot/core', async (importOriginal) => ({
-    ...(await importOriginal()),
-    getSharedSessionBinding: () => ({
-        hubSessionId: 'hub-4567890123456789012345',
-        sdkSessionId: 'sdk-4567890123456789012345',
-    }),
-}));
-
 vi.mock('#copilot/observability', () => ({
     getToolStats: () => ({
         'tool.x': { calls: 3, errors: 1, avgLatencyMs: 33 },
@@ -235,6 +232,8 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivityHistory: () => [],
 }));
 
+const { clearRuntimeInjectHistory, recordRuntimeInjectHistory } =
+    await import('../../../../src/copilot/presentation/state/index.js');
 const { cmdMetrics } = await import('../../../../src/copilot/terminal/commands/metrics.js');
 const { cmdUsage } = await import('../../../../src/copilot/terminal/commands/usage.js');
 const { recordTerminalSseEventArchive, resetTerminalSseEventArchiveForTests } =

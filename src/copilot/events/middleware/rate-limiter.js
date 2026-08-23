@@ -20,7 +20,7 @@
  * Cria um middleware de rate limiting parametrizável.
  *
  * @param {RateLimiterOptions} [options]
- * @returns {import('../../core/event-bus.js').Middleware}
+ * @returns {(event: import('../base-events.js').BaseEvent, next: () => void | Promise<void>) => void | Promise<void>}
  */
 export function createRateLimiter(options = {}) {
     const windowMs = options.windowMs ?? 1000;

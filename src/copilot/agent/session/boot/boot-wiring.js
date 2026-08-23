@@ -21,8 +21,8 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
+import { toError } from '#copilot/infra/public/platform/error';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../../facades/sdk-access.js';
 import { log } from '../../ports/logging/index.js';
@@ -100,7 +100,7 @@ import {
  * @property {(() => void)[]} unsubs — Funções de unsubscribe de eventos
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('#copilot/events/runtime').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
@@ -117,7 +117,7 @@ import {
  * @property {(() => void)[]} unsubs
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('#copilot/events/runtime').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
@@ -246,7 +246,7 @@ function stepStartQuotaMonitor(client, ctx, state) {
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringContext} ctx
  * @param {BootWiringPipelineState} state
- * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options]
+ * @param {{ eventBus?: import('#copilot/events/runtime').EventBus }} [options]
  * @returns {BootWiringStep[]}
  */
 export function createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options) {
@@ -392,7 +392,7 @@ export async function runBootPipeline(steps, state) {
  * @param {boolean} isResumed — Se a sessão foi retomada
  * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
  * @param {BootWiringContext} ctx — Callbacks e referências
- * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
+ * @param {{ eventBus?: import('#copilot/events/runtime').EventBus }} [options] - Opções adicionais (FAIXA-L14)
  * @returns {Promise<BootWiringResult>}
  */
 export async function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {

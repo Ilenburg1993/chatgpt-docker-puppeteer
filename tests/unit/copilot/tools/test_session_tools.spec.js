@@ -29,21 +29,19 @@ vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     withSkipPermission: mocks.withSkipPermission,
 }));
 
-vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
-    return {
-        ...actual,
-        logSwallowed: mocks.logSwallowed,
-        toError: mocks.toError,
-    };
-});
-
 const ioMock = {
     readText: vi.fn(),
     mkdirPathLocked: vi.fn(),
     createOrReplaceFileAtomic: vi.fn(),
 };
 vi.mock('#copilot/boot/application-infra', () => ({
+    getApplicationInfraHost: () => ({
+        processInfra: {
+            processId: 'test-process',
+            config: { eventBus: { maxCounters: 1000 } },
+            shutdown: { register: vi.fn(() => () => {}) },
+        },
+    }),
     getApplicationWorkspaceInfra: () => ({ io: ioMock }),
 }));
 

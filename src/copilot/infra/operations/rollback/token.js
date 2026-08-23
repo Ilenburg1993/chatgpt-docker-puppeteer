@@ -8,7 +8,8 @@
  * @module copilot/infra/operations/rollback/token
  */
 
-import { decodeBase64ToOwnedBuffer, sha256, toOwnedBuffer } from '#copilot/infra/internal/platform';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
+import { sha256 } from '#copilot/infra/internal/platform/hash';
 import { randomUUID } from 'node:crypto';
 
 /**
@@ -26,7 +27,7 @@ import { randomUUID } from 'node:crypto';
  * @property {string | null} contentHash
  * @property {number | null} bytes
  * @property {string | null} snapshotBase64
- * @property {import('#copilot/infra/internal/filesystem/transaction').IoRollbackSidecar | null} snapshotSidecar
+ * @property {import('#copilot/infra/internal/operations/contracts').IoRollbackSidecar | null} snapshotSidecar
  *
  * @typedef {object} IoRollbackToken
  * @property {4} version
