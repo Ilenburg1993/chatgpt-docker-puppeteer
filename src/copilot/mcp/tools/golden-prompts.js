@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/golden-prompts
  */
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 const GOLDEN_PROMPTS_VERSION = 5;
 
@@ -61,7 +61,7 @@ const GOLDEN_PROMPTS = [
 ];
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpGoldenPromptsTool = {
     name: 'mcp_golden_prompts',

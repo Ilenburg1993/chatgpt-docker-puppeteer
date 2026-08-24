@@ -85,11 +85,17 @@ export async function runDocsContractCheck() {
         detail: `rootScoped=${scopedPublic} globalBare=${globalPublic}`,
     });
 
-    const publicFacadeExists = await pathExists('src/copilot/infra/public/cache/index.js');
+    const cacheCapabilityPaths = [
+        'src/copilot/infra/public/cache/keys/index.js',
+        'src/copilot/infra/public/cache/tiering/index.js',
+        'src/copilot/infra/public/cache/ttl/index.js',
+    ];
+    const cacheCapabilityVisibility = await Promise.all(cacheCapabilityPaths.map((path) => pathExists(path)));
+    const aggregateCacheFacadeAbsent = !(await pathExists('src/copilot/infra/public/cache/index.js'));
     checks.push({
-        name: 'infra-public-facade-visible-on-filesystem',
-        passed: publicFacadeExists,
-        detail: publicFacadeExists ? 'src/copilot/infra/public/cache/index.js exists' : 'cache capability missing',
+        name: 'infra-public-cache-capabilities-are-exact',
+        passed: cacheCapabilityVisibility.every(Boolean) && aggregateCacheFacadeAbsent,
+        detail: `exactLeaves=${cacheCapabilityVisibility.filter(Boolean).length}/${cacheCapabilityPaths.length} aggregateFacadeAbsent=${aggregateCacheFacadeAbsent}`,
     });
 
     const lock = JSON.parse(await readWorkspaceText('package-lock.json'));

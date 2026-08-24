@@ -30,9 +30,10 @@
  * @typedef {{ statusCode: number; error: FakeMcpTransportError }} CapturedMcpTransportError
  *
  * @typedef {{
+ *     start?: () => Promise<void> | void;
  *     handleRequest?: (req: FakeMcpHttpRequest, res: FakeMcpHttpResponse, body?: unknown) => Promise<void> | void;
  *     close?: () => Promise<void> | void;
- *     send?: (message: unknown) => Promise<unknown> | unknown;
+ *     send?: (message: unknown) => Promise<void> | void;
  * }} FakeMcpTransportHandlers
  */
 
@@ -103,6 +104,9 @@ export function createMcpTransportErrorCollector() {
  */
 export function fakeMcpTransport(handlers = {}) {
     return {
+        async start() {
+            await handlers.start?.();
+        },
         /** @param {FakeMcpHttpRequest} req @param {FakeMcpHttpResponse} res @param {unknown} [body] */
         async handleRequest(req, res, body) {
             await handlers.handleRequest?.(req, res, body);
@@ -112,7 +116,7 @@ export function fakeMcpTransport(handlers = {}) {
         },
         /** @param {unknown} message */
         async send(message) {
-            return handlers.send?.(message);
+            await handlers.send?.(message);
         },
     };
 }

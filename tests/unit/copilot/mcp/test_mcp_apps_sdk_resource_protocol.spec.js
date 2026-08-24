@@ -2,14 +2,13 @@
 /**
  * Protocol-level proof for MCP Apps resource registration.
  */
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
-import { COMPANY_KNOWLEDGE_WIDGET_URI } from '#copilot/mcp/tools';
-import { createCopilotMcpServer } from '../../../../src/copilot/mcp/server.js';
+import { COMPANY_KNOWLEDGE_WIDGET_URI } from '#copilot/mcp/public/protocol/apps-sdk';
+import { createCopilotMcpServer } from '#copilot/mcp/public/server';
 
 /** @type {{ close: () => Promise<void> | void }[]} */
 const closeables = [];

@@ -5,12 +5,11 @@
  * @module copilot/mcp/tools/cloudflare-post-change-gates
  */
 
-import {
-    auditCloudflareRemoteTunnel,
-    isCloudflaredActionableOriginErrorLine,
-    readCloudflaredMetricsSnapshot,
-} from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { isCloudflaredActionableOriginErrorLine } from '#copilot/mcp/public/cloudflare/errors';
+import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
+import { auditCloudflareRemoteTunnel } from '#copilot/mcp/public/cloudflare/remote';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 import { mcpTunnelStatusTool } from './tunnel-status.js';
 
@@ -19,7 +18,7 @@ const MAX_ERROR_RATE = 0;
 const MAX_RPC_P95_MS = 2_500;
 const MAX_QUIC_RTT_MS = 5_000;
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpCloudflarePostChangeGatesTool = {
     name: 'mcp_cloudflare_post_change_gates',
     title: 'Cloudflare post-change gates',
@@ -249,7 +248,7 @@ export function evaluateGates(input) {
 }
 
 /**
- * @param {import('@modelcontextprotocol/sdk/types.js').CallToolResult} result
+ * @param {import('@modelcontextprotocol/server').CallToolResult} result
  * @returns {Record<string, unknown>}
  */
 function extractStructuredContent(result) {

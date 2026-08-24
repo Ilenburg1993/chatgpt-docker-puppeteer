@@ -9,7 +9,8 @@ const PROCESS_INFRA = resolve('src/copilot/infra/composition/process/service.js'
 const PROCESS_HEALTH = resolve('src/copilot/infra/observability/process/service.js');
 const PUBLIC = resolve('src/copilot/infra/public/platform/node/index.js');
 const MCP_CLI = resolve('src/copilot/mcp/cli.js');
-const SAFE_SUITE = resolve('src/copilot/mcp/scripts/run-safe-validation-suite.js');
+const SAFE_SUITE_LAUNCHER = resolve('src/copilot/mcp/scripts/run-safe-validation-suite.js');
+const SAFE_SUITE_RUNTIME = resolve('src/copilot/mcp/validation/suites/runtime.js');
 const OLD_MCP_FACADE = resolve('src/copilot/mcp/runtime/node-compile-cache.js');
 
 describe('Node compile-cache process ownership governance', () => {
@@ -51,12 +52,15 @@ describe('Node compile-cache process ownership governance', () => {
         expect(processHealth).toContain('ownerProcessId: processId');
     });
 
-    it('removes the MCP compatibility facade and makes launchers consume the Infra micro-surface directly', () => {
+    it('removes the MCP compatibility facade, keeps the script launcher thin and makes the suite owner consume the Infra micro-surface directly', () => {
         expect(existsSync(OLD_MCP_FACADE)).toBe(false);
         const cli = readFileSync(MCP_CLI, 'utf8');
-        const safeSuite = readFileSync(SAFE_SUITE, 'utf8');
+        const safeSuiteLauncher = readFileSync(SAFE_SUITE_LAUNCHER, 'utf8');
+        const safeSuiteRuntime = readFileSync(SAFE_SUITE_RUNTIME, 'utf8');
         expect(cli).toContain("from '#copilot/infra/public/platform/node'");
-        expect(safeSuite).toContain("from '#copilot/infra/public/platform/node'");
-        expect(safeSuite).not.toContain('../runtime/node-compile-cache.js');
+        expect(safeSuiteLauncher).toContain("from '#copilot/mcp/public/validation/suites'");
+        expect(safeSuiteLauncher).not.toContain("from '#copilot/infra/public/platform/node'");
+        expect(safeSuiteRuntime).toContain("from '#copilot/infra/public/platform/node'");
+        expect(safeSuiteRuntime).not.toContain('../runtime/node-compile-cache.js');
     });
 });

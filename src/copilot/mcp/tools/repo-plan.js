@@ -7,24 +7,12 @@
 
 import {
     errorResult,
-    getMcpWorkspaceIndexRegistry,
-    getMcpWorkspaceIo,
-    getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
-    resolveFocusedUnitTestCommand,
-    resolveReadPath,
-    resolveValidatedReadPath,
-    resolveValidatorCommand,
-    resolveWritePath,
-} from '#copilot/mcp/control-plane';
-import { WORKSPACE_ROOT } from '#copilot/tools';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
+import { resolveFocusedUnitTestCommand, resolveValidatorCommand } from '#copilot/mcp/public/validation';
 import { z } from 'zod';
-
-const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
-const readIoIndexStatus = INDEX_REGISTRY.status;
-
-const { readTextValidated, statPath } = getMcpWorkspaceIo();
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 160;
@@ -124,12 +112,13 @@ function optionalInteger(value) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['io']} workspaceIo
  * @param {string} absolutePath
  * @returns {Promise<boolean>}
  */
-async function pathExists(absolutePath) {
+async function pathExists(workspaceIo, absolutePath) {
     try {
-        await statPath(absolutePath);
+        await workspaceIo.statPath(absolutePath);
         return true;
     } catch {
         return false;
@@ -137,7 +126,7 @@ async function pathExists(absolutePath) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const repoPlanTools = [
     {
@@ -154,15 +143,16 @@ export const repoPlanTools = [
                 ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, content, maxDiffLines, includeDiffPreview }) => {
-            const resolved = await resolveWritePath(path);
+        handler: async ({ path, content, maxDiffLines, includeDiffPreview }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const resolved = await workspace.resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
             const diff = buildPlanDiffPreview('', initialContent, {
                 contextLines: 0,
                 maxLines: optionalInteger(maxDiffLines) ?? DEFAULT_MAX_DIFF_LINES,
             });
-            const destinationExists = await pathExists(resolved.resolved);
+            const destinationExists = await pathExists(workspace.io, resolved.resolved);
             return okResult(
                 {
                     success: true,
@@ -197,18 +187,14 @@ export const repoPlanTools = [
                 ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({
-            path,
-            old_string,
-            new_string,
-            replace_all,
-            diffContextLines,
-            maxDiffLines,
-            includeDiffPreview,
-        }) => {
-            const resolved = await resolveValidatedReadPath(path);
+        handler: async (
+            { path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview },
+            operationContext,
+        ) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const resolved = await workspace.resolveValidatedReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const snapshot = await readTextValidated(resolved.validatedReadPath);
+            const snapshot = await workspace.io.readTextValidated(resolved.validatedReadPath);
             const occurrences = countOccurrences(snapshot.content, old_string);
             if (occurrences === 0) {
                 return errorResult('old_string not found.', {
@@ -259,10 +245,11 @@ export const repoPlanTools = [
             path: z.string().min(1)['describe']('Workspace-relative file path to plan for quarantine.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path }) => {
-            const resolved = await resolveWritePath(path);
+        handler: async ({ path }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const resolved = await workspace.resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const stats = await statPath(resolved.resolved);
+            const stats = await workspace.io.statPath(resolved.resolved);
             return okResult({
                 success: true,
                 plannedTool: 'repo_quarantine_file',
@@ -287,14 +274,15 @@ export const repoPlanTools = [
             overwrite: z.boolean().optional()['describe']('Plan overwrite. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ source, destination, overwrite }) => {
+        handler: async ({ source, destination, overwrite }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
             // A move mutates its source; the plan must use the same write-policy class as the eventual apply.
-            const src = await resolveWritePath(source);
+            const src = await workspace.resolveWritePath(source);
             if (!src.ok) return errorResult(src.reason, { ...src, field: 'source' });
-            const dst = await resolveWritePath(destination);
+            const dst = await workspace.resolveWritePath(destination);
             if (!dst.ok) return errorResult(dst.reason, { ...dst, field: 'destination' });
-            const sourceStats = await statPath(src.resolved);
-            const destinationExists = await pathExists(dst.resolved);
+            const sourceStats = await workspace.io.statPath(src.resolved);
+            const destinationExists = await pathExists(workspace.io, dst.resolved);
             return okResult({
                 success: true,
                 plannedTool: 'repo_move_file',
@@ -325,17 +313,20 @@ export const repoPlanTools = [
             maxFiles: z.number().int().positive().max(25_000).optional()['describe']('Planned max files.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, maxFiles }) => {
-            const resolved = await resolveReadPath(typeof path === 'string' && path.trim() ? path : 'src/copilot');
+        handler: async ({ path, maxFiles }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const resolved = await workspace.resolveReadPath(
+                typeof path === 'string' && path.trim() ? path : 'src/copilot',
+            );
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             return okResult({
                 success: true,
                 plannedTool: 'repo_index_build',
                 path: resolved.relative,
-                workspaceRoot: getMcpWorkspaceRoot(),
-                currentStats: readIoIndexStatus(),
+                workspaceRoot: workspace.workspaceRoot,
+                currentStats: workspace.indexRegistry.status(),
                 plannedOptions: {
-                    workspaceRoot: WORKSPACE_ROOT,
+                    workspaceRoot: workspace.workspaceRoot,
                     recursive: true,
                     depth: 20,
                     respectGitignore: true,

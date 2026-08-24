@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { auditOriginRequestProfile, buildRecommendedOriginRequestPatch } from '#copilot/mcp/cloudflare';
+import {
+    auditOriginRequestProfile,
+    buildRecommendedOriginRequestPatch,
+} from '#copilot/mcp/public/cloudflare/origin-profile';
 
 describe('copilot MCP Cloudflare origin profile', () => {
     it('keeps origin h2 disabled by default', () => {

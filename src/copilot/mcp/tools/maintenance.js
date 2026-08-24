@@ -5,29 +5,26 @@
  * @module copilot/mcp/tools/maintenance
  */
 
+import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
 import {
-    boundedWriteAnnotations,
     buildAiArtifactsReport,
     cleanupAiArtifacts,
-    destructiveAnnotations,
-    getMcpWorkspaceIndexRegistry,
     inspectRootDependencyUpdates,
+    upgradeRootDependenciesToLatest,
+} from '#copilot/mcp/public/maintenance';
+import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import {
+    boundedWriteAnnotations,
+    destructiveAnnotations,
     okResult,
     openWorldBoundedWriteAnnotations,
     openWorldReadOnlyAnnotations,
-    readMcpMetricsSnapshot,
     readOnlyAnnotations,
-    upgradeRootDependenciesToLatest,
-} from '#copilot/mcp/control-plane';
-import { WORKSPACE_ROOT } from '#copilot/tools';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
+import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
 import { z } from 'zod';
 import { buildMcpCapabilitiesSummary } from './meta.js';
-import { repoStatusHandler } from './repo-status.js';
-import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
-
-const INDEX_REGISTRY = getMcpWorkspaceIndexRegistry();
-const readIoIndexStatus = INDEX_REGISTRY.status;
-const buildIoIndexForDirectory = INDEX_REGISTRY.buildDirectory;
 
 const maintenanceFixSchema = z.enum([
     'ai-artifacts-report',
@@ -40,10 +37,11 @@ const maintenanceFixSchema = z.enum([
 const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-report', 'run-mcp-smoke'];
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['indexRegistry']} indexRegistry
  * @returns {Promise<Record<string, unknown>[]>}
  */
-async function buildMaintenancePlanItems() {
-    const indexStats = readIoIndexStatus();
+async function buildMaintenancePlanItems(indexRegistry) {
+    const indexStats = indexRegistry.status();
     const metrics = readMcpMetricsSnapshot();
     const aiArtifactsReport = await buildAiArtifactsReport();
     return [
@@ -105,7 +103,7 @@ function normalizeFixes(fixes) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const maintenanceTools = [
     {
@@ -123,7 +121,14 @@ export const maintenanceTools = [
                 ['describe']('Fixed audit timeout. Default: 180000ms.'),
         },
         annotations: openWorldReadOnlyAnnotations(),
-        handler: async ({ timeoutMs } = {}) => okResult(await inspectRootDependencyUpdates({ timeoutMs })),
+        handler: async ({ timeoutMs } = {}, operationContext) =>
+            okResult(
+                await inspectRootDependencyUpdates({
+                    workspace: requireMcpToolWorkspace(operationContext),
+                    timeoutMs,
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                }),
+            ),
     },
     {
         name: 'mcp_dependency_upgrade',
@@ -145,7 +150,7 @@ export const maintenanceTools = [
                 ['describe']('Per-step timeout. Default: 900000ms.'),
         },
         annotations: openWorldBoundedWriteAnnotations(),
-        handler: async ({ confirmUpgrade, install, timeoutMs }) => {
+        handler: async ({ confirmUpgrade, install, timeoutMs }, operationContext) => {
             if (confirmUpgrade !== true) {
                 return okResult({
                     success: false,
@@ -153,7 +158,14 @@ export const maintenanceTools = [
                     hint: 'Pass confirmUpgrade=true only after reviewing mcp_dependency_outdated.',
                 });
             }
-            return okResult(await upgradeRootDependenciesToLatest({ install, timeoutMs }));
+            return okResult(
+                await upgradeRootDependenciesToLatest({
+                    workspace: requireMcpToolWorkspace(operationContext),
+                    install,
+                    timeoutMs,
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                }),
+            );
         },
     },
     {
@@ -202,14 +214,16 @@ export const maintenanceTools = [
             'Return the safe batched maintenance actions available for this MCP server, with risk and default behavior.',
         inputSchema: {},
         annotations: readOnlyAnnotations(),
-        handler: async () =>
-            okResult({
+        handler: async (_args, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            return okResult({
                 success: true,
                 defaultDryRun: true,
                 defaultFixes: [...DEFAULT_FIXES],
-                items: await buildMaintenancePlanItems(),
+                items: await buildMaintenancePlanItems(workspace.indexRegistry),
                 note: 'Use mcp_maintenance_apply_safe_fixes with dryRun=true first. No arbitrary shell or arbitrary paths are accepted.',
-            }),
+            });
+        },
     },
     {
         name: 'mcp_maintenance_apply_safe_fixes',
@@ -224,7 +238,10 @@ export const maintenanceTools = [
             dryRun: z.boolean().optional()['describe']('Plan without mutation. Default: true.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ fixes, dryRun }) => {
+        handler: async ({ fixes, dryRun }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const readIoIndexStatus = workspace.indexRegistry.status;
+            const buildIoIndexForDirectory = workspace.indexRegistry.buildDirectory;
             const selectedFixes = normalizeFixes(fixes);
             const isDryRun = dryRun !== false;
             /** @type {Record<string, unknown>[]} */
@@ -232,13 +249,13 @@ export const maintenanceTools = [
 
             for (const fix of selectedFixes) {
                 if (fix === 'workspace-status') {
-                    const status = await repoStatusHandler();
+                    const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
                     results.push({
                         fix,
                         dryRun: isDryRun,
-                        success: status.structuredContent?.['success'] === true,
-                        dirty: status.structuredContent?.['dirty'] === true,
-                        branch: status.structuredContent?.['branch'] ?? null,
+                        success: status.success,
+                        dirty: status.success ? status.dirty : null,
+                        branch: status.success ? status.branch : null,
                     });
                     continue;
                 }
@@ -271,13 +288,13 @@ export const maintenanceTools = [
                             plannedTool: 'mcp_smoke_workspace',
                         });
                     } else {
-                        const smoke = await mcpSmokeWorkspaceTool.handler({});
+                        const smoke = await runMcpWorkspaceSmoke(workspace);
                         results.push({
                             fix,
                             dryRun: false,
-                            success: smoke.structuredContent?.['success'] === true,
-                            status: smoke.structuredContent?.['status'] ?? null,
-                            warnings: smoke.structuredContent?.['warnings'] ?? [],
+                            success: smoke.success,
+                            status: smoke.status,
+                            warnings: smoke.warnings,
                         });
                     }
                     continue;
@@ -290,7 +307,7 @@ export const maintenanceTools = [
                             success: true,
                             plannedPath: 'src/copilot',
                             plannedOptions: {
-                                workspaceRoot: WORKSPACE_ROOT,
+                                workspaceRoot: workspace.workspaceRoot,
                                 recursive: true,
                                 depth: 20,
                                 respectGitignore: true,
@@ -302,7 +319,7 @@ export const maintenanceTools = [
                         });
                     } else {
                         const result = await buildIoIndexForDirectory('src/copilot', {
-                            workspaceRoot: WORKSPACE_ROOT,
+                            workspaceRoot: workspace.workspaceRoot,
                             recursive: true,
                             depth: 20,
                             respectGitignore: true,

@@ -13,7 +13,7 @@ import {
     planIndexStartup,
     readIndexStartupCheckpoint,
     writeIndexStartupCheckpoint,
-} from '../../../../src/copilot/mcp/control-plane/index-auto-build-checkpoint.js';
+} from '#copilot/testing/mcp/indexing/auto-build';
 
 function cleanSnapshot(head = 'abc') {
     return {

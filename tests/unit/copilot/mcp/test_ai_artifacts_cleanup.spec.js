@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createAiArtifactsRuntime } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
+import { createAiArtifactsRuntime } from '#copilot/testing/mcp/maintenance';
 
 /** @type {string[]} */
 const roots = [];

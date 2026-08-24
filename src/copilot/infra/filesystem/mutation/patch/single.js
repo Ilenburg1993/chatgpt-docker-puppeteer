@@ -45,6 +45,7 @@ const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
  *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
  *     capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     validateUpdatedContent?: (content: string) => void;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
@@ -86,6 +87,17 @@ export async function patchTextLocked(filePath, options, invalidationBus = undef
                     void readMs;
                     void patchMs;
                     const { updated, replacedOccurrences, bytesWritten } = patch;
+                    if (options.validateUpdatedContent) {
+                        try {
+                            options.validateUpdatedContent(updated);
+                        } catch (error) {
+                            throw annotatePatchRecoveryState(error, previousHash, rawBuffer.byteLength, {
+                                currentStateKind: 'locked-file',
+                                diskBaselineHash: previousHash,
+                                diskBaselineBytes: rawBuffer.byteLength,
+                            });
+                        }
+                    }
                     const contentHash = sha256(updated);
                     const previousSnapshot =
                         patch.noop || !captureRollback

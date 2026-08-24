@@ -9,11 +9,12 @@ import {
     applyCloudflareMcpPassthroughPlan,
     buildCloudflareMcpPassthroughPlan,
     diffCloudflareMcpPassthroughPlan,
-} from '#copilot/mcp/cloudflare';
-import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/cloudflare/passthrough';
+
+import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpCloudflareMcpPassthroughPlanTool = {
     name: 'mcp_cloudflare_mcp_passthrough_plan',
     title: 'Cloudflare MCP passthrough plan',
@@ -24,7 +25,7 @@ export const mcpCloudflareMcpPassthroughPlanTool = {
     handler: async () => okResult(await buildCloudflareMcpPassthroughPlan()),
 };
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpCloudflareMcpPassthroughDiffTool = {
     name: 'mcp_cloudflare_mcp_passthrough_diff',
     title: 'Cloudflare MCP passthrough diff',
@@ -35,7 +36,7 @@ export const mcpCloudflareMcpPassthroughDiffTool = {
     handler: async () => okResult(await diffCloudflareMcpPassthroughPlan()),
 };
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpCloudflareMcpPassthroughApplyTool = {
     name: 'mcp_cloudflare_mcp_passthrough_apply',
     title: 'Cloudflare MCP passthrough apply',

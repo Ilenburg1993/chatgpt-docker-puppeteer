@@ -21,7 +21,7 @@ import {
     normalizeTunnelMode,
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
-} from '#copilot/mcp/cloudflare';
+} from '#copilot/mcp/public/cloudflare/config';
 
 describe('copilot MCP Cloudflare Tunnel config', () => {
     it('normalizes the MCP origin to a root HTTP URL', () => {

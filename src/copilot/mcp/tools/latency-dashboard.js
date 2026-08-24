@@ -8,14 +8,13 @@
 import {
     appendMcpLatencyDashboardSnapshot,
     compareMcpLatencyDashboardSnapshots,
-    okResult,
     readMcpLatencyDashboardHistory,
-    readMcpMetricsSnapshot,
     readMcpRoundTripAnalyticsSnapshot,
-    readOnlyAnnotations,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/diagnostics/latency';
+import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { readMcpHttpSessionRuntimeState } from '#copilot/mcp/public/transport/http/stateful';
 import { z } from 'zod';
-import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 
 const DEFAULT_MIN_SAMPLE_CALLS = 5;
 
@@ -115,7 +114,7 @@ const MAX_ROWS = 12;
  */
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpLatencyDashboardTool = {
     name: 'mcp_latency_dashboard',
@@ -343,12 +342,12 @@ async function buildLatencyHistoryReport(dashboard, options) {
     const previousEntry = historyBefore.entries.at(-1) ?? null;
     const previousSnapshot = previousEntry?.snapshot ?? null;
     const comparison = compareMcpLatencyDashboardSnapshots(
-        /** @type {import('#copilot/mcp/control-plane').McpLatencyDashboardSnapshot} */ (dashboard),
+        /** @type {import('#copilot/mcp/public/diagnostics/latency').McpLatencyDashboardSnapshot} */ (dashboard),
         previousSnapshot,
     );
     const persistence = options.persistSnapshot
         ? await appendMcpLatencyDashboardSnapshot(
-              /** @type {import('#copilot/mcp/control-plane').McpLatencyDashboardSnapshot} */ (dashboard),
+              /** @type {import('#copilot/mcp/public/diagnostics/latency').McpLatencyDashboardSnapshot} */ (dashboard),
               { maxSnapshots: options.maxHistorySnapshots },
           )
         : { persisted: false, reason: 'persistSnapshot=false' };
@@ -417,7 +416,7 @@ function readLatencyDashboardBudgets(options) {
 /**
  * @param {Record<
  *     string,
- *     import('#copilot/mcp/control-plane').ToolMetric & {
+ *     import('#copilot/mcp/public/observability').ToolMetric & {
  *         averageDurationMs: number;
  *         phaseAverages: Record<
  *             string,
@@ -458,7 +457,7 @@ function buildToolRows(tools, maxRows) {
  * Rank tools by cumulative handler cost. Average-only rankings hide hot tools whose per-call latency is modest but
  * whose repeated use dominates an interactive repo workflow.
  *
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {Record<string, import('#copilot/mcp/public/observability').ToolMetric & { averageDurationMs: number }>} tools
  * @param {number} totalCalls
  * @param {number} maxRows
  */
@@ -486,7 +485,7 @@ function buildCumulativeCostRows(tools, totalCalls, maxRows) {
 /**
  * Rank tools by call count so round-trip pressure is visible even when server-side handler time is low.
  *
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {Record<string, import('#copilot/mcp/public/observability').ToolMetric & { averageDurationMs: number }>} tools
  * @param {number} totalCalls
  * @param {number} maxRows
  */
@@ -513,7 +512,7 @@ function buildCallPressureRows(tools, totalCalls, maxRows) {
  * Rank tools by their average result payload. Handler latency alone misses tools that are cheap to execute but
  * expensive to serialize, transport and inject into the model context.
  *
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric>} tools
+ * @param {Record<string, import('#copilot/mcp/public/observability').ToolMetric>} tools
  * @param {number} maxRows
  */
 function buildLargestResultPayloadRows(tools, maxRows) {
@@ -543,7 +542,7 @@ function buildLargestResultPayloadRows(tools, maxRows) {
  * Rank tools by cumulative result volume so a moderately sized response repeated many times is visible as a context and
  * transport pressure source.
  *
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric>} tools
+ * @param {Record<string, import('#copilot/mcp/public/observability').ToolMetric>} tools
  * @param {number} maxRows
  */
 function buildResultVolumeRows(tools, maxRows) {
@@ -570,7 +569,7 @@ function buildResultVolumeRows(tools, maxRows) {
 /**
  * @param {Record<
  *     string,
- *     import('#copilot/mcp/control-plane').ToolMetric & {
+ *     import('#copilot/mcp/public/observability').ToolMetric & {
  *         averageDurationMs: number;
  *         phaseAverages: Record<
  *             string,
@@ -606,7 +605,7 @@ function buildPhaseRows(tools, maxRows) {
 /**
  * @param {Record<
  *     string,
- *     import('#copilot/mcp/control-plane').ToolMetric & {
+ *     import('#copilot/mcp/public/observability').ToolMetric & {
  *         averageDurationMs: number;
  *         phaseAverages: Record<
  *             string,
@@ -647,7 +646,7 @@ function buildPhaseTotals(tools) {
 /**
  * @param {Record<
  *     string,
- *     import('#copilot/mcp/control-plane').ToolMetric & {
+ *     import('#copilot/mcp/public/observability').ToolMetric & {
  *         averageDurationMs: number;
  *         phaseAverages: Record<
  *             string,
@@ -698,7 +697,7 @@ function buildByteAccounting(tools) {
 }
 
 /**
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {Record<string, import('#copilot/mcp/public/observability').ToolMetric & { averageDurationMs: number }>} tools
  * @param {number} maxRows
  */
 function buildRoundTripAccounting(tools, maxRows) {

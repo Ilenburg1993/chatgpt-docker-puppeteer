@@ -8,11 +8,12 @@
  * @module copilot/mcp/tools/session-profile
  */
 
-import { buildChatGptConnectorProfile } from '#copilot/mcp/connection';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { buildChatGptConnectorProfile } from '#copilot/mcp/public/connection';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpSessionProfileTool = {
     name: 'mcp_session_profile',

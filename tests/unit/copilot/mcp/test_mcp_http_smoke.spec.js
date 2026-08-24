@@ -9,11 +9,11 @@ import { describe, it } from 'vitest';
 import {
     buildMcpHttpProtocolReport,
     createMcpHttpProtocolState,
-    readMcpHttp2ServerPolicy,
-    readMcpHttpServerTimingPolicy,
     recordMcpHttpProtocolRequest,
-} from '#copilot/mcp/adapters';
-import { compareToolNames, extractMcpToolNames } from '#copilot/mcp/scripts';
+} from '#copilot/mcp/public/adapters/http-protocol';
+import { readMcpHttpServerTimingPolicy } from '#copilot/mcp/public/adapters/http1';
+import { readMcpHttp2ServerPolicy } from '#copilot/mcp/public/adapters/http2';
+import { compareToolNames, extractMcpToolNames } from '#copilot/mcp/public/diagnostics/http-smoke';
 
 describe('copilot MCP local HTTP smoke helpers', () => {
     it('extracts tool names from a JSON-RPC tools/list body', () => {

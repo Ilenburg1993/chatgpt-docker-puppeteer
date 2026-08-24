@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { buildMcpSessionAuthBindingFromVerifiedJwtPayload, readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { buildMcpSessionAuthBindingFromVerifiedJwtPayload, readMcpAuthConfig } from '#copilot/mcp/public/auth';
 
 describe('MCP session binding from verified JWT claims', () => {
     it('hashes actor identifiers and preserves only non-secret resource, audience and scopes', () => {

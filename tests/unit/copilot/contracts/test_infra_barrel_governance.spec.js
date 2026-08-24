@@ -1,6 +1,6 @@
 // @ts-check
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -31,13 +31,33 @@ function stripJavaScriptComments(source) {
     return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|[^:])\/\/.*$/gmu, '$1');
 }
 
+/** @type {Map<string, string[]>} */
+const javascriptFilesCache = new Map();
+
 /** @param {string} directory @returns {string[]} */
 function listJavaScriptFiles(directory) {
-    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const cached = javascriptFilesCache.get(directory);
+    if (cached) return cached;
+    const files = readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
         const entryPath = join(directory, entry.name);
         if (entry.isDirectory()) return listJavaScriptFiles(entryPath);
         return entry.isFile() && entry.name.endsWith('.js') ? [entryPath] : [];
     });
+    javascriptFilesCache.set(directory, files);
+    return files;
+}
+
+/** @type {Map<string, string>} */
+const javascriptSourceCache = new Map();
+
+/** Repository governance is read-only within this suite; reuse each immutable source snapshot across its many scans. */
+/** @param {string} file */
+function readJavaScriptSource(file) {
+    const cached = javascriptSourceCache.get(file);
+    if (cached !== undefined) return cached;
+    const source = readFileSync(file, 'utf8');
+    javascriptSourceCache.set(file, source);
+    return source;
 }
 
 /** @param {string} importer @param {string} specifier */
@@ -282,7 +302,7 @@ describe('infra barrel governance', () => {
         const envTouchpoints = [];
         const directBootstrapTouchpoints = [];
         for (const file of listJavaScriptFiles(INFRA_ROOT)) {
-            const source = stripJavaScriptComments(await readFile(file, 'utf8'));
+            const source = stripJavaScriptComments(readJavaScriptSource(file));
             if (!source.includes('process.env')) continue;
             const relativeFile = relative(INFRA_ROOT, file).replaceAll('\\', '/');
             envTouchpoints.push(relativeFile);
@@ -307,7 +327,7 @@ describe('infra barrel governance', () => {
         const publicRoot = join(INFRA_ROOT, 'public');
         const starViolations = [];
         for (const file of listJavaScriptFiles(publicRoot)) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             if (/\bexport\s+\*/u.test(source)) starViolations.push(relative(publicRoot, file));
         }
         expect(starViolations).toEqual([]);
@@ -418,7 +438,7 @@ describe('infra barrel governance', () => {
         const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
         for (const file of listJavaScriptFiles(copilotRoot)) {
             if (isInsideDirectory(INFRA_ROOT, file)) continue;
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];
                 if (specifier && forbidden.has(specifier))
@@ -434,7 +454,7 @@ describe('infra barrel governance', () => {
         const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
         for (const file of listJavaScriptFiles(copilotRoot)) {
             if (isInsideDirectory(INFRA_ROOT, file)) continue;
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];
                 if (!specifier) continue;
@@ -461,7 +481,7 @@ describe('infra barrel governance', () => {
         for (const root of roots) {
             for (const file of listJavaScriptFiles(root)) {
                 if (isInsideDirectory(infraTestsRoot, file) || file === governanceTest) continue;
-                const source = await readFile(file, 'utf8');
+                const source = readJavaScriptSource(file);
                 for (const match of source.matchAll(moduleSpecifierPattern)) {
                     const specifier = match[1];
                     if (!specifier) continue;
@@ -486,7 +506,7 @@ describe('infra barrel governance', () => {
         const publicViolations = [];
         const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
         for (const file of listJavaScriptFiles(INFRA_ROOT)) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const isPublic = isInsideDirectory(publicRoot, file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];
@@ -539,7 +559,7 @@ describe('infra barrel governance', () => {
         const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"](\.\.?\/[^'"]+)['"]/g;
 
         for (const file of listJavaScriptFiles(INFRA_ROOT)) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const importerDirectory = dirname(file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];
@@ -571,7 +591,7 @@ describe('infra barrel governance', () => {
         const opaqueAnyPattern =
             /@(?:type|param|returns?|typedef|property)\b[^\n]*\bany\b|\b(?:Array|Promise|ReadonlyArray)<any>\b|=>\s*any\b/g;
         for (const file of listJavaScriptFiles(INFRA_ROOT)) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const matches = [...source.matchAll(opaqueAnyPattern)];
             if (matches.length > 0) {
                 violations.push(`${relative(INFRA_ROOT, file)}:${matches.map((match) => match[0]).join(' | ')}`);
@@ -583,7 +603,7 @@ describe('infra barrel governance', () => {
     it('identidade @module acompanha o owner físico atual', async () => {
         const violations = [];
         for (const file of listJavaScriptFiles(INFRA_ROOT)) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const match = source.match(/@module\s+(copilot\/infra\/[^\s*]+)/);
             if (!match) continue;
             const relativeFile = relative(INFRA_ROOT, file).replaceAll('\\', '/');
@@ -598,7 +618,7 @@ describe('infra barrel governance', () => {
     it('todo index.js de infra é barrel puro, sem implementação ou import runtime', async () => {
         const violations = [];
         for (const file of listJavaScriptFiles(INFRA_ROOT).filter((entry) => entry.endsWith('/index.js'))) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const hasRuntimeImport = /^\s*import\s/m.test(source);
             const hasImplementation = /^\s*(?:export\s+)?(?:(?:async\s+)?function|class|(?:const|let|var)\s)\b/m.test(
                 source,
@@ -624,7 +644,7 @@ describe('infra barrel governance', () => {
             const sourceOwner = findBarrelOwner(file);
             if (!sourceOwner) continue;
             if (!graph.has(sourceOwner)) graph.set(sourceOwner, new Set());
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];
                 if (!specifier) continue;
@@ -654,7 +674,7 @@ describe('infra barrel governance', () => {
         const moduleSpecifierPattern = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
 
         for (const file of files) {
-            const source = await readFile(file, 'utf8');
+            const source = readJavaScriptSource(file);
             const sourceNode = relative(INFRA_ROOT, file);
             for (const match of source.matchAll(moduleSpecifierPattern)) {
                 const specifier = match[1];

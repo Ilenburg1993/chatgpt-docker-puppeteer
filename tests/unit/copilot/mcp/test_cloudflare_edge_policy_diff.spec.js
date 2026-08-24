@@ -1,4 +1,4 @@
-import { buildEdgePolicyDiff } from '#copilot/mcp/cloudflare';
+import { buildEdgePolicyDiff } from '#copilot/mcp/public/cloudflare/edge-diff';
 import { describe, expect, it } from 'vitest';
 
 const desired = {

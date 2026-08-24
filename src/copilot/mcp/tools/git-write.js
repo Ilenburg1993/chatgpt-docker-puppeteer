@@ -8,27 +8,35 @@
  * @module copilot/mcp/tools/git-write
  */
 
+import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
 import {
-    appendMcpAuditEvent,
     boundedWriteAnnotations,
     destructiveAnnotations,
     errorResult,
-    getMcpWorkspaceIo,
     okResult,
     readOnlyAnnotations,
-    resolveWritePath,
+    requireMcpToolWorkspace,
     withResultExecutionHint,
-} from '#copilot/mcp/control-plane';
-import { execGit } from '#copilot/mcp/tools/shared';
+} from '#copilot/mcp/public/protocol/tools';
+import { execWorkspaceGit as execGit } from '#copilot/mcp/public/workspace/git';
 import { z } from 'zod';
-
-const gitWriteWorkspaceIo = getMcpWorkspaceIo();
 
 const MAX_STAGE_PATHS = 200;
 const MAX_STAGE_FILES = 500;
 const MAX_COMMIT_MESSAGE_CHARS = 4000;
 const HEAD_RE = /^[0-9a-f]{7,64}$/iu;
 const PATHSPEC_MAGIC_RE = /^(?::|[-])|[*?[\]{}!]/u;
+
+/** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} GitWriteWorkspaceCapability */
+/** @typedef {Readonly<{ workspace: GitWriteWorkspaceCapability; exec: typeof execGit }>} GitWriteRuntime */
+
+/** @param {GitWriteWorkspaceCapability} workspace @returns {GitWriteRuntime} */
+function createGitWriteRuntime(workspace) {
+    return Object.freeze({
+        workspace,
+        exec: (args, options = {}) => execGit(args, { ...options, cwd: workspace.workspaceRoot }),
+    });
+}
 
 const explicitPathsSchema = z
     .array(z.string().min(1).max(1024))
@@ -38,21 +46,21 @@ const explicitPathsSchema = z
         'Explicit workspace-relative paths. Git pathspec magic, globs, option-like values and implicit dot are rejected.',
     );
 
-/** @returns {Promise<string | null>} */
-async function readHead() {
-    const result = await execGit(['rev-parse', 'HEAD']);
+/** @param {GitWriteRuntime} runtime @returns {Promise<string | null>} */
+async function readHead(runtime) {
+    const result = await runtime.exec(['rev-parse', 'HEAD']);
     return result.success ? result.stdout.trim() || null : null;
 }
 
-/** @returns {Promise<string | null>} */
-async function readBranch() {
-    const result = await execGit(['branch', '--show-current']);
+/** @param {GitWriteRuntime} runtime @returns {Promise<string | null>} */
+async function readBranch(runtime) {
+    const result = await runtime.exec(['branch', '--show-current']);
     return result.success ? result.stdout.trim() || null : null;
 }
 
-/** @returns {Promise<string | null>} */
-async function readUpstream() {
-    const result = await execGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+/** @param {GitWriteRuntime} runtime @returns {Promise<string | null>} */
+async function readUpstream(runtime) {
+    const result = await runtime.exec(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
     return result.success ? result.stdout.trim() || null : null;
 }
 
@@ -67,10 +75,11 @@ function validateExpectedHead(expectedHead, actualHead) {
 }
 
 /**
+ * @param {GitWriteRuntime} runtime
  * @param {string[]} paths
  * @returns {Promise<{ ok: true; paths: string[] } | { ok: false; error: string; path?: string }>}
  */
-async function normalizeExplicitPaths(paths) {
+async function normalizeExplicitPaths(runtime, paths) {
     const normalized = [];
     const seen = new Set();
     for (const rawValue of paths) {
@@ -89,7 +98,7 @@ async function normalizeExplicitPaths(paths) {
                 path: rawValue,
             };
         }
-        const resolved = await resolveWritePath(raw);
+        const resolved = await runtime.workspace.resolveWritePath(raw);
         if (!resolved.ok) return { ok: false, error: resolved.reason, path: rawValue };
         if (resolved.relative === '.' || resolved.relative.startsWith('../')) {
             return { ok: false, error: 'Path must resolve to a concrete target inside the workspace.', path: rawValue };
@@ -114,18 +123,21 @@ export function isAccidentalExecutableModeDrift(input) {
     return input.headMode === '100755' && (input.currentMode & 0o111) === 0 && input.hasShebang;
 }
 
-/** @param {string} filePath */
-async function fileHasShebang(filePath) {
-    const snapshot = await gitWriteWorkspaceIo.readBytesRangeFresh(filePath, { start: 0, maxBytes: 2 });
+/** @param {GitWriteRuntime} runtime @param {string} filePath */
+async function fileHasShebang(runtime, filePath) {
+    const snapshot = await runtime.workspace.io.readBytesRangeFresh(filePath, { start: 0, maxBytes: 2 });
     return snapshot.bytesRead === 2 && snapshot.content[0] === 0x23 && snapshot.content[1] === 0x21;
 }
 
 /**
+ * @param {GitWriteRuntime} runtime
  * @param {string[]} paths
  * @returns {Promise<{ path: string; headMode: string; currentMode: number; targetMode: number }[]>}
  */
-async function inspectAccidentalExecutableModeDrift(paths) {
-    const tracked = await execGit(['ls-files', '--stage', '-z', '--', ...paths], { maxBufferBytes: 4 * 1024 * 1024 });
+async function inspectAccidentalExecutableModeDrift(runtime, paths) {
+    const tracked = await runtime.exec(['ls-files', '--stage', '-z', '--', ...paths], {
+        maxBufferBytes: 4 * 1024 * 1024,
+    });
     if (!tracked.success || !tracked.stdout) return [];
     const rows = [];
     for (const record of tracked.stdout.split('\0').filter(Boolean)) {
@@ -134,11 +146,11 @@ async function inspectAccidentalExecutableModeDrift(paths) {
         const headMode = match[1];
         const relative = match[2];
         if (headMode !== '100755' || !relative) continue;
-        const resolved = await resolveWritePath(relative);
+        const resolved = await runtime.workspace.resolveWritePath(relative);
         if (!resolved.ok) continue;
         let stats;
         try {
-            stats = (await gitWriteWorkspaceIo.statPath(resolved.resolved)).stats;
+            stats = (await runtime.workspace.io.statPath(resolved.resolved)).stats;
         } catch {
             continue;
         }
@@ -147,7 +159,7 @@ async function inspectAccidentalExecutableModeDrift(paths) {
         if ((currentMode & 0o111) !== 0) continue;
         let hasShebang;
         try {
-            hasShebang = await fileHasShebang(resolved.resolved);
+            hasShebang = await fileHasShebang(runtime, resolved.resolved);
         } catch {
             continue;
         }
@@ -158,15 +170,16 @@ async function inspectAccidentalExecutableModeDrift(paths) {
 }
 
 /**
+ * @param {GitWriteRuntime} runtime
  * @param {string[]} paths
  */
-async function repairAccidentalExecutableModeDrift(paths) {
-    const drift = await inspectAccidentalExecutableModeDrift(paths);
+async function repairAccidentalExecutableModeDrift(runtime, paths) {
+    const drift = await inspectAccidentalExecutableModeDrift(runtime, paths);
     const repaired = [];
     for (const row of drift) {
-        const resolved = await resolveWritePath(row.path);
+        const resolved = await runtime.workspace.resolveWritePath(row.path);
         if (!resolved.ok) continue;
-        const mutation = await gitWriteWorkspaceIo.chmodFileLocked(resolved.resolved, row.targetMode, {
+        const mutation = await runtime.workspace.io.chmodFileLocked(resolved.resolved, row.targetMode, {
             riskClass: 'medium',
             advisoryLimits: { tool: 'git_stage', reason: 'head-executable-shebang-xbit-loss' },
         });
@@ -182,6 +195,7 @@ async function repairAccidentalExecutableModeDrift(paths) {
 }
 
 /**
+ * @param {GitWriteRuntime} runtime
  * @param {string[]} paths
  * @returns {Promise<
  *     | {
@@ -194,12 +208,15 @@ async function repairAccidentalExecutableModeDrift(paths) {
  *     | { ok: false; error: string; path?: string }
  * >}
  */
-async function planStage(paths) {
-    const normalized = await normalizeExplicitPaths(paths);
+async function planStage(runtime, paths) {
+    const normalized = await normalizeExplicitPaths(runtime, paths);
     if (!normalized.ok) return normalized;
-    const status = await execGit(['status', '--porcelain=v1', '--untracked-files=all', '--', ...normalized.paths], {
-        maxBufferBytes: 4 * 1024 * 1024,
-    });
+    const status = await runtime.exec(
+        ['status', '--porcelain=v1', '--untracked-files=all', '--', ...normalized.paths],
+        {
+            maxBufferBytes: 4 * 1024 * 1024,
+        },
+    );
     if (!status.success) return { ok: false, error: status.error ?? 'Unable to inspect selected Git paths.' };
     const affected = status.stdout
         .split(/\r?\n/u)
@@ -211,15 +228,15 @@ async function planStage(paths) {
             error: `Selected paths expand to ${affected.length} changed files; maximum bounded staging set is ${MAX_STAGE_FILES}.`,
         };
     }
-    const executableModeDrift = await inspectAccidentalExecutableModeDrift(normalized.paths);
+    const executableModeDrift = await inspectAccidentalExecutableModeDrift(runtime, normalized.paths);
     return { ok: true, paths: normalized.paths, affected, affectedCount: affected.length, executableModeDrift };
 }
 
-/** @returns {Promise<{ names: string[]; stat: string }>} */
-async function readStagedSummary() {
+/** @param {GitWriteRuntime} runtime @returns {Promise<{ names: string[]; stat: string }>} */
+async function readStagedSummary(runtime) {
     const [names, stat] = await Promise.all([
-        execGit(['diff', '--cached', '--name-only']),
-        execGit(['diff', '--cached', '--stat']),
+        runtime.exec(['diff', '--cached', '--name-only']),
+        runtime.exec(['diff', '--cached', '--stat']),
     ]);
     return {
         names: names.success
@@ -232,11 +249,11 @@ async function readStagedSummary() {
     };
 }
 
-/** @returns {Promise<{ name: string | null; email: string | null }>} */
-async function readCommitIdentity() {
+/** @param {GitWriteRuntime} runtime @returns {Promise<{ name: string | null; email: string | null }>} */
+async function readCommitIdentity(runtime) {
     const [name, email] = await Promise.all([
-        execGit(['config', '--get', 'user.name']),
-        execGit(['config', '--get', 'user.email']),
+        runtime.exec(['config', '--get', 'user.name']),
+        runtime.exec(['config', '--get', 'user.email']),
     ]);
     return {
         name: name.success ? name.stdout.trim() || null : null,
@@ -244,13 +261,13 @@ async function readCommitIdentity() {
     };
 }
 
-/** @returns {Promise<Record<string, unknown>>} */
-async function buildPushState() {
-    const [head, branch, upstream] = await Promise.all([readHead(), readBranch(), readUpstream()]);
+/** @param {GitWriteRuntime} runtime @returns {Promise<Record<string, unknown>>} */
+async function buildPushState(runtime) {
+    const [head, branch, upstream] = await Promise.all([readHead(runtime), readBranch(runtime), readUpstream(runtime)]);
     let ahead = null;
     let behind = null;
     if (upstream) {
-        const counts = await execGit(['rev-list', '--left-right', '--count', '@{upstream}...HEAD']);
+        const counts = await runtime.exec(['rev-list', '--left-right', '--count', '@{upstream}...HEAD']);
         if (counts.success) {
             const [behindRaw, aheadRaw] = counts.stdout.trim().split(/\s+/u);
             behind = Number.isFinite(Number(behindRaw)) ? Number(behindRaw) : null;
@@ -268,7 +285,7 @@ function isFileCoveredBySelectedPaths(file, selected) {
     );
 }
 
-/** @type {import('../registry.js').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
 export const gitWriteTools = [
     {
         name: 'git_stage_plan',
@@ -277,10 +294,11 @@ export const gitWriteTools = [
             'Validate explicit workspace paths and enumerate the exact changed files that bounded staging would affect.',
         inputSchema: { paths: explicitPathsSchema },
         annotations: readOnlyAnnotations(),
-        handler: async ({ paths }) => {
-            const plan = await planStage(paths);
+        handler: async ({ paths }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const plan = await planStage(runtime, paths);
             if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
-            const head = await readHead();
+            const head = await readHead(runtime);
             return okResult({ success: true, ...plan, head }, JSON.stringify({ ...plan, head }, null, 2));
         },
     },
@@ -301,11 +319,12 @@ export const gitWriteTools = [
                 ['describe']('Explicit acknowledgement that the enumerated path set should be staged.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ paths, expectedHead }) => {
-            const head = await readHead();
+        handler: async ({ paths, expectedHead }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const head = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, head);
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
-            const plan = await planStage(paths);
+            const plan = await planStage(runtime, paths);
             if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
             if (plan.affectedCount === 0) {
                 return okResult(
@@ -313,14 +332,14 @@ export const gitWriteTools = [
                     'No selected changes to stage.',
                 );
             }
-            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(plan.paths);
-            const result = await execGit(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
+            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(runtime, plan.paths);
+            const result = await runtime.exec(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
             if (!result.success)
                 return errorResult(result.error ?? 'git add failed.', {
                     code: 'ERR_GIT_STAGE_FAILED',
                     paths: plan.paths,
                 });
-            const staged = await readStagedSummary();
+            const staged = await readStagedSummary(runtime);
             await appendMcpAuditEvent({
                 event: 'git_stage',
                 tool: 'git_stage',
@@ -356,8 +375,13 @@ export const gitWriteTools = [
             expectedHead: z.string().max(64).optional(),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ message, expectedHead }) => {
-            const [head, identity, staged] = await Promise.all([readHead(), readCommitIdentity(), readStagedSummary()]);
+        handler: async ({ message, expectedHead }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const [head, identity, staged] = await Promise.all([
+                readHead(runtime),
+                readCommitIdentity(runtime),
+                readStagedSummary(runtime),
+            ]);
             const headError = validateExpectedHead(expectedHead, head);
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
             const plan = {
@@ -384,8 +408,13 @@ export const gitWriteTools = [
             confirmCommit: z.literal(true),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ message, expectedHead }) => {
-            const [head, identity, staged] = await Promise.all([readHead(), readCommitIdentity(), readStagedSummary()]);
+        handler: async ({ message, expectedHead }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const [head, identity, staged] = await Promise.all([
+                readHead(runtime),
+                readCommitIdentity(runtime),
+                readStagedSummary(runtime),
+            ]);
             const headError = validateExpectedHead(expectedHead, head);
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
             if (staged.names.length === 0)
@@ -395,7 +424,7 @@ export const gitWriteTools = [
                     code: 'ERR_GIT_IDENTITY_MISSING',
                     identity,
                 });
-            const result = await execGit(['commit', '-m', message.trim()], {
+            const result = await runtime.exec(['commit', '-m', message.trim()], {
                 timeoutMs: 120_000,
                 maxBufferBytes: 4 * 1024 * 1024,
             });
@@ -405,7 +434,7 @@ export const gitWriteTools = [
                     previousHead: head,
                     stagedFiles: staged.names,
                 });
-            const newHead = await readHead();
+            const newHead = await readHead(runtime);
             await appendMcpAuditEvent({
                 event: 'git_commit',
                 tool: 'git_commit',
@@ -440,8 +469,9 @@ export const gitWriteTools = [
                 ['describe']('Contact the configured upstream with git push --dry-run. Default: true.'),
         },
         annotations: { ...readOnlyAnnotations(), openWorldHint: true },
-        handler: async ({ expectedHead, runDryRun }) => {
-            const state = await buildPushState();
+        handler: async ({ expectedHead, runDryRun }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const state = await buildPushState(runtime);
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
             if (headError)
                 return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head: state['head'] });
@@ -457,7 +487,7 @@ export const gitWriteTools = [
                 });
             let dryRun = null;
             if (runDryRun !== false) {
-                const result = await execGit(['push', '--dry-run', '--porcelain'], {
+                const result = await runtime.exec(['push', '--dry-run', '--porcelain'], {
                     timeoutMs: 60_000,
                     maxBufferBytes: 2 * 1024 * 1024,
                 });
@@ -495,9 +525,10 @@ export const gitWriteTools = [
                 ['describe']('Explicit acknowledgement of stage + commit + optional upstream push.'),
         },
         annotations: { ...destructiveAnnotations(), openWorldHint: true },
-        handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }) => {
+        handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
             const startedAt = Date.now();
-            const initialHead = await readHead();
+            const initialHead = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, initialHead);
             if (headError) {
                 return errorResult(headError, {
@@ -506,7 +537,7 @@ export const gitWriteTools = [
                     head: initialHead,
                 });
             }
-            const initialStaged = await readStagedSummary();
+            const initialStaged = await readStagedSummary(runtime);
             if (initialStaged.names.length > 0) {
                 return errorResult('Composite publish requires a clean Git index before staging explicit paths.', {
                     code: 'ERR_GIT_PUBLISH_INDEX_NOT_CLEAN',
@@ -514,7 +545,7 @@ export const gitWriteTools = [
                     hint: 'Use the granular git_commit/git_push flow for intentionally pre-staged changes.',
                 });
             }
-            const plan = await planStage(paths);
+            const plan = await planStage(runtime, paths);
             if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
             if (plan.affectedCount === 0) {
                 return errorResult('No selected changes are available to publish.', {
@@ -524,18 +555,18 @@ export const gitWriteTools = [
             }
 
             const stageStartedAt = Date.now();
-            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(plan.paths);
-            const stage = await execGit(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
+            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(runtime, plan.paths);
+            const stage = await runtime.exec(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
             if (!stage.success) {
                 return errorResult(stage.error ?? 'git add failed.', {
                     code: 'ERR_GIT_STAGE_FAILED',
                     paths: plan.paths,
                 });
             }
-            const staged = await readStagedSummary();
+            const staged = await readStagedSummary(runtime);
             const unexpectedStaged = staged.names.filter((file) => !isFileCoveredBySelectedPaths(file, plan.paths));
             if (unexpectedStaged.length > 0) {
-                await execGit(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
+                await runtime.exec(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
                 return errorResult('Composite publish observed staged files outside the explicit selected path set.', {
                     code: 'ERR_GIT_PUBLISH_STAGE_ESCAPE',
                     unexpectedStaged,
@@ -546,16 +577,16 @@ export const gitWriteTools = [
                 return errorResult('Selected changes produced an empty staged index.', { code: 'ERR_GIT_EMPTY_INDEX' });
             }
 
-            const identity = await readCommitIdentity();
+            const identity = await readCommitIdentity(runtime);
             if (!identity.name || !identity.email) {
-                await execGit(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
+                await runtime.exec(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
                 return errorResult('Git user.name/user.email are not configured.', {
                     code: 'ERR_GIT_IDENTITY_MISSING',
                     identity,
                 });
             }
             const commitStartedAt = Date.now();
-            const commit = await execGit(['commit', '-m', message.trim()], {
+            const commit = await runtime.exec(['commit', '-m', message.trim()], {
                 timeoutMs: 120_000,
                 maxBufferBytes: 4 * 1024 * 1024,
             });
@@ -566,14 +597,14 @@ export const gitWriteTools = [
                     stagedFiles: staged.names,
                 });
             }
-            const committedHead = await readHead();
+            const committedHead = await readHead(runtime);
             const shouldPush = push !== false;
             let pushResult = null;
             let pushStartedAt = null;
             let beforePush = null;
             let afterPush = null;
             if (shouldPush) {
-                beforePush = await buildPushState();
+                beforePush = await buildPushState(runtime);
                 if (!beforePush['branch']) {
                     return errorResult('Commit created, but detached HEAD cannot be pushed by the governed tool.', {
                         code: 'ERR_GIT_DETACHED_HEAD_AFTER_COMMIT',
@@ -589,7 +620,7 @@ export const gitWriteTools = [
                     });
                 }
                 if (pushDryRunFirst === true) {
-                    const dryRun = await execGit(['push', '--dry-run', '--porcelain'], {
+                    const dryRun = await runtime.exec(['push', '--dry-run', '--porcelain'], {
                         timeoutMs: 60_000,
                         maxBufferBytes: 2 * 1024 * 1024,
                     });
@@ -604,7 +635,7 @@ export const gitWriteTools = [
                     }
                 }
                 pushStartedAt = Date.now();
-                const pushed = await execGit(['push', '--porcelain'], {
+                const pushed = await runtime.exec(['push', '--porcelain'], {
                     timeoutMs: 120_000,
                     maxBufferBytes: 4 * 1024 * 1024,
                 });
@@ -623,7 +654,7 @@ export const gitWriteTools = [
                         stderr: pushed.stderr,
                     });
                 }
-                afterPush = await buildPushState();
+                afterPush = await buildPushState(runtime);
             }
 
             await appendMcpAuditEvent({
@@ -697,8 +728,9 @@ export const gitWriteTools = [
             confirmPush: z.literal(true),
         },
         annotations: { ...destructiveAnnotations(), openWorldHint: true },
-        handler: async ({ expectedHead, expectedUpstream, pushDryRunFirst }) => {
-            const state = await buildPushState();
+        handler: async ({ expectedHead, expectedUpstream, pushDryRunFirst }, operationContext) => {
+            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const state = await buildPushState(runtime);
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
             if (headError)
                 return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head: state['head'] });
@@ -714,7 +746,7 @@ export const gitWriteTools = [
                 );
             }
             if (pushDryRunFirst === true) {
-                const dryRun = await execGit(['push', '--dry-run', '--porcelain'], {
+                const dryRun = await runtime.exec(['push', '--dry-run', '--porcelain'], {
                     timeoutMs: 60_000,
                     maxBufferBytes: 2 * 1024 * 1024,
                 });
@@ -726,7 +758,7 @@ export const gitWriteTools = [
                     });
                 }
             }
-            const result = await execGit(['push', '--porcelain'], {
+            const result = await runtime.exec(['push', '--porcelain'], {
                 timeoutMs: 120_000,
                 maxBufferBytes: 4 * 1024 * 1024,
             });
@@ -736,7 +768,7 @@ export const gitWriteTools = [
                     state,
                     stderr: result.stderr,
                 });
-            const after = await buildPushState();
+            const after = await buildPushState(runtime);
             await appendMcpAuditEvent({
                 event: 'git_push',
                 tool: 'git_push',

@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { mcpReloadPlanTool } from '#copilot/mcp/tools';
-import { summarizeMcpReloadState } from '../../../../src/copilot/mcp/control-plane/reload-state.js';
+import { summarizeMcpReloadState } from '#copilot/mcp/public/runtime/reload';
+import { mcpReloadPlanTool } from '#copilot/testing/mcp/tools/reload';
 
 describe('MCP reload state reconciliation', () => {
     it('reduces the normal post-reload workflow to one connector smoke call', async () => {
@@ -38,6 +38,14 @@ describe('MCP reload state reconciliation', () => {
     });
 
     it('keeps in-flight and failed reloads non-reconciled', () => {
+        const launching = summarizeMcpReloadState(
+            { status: 'launching', requestId: 'mcp-reload-launching', profile: 'quic' },
+            '2026-08-14T18:09:00.000Z',
+        );
+        expect(launching.inFlight).toBe(true);
+        expect(launching.failed).toBe(false);
+        expect(launching.reconciledWithConnectorSmoke).toBe(false);
+
         const inFlight = summarizeMcpReloadState(
             { status: 'running', requestId: 'mcp-reload-running', profile: 'auto' },
             '2026-08-14T18:10:00.000Z',

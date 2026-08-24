@@ -1,10 +1,11 @@
 // @ts-check
 
-import { createCloudflareStateStore } from '#copilot/mcp/cloudflare';
+import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/state';
 import {
     readMcpStartupMaintenanceState,
     resetMcpStartupMaintenanceForTests,
     scheduleMcpStartupMaintenance,
+    stopMcpStartupMaintenance,
 } from '#copilot/testing/mcp/runtime/startup-maintenance';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -53,6 +54,53 @@ describe('MCP startup maintenance', () => {
         assert.equal(state.staleQuickTunnelStateRemoved, true);
         assert.equal(state.detachedLiveRunsReaped, 2);
         assert.equal(state.detachedLiveRunReaperFailures, 0);
+    });
+
+    it('stops an in-flight startup generation before later maintenance phases can run', async () => {
+        /** @type {(() => void)[]} */
+        const callbacks = [];
+        /** @type {(value: { removed: boolean }) => void} */
+        let releaseCleanup = () => {
+            throw new Error('cleanup resolver was not installed');
+        };
+        let smokeCalls = 0;
+        scheduleMcpStartupMaintenance({
+            enabled: true,
+            delayMs: 0,
+            setTimeoutFn: /** @type {typeof setTimeout} */ (
+                (/** @type {() => void} */ fn) => {
+                    callbacks.push(fn);
+                    return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+                }
+            ),
+            cleanupRunner: () =>
+                new Promise((resolve) => {
+                    releaseCleanup = resolve;
+                }),
+            rollbackCleanupRunner: async () => {
+                throw new Error('stale startup generation must not reach rollback cleanup');
+            },
+            detachedLiveReaper: async () => {
+                throw new Error('stale startup generation must not reach detached reaper');
+            },
+            smokeRunner: async () => {
+                smokeCalls += 1;
+                return { success: true };
+            },
+        });
+        callbacks.shift()?.();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(readMcpStartupMaintenanceState().running, true);
+
+        const stopping = stopMcpStartupMaintenance();
+        releaseCleanup({ removed: false });
+        await stopping;
+
+        const state = readMcpStartupMaintenanceState();
+        assert.equal(state.scheduled, false);
+        assert.equal(state.running, false);
+        assert.equal(state.completed, false);
+        assert.equal(smokeCalls, 0);
     });
 
     it('keeps workspace smoke successful when detached live reaping fails non-fatally', async () => {

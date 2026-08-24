@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '#copilot/mcp';
-import { MCP_TOOL_EXECUTION_LIMITS } from '#copilot/mcp/control-plane';
-import { buildToolPayloadAudit } from '#copilot/mcp/scripts';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+
+import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
+import { MCP_TOOL_EXECUTION_LIMITS } from '#copilot/mcp/public/protocol/tools';
 
 describe('MCP tools/list payload audit', () => {
     it('measures SDK wire descriptors instead of internal Zod state', async () => {

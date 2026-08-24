@@ -9,7 +9,7 @@
  * @module copilot/mcp/cloudflare/skip-audit
  */
 
-import { createTtlCache } from '#copilot/mcp/control-plane';
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { auditCloudflareConfigPosture } from './config-audit.js';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
@@ -28,7 +28,7 @@ const SKIPPABLE_PRODUCTS = ['bic', 'securityLevel', 'uaBlock', 'zoneLockdown', '
 const NON_SKIPPABLE_OR_CONFIG_FIRST_PRODUCTS = ['rocketLoader', 'rum', 'emailObfuscation', 'zaraz'];
 const DEFAULT_SKIP_AUDIT_CACHE_TTL_MS = 60_000;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const skipAuditCache = createTtlCache({
     name: 'cloudflare-skip-audit',
     ttlMs: DEFAULT_SKIP_AUDIT_CACHE_TTL_MS,

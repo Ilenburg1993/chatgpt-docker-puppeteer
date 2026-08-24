@@ -27,6 +27,14 @@ export const INFRA_PUBLIC_API_COST_BASELINE = Object.freeze([
         externalPackages: [],
     }),
     defineBaseline({
+        alias: '#copilot/infra/public/cache/ttl',
+        moduleCount: 3,
+        maxModuleCount: 5,
+        sourceBytes: 7184,
+        maxSourceBytes: 10776,
+        externalPackages: [],
+    }),
+    defineBaseline({
         alias: '#copilot/infra/public/composition/database/sqlite',
         moduleCount: 3,
         maxModuleCount: 5,

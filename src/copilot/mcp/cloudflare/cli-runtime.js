@@ -1,5 +1,7 @@
 // @ts-check
 /** Runtime lifecycle helpers for Cloudflare Tunnel + MCP HTTP origin. */
+import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { probeHealth } from './cli-probe.js';
@@ -79,40 +81,62 @@ async function stopManagedStackWithController(processes) {
 }
 
 /**
+ * Observe a foreground cloudflared process until Node reports physical `close`.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @returns {Promise<{ ok: boolean; exitCode: number | null; signal: NodeJS.Signals | null; error: string | null }>}
+ */
+export async function observeForegroundCloudflared(child) {
+    let error = null;
+    child.once('error', (spawnError) => {
+        error = spawnError.message;
+    });
+    const observation = await createAttachedChildProcessSupervisor(child, { processGroup: false }).closed;
+    return {
+        ok: error === null && observation.exitCode === 0,
+        exitCode: observation.exitCode,
+        signal: observation.signal,
+        error:
+            error ??
+            (observation.signal
+                ? `cloudflared terminated by ${observation.signal}`
+                : observation.exitCode === 0
+                  ? null
+                  : `cloudflared exited with ${String(observation.exitCode)}`),
+    };
+}
+
+/**
  * @param {string[]} args
  * @param {import('./config.js').CloudflareTunnelTransportProtocol} protocol
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {void}
  */
-export function runCloudflared(args, protocol, env = process.env) {
+export async function runCloudflared(args, protocol, env = process.env) {
     const child = spawn('cloudflared', args, {
         stdio: 'inherit',
         env: buildCloudflaredEnvironment({ transportProtocol: protocol }, env),
     });
-    child.on('exit', (code) => {
-        process.exitCode = code ?? 1;
-    });
+    return await observeForegroundCloudflared(child);
 }
 
 /**
  * @param {import('./config.js').CloudflareTunnelConfig} config
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {void}
+ * @param {{ onStdout?: (chunk: string) => void; onConnectorUrl?: (url: string) => void }} [observers]
  */
-export function runQuickTunnel(config, env = process.env) {
+export async function runQuickTunnel(config, env = process.env, observers = {}) {
     const child = spawn('cloudflared', buildQuickTunnelArgs(config), {
         stdio: ['ignore', 'pipe', 'inherit'],
         env: buildCloudflaredEnvironment(config, env),
     });
-    child.stdout.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => {
-        process.stdout.write(chunk);
-        const found = extractTryCloudflareUrl(String(chunk));
-        if (found) process.stderr.write(`[copilot-mcp-cloudflare] quick tunnel URL: ${found}/mcp\n`);
+    child.stdout?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk) => {
+        const text = String(chunk);
+        observers.onStdout?.(text);
+        const found = extractTryCloudflareUrl(text);
+        if (found) observers.onConnectorUrl?.(`${found}/mcp`);
     });
-    child.on('exit', (code) => {
-        process.exitCode = code ?? 1;
-    });
+    return await observeForegroundCloudflared(child);
 }
 
 /**
@@ -210,8 +234,10 @@ function buildMcpHttpEnvironment(config, originTransport, env) {
  * @returns {NodeJS.ProcessEnv}
  */
 function buildCloudflaredEnvironment(config, env) {
-    return {
-        ...env,
-        TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto',
-    };
+    return buildMcpChildEnvironment({
+        parentEnv: env,
+        overrides: {
+            TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto',
+        },
+    }).env;
 }

@@ -8,25 +8,25 @@
  * @module copilot/mcp/tools/tool-payload-audit
  */
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
-import { buildToolPayloadAudit } from '../scripts/tool-payload-audit.js';
 
-/** @type {() => import('../registry.js').McpToolDefinition[]} */
+/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
 let toolsProvider = () => [];
 
 /**
  * A registry injeta a superfície já normalizada depois de construí-la; assim o auditor não depende de volta da
  * registry.
  *
- * @param {() => import('../registry.js').McpToolDefinition[]} provider
+ * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
  * @returns {void}
  */
 export function bindMcpToolPayloadAuditProvider(provider) {
     toolsProvider = provider;
 }
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpToolPayloadAuditTool = {
     name: 'mcp_tool_payload_audit',
     title: 'MCP tool payload audit',

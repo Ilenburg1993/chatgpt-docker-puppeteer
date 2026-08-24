@@ -6,8 +6,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { handleStatefulMcpHttpRequest, readMcpHttpSessionRuntimeState } from '#copilot/mcp/adapters';
-import { createMcpHttpSessionRuntime, createMcpHttpStreamRegistry } from '#copilot/mcp/control-plane';
+import {
+    handleStatefulMcpHttpRequest,
+    readMcpHttpSessionRuntimeState,
+} from '#copilot/mcp/public/adapters/http-stateful';
+import { createMcpHttpSessionRuntime, createMcpHttpStreamRegistry } from '#copilot/testing/mcp/transport/http/stateful';
 import {
     createMcpTransportErrorCollector,
     fakeMcpTransport,
@@ -136,7 +139,7 @@ describe('MCP HTTP stream registry', () => {
 
         assert.equal(handled, 1);
         assert.equal(closed, 1);
-        assert.equal(runtime.get('session-delete'), null);
+        assert.equal(await runtime.get('session-delete'), null);
         assert.equal(res.statusCode, 204);
         assert.equal(res.writableEnded, true);
         assert.equal(registry.snapshot()['activeStreams'], 0);

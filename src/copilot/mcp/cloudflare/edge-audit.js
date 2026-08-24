@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/edge-audit
  */
 
-import { createTtlCache } from '#copilot/mcp/control-plane';
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
@@ -36,7 +36,7 @@ const SENSITIVE_HEADER_NAMES = [
 const INTERACTIVE_OR_BLOCKING_ACTIONS = ['managed_challenge', 'js_challenge', 'challenge', 'block'];
 const DEFAULT_EDGE_AUDIT_CACHE_TTL_MS = 60_000;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const edgeAuditCache = createTtlCache({
     name: 'cloudflare-edge-audit',
     ttlMs: DEFAULT_EDGE_AUDIT_CACHE_TTL_MS,

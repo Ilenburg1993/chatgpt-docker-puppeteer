@@ -6,7 +6,7 @@ import {
     summarizeAuditInterToolHistory,
     summarizeCloudflareMetrics,
     summarizeReachability,
-} from '#copilot/mcp/tools';
+} from '#copilot/testing/mcp/diagnostics/latency/attribution';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 

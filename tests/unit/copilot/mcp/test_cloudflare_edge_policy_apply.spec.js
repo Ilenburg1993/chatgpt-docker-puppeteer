@@ -1,4 +1,7 @@
-import { buildCloudflareEdgeApplyPlan, buildCloudflareEdgeDesiredApiRules } from '#copilot/mcp/cloudflare';
+import {
+    buildCloudflareEdgeApplyPlan,
+    buildCloudflareEdgeDesiredApiRules,
+} from '#copilot/mcp/public/cloudflare/edge-apply';
 import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/edge-policy-apply', () => {

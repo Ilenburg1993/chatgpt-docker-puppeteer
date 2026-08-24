@@ -6,8 +6,8 @@
  * upstream manager to import tools and proxy calls.
  */
 
-import { Client } from '@modelcontextprotocol/sdk/client';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 function withTimeout(/** @type {any} */ promise, /** @type {any} */ timeoutMs, /** @type {any} */ label) {
     const ms = Number(timeoutMs);
@@ -102,13 +102,14 @@ export class MCPStdioUpstreamClient {
         }
         if (!this.connected) await this.connect();
 
-        // NOTE: MCP SDK does not currently accept AbortSignal for stdio calls.
-        // We enforce an upper bound via timeout, and if it fires, we tear down the connection.
         try {
-            return await withTimeout(
-                /** @type {any} */ (this.client).callTool({ name, arguments: args }),
-                this.callTimeoutMs,
-                `[MCP stdio:${this.alias}] tools/call(${name})`,
+            return await /** @type {any} */ (this.client).callTool(
+                { name, arguments: args },
+                {
+                    ...(signal ? { signal } : {}),
+                    timeout: this.callTimeoutMs,
+                    maxTotalTimeout: this.callTimeoutMs,
+                },
             );
         } catch (/** @type {any} */ _raw_err) {
             const err = /** @type {any} */ (_raw_err);

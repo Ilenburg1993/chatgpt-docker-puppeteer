@@ -1,6 +1,7 @@
 // @ts-check
 /** Cloudflare MCP smoke orchestration. */
-import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { MCP_PROTOCOL_LEGACY_DEFAULT_VERSION } from '#copilot/mcp/public/protocol/version';
 import {
     buildToolsListSmokeHeaders,
     extractAuthorizationServer,
@@ -12,7 +13,6 @@ import {
 } from './cli-probe.js';
 import { createCloudflareStateStore } from './state.js';
 
-const DEFAULT_MCP_PROTOCOL_VERSION = '2025-11-25';
 const DEFAULT_SMOKE_ATTEMPTS = 3;
 const DEFAULT_SMOKE_DELAY_MS = 1_000;
 const DEFAULT_CRITICAL_TOOL_NAMES = [
@@ -43,7 +43,7 @@ export async function runCloudflareSmoke({
 } = {}) {
     if (!config) throw new Error('Cloudflare smoke requires a resolved tunnel config.');
     const connectorUrl = resolveConnectorUrl(config, env);
-    const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_MCP_PROTOCOL_VERSION).trim();
+    const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? MCP_PROTOCOL_LEGACY_DEFAULT_VERSION).trim();
     const smokeAttempts = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_ATTEMPTS', DEFAULT_SMOKE_ATTEMPTS, 1, 20);
     const smokeDelayMs = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_DELAY_MS', DEFAULT_SMOKE_DELAY_MS, 100, 30_000);
     const probeOptions = { attempts: smokeAttempts, delayMs: smokeDelayMs };

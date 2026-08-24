@@ -6,7 +6,8 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { createTtlCache } from '#copilot/mcp/control-plane';
+
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import Cloudflare from 'cloudflare';
 import { createHash } from 'node:crypto';
 import { readCloudflareTunnelConfig } from './config.js';
@@ -27,13 +28,13 @@ const REMOTE_API_ENV_IO = createConfiguredFsIo(
 const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 60_000;
 const DEFAULT_ENV_FILE_CACHE_TTL_MS = 2_000;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const remoteAuditCache = createTtlCache({
     name: 'cloudflare-remote-audit',
     ttlMs: DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS,
     maxEntries: 32,
 });
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, string>>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<Record<string, string>>} */
 const localEnvFileCache = createTtlCache({
     name: 'cloudflare-env-file',
     ttlMs: DEFAULT_ENV_FILE_CACHE_TTL_MS,

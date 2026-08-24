@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { devOAuthTestHarness } from '../../../../src/copilot/mcp/control-plane/dev-oauth.js';
+import { devOAuthTestHarness } from '#copilot/testing/mcp/auth';
 
 describe('dev OAuth SSRF protection', () => {
     it.each([

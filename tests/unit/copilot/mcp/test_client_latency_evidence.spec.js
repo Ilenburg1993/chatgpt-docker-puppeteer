@@ -1,17 +1,17 @@
 // @ts-check
 
-import { summarizeClientLatencyEvidence, summarizeClientLatencyNumbers } from '#copilot/mcp/control-plane';
+import { summarizeClientLatencyEvidence, summarizeClientLatencyNumbers } from '#copilot/mcp/public/diagnostics/latency';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 /**
  * @param {string} sampleId
- * @param {import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientThinkingMode} thinkingMode
+ * @param {import('#copilot/mcp/public/diagnostics/latency').ClientThinkingMode} thinkingMode
  * @param {number} ttftMs
  * @param {Partial<
- *     import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientLatencyEvidenceEntry
+ *     import('#copilot/mcp/public/diagnostics/latency').ClientLatencyEvidenceEntry
  * >} [extra]
- * @returns {import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientLatencyEvidenceEntry}
+ * @returns {import('#copilot/mcp/public/diagnostics/latency').ClientLatencyEvidenceEntry}
  */
 function row(sampleId, thinkingMode, ttftMs, extra = {}) {
     return {

@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/copilot-session
  */
 
-import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { getActiveSdkSession, listActiveSdkSessions } from '#copilot/sdk/session';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ function publicSessionSummary(entry) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const copilotSessionTools = [
     {

@@ -9,22 +9,57 @@ import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it } from 'vitest';
 
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { createMcpToolOperationContext, getResultExecutionHint } from '#copilot/mcp/public/protocol/tools';
 import {
     cancelJob,
-    getResultExecutionHint,
     normalizeFocusedUnitTestFiles,
-    pruneCompletedJobRecords,
     readCopilotValidatorCapacityState,
     readJobOutput,
-    readValidatorResourceSnapshot,
     resolveFocusedUnitTestCommand,
-    resolveJobTimeoutMs,
     resolveValidatorCommand,
+} from '#copilot/mcp/public/validation';
+import { resolveSafeValidationSuite } from '#copilot/mcp/public/validation/suites';
+import { jobTools } from '#copilot/testing/mcp/tools/jobs';
+import {
+    pruneCompletedJobRecords,
+    readValidatorResourceSnapshot,
+    resolveJobTimeoutMs,
     resolveValidatorVitestMaxWorkers,
-} from '#copilot/mcp/control-plane';
-import { resolveSafeValidationSuite } from '#copilot/mcp/scripts';
-import { jobTools } from '#copilot/mcp/tools';
-import { validateDevcontainerBashFile } from '../../../../src/copilot/mcp/scripts/validate-devcontainer-shell.js';
+} from '#copilot/testing/mcp/validation';
+import {
+    runBoundedDevcontainerValidationProcess,
+    validateDevcontainerBashFile,
+} from '#copilot/testing/mcp/validation/devcontainer-shell';
+
+const TEST_WORKSPACE = createComposedMcpProcessHost({
+    hostId: 'mcp-jobs-unit-process-host',
+    backgroundServices: false,
+}).workspace;
+const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
+    {
+        mcpReq: {
+            id: 'mcp-jobs-unit',
+            method: 'tools/call',
+            signal: new AbortController().signal,
+            _meta: { caller: 'test_mcp_jobs' },
+            envelope: { protocol: '2026' },
+        },
+    },
+    { workspace: TEST_WORKSPACE },
+);
+
+/** @param {string} name */
+function findJobTool(name) {
+    const definition = jobTools.find((candidate) => candidate.name === name);
+    assert.ok(definition, `missing job tool ${name}`);
+    return {
+        ...definition,
+        handler: /** @type {typeof definition.handler} */ (
+            (input) => definition.handler(input, TOOL_OPERATION_CONTEXT)
+        ),
+    };
+}
 
 describe('copilot MCP jobs', () => {
     it('resolves only allowlisted validator commands', () => {
@@ -116,6 +151,20 @@ describe('copilot MCP jobs', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('observes physical child close before reporting a DevContainer validation timeout', async () => {
+        const result = await runBoundedDevcontainerValidationProcess(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 1000)'],
+            { timeoutMs: 40, cwd: process.cwd() },
+        );
+
+        assert.equal(result.ok, false);
+        assert.equal(result.timedOut, true);
+        assert.equal(result.terminationRequested, true);
+        assert.equal(result.lifecycleState, 'closed');
+        assert.ok(result.durationMs < 5_000, `timeout child took ${String(result.durationMs)}ms to close`);
     });
 
     it('rejects unsupported validators', () => {
@@ -346,8 +395,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('keeps the exposed validator schema future-proof while enforcing the runtime allowlist server-side', async () => {
-        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
-        assert.ok(tool);
+        const tool = findJobTool('run_copilot_validator');
 
         const rejected = await tool.handler({ validator: 'future-unsafe-command' });
         assert.equal(rejected.isError, true);
@@ -361,8 +409,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('requires explicit focused files only for validator=unit-focused', async () => {
-        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
-        assert.ok(tool);
+        const tool = findJobTool('run_copilot_validator');
 
         const missingFile = await tool.handler({ validator: 'unit-focused' });
         assert.equal(missingFile.isError, true);
@@ -377,8 +424,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('run_copilot_validator blocks nested validator subprocesses inside Vitest', async () => {
-        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
-        assert.ok(tool);
+        const tool = findJobTool('run_copilot_validator');
         const result = await tool.handler({
             validator: 'unit-focused',
             testFile: 'tests/unit/copilot/infra/test_bulk_executor.spec.js',
@@ -391,8 +437,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('run_copilot_validator batches remain serialized and isolate invalid-path from nested-runner failures', async () => {
-        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
-        assert.ok(tool);
+        const tool = findJobTool('run_copilot_validator');
         const result = await tool.handler({
             batch: [
                 {
@@ -432,8 +477,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('job_list returns a structured job array', async () => {
-        const tool = jobTools.find((candidate) => candidate.name === 'job_list');
-        assert.ok(tool);
+        const tool = findJobTool('job_list');
         const result = await tool.handler({ limit: 5 });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);

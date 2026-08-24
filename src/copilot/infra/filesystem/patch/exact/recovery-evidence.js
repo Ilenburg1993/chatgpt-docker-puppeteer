@@ -9,6 +9,7 @@ const PATCH_RECOVERY_MAX_EVIDENCE_LINES = 12;
 const PATCH_RECOVERY_MAX_FRAGMENTS = 3;
 const PATCH_RECOVERY_MIN_FRAGMENT_CHARS = 6;
 const PATCH_RECOVERY_MAX_FRAGMENT_CHARS = 96;
+const PATCH_RECOVERY_MAX_EXACT_ANCHOR_CHARS = 32 * 1024;
 
 /** @param {string} content */
 function detectPatchNewlineStyle(content) {
@@ -77,6 +78,63 @@ function boundedPatchOccurrenceEvidence(content, needle) {
         occurrenceLines: selected.map((offset) => lineNumberAtTextOffset(content, offset)),
         occurrenceLinesTruncated: truncated || offsets.length > selected.length,
     };
+}
+
+/** @param {string} value @param {'none' | 'mixed' | 'lf' | 'crlf' | 'cr'} style */
+function projectPatchNewlineStyle(value, style) {
+    const normalized = normalizePatchLineEndings(value);
+    if (style === 'crlf') return normalized.replace(/\n/gu, '\r\n');
+    if (style === 'cr') return normalized.replace(/\n/gu, '\r');
+    if (style === 'lf' || style === 'none') return normalized;
+    return null;
+}
+
+/**
+ * Return one literal recovery anchor only when it is already present exactly once in the original content. The
+ * candidate is evidence for the next exact-string call; it never authorizes the current mutation.
+ *
+ * @param {string} content
+ * @param {string} oldString
+ * @param {'none' | 'mixed' | 'lf' | 'crlf' | 'cr'} newlineStyle
+ */
+function buildExactRecoveryAnchor(content, oldString, newlineStyle) {
+    if (oldString.length > PATCH_RECOVERY_MAX_EXACT_ANCHOR_CHARS) return null;
+    const quoteNormalized = normalizePatchQuoteEscapes(oldString);
+    const newlineProjected = projectPatchNewlineStyle(oldString, newlineStyle);
+    const quoteAndNewlineProjected = projectPatchNewlineStyle(quoteNormalized, newlineStyle);
+    const quoteChanged = quoteNormalized !== oldString;
+    const newlineChanged = typeof newlineProjected === 'string' && newlineProjected !== oldString;
+    const candidates = [
+        ...(quoteChanged && newlineChanged
+            ? [{ value: quoteAndNewlineProjected, reason: 'quote-and-line-ending-normalization' }]
+            : []),
+        ...(quoteChanged ? [{ value: quoteNormalized, reason: 'quote-escape-normalization' }] : []),
+        ...(newlineChanged ? [{ value: newlineProjected, reason: 'line-ending-normalization' }] : []),
+    ];
+    const seen = new Set([oldString]);
+    for (const candidate of candidates) {
+        if (
+            typeof candidate.value !== 'string' ||
+            candidate.value.length === 0 ||
+            candidate.value.length > PATCH_RECOVERY_MAX_EXACT_ANCHOR_CHARS ||
+            seen.has(candidate.value)
+        ) {
+            continue;
+        }
+        seen.add(candidate.value);
+        const { offsets, truncated } = findOccurrenceOffsets(content, candidate.value, 2);
+        if (!truncated && offsets.length === 1) {
+            return {
+                recoveryOldString: candidate.value,
+                recoveryOldStringChars: candidate.value.length,
+                recoveryReason: candidate.reason,
+                recoveryOccurrenceLine: lineNumberAtTextOffset(content, offsets[0] ?? 0),
+                recoveryExactAnchor: true,
+                recoveryRereadRequired: false,
+            };
+        }
+    }
+    return null;
 }
 
 /** @param {string} oldString */
@@ -162,9 +220,15 @@ export function buildPatchNotFoundEvidence(content, options) {
         options.newString.length >= PATCH_RECOVERY_MIN_FRAGMENT_CHARS &&
         desired.occurrenceCount === 1 &&
         desired.occurrenceCountExact;
+    const exactRecoveryAnchor = buildExactRecoveryAnchor(
+        content,
+        options.oldString,
+        /** @type {'none' | 'mixed' | 'lf' | 'crlf' | 'cr'} */ (base.newlineStyle),
+    );
 
     return {
         ...base,
+        ...(exactRecoveryAnchor ?? {}),
         desiredStateEvidenceAvailable: desired !== null,
         desiredTextPresent,
         convergenceCandidate,

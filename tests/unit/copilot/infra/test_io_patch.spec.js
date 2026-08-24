@@ -69,6 +69,29 @@ describe('infra/io/patch', () => {
         }
     });
 
+    it('devolve anchor CRLF literal único para retry exato sem reread', () => {
+        const content = 'header\r\nconst valueName = 2;\r\nfooter\r\n';
+        try {
+            computeTextPatch(content, {
+                oldString: 'const valueName = 2;\n',
+                newString: 'const valueName = 3;\n',
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_NOT_FOUND',
+                details: {
+                    newlineStyle: 'crlf',
+                    recoveryExactAnchor: true,
+                    recoveryRereadRequired: false,
+                    recoveryReason: 'line-ending-normalization',
+                    recoveryOldString: 'const valueName = 2;\r\n',
+                    recoveryOccurrenceLine: 2,
+                },
+            });
+        }
+    });
+
     it('identifica escaping literal de aspas como divergência diagnóstica sem relaxar o exact match', () => {
         const content = 'return fail(`Access to protected real path segment "${blockedHit}" is blocked`);\n';
         try {
@@ -83,6 +106,12 @@ describe('infra/io/patch', () => {
                 details: {
                     quoteEscapeNormalizedOccurrenceCount: 1,
                     quoteEscapeNormalizedOccurrenceCountExact: true,
+                    recoveryExactAnchor: true,
+                    recoveryRereadRequired: false,
+                    recoveryReason: 'quote-escape-normalization',
+                    recoveryOldString:
+                        'return fail(`Access to protected real path segment "${blockedHit}" is blocked`);',
+                    recoveryOccurrenceLine: 1,
                 },
             });
         }

@@ -18,9 +18,8 @@
  * ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"], "env": { "OLLAMA_CLOUD_ENABLED": "true",
  * "OLLAMA_CLOUD_API_KEY": "your_key_here", "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..." } } } }
  */
-
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 
 // Tool Registry (DRY Architecture)
 import { initialize, normalizeToolResultPayload, registry } from '../../src/integration/tool-registry.mjs';
@@ -38,114 +37,87 @@ const server = new Server(
     },
 );
 
-/** @type {Map<string, AbortController>} */
-const activeRequests = new Map();
+/**
+ * Validate the legacy integration registry's JSON schemas before exposing them through MCP v2.
+ *
+ * @returns {import('@modelcontextprotocol/server').Tool[]}
+ */
+function readMcpToolMetadata() {
+    return registry.getAllMetadata().map((tool) => {
+        const inputSchema = tool.inputSchema;
+        if (!inputSchema || typeof inputSchema !== 'object' || Array.isArray(inputSchema)) {
+            throw new Error(`Tool ${tool.name} has an invalid inputSchema.`);
+        }
+        const schema = /** @type {Record<string, unknown>} */ (inputSchema);
+        if (schema['type'] !== 'object') {
+            throw new Error(`Tool ${tool.name} inputSchema must declare type=object.`);
+        }
+        return {
+            ...tool,
+            inputSchema: /** @type {import('@modelcontextprotocol/server').Tool['inputSchema']} */ (schema),
+        };
+    });
+}
 
 /**
- * List all available tools from Tool Registry
+ * List all available tools from Tool Registry.
  */
-server.setRequestHandler(/** @type {any} */ ('tools/list'), async () => {
-    const tools = registry.getAllMetadata();
-    console.error('[MCP] Listing tools:', tools.map((t) => t.name).join(', '));
+server.setRequestHandler('tools/list', async () => {
+    const tools = readMcpToolMetadata();
+    console.error('[MCP] Listing tools:', tools.map((tool) => tool.name).join(', '));
     return { tools };
 });
 
 /**
- * Execute tool by name via Tool Registry
+ * Execute tool by name via Tool Registry. MCP v2 already translates notifications/cancelled into
+ * ctx.mcpReq.signal, so the adapter only composes that caller cancellation with its own deadline.
  */
-server.setRequestHandler(/** @type {any} */ ('tools/call'), async (request) => {
+server.setRequestHandler('tools/call', async (request, ctx) => {
     const toolName = request.params.name;
     const args = request.params.arguments || {};
-    const requestId =
-        request?.id !== undefined && request?.id !== null
-            ? String(request.id)
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    console.error(`[MCP] Calling tool: ${toolName} with args:`, JSON.stringify(args, null, 2));
-
-    const controller = new AbortController();
-    activeRequests.set(requestId, controller);
+    const requestId = String(ctx.mcpReq.id);
     const timeoutMs = Number(process.env['MCP_TOOL_TIMEOUT'] || 90000);
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = AbortSignal.any([ctx.mcpReq.signal, timeoutSignal]);
+
+    console.error(`[MCP] Calling tool ${toolName} request=${requestId} with args:`, JSON.stringify(args, null, 2));
 
     try {
-        const result = /** @type {any} */ (await registry.execute(toolName, args, { signal: controller.signal }));
+        const result = /** @type {any} */ (await registry.execute(toolName, args, { signal }));
 
-        // MCP expects content array format
-        // If result is already in MCP format, return as-is
         if (result && typeof result === 'object' && Array.isArray(result.content)) {
             return result;
         }
 
         const normalized = normalizeToolResultPayload(result);
-
-        // Otherwise, wrap in MCP format
         return {
-            content: [
-                {
-                    type: 'text',
-                    text: normalized.text,
-                },
-            ],
+            content: [{ type: 'text', text: normalized.text }],
             structuredContent: {
                 ...(normalized.json !== undefined ? { data: normalized.json } : {}),
                 flags: normalized.flags,
             },
         };
     } catch (error) {
-        if (controller.signal.aborted) {
+        if (signal.aborted) {
+            const reason = ctx.mcpReq.signal.aborted ? 'cancelled by caller' : `timed out after ${timeoutMs}ms`;
             return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Tool "${toolName}" timed out/cancelled after ${timeoutMs}ms`,
-                    },
-                ],
+                content: [{ type: 'text', text: `Tool "${toolName}" ${reason}` }],
                 isError: true,
             };
         }
-        console.error(`[MCP] Tool error:`, error);
-        const _ce = /** @type {any} */ (error);
+        console.error('[MCP] Tool error:', error);
+        const message = error instanceof Error ? error.message : String(error);
         return {
-            content: [
-                {
-                    type: 'text',
-                    text: `Error executing ${toolName}: ${_ce.message}`,
-                },
-            ],
+            content: [{ type: 'text', text: `Error executing ${toolName}: ${message}` }],
             isError: true,
         };
-    } finally {
-        clearTimeout(timeoutId);
-        activeRequests.delete(requestId);
     }
 });
-
-if (typeof server.setNotificationHandler === 'function') {
-    server.setNotificationHandler(
-        /** @type {any} */ ('notifications/cancelled'),
-        /** @type {any} */ (
-            async (/** @type {any} */ notification) => {
-                const targetId =
-                    notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
-                const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
-                if (!key) return {};
-                const controller = activeRequests.get(key);
-                if (controller) {
-                    controller.abort();
-                    activeRequests.delete(key);
-                    console.error(`[MCP] Cancelled active request ${key}`);
-                }
-                return {};
-            }
-        ),
-    );
-}
 
 /**
  * List available resources (optional - for future use)
  */
-server.setRequestHandler(/** @type {any} */ ('resources/list'), async () => {
+server.setRequestHandler('resources/list', async () => {
     return {
         resources: [
             {
@@ -161,7 +133,7 @@ server.setRequestHandler(/** @type {any} */ ('resources/list'), async () => {
 /**
  * Read resource content (optional - for future use)
  */
-server.setRequestHandler(/** @type {any} */ ('resources/read'), async (request) => {
+server.setRequestHandler('resources/read', async (request) => {
     const uri = request.params.uri;
 
     if (uri === 'rag://stats') {

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { summarizeCloudflaredLatencyHistograms } from '#copilot/mcp/cloudflare';
+import { summarizeCloudflaredLatencyHistograms } from '#copilot/mcp/public/cloudflare/metrics-histograms';
 
 describe('cloudflared metrics histograms', () => {
     it('uses the histogram count total instead of the last finite bucket', () => {

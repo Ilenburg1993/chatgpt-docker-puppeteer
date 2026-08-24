@@ -4,12 +4,30 @@ import assert from 'node:assert/strict';
 import { hash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { afterEach, describe, it } from 'vitest';
+import { afterAll, afterEach, describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '#copilot/mcp';
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 
 /** @type {string[]} */
 const tempDirs = [];
+const TEST_PROCESS_HOST = createComposedMcpProcessHost({
+    hostId: 'mcp-patch-batch-v2-unit-process-host',
+    backgroundServices: false,
+});
+const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
+    {
+        mcpReq: {
+            id: 'mcp-patch-batch-v2-unit',
+            method: 'tools/call',
+            signal: new AbortController().signal,
+            _meta: { caller: 'test_mcp_patch_batch_v2' },
+            envelope: { protocol: '2026' },
+        },
+    },
+    { workspace: TEST_PROCESS_HOST.workspace },
+);
 
 /** @param {string} value */
 function sha256(value) {
@@ -20,7 +38,10 @@ function sha256(value) {
 function findTool(name) {
     const tool = getCanonicalMcpTools().find((candidate) => candidate.name === name);
     assert.ok(tool, `missing tool ${name}`);
-    return tool;
+    return {
+        ...tool,
+        handler: /** @type {typeof tool.handler} */ ((input) => tool.handler(input, TOOL_OPERATION_CONTEXT)),
+    };
 }
 
 /**
@@ -42,6 +63,10 @@ async function createRepoFile(name, content) {
 
 afterEach(async () => {
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+afterAll(async () => {
+    await TEST_PROCESS_HOST.dispose();
 });
 
 describe('repo_apply_patch_batch V2', () => {

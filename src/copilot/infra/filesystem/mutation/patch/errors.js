@@ -31,7 +31,7 @@ export function annotatePatchRecoveryState(error, currentHash, currentBytes, con
  * @param {unknown} error
  * @param {number} operationIndex
  * @param {number} completedOperationCount
- * @param {'baseline-hash' | 'operation'} failurePhase
+ * @param {'baseline-hash' | 'operation' | 'result-validation'} failurePhase
  */
 export function annotatePatchBatchOperationError(error, operationIndex, completedOperationCount, failurePhase) {
     const target =

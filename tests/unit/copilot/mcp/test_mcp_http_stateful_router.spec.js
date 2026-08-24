@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
-import { createMcpHttpSessionRuntime, createMcpInMemoryEventStore } from '#copilot/mcp/control-plane';
+import { handleStatefulMcpHttpRequest } from '#copilot/mcp/public/adapters/http-stateful';
+import { createMcpHttpSessionRuntime, createMcpInMemoryEventStore } from '#copilot/testing/mcp/transport/http/stateful';
 import {
     createMcpTransportErrorCollector,
     fakeMcpTransport,
@@ -66,6 +66,27 @@ describe('MCP HTTP stateful router', () => {
         assert.equal(bodySeen, initializeBody);
         assert.equal(runtime.snapshot()['activeSessions'], 1);
         assert.equal(JSON.stringify(runtime.snapshot()).includes('session-1'), false);
+    });
+
+    it('rejects initialize when composition did not inject a server factory', async () => {
+        const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
+        const { writeTransportError } = createMcpTransportErrorCollector();
+
+        await assert.rejects(
+            handleStatefulMcpHttpRequest({
+                req: fakeReq('POST'),
+                res: fakeRes(),
+                url: new URL('https://mcp.aurelin.org/mcp'),
+                parsedMcpBody: initializeBody,
+                authContext: { bearerToken: null, headers: {}, method: 'POST', url: 'https://mcp.aurelin.org/mcp' },
+                protocolVersion: '2025-11-25',
+                runtime,
+                useSqliteStore: false,
+                readHeader,
+                writeTransportError,
+            }),
+            /requires an injected server factory/u,
+        );
     });
 
     it('rejects initialize with 503 before the SDK when session capacity is exhausted', async () => {

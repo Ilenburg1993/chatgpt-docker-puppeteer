@@ -5,11 +5,12 @@
  * @module copilot/mcp/tools/cloudflare-skip
  */
 
-import { auditCloudflareSkipPosture } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { auditCloudflareSkipPosture } from '#copilot/mcp/public/cloudflare/skip-audit';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareSkipAuditTool = {
     name: 'mcp_cloudflare_skip_audit',

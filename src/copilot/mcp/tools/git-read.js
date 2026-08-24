@@ -5,12 +5,34 @@
  * @module copilot/mcp/tools/git-read
  */
 
-import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
-import { execGit } from '#copilot/mcp/tools/shared';
+import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { execWorkspaceGit as execGit } from '#copilot/mcp/public/workspace/git';
 import { z } from 'zod';
 
+const gitStatusOutputSchema = z.object({
+    success: z.literal(true),
+    status: z.string(),
+});
+const gitDiffOutputSchema = z.object({
+    success: z.literal(true),
+    diff: z.string(),
+    staged: z.boolean(),
+    path: z.string().nullable(),
+});
+const gitLogOutputSchema = z.object({
+    success: z.literal(true),
+    log: z.string(),
+    limit: z.number().int().min(1).max(50),
+});
+const gitBranchInfoOutputSchema = z.object({
+    success: z.literal(true),
+    branch: z.string(),
+    upstream: z.string().nullable(),
+    head: z.string(),
+});
+
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const gitReadTools = [
     {
@@ -18,6 +40,7 @@ export const gitReadTools = [
         title: 'Git status',
         description: 'Return the current Git branch, HEAD and short status for the workspace.',
         inputSchema: {},
+        outputSchema: gitStatusOutputSchema,
         annotations: readOnlyAnnotations(),
         handler: async () => {
             const status = await execGit(['status', '--short', '--branch']);
@@ -38,6 +61,7 @@ export const gitReadTools = [
             staged: z.boolean().optional()['describe']('If true, return staged changes only.'),
             path: z.string().optional()['describe']('Optional workspace-relative path to diff.'),
         },
+        outputSchema: gitDiffOutputSchema,
         annotations: readOnlyAnnotations(),
         handler: async ({ staged, path }) => {
             const args = ['diff'];
@@ -64,6 +88,7 @@ export const gitReadTools = [
         inputSchema: {
             limit: z.number().int().min(1).max(50).optional()['describe']('Maximum commits to return. Default: 10.'),
         },
+        outputSchema: gitLogOutputSchema,
         annotations: readOnlyAnnotations(),
         handler: async ({ limit }) => {
             const safeLimit = String(limit ?? 10);
@@ -83,6 +108,7 @@ export const gitReadTools = [
         title: 'Git branch info',
         description: 'Return current branch and upstream tracking information.',
         inputSchema: {},
+        outputSchema: gitBranchInfoOutputSchema,
         annotations: readOnlyAnnotations(),
         handler: async () => {
             const [branch, upstream, head] = await Promise.all([

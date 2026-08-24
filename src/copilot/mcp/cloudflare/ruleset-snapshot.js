@@ -10,7 +10,7 @@
  * @module copilot/mcp/cloudflare/ruleset-snapshot
  */
 
-import { createTtlCache } from '#copilot/mcp/control-plane';
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { createHash } from 'node:crypto';
 import { getCloudflareClient } from './remote-api.js';
 
@@ -27,7 +27,7 @@ const MAX_RULESET_DETAIL_CONCURRENCY = 6;
  * }} CloudflareRulesetSnapshot
  */
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<CloudflareRulesetSnapshot>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<CloudflareRulesetSnapshot>} */
 const rulesetSnapshotCache = createTtlCache({
     name: 'cloudflare-ruleset-snapshot',
     ttlMs: DEFAULT_CLOUDFLARE_RULESET_SNAPSHOT_TTL_MS,

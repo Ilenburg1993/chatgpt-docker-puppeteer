@@ -3,8 +3,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { readDeclaredNpmVersionFromPackageText, summarizeInstallScriptPolicy } from '#copilot/mcp/control-plane';
-import { runDependencyNativeSmoke } from '#copilot/mcp/scripts';
+import { runDependencyNativeSmoke } from '#copilot/mcp/public/maintenance/dependencies/native-smoke';
+import {
+    readDeclaredNpmVersionFromPackageText,
+    runFixedDependencyMaintenanceCommandForTests,
+    summarizeInstallScriptPolicy,
+} from '#copilot/testing/mcp/maintenance';
 
 describe('MCP dependency maintenance', () => {
     it('reads the exact npm version from packageManager without confusing it with a dependency', () => {
@@ -28,6 +32,27 @@ describe('MCP dependency maintenance', () => {
         assert.deepEqual(policy.pending, ['node-pty', 'unexpected-native-package']);
         assert.deepEqual(policy.trustedPending, ['node-pty']);
         assert.deepEqual(policy.untrustedPending, ['unexpected-native-package']);
+    });
+
+    it('cancels a fixed maintenance subprocess only after the child close is observed', async () => {
+        const controller = new AbortController();
+        const startedAt = Date.now();
+        const command = runFixedDependencyMaintenanceCommandForTests(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 1000)'],
+            {
+                cwd: process.cwd(),
+                timeoutMs: 30_000,
+                signal: controller.signal,
+            },
+        );
+        setTimeout(() => controller.abort(), 75).unref();
+        const result = await command;
+        assert.equal(result.success, false);
+        assert.equal(result.cancelled, true);
+        assert.equal(result.timedOut, false);
+        assert.ok(result.durationMs < 5_000, JSON.stringify(result, null, 2));
+        assert.ok(Date.now() - startedAt < 5_000, JSON.stringify(result, null, 2));
     });
 
     it('proves currently declared native/runtime-sensitive dependencies are loadable', async () => {

@@ -12,30 +12,48 @@ import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
 import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } from '#copilot/boot';
 import { ensureIoIndexSchema } from '#copilot/infra/public/testing/indexing/sqlite';
-import { getCanonicalMcpTools } from '#copilot/mcp';
-import {
-    getTtlCacheStats,
-    recordMcpToolMetric,
-    resetMcpMetricsForTests,
-    resolveReadPath,
-    resolveValidatedReadPath,
-} from '#copilot/mcp/control-plane';
-import {
-    readRepoReadFileResultCacheStats,
-    resetRepoReadResponseCacheForTest,
-} from '../../../../src/copilot/mcp/tools/repo-read-cache.js';
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { recordMcpToolMetric } from '#copilot/mcp/public/observability';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
+import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
+import { resetRepoReadResponseCacheForTest } from '#copilot/testing/mcp/workspace/repository/read-cache';
 
 /** @type {import('better-sqlite3').Database | null} */
 let testInfraDb = null;
+const TEST_PROCESS_HOST = createComposedMcpProcessHost({
+    hostId: 'mcp-tools-unit-process-host',
+    backgroundServices: false,
+});
+const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
+    {
+        mcpReq: {
+            id: 'mcp-tools-unit',
+            method: 'tools/call',
+            signal: new AbortController().signal,
+            _meta: { caller: 'test_mcp_tools' },
+            envelope: { protocol: '2026' },
+        },
+    },
+    { workspace: TEST_WORKSPACE },
+);
+/** @type {Awaited<ReturnType<typeof TEST_PROCESS_HOST.acquire>> | null} */
+let testProcessHostLease = null;
 
-beforeAll(() => {
+beforeAll(async () => {
     testInfraDb = new Database(':memory:');
     const db = /** @type {import('better-sqlite3').Database} */ (testInfraDb);
     ensureIoIndexSchema(adaptBetterSqliteDatabase(db));
     configureApplicationInfraSqliteProvider(createBetterSqliteProvider(() => db));
+    testProcessHostLease = await TEST_PROCESS_HOST.acquire({ reason: 'mcp-tools-unit' });
 });
 
-afterAll(() => {
+afterAll(async () => {
+    await testProcessHostLease?.release();
+    testProcessHostLease = null;
+    await TEST_PROCESS_HOST.dispose();
     getApplicationInfraRuntime().database.reset();
     if (testInfraDb?.open) testInfraDb.close();
     testInfraDb = null;
@@ -45,23 +63,26 @@ afterAll(() => {
 function findTool(name) {
     const tool = getCanonicalMcpTools().find((candidate) => candidate.name === name);
     assert.ok(tool, `missing tool ${name}`);
-    return tool;
+    return {
+        ...tool,
+        handler: /** @type {typeof tool.handler} */ ((input) => tool.handler(input, TOOL_OPERATION_CONTEXT)),
+    };
 }
 
 describe('copilot MCP tools', () => {
     it('resolves workspace read paths and rejects escapes', async () => {
-        const ok = await resolveReadPath('src/copilot/mcp/README.md');
+        const ok = await TEST_WORKSPACE.resolveReadPath('src/copilot/mcp/README.md');
         assert.equal(ok.ok, true);
         if (ok.ok) {
             assert.equal(ok.relative, 'src/copilot/mcp/README.md');
             assert.equal(ok.validatedReadPath, undefined);
         }
 
-        const withCapability = await resolveValidatedReadPath('src/copilot/mcp/README.md');
+        const withCapability = await TEST_WORKSPACE.resolveValidatedReadPath('src/copilot/mcp/README.md');
         assert.equal(withCapability.ok, true);
         if (withCapability.ok) assert.ok(withCapability.validatedReadPath);
 
-        const denied = await resolveReadPath('../package.json');
+        const denied = await TEST_WORKSPACE.resolveReadPath('../package.json');
         assert.equal(denied.ok, false);
         if (!denied.ok) {
             assert.equal(denied.code, 'ERR_PATH_DENIED');
@@ -281,7 +302,7 @@ describe('copilot MCP tools', () => {
         assert.equal(afterSecond['trustWindowHits'], 1);
         assert.equal(afterSecond['fingerprintValidations'], 0);
         assert.equal(afterSecond.size, 1);
-        const resolved = await resolveReadPath(args.path);
+        const resolved = await TEST_WORKSPACE.resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
@@ -595,7 +616,7 @@ describe('copilot MCP tools', () => {
         assert.ok(afterFirst.chunkBytes > 0);
         assert.equal(afterSecond['chunkHits'], 1);
         assert.equal(afterSecond.chunkSize, 1);
-        const resolved = await resolveReadPath(args.path);
+        const resolved = await TEST_WORKSPACE.resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
@@ -773,10 +794,13 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(orphanImportsDir.structuredContent?.['checkedImports'] ?? 0) > 0);
         assert.ok(Number(orphanImportsDir.structuredContent?.['scannedFiles'] ?? 0) > 1);
 
-        const importTargetCache = getTtlCacheStats().find((entry) => entry.name === 'repo-index-import-target-exists');
-        assert.equal(importTargetCache?.ttlMs, 5 * 60 * 1000);
-        assert.equal(importTargetCache?.maxEntries, 10_000);
-        assert.ok(Number(importTargetCache?.size ?? 0) <= Number(importTargetCache?.maxEntries ?? 0));
+        // Import-target existence is memoized only inside one orphan-import audit; no process-global TTL cache survives the call.
+        const indexingRepositorySource = await readFile(
+            join(process.cwd(), 'src/copilot/mcp/indexing/repository/orphan-imports.js'),
+            'utf8',
+        );
+        assert.doesNotMatch(indexingRepositorySource, /createTtlCache|repo-index-import-target-exists/u);
+        assert.match(indexingRepositorySource, /const targetExistsMemo = new Map\(\)/u);
     });
 
     it('repo_find_orphan_imports resolves package imports and classifies protected targets', async () => {
@@ -933,7 +957,9 @@ describe('copilot MCP tools', () => {
         assert.equal('advertisedTools' in structured, false);
         assert.ok(Buffer.byteLength(JSON.stringify(structured), 'utf8') < 8 * 1024);
         const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
-        assert.equal(authProfile['maxPowerDefault'], true);
+        assert.equal(authProfile['initialScopeProfile'], 'max-autonomy');
+        assert.equal(authProfile['stepUpPreferred'], false);
+        assert.equal(authProfile['broadInitialGrant'], true);
         assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
         assert.equal(structured['executionLimitsVersion'], 2);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
@@ -1018,14 +1044,18 @@ describe('copilot MCP tools', () => {
         );
         assert.equal('tools' in structured, false);
         const metadataCoverage = /** @type {Record<string, unknown>} */ (structured['metadataCoverage']);
-        assert.equal(metadataCoverage['outputSchemaPolicy'], 'baseline-plus-specific');
-        assert.equal(metadataCoverage['outputSchemaCount'], getCanonicalMcpTools().length);
-        assert.equal(metadataCoverage['baselineOutputSchemaCount'], getCanonicalMcpTools().length - 2);
-        assert.equal(metadataCoverage['specificOutputSchemaCount'], 2);
-        assert.equal(metadataCoverage['outputSchemaComplete'], true);
+        assert.equal(metadataCoverage['outputSchemaPolicy'], 'explicit-specific-only');
+        const specificOutputSchemaCount = getCanonicalMcpTools().filter(
+            (tool) => tool.outputSchema !== undefined,
+        ).length;
+        assert.equal(metadataCoverage['specificOutputSchemaCount'], specificOutputSchemaCount);
+        assert.equal(
+            metadataCoverage['missingSpecificOutputSchemaCount'],
+            getCanonicalMcpTools().length - specificOutputSchemaCount,
+        );
+        assert.equal(metadataCoverage['outputSchemaComplete'], false);
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
         assert.equal(metadataCoverage['securityComplete'], true);
-        assert.equal(metadataCoverage['outputSchemaComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
         assert.equal(structured['executionLimitsVersion'], 2);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
@@ -1041,7 +1071,9 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof schemaConvergence['runtimeEpoch'], 'string');
         assert.equal(typeof schemaConvergence['status'], 'string');
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
-        assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);
+        assert.equal(hostApprovalProfile['oauthInitialScopeProfile'], 'max-autonomy');
+        assert.equal(hostApprovalProfile['oauthStepUpPreferred'], false);
+        assert.equal(hostApprovalProfile['oauthBroadInitialGrantCompatibility'], true);
         assert.match(String(hostApprovalProfile['preferredStrategy']), /direct bounded one-shot/u);
         const publicationWorkflow = /** @type {Record<string, unknown>} */ (structured['publicationWorkflow']);
         assert.equal(publicationWorkflow['preferred'], 'git_publish_changes');
@@ -1359,6 +1391,15 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof metadataAlignment['resourceMatchesAudience'], 'boolean');
         const toolScopes = /** @type {Record<string, unknown>} */ (structured['toolScopes']);
         assert.ok(Array.isArray(toolScopes['publicDiagnosticTools']));
+        assert.deepEqual(toolScopes['scopeClassesAdvertised'], [
+            'repo:read',
+            'repo:write',
+            'repo:validate',
+            'repo:admin',
+        ]);
+        const oauth = /** @type {Record<string, unknown>} */ (structured['oauth']);
+        assert.equal(oauth['initialScopeProfile'], 'max-autonomy');
+        assert.equal(oauth['stepUpPreferred'], false);
     });
 
     it('mcp_oauth_issuer_diagnostics reports missing issuer without network calls', async () => {
@@ -1380,8 +1421,11 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['grade'], 'string');
         assert.equal(typeof result.structuredContent?.['toolCounts'], 'object');
         const auth = /** @type {Record<string, unknown>} */ (result.structuredContent?.['auth']);
-        assert.equal(auth['maxPowerRepoScopesByDefault'], true);
+        assert.equal(auth['initialScopeProfile'], 'max-autonomy');
+        assert.equal(auth['stepUpPreferred'], false);
+        assert.equal(auth['broadInitialGrant'], true);
         assert.ok(/** @type {string[]} */ (auth['initialScopes']).includes('repo:write'));
+        assert.ok(Array.isArray(result.structuredContent?.['authAdvisories']));
     });
 
     it('patch batch preserves global preflight safety and supports per-target-fast partial progress', async () => {
@@ -1522,7 +1566,7 @@ describe('copilot MCP tools', () => {
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
         const patchPlanTool = findTool('repo_patch_plan');
         const patchPlan = await patchPlanTool.handler({
-            path: 'src/copilot/mcp/registry.js',
+            path: 'src/copilot/mcp/registry/runtime.js',
             old_string: 'getCanonicalMcpTools',
             new_string: 'getCanonicalMcpTools',
         });

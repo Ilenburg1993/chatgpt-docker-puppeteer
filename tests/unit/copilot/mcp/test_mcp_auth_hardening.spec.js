@@ -6,20 +6,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
-    MCP_AUTH_SCOPES,
     authorizeMcpToolCall,
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
+    MCP_AUTH_SCOPES,
     parseBearerToken,
     readMcpAuthConfig,
-    resetMcpAuthRuntimeForTests,
     scopesForMcpTool,
     securitySchemesForMcpTool,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/auth';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import { resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
 
-/** @type {import('#copilot/mcp').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 const readTool = {
     name: 'repo_read_file',
     title: 'Read file',
@@ -34,7 +34,7 @@ const readTool = {
     handler: () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: {} }),
 };
 
-/** @type {import('#copilot/mcp').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 const writeTool = {
     name: 'repo_apply_patch',
     title: 'Apply patch',
@@ -60,7 +60,7 @@ describe('MCP auth hardening', () => {
         assert.equal(parseBearerToken(['Bearer first', 'Bearer second']), undefined);
     });
 
-    it('keeps default OAuth grants max-power and stable for low-friction ChatGPT usage', () => {
+    it('keeps maximum OAuth authority as the explicit default to avoid reauthorization round-trips', () => {
         const config = readMcpAuthConfig({
             COPILOT_MCP_AUTH_MODE: 'oauth',
             COPILOT_MCP_PUBLIC_URL: 'https://mcp.example.test/mcp',
@@ -69,6 +69,8 @@ describe('MCP auth hardening', () => {
         assert.equal(config.mode, 'oauth');
         assert.equal(config.enforcement, 'all');
         assert.equal(config.resource, 'https://mcp.example.test');
+        assert.equal(config.initialScopeProfile, 'max-autonomy');
+        assert.equal(config.stepUpPreferred, false);
         assert.deepEqual(config.initialScopes, [
             MCP_AUTH_SCOPES.read,
             MCP_AUTH_SCOPES.write,
@@ -81,6 +83,26 @@ describe('MCP auth hardening', () => {
             'https://mcp.example.test/mcp',
             'https://mcp.example.test/mcp/',
         ]);
+    });
+
+    it('supports least-privilege bootstrap and explicit custom scope profiles', () => {
+        const leastPrivilege = readMcpAuthConfig({
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+            COPILOT_MCP_PUBLIC_URL: 'https://mcp.example.test/mcp',
+            COPILOT_MCP_OAUTH_INITIAL_SCOPE_PROFILE: 'least-privilege',
+        });
+        assert.equal(leastPrivilege.initialScopeProfile, 'least-privilege');
+        assert.equal(leastPrivilege.stepUpPreferred, true);
+        assert.deepEqual(leastPrivilege.initialScopes, [MCP_AUTH_SCOPES.read]);
+
+        const custom = readMcpAuthConfig({
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+            COPILOT_MCP_PUBLIC_URL: 'https://mcp.example.test/mcp',
+            COPILOT_MCP_OAUTH_INITIAL_SCOPES: 'repo:read,repo:validate',
+        });
+        assert.equal(custom.initialScopeProfile, 'custom');
+        assert.equal(custom.stepUpPreferred, false);
+        assert.deepEqual(custom.initialScopes, [MCP_AUTH_SCOPES.read, MCP_AUTH_SCOPES.validate]);
     });
 
     it('sanitizes WWW-Authenticate challenge values without dropping required scopes', () => {

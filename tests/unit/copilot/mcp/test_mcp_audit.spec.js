@@ -15,7 +15,7 @@ const AUDIT_DISABLED_ENV = 'COPILOT_MCP_AUDIT_DISABLED';
 async function loadAuditModule(auditFile) {
     process.env[AUDIT_FILE_ENV] = auditFile;
     vi.resetModules();
-    return import('../../../../src/copilot/mcp/control-plane/audit.js');
+    return import('#copilot/testing/mcp/observability');
 }
 
 function captureAuditEnv() {
@@ -37,6 +37,20 @@ function restoreAuditEnv(previous) {
 }
 
 describe('copilot MCP audit', () => {
+    it('default artifact identity remains under src/copilot/.ai after owner relocation', async () => {
+        const previous = captureAuditEnv();
+        try {
+            delete process.env[AUDIT_FILE_ENV];
+            vi.resetModules();
+            const audit = await import('#copilot/testing/mcp/observability');
+            assert.equal(
+                audit.getMcpAuditFileForTests(),
+                path.join(process.cwd(), 'src/copilot/.ai/audit/mcp-tool-calls.jsonl'),
+            );
+        } finally {
+            restoreAuditEnv(previous);
+        }
+    });
     it('appends and bounded-reads JSONL events from one bootstrap-bound audit file', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-'));
         const auditFile = path.join(dir, 'audit.jsonl');

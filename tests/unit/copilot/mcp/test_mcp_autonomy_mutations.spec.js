@@ -3,9 +3,31 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { reapCompletedDetachedLiveRuns } from '#copilot/testing/mcp/integrations/model-gateway/live-runs';
 import { gitWriteTools, isAccidentalExecutableModeDrift } from '../../../../src/copilot/mcp/tools/git-write.js';
-import { llmBLiveTools, reapCompletedDetachedLiveRuns } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
+import { llmBLiveTools } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
 import { mcpReloadTools } from '../../../../src/copilot/mcp/tools/restart-control.js';
+
+const AUTONOMY_WORKSPACE = createComposedMcpProcessHost({
+    hostId: 'autonomy-mutations-test-host',
+    backgroundServices: false,
+}).workspace;
+
+function createAutonomyOperationContext() {
+    return createMcpToolOperationContext(
+        {
+            mcpReq: {
+                id: 'autonomy-mutation-test',
+                method: 'tools/call',
+                signal: new AbortController().signal,
+                _meta: { caller: 'unit-test' },
+            },
+        },
+        { workspace: AUTONOMY_WORKSPACE },
+    );
+}
 
 /**
  * @template {{ name: string }} T
@@ -41,9 +63,10 @@ describe('MCP governed autonomy mutations', () => {
 
     it('rejects implicit/pathspec Git staging and exposes no arbitrary Git command surface', async () => {
         const stagePlan = tool(gitWriteTools, 'git_stage_plan');
-        const dot = await stagePlan.handler({ paths: ['.'] });
-        const option = await stagePlan.handler({ paths: ['--all'] });
-        const glob = await stagePlan.handler({ paths: ['src/copilot/**/*.js'] });
+        const operationContext = createAutonomyOperationContext();
+        const dot = await stagePlan.handler({ paths: ['.'] }, operationContext);
+        const option = await stagePlan.handler({ paths: ['--all'] }, operationContext);
+        const glob = await stagePlan.handler({ paths: ['src/copilot/**/*.js'] }, operationContext);
 
         assert.equal(dot.isError, true);
         assert.equal(option.isError, true);
@@ -119,7 +142,10 @@ describe('MCP governed autonomy mutations', () => {
         assert.equal('signal' in cancelTool.inputSchema, false);
         assert.equal(cancelTool.annotations?.destructiveHint, true);
         assert.equal(cancelTool.annotations?.openWorldHint, false);
-        const missing = await cancelTool.handler({ runId: 'mcp-00000000-0000-0000-0000-000000000000' });
+        const missing = await cancelTool.handler(
+            { runId: 'mcp-00000000-0000-0000-0000-000000000000' },
+            createAutonomyOperationContext(),
+        );
         assert.equal(missing.isError, true);
         assert.equal(missing.structuredContent?.['code'], 'ERR_LLMB_LIVE_CANCEL_NOT_FOUND');
     });
@@ -129,7 +155,7 @@ describe('MCP governed autonomy mutations', () => {
         const cancelled = [];
         const oldVerified = 'mcp-11111111-1111-4111-8111-111111111111';
         const failingVerified = 'mcp-22222222-2222-4222-8222-222222222222';
-        const result = await reapCompletedDetachedLiveRuns({
+        const result = await reapCompletedDetachedLiveRuns(AUTONOMY_WORKSPACE, {
             nowMs: 100_000,
             graceMs: 30_000,
             deps: {

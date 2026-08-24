@@ -1,16 +1,22 @@
 // @ts-check
 import { existsSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
-    collectCoreDependencies,
     readCoreExtinctionBaseline,
     readCoreExtinctionTargets,
     validateCoreExtinctionRatchet,
 } from '../../../../scripts/ci/check-copilot-core-extinction.mjs';
 
+/** @type {ReturnType<typeof validateCoreExtinctionRatchet>} */
+let extinctionResult;
+
 describe('Core extinction governance', () => {
+    beforeAll(() => {
+        extinctionResult = validateCoreExtinctionRatchet();
+    });
+
     it('enforces the completed extinction invariant: no tree, aliases or dependencies may return', () => {
-        const result = validateCoreExtinctionRatchet();
+        const result = extinctionResult;
         expect(result.extinctionComplete).toBe(true);
         expect(result.current).toEqual([]);
         expect(result.packageAliases).toEqual([]);
@@ -38,6 +44,6 @@ describe('Core extinction governance', () => {
     });
 
     it('scanner remains active after extinction and therefore detects any future reintroduction', () => {
-        expect(collectCoreDependencies()).toEqual([]);
+        expect(extinctionResult.current).toEqual([]);
     });
 });

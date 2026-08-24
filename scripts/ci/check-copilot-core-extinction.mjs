@@ -120,6 +120,9 @@ function nodeStringLiteralValue(node) {
 /** @param {string} file @param {PackageImports} imports @returns {CoreDependency[]} */
 function collectFileDependencies(file, imports) {
     const source = readFileSync(file, 'utf8');
+    // Every path/specifier that can target the retired owner contains a literal `core` path segment. Keep the ratchet
+    // fail-closed while avoiding a full Babel parse for unrelated words such as `record`, `score` or `coreless`.
+    if (!/(?:#copilot\/core|[./]core(?:\/|['"`\s),}]))/mu.test(source)) return [];
     /** @type {Map<string, CoreDependency>} */
     const found = new Map();
     const rel = normalizeRepoPath(file);

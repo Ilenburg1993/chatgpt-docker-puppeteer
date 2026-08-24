@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
-import { copilotSessionTools } from '#copilot/mcp/tools';
+import { copilotSessionTools } from '#copilot/testing/mcp/tools/copilot-session';
 import {
     clearActiveSdkSessions,
     registerActiveSdkSession,

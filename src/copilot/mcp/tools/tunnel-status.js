@@ -5,30 +5,32 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '#copilot/mcp/public/cloudflare/config';
+import { runCanonicalConnectorSmoke } from '#copilot/mcp/public/cloudflare/connector-smoke';
+import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
 import {
-    createCloudflareStateStore,
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
-    readCloudflareTunnelConfig,
+} from '#copilot/mcp/public/cloudflare/errors';
+import { createCloudflareManagedProcessController } from '#copilot/mcp/public/cloudflare/managed-process';
+import {
+    createCloudflareStateStore,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-    validateConfiguredPublicUrl,
-} from '#copilot/mcp/cloudflare';
-import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
+} from '#copilot/mcp/public/cloudflare/state';
+import { formatChatGptConnectorAuthentication } from '#copilot/mcp/public/connection';
 import {
     boundedWriteAnnotations,
     errorResult,
     okResult,
-    readMcpAuthConfig,
-    readMcpHttpStatefulSessionPolicy,
-    readMcpReloadState,
     readOnlyAnnotations,
-    summarizeMcpReloadState,
-} from '#copilot/mcp/control-plane';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
+import { readMcpReloadState, summarizeMcpReloadState } from '#copilot/mcp/public/runtime/reload';
+import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful';
 import https from 'node:https';
 import { z } from 'zod';
-import { createCloudflareManagedProcessController } from '../cloudflare/cli-process.js';
-import { runCanonicalConnectorSmoke } from '../cloudflare/connector-smoke.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 
@@ -330,10 +332,11 @@ function summarizePostRestartReadiness(snapshot) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {{ includeDiagnostics?: boolean }} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
-async function buildPostRestartReadinessSnapshot(options = {}) {
+async function buildPostRestartReadinessSnapshot(workspace, options = {}) {
     const config = readCloudflareTunnelConfig();
     const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
     const connectorSmoke = summarizeConnectorSmokeState(
@@ -341,7 +344,7 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
         config.publicMcpUrl ?? null,
     );
     const processes = createCloudflareManagedProcessController(config);
-    const reload = summarizeMcpReloadState(await readMcpReloadState(), connectorSmoke.checkedAt);
+    const reload = summarizeMcpReloadState(await readMcpReloadState(workspace), connectorSmoke.checkedAt);
     const connectorSmokeAgeFresh =
         connectorSmoke.ok === true &&
         typeof connectorSmoke.ageMinutes === 'number' &&
@@ -358,13 +361,7 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
     ]);
     const originDiagnostics =
         options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics(processes);
-    const statefulPolicy = {
-        ...readMcpHttpStatefulSessionPolicy(),
-        postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
-        sessionIdHashSecretPresent:
-            typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' &&
-            process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
-    };
+    const statefulPolicy = readMcpHttpStatefulRuntimePolicySnapshot();
     const permanentUrlReady =
         config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
     const healthReady = localHealth.ok || publicHealth.ok;
@@ -427,9 +424,10 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
 
 /**
  * @param {{ includeRemoteToolNames?: boolean; includeDetails?: boolean }} input
- * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
+ * @returns {Promise<import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult>}
  */
-async function runConnectorSmokeRefresh(input) {
+async function runConnectorSmokeRefresh(input, operationContext) {
     const config = readCloudflareTunnelConfig();
     if (!config.publicMcpUrl) {
         return errorResult('Permanent MCP connector URL is not configured.', {
@@ -443,12 +441,9 @@ async function runConnectorSmokeRefresh(input) {
     try {
         report = await runCanonicalConnectorSmoke({
             config,
-            env: {
-                ...process.env,
-                COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
-                COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
-                COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl,
-            },
+            env: buildCloudflareConnectorSmokeEnvironment(process.env, {
+                publicMcpUrl: config.publicMcpUrl,
+            }),
             persistState: true,
         });
     } catch (error) {
@@ -468,7 +463,9 @@ async function runConnectorSmokeRefresh(input) {
             detailsAvailable: !includeDetails,
         });
     }
-    const readiness = await buildPostRestartReadinessSnapshot({ includeDiagnostics: false });
+    const readiness = await buildPostRestartReadinessSnapshot(requireMcpToolWorkspace(operationContext), {
+        includeDiagnostics: false,
+    });
     const readinessSummary = summarizePostRestartReadiness(readiness);
     return okResult({
         success: true,
@@ -491,7 +488,7 @@ async function runConnectorSmokeRefresh(input) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpTunnelStatusTool = {
     name: 'mcp_tunnel_status',
@@ -573,7 +570,7 @@ export const mcpTunnelStatusTool = {
 };
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpConnectorSmokeRefreshTool = {
     name: 'mcp_connector_smoke_refresh',
@@ -597,7 +594,7 @@ export const mcpConnectorSmokeRefreshTool = {
 };
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpPostRestartReadinessTool = {
     name: 'mcp_post_restart_readiness',
@@ -606,5 +603,10 @@ export const mcpPostRestartReadinessTool = {
         'Return a compact post-restart readiness snapshot for the permanent Cloudflare MCP connector before ChatGPT starts heavier work.',
     inputSchema: {},
     annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await buildPostRestartReadinessSnapshot({ includeDiagnostics: true })),
+    handler: async (_args, operationContext) =>
+        okResult(
+            await buildPostRestartReadinessSnapshot(requireMcpToolWorkspace(operationContext), {
+                includeDiagnostics: true,
+            }),
+        ),
 };

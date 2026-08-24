@@ -5,12 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-config
  */
 
-import { auditCloudflareConfigPosture } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { auditCloudflareConfigPosture } from '#copilot/mcp/public/cloudflare/config-audit';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareConfigAuditTool = {
     name: 'mcp_cloudflare_config_audit',
@@ -37,7 +38,7 @@ export const mcpCloudflareConfigAuditTool = {
 };
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflarePlanCapabilitiesAuditTool = {
     name: 'mcp_cloudflare_plan_capabilities_audit',

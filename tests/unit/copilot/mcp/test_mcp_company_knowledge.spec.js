@@ -6,14 +6,37 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import {
+    buildCompanyKnowledgeWidgetResource,
+    COMPANY_KNOWLEDGE_WIDGET_URI,
+} from '#copilot/mcp/public/protocol/apps-sdk';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
     COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME,
-    COMPANY_KNOWLEDGE_WIDGET_URI,
-    buildCompanyKnowledgeWidgetResource,
     companyKnowledgeTestHarness,
     companyKnowledgeTools,
-} from '#copilot/mcp/tools';
+} from '#copilot/testing/mcp/tools/company-knowledge';
+
+const COMPANY_KNOWLEDGE_WORKSPACE = createComposedMcpProcessHost({
+    hostId: 'company-knowledge-test-host',
+    backgroundServices: false,
+}).workspace;
+
+function createCompanyKnowledgeOperationContext() {
+    return createMcpToolOperationContext(
+        {
+            mcpReq: {
+                id: 'company-knowledge-test',
+                method: 'tools/call',
+                signal: new AbortController().signal,
+                _meta: { caller: 'unit-test' },
+            },
+        },
+        { workspace: COMPANY_KNOWLEDGE_WORKSPACE },
+    );
+}
 
 describe('MCP Company Knowledge tools', () => {
     beforeEach(() => {
@@ -42,7 +65,10 @@ describe('MCP Company Knowledge tools', () => {
         const search = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME);
         assert.ok(search);
 
-        const searchResult = await search.handler({ query: 'MCP OAuth workspace' });
+        const searchResult = await search.handler(
+            { query: 'MCP OAuth workspace' },
+            createCompanyKnowledgeOperationContext(),
+        );
         const parsedSearchText = JSON.parse(searchResult.content[0]?.text ?? '{}');
         const results = /** @type {{ id: string; title: string; url: string }[]} */ (
             searchResult.structuredContent['results']
@@ -57,7 +83,7 @@ describe('MCP Company Knowledge tools', () => {
 
         const fetch = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_FETCH_TOOL_NAME);
         assert.ok(fetch);
-        const fetchResult = await fetch.handler({ id: results[0]?.id });
+        const fetchResult = await fetch.handler({ id: results[0]?.id }, createCompanyKnowledgeOperationContext());
         const parsedFetchText = JSON.parse(fetchResult.content[0]?.text ?? '{}');
 
         assert.deepEqual(parsedFetchText, fetchResult.structuredContent);
@@ -72,7 +98,10 @@ describe('MCP Company Knowledge tools', () => {
         const fetch = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_FETCH_TOOL_NAME);
         assert.ok(fetch);
 
-        const result = await fetch.handler({ id: 'repo:not-a-real-document' });
+        const result = await fetch.handler(
+            { id: 'repo:not-a-real-document' },
+            createCompanyKnowledgeOperationContext(),
+        );
 
         assert.equal(result.isError, true);
         assert.equal(result.structuredContent['code'], 'COMPANY_KNOWLEDGE_DOCUMENT_NOT_FOUND');

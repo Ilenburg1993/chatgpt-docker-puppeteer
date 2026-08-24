@@ -5,13 +5,13 @@
  * @module copilot/mcp/tools/host-blocks
  */
 
+import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
-    readMcpSchemaConvergenceState,
     readOnlyAnnotations,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const HOST_BLOCK_TEMPLATE = {
@@ -241,7 +241,7 @@ function classifyHostBlock(input) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpHostBlockDiagnosticsTool = {
     name: 'mcp_host_block_diagnostics',

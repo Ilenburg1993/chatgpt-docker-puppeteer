@@ -50,6 +50,7 @@ const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
  *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
  *     capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     validateUpdatedContent?: (content: string) => void;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
@@ -157,6 +158,28 @@ export async function patchTextBatchLocked(filePath, options, invalidationBus = 
                         }
                     }
 
+                    if (options.validateUpdatedContent) {
+                        try {
+                            options.validateUpdatedContent(currentContent);
+                        } catch (error) {
+                            const annotated = annotatePatchRecoveryState(
+                                error,
+                                currentHash,
+                                utf8ByteLength(currentContent, 'patch batch validated result'),
+                                {
+                                    currentStateKind: 'virtual-batch',
+                                    diskBaselineHash: previousHash,
+                                    diskBaselineBytes: rawBuffer.byteLength,
+                                },
+                            );
+                            throw annotatePatchBatchOperationError(
+                                annotated,
+                                Math.max(0, options.operations.length - 1),
+                                operations.length,
+                                'result-validation',
+                            );
+                        }
+                    }
                     const finalNoop = currentContent === initialContent;
                     const contentHash = currentHash;
                     const projectedBytes = utf8ByteLength(currentContent, 'patch batch result');

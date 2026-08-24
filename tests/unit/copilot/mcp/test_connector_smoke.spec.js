@@ -3,11 +3,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { readCloudflareTunnelConfig } from '#copilot/testing/mcp/cloudflare/config';
-import { runCanonicalConnectorSmoke } from '#copilot/testing/mcp/cloudflare/connector-smoke';
+import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
+import { runCanonicalConnectorSmoke } from '#copilot/mcp/public/cloudflare/connector-smoke';
+import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
 
 /** @returns {Awaited<
-    ReturnType<typeof import('../../../../src/copilot/mcp/cloudflare/cli-smoke.js').runCloudflareSmoke>
+    ReturnType<typeof import('#copilot/testing/mcp/cloudflare/cli-smoke').runCloudflareSmoke>
 >} */
 function healthyUnauthenticatedSmoke() {
     return {
@@ -83,7 +84,7 @@ function requireFixtureIndex(values, index, label) {
 
 describe('canonical connector smoke', () => {
     it('fails the canonical gate when authenticated OAuth fails even if the public challenge is healthy', async () => {
-        /** @type {{ state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }[]} */
+        /** @type {{ state: import('#copilot/mcp/public/cloudflare/state').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
@@ -113,7 +114,7 @@ describe('canonical connector smoke', () => {
     });
 
     it('persists authenticated tool-registry evidence instead of the expected unauthenticated 401 tools response', async () => {
-        /** @type {{ state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }[]} */
+        /** @type {{ state: import('#copilot/mcp/public/cloudflare/state').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
@@ -141,6 +142,48 @@ describe('canonical connector smoke', () => {
             unexpectedRemoteTools: [],
             authChallenge: true,
         });
+    });
+
+    it('passes the exact same bounded environment snapshot to public and OAuth/DCR branches', async () => {
+        const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
+            PATH: '/usr/bin',
+            COPILOT_MCP_PROTOCOL_VERSION: '2026-07-28',
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'must-not-cross',
+            CLOUDFLARE_TUNNEL_TOKEN: 'must-not-cross-either',
+            FUTURE_SECRET: 'unknown-secret',
+        });
+        const env = buildCloudflareConnectorSmokeEnvironment(parentEnv, {
+            publicMcpUrl: 'https://mcp.example.com/mcp',
+        });
+        /** @type {NodeJS.ProcessEnv | null} */
+        let unauthEnv = null;
+        /** @type {NodeJS.ProcessEnv | null} */
+        let oauthEnv = null;
+
+        const report = await runCanonicalConnectorSmoke({
+            config: testConfig(),
+            env,
+            persistState: false,
+            deps: {
+                runUnauthenticatedSmoke: async (input) => {
+                    unauthEnv = input?.env ?? null;
+                    return healthyUnauthenticatedSmoke();
+                },
+                runOauthSmoke: async (options) => {
+                    oauthEnv = /** @type {NodeJS.ProcessEnv | null} */ (options['env'] ?? null);
+                    return healthyOauthSmoke();
+                },
+            },
+        });
+
+        assert.equal(report['ok'], true);
+        assert.equal(unauthEnv, env);
+        assert.equal(oauthEnv, env);
+        assert.equal(env['COPILOT_MCP_PROTOCOL_VERSION'], '2026-07-28');
+        assert.equal(env['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
+        assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
+        assert.equal(env['FUTURE_SECRET'], undefined);
     });
 
     it('starts public and authenticated smoke branches concurrently', async () => {

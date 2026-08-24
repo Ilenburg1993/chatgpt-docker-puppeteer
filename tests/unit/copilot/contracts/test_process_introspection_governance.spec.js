@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const LINUX_ARGV = resolve('src/copilot/infra/platform/process/introspection/linux-argv.js');
 const RESOURCES = resolve('src/copilot/infra/platform/process/introspection/resources.js');
 const PUBLIC = resolve('src/copilot/infra/public/platform/process/introspection/index.js');
-const MCP_JOBS = resolve('src/copilot/mcp/control-plane/jobs.js');
+const MCP_JOBS = resolve('src/copilot/mcp/validation/jobs/runtime.js');
 const OLD_MCP_OWNER = resolve('src/copilot/mcp/control-plane/process-introspection.js');
 const CONFIGURED_GRANTS = resolve('config/architecture/copilot-configured-fs-grants.json');
 const BOOT_WORKSPACE = resolve('src/copilot/boot/workspace.js');

@@ -2,9 +2,10 @@
 
 import {
     readMcpRoundTripAnalyticsMonitorState,
-    resetMcpRoundTripAnalyticsMonitorForTests,
     scheduleMcpRoundTripAnalyticsMonitor,
-} from '#copilot/mcp/control-plane';
+    stopMcpRoundTripAnalyticsMonitor,
+} from '#copilot/mcp/public/diagnostics/latency';
+import { resetMcpRoundTripAnalyticsMonitorForTests } from '#copilot/testing/mcp/diagnostics/latency';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
@@ -60,6 +61,45 @@ describe('MCP round-trip analytics monitor', () => {
         assert.equal(state.lastLagBytes, 0);
         assert.equal(state.lastComplete, true);
         assert.equal(callbacks.length, 1);
+    });
+
+    it('stops an in-flight generation without allowing stale work to reschedule itself', async () => {
+        /** @type {(() => void)[]} */
+        const callbacks = [];
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
+        /** @type {(value: Record<string, unknown>) => void} */
+        let releaseSync = () => {
+            throw new Error('sync resolver was not installed');
+        };
+        scheduleMcpRoundTripAnalyticsMonitor({
+            enabled: true,
+            initialDelayMs: 0,
+            intervalMs: 60_000,
+            setTimeoutFn,
+            syncFn: () =>
+                new Promise((resolve) => {
+                    releaseSync = resolve;
+                }),
+        });
+        callbacks.shift()?.();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(readMcpRoundTripAnalyticsMonitorState().running, true);
+
+        const stopping = stopMcpRoundTripAnalyticsMonitor();
+        assert.equal(readMcpRoundTripAnalyticsMonitorState().enabled, false);
+        releaseSync({ ok: true, processedBytes: 1, indexedEvents: 1, lagBytes: 0, complete: true });
+        await stopping;
+
+        const state = readMcpRoundTripAnalyticsMonitorState();
+        assert.equal(state.enabled, false);
+        assert.equal(state.running, false);
+        assert.equal(state.scheduled, false);
+        assert.equal(callbacks.length, 0);
     });
 
     it('records a failed sync without throwing and still schedules the next cycle', async () => {

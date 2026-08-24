@@ -3,6 +3,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { repoWorkingSetTool, resetMcpWorkingSetsForTest } from '../../../../src/copilot/mcp/tools/repo-working-set.js';
+
 const mocks = vi.hoisted(() => {
     const stats = {
         sessionId: 'mock',
@@ -11,7 +15,7 @@ const mocks = vi.hoisted(() => {
         selectedFiles: 2,
         hardLimitReached: true,
         selection: {
-            mode: 'coverage',
+            mode: /** @type {const} */ ('coverage'),
             candidateBuckets: 3,
             selectedBuckets: 2,
             preferredRequested: 1,
@@ -28,7 +32,7 @@ const mocks = vi.hoisted(() => {
         warmDurationMs: 5,
         ready: true,
         degraded: false,
-        status: 'ready',
+        status: /** @type {const} */ ('ready'),
         lastError: null,
         startedAt: 1,
         completedAt: 2,
@@ -88,13 +92,13 @@ const mocks = vi.hoisted(() => {
             contextBytes: 128,
             ready: true,
             degraded: false,
-            status: 'ready',
+            status: /** @type {const} */ ('ready'),
             lastError: null,
         })),
         findSymbol: vi.fn(() => [
             {
                 filePath: `${process.cwd()}/src/copilot/a.js`,
-                symbol: { name: 'alpha', kind: 'function', line: 1, exported: true },
+                symbol: { name: 'alpha', kind: /** @type {const} */ ('function'), line: 1, exported: true },
             },
         ]),
         refreshScope,
@@ -102,15 +106,34 @@ const mocks = vi.hoisted(() => {
     };
 });
 
-vi.mock('#copilot/mcp/control-plane', async (importOriginal) => {
-    const actual = /** @type {typeof import('#copilot/mcp/control-plane')} */ (await importOriginal());
-    return {
-        ...actual,
-        getMcpWorkspaceIndexing: () => ({ context: mocks }),
-    };
+const BASE_TEST_WORKSPACE = createComposedMcpProcessHost({
+    hostId: 'mcp-working-set-unit-process-host',
+    backgroundServices: false,
+}).workspace;
+const TEST_WORKSPACE = Object.freeze({
+    ...BASE_TEST_WORKSPACE,
+    indexing: Object.freeze({
+        ...BASE_TEST_WORKSPACE.indexing,
+        context: Object.freeze({ ...BASE_TEST_WORKSPACE.indexing.context, ...mocks }),
+    }),
 });
+const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
+    {
+        mcpReq: {
+            id: 'mcp-working-set-unit',
+            method: 'tools/call',
+            signal: new AbortController().signal,
+            _meta: { caller: 'test_mcp_repo_working_set' },
+            envelope: { protocol: '2026' },
+        },
+    },
+    { workspace: TEST_WORKSPACE },
+);
 
-import { repoWorkingSetTool, resetMcpWorkingSetsForTest } from '../../../../src/copilot/mcp/tools/repo-working-set.js';
+/** @param {Record<string, unknown>} input */
+function callRepoWorkingSet(input) {
+    return repoWorkingSetTool.handler(input, TOOL_OPERATION_CONTEXT);
+}
 
 afterEach(() => {
     resetMcpWorkingSetsForTest();
@@ -124,7 +147,7 @@ function structured(result) {
 
 describe('mcp/repo_working_set', () => {
     it('abre working set com id opaco gerado no servidor e retorna contexto no mesmo call', async () => {
-        const result = await repoWorkingSetTool.handler({
+        const result = await callRepoWorkingSet({
             action: 'open',
             path: 'src/copilot',
             maxFiles: 2,
@@ -169,7 +192,7 @@ describe('mcp/repo_working_set', () => {
     });
 
     it('open contextMode=omit aquece e retorna id/stats sem materializar manifest', async () => {
-        const result = await repoWorkingSetTool.handler({
+        const result = await callRepoWorkingSet({
             action: 'open',
             path: 'src/copilot',
             contextMode: 'omit',
@@ -185,7 +208,7 @@ describe('mcp/repo_working_set', () => {
     });
 
     it('rejeita seed legível que esteja fora do root aberto', async () => {
-        const result = await repoWorkingSetTool.handler({
+        const result = await callRepoWorkingSet({
             action: 'open',
             path: 'src/copilot/mcp',
             seedPaths: ['package.json'],
@@ -197,7 +220,7 @@ describe('mcp/repo_working_set', () => {
     });
 
     it('rejeita id forjado antes de chamar find/refresh/close da engine compartilhada', async () => {
-        const result = await repoWorkingSetTool.handler({ action: 'find', workingSetId: 'forged', symbol: 'alpha' });
+        const result = await callRepoWorkingSet({ action: 'find', workingSetId: 'forged', symbol: 'alpha' });
 
         expect(result.isError).toBe(true);
         expect(mocks.findSymbol).not.toHaveBeenCalled();
@@ -207,7 +230,7 @@ describe('mcp/repo_working_set', () => {
 
     it('refresh auto/include/omit materializa contexto somente quando a política exige', async () => {
         const opened = structured(
-            await repoWorkingSetTool.handler({
+            await callRepoWorkingSet({
                 action: 'open',
                 path: 'src/copilot',
                 indexMode: 'off',
@@ -218,13 +241,13 @@ describe('mcp/repo_working_set', () => {
         expect(mocks.getScopeContext).not.toHaveBeenCalled();
 
         mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, removed: 0, failed: 0, skipped: 0 });
-        const auto = structured(await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id }));
+        const auto = structured(await callRepoWorkingSet({ action: 'refresh', workingSetId: id }));
         assert.equal(auto['contextIncluded'], true);
         assert.ok(auto['context']);
         expect(mocks.getScopeContext).toHaveBeenCalledTimes(1);
 
         mocks.refreshScope.mockResolvedValueOnce({ refreshed: 0, removed: 1, failed: 0, skipped: 0 });
-        const removed = structured(await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id }));
+        const removed = structured(await callRepoWorkingSet({ action: 'refresh', workingSetId: id }));
         assert.equal(removed['removed'], 1);
         assert.equal(removed['contextIncluded'], true);
         assert.ok(removed['context']);
@@ -232,7 +255,7 @@ describe('mcp/repo_working_set', () => {
 
         mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, removed: 0, failed: 0, skipped: 0 });
         const omitted = structured(
-            await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id, contextMode: 'omit' }),
+            await callRepoWorkingSet({ action: 'refresh', workingSetId: id, contextMode: 'omit' }),
         );
         assert.equal(omitted['contextIncluded'], false);
         assert.equal(omitted['context'], undefined);
@@ -240,7 +263,7 @@ describe('mcp/repo_working_set', () => {
 
         mocks.refreshScope.mockResolvedValueOnce({ refreshed: 0, removed: 0, failed: 0, skipped: 0 });
         const included = structured(
-            await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id, contextMode: 'include' }),
+            await callRepoWorkingSet({ action: 'refresh', workingSetId: id, contextMode: 'include' }),
         );
         assert.equal(included['contextIncluded'], true);
         assert.ok(included['context']);
@@ -274,7 +297,7 @@ describe('mcp/repo_working_set', () => {
             lastError: null,
         });
 
-        const result = await repoWorkingSetTool.handler({ action: 'open', path: 'src/copilot' });
+        const result = await callRepoWorkingSet({ action: 'open', path: 'src/copilot' });
         const structuredContent = structured(result);
         const actualBytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
         const legacyLike = {
@@ -290,19 +313,17 @@ describe('mcp/repo_working_set', () => {
     });
 
     it('compõe find, refresh, status, context e close sobre o mesmo working set', async () => {
-        const opened = structured(
-            await repoWorkingSetTool.handler({ action: 'open', path: 'src/copilot', indexMode: 'off' }),
-        );
+        const opened = structured(await callRepoWorkingSet({ action: 'open', path: 'src/copilot', indexMode: 'off' }));
         const id = String(opened['workingSetId']);
 
         const found = structured(
-            await repoWorkingSetTool.handler({ action: 'find', workingSetId: id, symbol: 'alpha', exactMatch: true }),
+            await callRepoWorkingSet({ action: 'find', workingSetId: id, symbol: 'alpha', exactMatch: true }),
         );
         assert.equal(found['matchCount'], 1);
         assert.equal(found['matches'][0]?.path, 'src/copilot/a.js');
 
         const contextCallsAfterOpen = mocks.getScopeContext.mock.calls.length;
-        const refreshed = structured(await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id }));
+        const refreshed = structured(await callRepoWorkingSet({ action: 'refresh', workingSetId: id }));
         assert.equal(refreshed['refreshed'], 0);
         assert.equal(refreshed['contextIncluded'], false);
         assert.equal(refreshed['contextAvailable'], true);
@@ -310,17 +331,17 @@ describe('mcp/repo_working_set', () => {
         expect(mocks.getScopeContext).toHaveBeenCalledTimes(contextCallsAfterOpen);
         expect(mocks.refreshScope).toHaveBeenCalledWith(id, undefined);
 
-        const status = structured(await repoWorkingSetTool.handler({ action: 'status', workingSetId: id }));
+        const status = structured(await callRepoWorkingSet({ action: 'status', workingSetId: id }));
         assert.equal(status['workingSetId'], id);
         assert.ok(status['stats']);
 
         const context = structured(
-            await repoWorkingSetTool.handler({ action: 'context', workingSetId: id, maxFiles: 10, maxBytes: 8192 }),
+            await callRepoWorkingSet({ action: 'context', workingSetId: id, maxFiles: 10, maxBytes: 8192 }),
         );
         assert.ok(context['context']);
         expect(mocks.getScopeContext).toHaveBeenLastCalledWith(id, { maxFiles: 10, maxBytes: 8192 });
 
-        const closed = structured(await repoWorkingSetTool.handler({ action: 'close', workingSetId: id }));
+        const closed = structured(await callRepoWorkingSet({ action: 'close', workingSetId: id }));
         assert.equal(closed['closed'], true);
         expect(mocks.closeScope).toHaveBeenCalledWith(id);
     });

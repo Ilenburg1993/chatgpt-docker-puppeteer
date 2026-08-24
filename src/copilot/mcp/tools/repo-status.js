@@ -1,38 +1,36 @@
 // @ts-check
 /**
- * repo_status MCP tool.
+ * repo_status MCP wire adapter.
  *
  * @module copilot/mcp/tools/repo-status
  */
 
-import { errorResult, getMcpWorkspaceRoot, okResult } from '#copilot/mcp/control-plane';
-import { execGit } from '#copilot/mcp/tools/shared';
+import { errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
+import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
+import { z } from 'zod';
+
+export const repoStatusOutputSchema = z.object({
+    success: z.literal(true),
+    workspaceRoot: z.string(),
+    branch: z.string(),
+    head: z.string(),
+    status: z.string(),
+    dirty: z.boolean(),
+});
 
 /**
- * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
+ * Wire-only projection for repo_status. Internal consumers must use readRepositoryStatus() instead of invoking this
+ * handler as an application API.
+ *
+ * @returns {Promise<import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult>}
  */
 export async function repoStatusHandler() {
-    const [branch, status, head] = await Promise.all([
-        execGit(['branch', '--show-current']),
-        execGit(['status', '--short', '--branch']),
-        execGit(['rev-parse', '--short', 'HEAD']),
-    ]);
+    const status = await readRepositoryStatus();
     if (!status.success) {
-        return errorResult(status.error ?? 'Unable to read git status.', {
-            code: 'ERR_GIT_STATUS_FAILED',
-            hint: 'Confirm this workspace is a Git repository and Git is available in the container.',
+        return errorResult(status.error, {
+            code: status.code,
+            hint: status.hint,
         });
     }
-    const structured = {
-        success: true,
-        workspaceRoot: getMcpWorkspaceRoot(),
-        branch: branch.stdout.trim(),
-        head: head.stdout.trim(),
-        status: status.stdout,
-        dirty: status.stdout
-            .split('\n')
-            .filter((line) => line.trim() !== '')
-            .some((line) => !line.startsWith('## ')),
-    };
-    return okResult(structured, `branch=${structured.branch}\nhead=${structured.head}\n${structured.status}`.trim());
+    return okResult(status, `branch=${status.branch}\nhead=${status.head}\n${status.status}`.trim());
 }

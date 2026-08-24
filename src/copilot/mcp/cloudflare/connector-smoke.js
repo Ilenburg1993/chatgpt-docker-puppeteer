@@ -101,10 +101,11 @@ export async function runCanonicalConnectorSmoke({
     const runOauthSmoke =
         deps.runOauthSmoke ??
         (async (options) => {
-            const { runMcpOAuthSmoke } = await import('../scripts/oauth-smoke.js');
+            const { runMcpOAuthSmoke } = await import('#copilot/mcp/public/diagnostics/oauth-smoke');
             return /** @type {Promise<Record<string, unknown>>} */ (runMcpOAuthSmoke(options));
         });
     const oauthOptions = {
+        env,
         ...(config.publicMcpUrl ? { resource: new URL('/', config.publicMcpUrl).origin } : {}),
         timeoutMs: 5_000,
         retryAttempts: 2,

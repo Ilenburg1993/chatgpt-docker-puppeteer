@@ -5,12 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-edge
  */
 
-import { auditCloudflareEdgeRulesets } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { auditCloudflareEdgeRulesets } from '#copilot/mcp/public/cloudflare/edge-audit';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgeAuditTool = {
     name: 'mcp_cloudflare_edge_audit',

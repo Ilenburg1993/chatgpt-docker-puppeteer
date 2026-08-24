@@ -15,7 +15,7 @@ import {
     createSqliteMcpEventStore,
     ensureMcpEventStoreSchema,
     parseMcpEventId,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/testing/mcp/transport/http/stateful';
 
 describe('MCP HTTP event stores', () => {
     it('builds and parses stream-scoped event IDs', () => {

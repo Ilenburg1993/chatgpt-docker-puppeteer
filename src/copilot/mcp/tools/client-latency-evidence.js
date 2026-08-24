@@ -7,12 +7,10 @@
 
 import {
     appendClientLatencyEvidence,
-    boundedWriteAnnotations,
-    errorResult,
-    okResult,
     readClientLatencyEvidence,
     summarizeClientLatencyEvidence,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/diagnostics/latency';
+import { boundedWriteAnnotations, errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const labelSchema = z
@@ -21,7 +19,7 @@ const labelSchema = z
     .max(64)
     ['regex'](/^[A-Za-z0-9._:-]+$/u);
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpClientLatencyEvidenceTool = {
     name: 'mcp_client_latency_evidence',
     title: 'Client TTFT evidence',

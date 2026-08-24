@@ -5,25 +5,17 @@
  * @module copilot/mcp/tools/meta
  */
 
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
 import {
-    MCP_AUTH_SCOPES,
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
-    readMcpAuthConfig,
     readOnlyAnnotations,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
 const CAPABILITIES_VERSION = 62;
-const MAX_POWER_REPO_SCOPES = [
-    MCP_AUTH_SCOPES.read,
-    MCP_AUTH_SCOPES.write,
-    MCP_AUTH_SCOPES.validate,
-    MCP_AUTH_SCOPES.admin,
-];
-
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
@@ -313,14 +305,16 @@ export function buildMcpCapabilitiesSummary(options = {}) {
     const groups = getMcpCapabilityGroups();
     const advertisedTools = getAdvertisedMcpToolNames();
     const auth = readMcpAuthConfig();
-    const maxPowerDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
+    const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
     const groupCounts = Object.fromEntries(Object.entries(groups).map(([name, tools]) => [name, tools.length]));
     const authProfile = {
         mode: auth.mode,
         enforcement: auth.enforcement,
         authorizationServersConfigured: auth.authorizationServers.length > 0,
         initialScopes: [...auth.initialScopes],
-        maxPowerDefault,
+        initialScopeProfile: auth.initialScopeProfile,
+        stepUpPreferred: auth.stepUpPreferred,
+        broadInitialGrant,
     };
     const compact = {
         success: true,
@@ -356,7 +350,7 @@ export function buildMcpCapabilitiesSummary(options = {}) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const metaTools = [
     {

@@ -34,8 +34,6 @@ import {
 import { createArgReader } from '../cli-args.mjs';
 import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
-loadModelGatewayDotenv();
-
 const ROOT = REPO_ROOT;
 const LIVE_RUNNER_PATH = COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH;
 const REDACTION_WORKER_PATH = path.join(ROOT, 'scripts/model-gateway/commands/model-gateway-live-redaction-worker.mjs');
@@ -950,6 +948,7 @@ if (isDirectCli) {
             `Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]\n\nCheck whether the model-gateway metadata database is ready for terminal llm-b live tests.\nThis does not start the terminal, execute providers, run models or run runtime probes.\n`,
         );
     } else {
+        loadModelGatewayDotenv();
         const json = argSet.has('--json');
         const fail = argSet.has('--fail');
         const sqliteRedactionMaxRowsPerTable =

@@ -5,20 +5,21 @@
  * @module copilot/mcp/tools/cloudflare-transport-benchmark
  */
 
+import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
+import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
 import {
-    readCloudflaredMetricsSnapshot,
-    readCloudflareTunnelConfig,
     readTransportBenchmarkState,
     TRANSPORT_BENCHMARK_STATE_PATH,
-} from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/cloudflare/transport-benchmark';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const CANDIDATES = ['http2', 'auto', 'quic'];
 const DEFAULT_MIN_SAMPLES = 5;
 const DEFAULT_MAX_P95_REGRESSION_PERCENT = 10;
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpCloudflareTransportBenchmarkPlanTool = {
     name: 'mcp_cloudflare_transport_benchmark_plan',
     title: 'Cloudflare transport benchmark plan',

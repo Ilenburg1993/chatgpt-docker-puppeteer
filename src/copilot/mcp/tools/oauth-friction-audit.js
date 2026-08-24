@@ -9,20 +9,19 @@ import {
     buildBuiltInDevOAuthMetadata,
     buildProtectedResourceMetadata,
     isBuiltInDevOAuthEnabled,
-    okResult,
     readDevOAuthPersistenceStatus,
     readDevOAuthTokenLifetimePolicy,
     readMcpAuthConfig,
-    readOnlyAnnotations,
     scopesForMcpTool,
     securitySchemesForMcpTool,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/auth';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
-/** @type {() => import('../registry.js').McpToolDefinition[]} */
+/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
 let toolsProvider = () => [];
 
 /**
- * @param {() => import('../registry.js').McpToolDefinition[]} provider
+ * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
  * @returns {void}
  */
 export function bindMcpOAuthFrictionAuditProvider(provider) {
@@ -30,7 +29,7 @@ export function bindMcpOAuthFrictionAuditProvider(provider) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpOAuthFrictionAuditTool = {
     name: 'mcp_oauth_friction_audit',
@@ -119,6 +118,9 @@ export const mcpOAuthFrictionAuditTool = {
                 authorizationServers: [...config.authorizationServers],
                 jwksUriConfigured: Boolean(config.jwksUri),
                 initialScopes: [...config.initialScopes],
+                initialScopeProfile: config.initialScopeProfile,
+                stepUpPreferred: config.stepUpPreferred,
+                broadInitialGrant: config.scopesSupported.every((scope) => config.initialScopes.includes(scope)),
                 publicDiagnostic: true,
             },
             metadataAlignment: {
@@ -169,7 +171,7 @@ export const mcpOAuthFrictionAuditTool = {
 };
 
 /**
- * @param {import('../registry.js').McpToolDefinition[]} tools
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
  * @returns {{
  *     count: number;
  *     readOnlyCount: number;
@@ -178,7 +180,7 @@ export const mcpOAuthFrictionAuditTool = {
  *     adminScopeTools: string[];
  *     validateScopeTools: string[];
  *     publicDiagnosticTools: string[];
- *     maxPowerScopesAdvertisedByDefault: boolean;
+ *     scopeClassesAdvertised: string[];
  * }}
  */
 function summarizeToolScopes(tools) {
@@ -211,7 +213,7 @@ function summarizeToolScopes(tools) {
             .map((row) => row.name)
             .sort(),
         publicDiagnosticTools: ['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics'],
-        maxPowerScopesAdvertisedByDefault: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'].every((scope) =>
+        scopeClassesAdvertised: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'].filter((scope) =>
             rows.some(
                 (row) =>
                     row.scopes.map(String).includes(scope) ||
@@ -244,7 +246,7 @@ function asSortedStringArray(value) {
 function buildRecommendedFixes(input) {
     if (input.critical.length === 0 && input.warnings.length === 0) {
         return [
-            'Keep OAuth metadata stable, refresh-token rotation enabled, and max-power scopes advertised for ChatGPT.',
+            'Keep OAuth metadata stable, refresh-token rotation enabled, and per-tool scopes least-authority; use a broad initial grant only when real-client compatibility evidence requires it.',
             'Continue reducing write confirmation count with plan tools, repo_apply_file_batch, and remembered approvals when offered by chatgpt.com.',
         ];
     }

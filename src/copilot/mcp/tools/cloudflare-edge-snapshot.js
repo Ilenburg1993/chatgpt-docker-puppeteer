@@ -5,11 +5,12 @@
  * @module copilot/mcp/tools/cloudflare-edge-snapshot
  */
 
-import { buildCloudflareEdgeSnapshot } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { buildCloudflareEdgeSnapshot } from '#copilot/mcp/public/cloudflare/edge-snapshot';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgeSnapshotTool = {
     name: 'mcp_cloudflare_edge_snapshot',

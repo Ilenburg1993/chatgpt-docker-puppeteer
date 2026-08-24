@@ -5,16 +5,14 @@
  * @module copilot/mcp/tools/apps-sdk-readiness
  */
 
-import { getMcpWorkspaceIo, getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { buildCompanyKnowledgeWidgetResource } from '#copilot/mcp/public/protocol/apps-sdk';
+import { okResult, readOnlyAnnotations, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
 import path from 'node:path';
-import { buildCompanyKnowledgeWidgetResource } from './apps-sdk-resources.js';
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
     COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME,
     companyKnowledgeTools,
 } from './company-knowledge.js';
-
-const appsSdkWorkspaceIo = getMcpWorkspaceIo();
 
 /** @type {Record<string, string>} */
 const MARKERS = {
@@ -37,10 +35,11 @@ const MARKERS = {
 };
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['io']} workspaceIo
  * @param {string} directory
  * @returns {Promise<string[]>}
  */
-async function listJsFiles(directory) {
+async function listJsFiles(workspaceIo, directory) {
     /** @type {string[]} */
     const files = [];
     /**
@@ -50,10 +49,10 @@ async function listJsFiles(directory) {
      */
     async function walk(current, depth) {
         if (depth > 8) return;
-        const entries = (await appsSdkWorkspaceIo.listDirectoryNamesFresh(current)).entries;
+        const entries = (await workspaceIo.listDirectoryNamesFresh(current)).entries;
         for (const entryName of entries) {
             const fullPath = path.join(current, entryName);
-            const info = (await appsSdkWorkspaceIo.lstatPath(fullPath)).stats;
+            const info = (await workspaceIo.lstatPath(fullPath)).stats;
             if (info.isSymbolicLink()) continue;
             if (info.isDirectory()) {
                 if (entryName === 'node_modules' || entryName === '.git') continue;
@@ -69,20 +68,22 @@ async function listJsFiles(directory) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['io']} workspaceIo
+ * @param {string} workspaceRoot
  * @param {string[]} files
  * @returns {Promise<Record<string, string[]>>}
  */
-async function scanMarkers(files) {
+async function scanMarkers(workspaceIo, workspaceRoot, files) {
     /** @type {Record<string, string[]>} */
     const found = {};
     for (const [key] of Object.entries(MARKERS)) found[key] = [];
     for (const file of files) {
-        const stats = (await appsSdkWorkspaceIo.statPath(file)).stats;
+        const stats = (await workspaceIo.statPath(file)).stats;
         if (stats.size > 512 * 1024) continue;
-        const text = (await appsSdkWorkspaceIo.readTextFresh(file, { includeHash: false })).content;
+        const text = (await workspaceIo.readTextFresh(file, { includeHash: false })).content;
         for (const [key, marker] of Object.entries(MARKERS)) {
             const matches = found[key] ?? [];
-            if (text.includes(marker)) matches.push(path.relative(getMcpWorkspaceRoot(), file));
+            if (text.includes(marker)) matches.push(path.relative(workspaceRoot, file));
             found[key] = matches;
         }
     }
@@ -90,7 +91,7 @@ async function scanMarkers(files) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpAppsSdkReadinessTool = {
     name: 'mcp_apps_sdk_readiness',
@@ -99,11 +100,12 @@ export const mcpAppsSdkReadinessTool = {
         'Inspect this MCP server for Apps SDK widget/CSP metadata, Company Knowledge search/fetch readiness, and prompt-friction implications.',
     inputSchema: {},
     annotations: readOnlyAnnotations(),
-    handler: async () => {
-        const root = getMcpWorkspaceRoot();
+    handler: async (_, operationContext) => {
+        const workspace = requireMcpToolWorkspace(operationContext);
+        const root = workspace.workspaceRoot;
         const mcpDir = path.join(root, 'src/copilot/mcp');
-        const files = await listJsFiles(mcpDir);
-        const found = await scanMarkers(files);
+        const files = await listJsFiles(workspace.io, mcpDir);
+        const found = await scanMarkers(workspace.io, root, files);
         const hasWidgetResource =
             (found['appResource'] ?? []).length > 0 ||
             (found['appResourceRegistrar'] ?? []).length > 0 ||

@@ -6,11 +6,11 @@ import { afterEach, describe, it } from 'vitest';
 
 import {
     readMcpAuthJwksWarmupState,
-    resetMcpAuthJwksWarmupForTests,
-    resetMcpAuthRuntimeForTests,
     scheduleMcpAuthJwksWarmup,
+    stopMcpAuthJwksWarmup,
     warmMcpRemoteJwks,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/auth';
+import { resetMcpAuthJwksWarmupForTests, resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
 
 /** @type {http.Server[]} */
 const servers = [];
@@ -97,6 +97,51 @@ describe('MCP auth JWKS warmup', () => {
         assert.equal(state.durationMs, 12);
         assert.equal(state.delayMs, 0);
         assert.equal(state.error, null);
+    });
+
+    it('stops an in-flight warmup generation without publishing stale completion state', async () => {
+        /** @type {{ value: (() => void) | undefined }} */
+        const callback = { value: undefined };
+        /** @type {(value: Awaited<ReturnType<typeof warmMcpRemoteJwks>>) => void} */
+        let releaseWarmup = () => {
+            throw new Error('warmup resolver was not installed');
+        };
+        scheduleMcpAuthJwksWarmup({
+            enabled: true,
+            delayMs: 0,
+            env: {},
+            setTimeoutFn: (fn) => {
+                callback.value = fn;
+                return { unref() {} };
+            },
+            warmupRunner: () =>
+                new Promise((resolve) => {
+                    releaseWarmup = resolve;
+                }),
+            logFn: () => {},
+        });
+        assert.ok(callback.value);
+        callback.value();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(readMcpAuthJwksWarmupState().running, true);
+
+        const stopping = stopMcpAuthJwksWarmup();
+        releaseWarmup({
+            ok: true,
+            skipped: false,
+            reason: null,
+            jwksUri: 'https://stale.example/jwks.json',
+            source: 'remote',
+            keyCount: 1,
+            durationMs: 1,
+        });
+        await stopping;
+
+        const state = readMcpAuthJwksWarmupState();
+        assert.equal(state.scheduled, false);
+        assert.equal(state.running, false);
+        assert.equal(state.completed, false);
+        assert.equal(state.jwksUri, null);
     });
 
     it('records warmup failure without throwing into the HTTP startup path', async () => {

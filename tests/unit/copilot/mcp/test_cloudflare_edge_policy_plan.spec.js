@@ -1,4 +1,4 @@
-import { buildCloudflareEdgePolicyPlan } from '#copilot/mcp/cloudflare';
+import { buildCloudflareEdgePolicyPlan } from '#copilot/mcp/public/cloudflare/edge-policy';
 import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/edge-policy-plan', () => {

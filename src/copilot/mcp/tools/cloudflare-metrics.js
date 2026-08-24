@@ -5,12 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-metrics
  */
 
-import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareMetricsSnapshotTool = {
     name: 'mcp_cloudflare_metrics_snapshot',

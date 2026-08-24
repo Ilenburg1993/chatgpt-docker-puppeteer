@@ -8,7 +8,7 @@
  * @module copilot/mcp/cloudflare/http-latency-analytics
  */
 
-import { createTtlCache } from '#copilot/mcp/control-plane';
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 
 const GRAPHQL_URL = 'https://api.cloudflare.com/client/v4/graphql';
@@ -17,7 +17,7 @@ const DEFAULT_CACHE_TTL_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_WINDOW_MINUTES = 24 * 60;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<
     Record<string, unknown> & { ok: boolean; available: boolean }
 >} */
 const analyticsCache = createTtlCache({

@@ -5,12 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-edge-apply
  */
 
-import { applyCloudflareEdgePolicy } from '#copilot/mcp/cloudflare';
-import { boundedWriteAnnotations, okResult } from '#copilot/mcp/control-plane';
+import { applyCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge-apply';
+
+import { boundedWriteAnnotations, okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgePolicyApplyTool = {
     name: 'mcp_cloudflare_edge_policy_apply',

@@ -9,21 +9,19 @@
  * @module copilot/mcp/tools/company-knowledge
  */
 
+import { COMPANY_KNOWLEDGE_WIDGET_URI } from '#copilot/mcp/public/protocol/apps-sdk';
 import {
     errorResult,
-    getMcpWorkspaceIo,
-    getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
-    resolveReadPath,
-} from '#copilot/mcp/control-plane';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
 
 export const COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME = 'search';
 export const COMPANY_KNOWLEDGE_FETCH_TOOL_NAME = 'fetch';
-export const COMPANY_KNOWLEDGE_WIDGET_URI = 'ui://copilot/company-knowledge/v2.html';
 
 const DEFAULT_REPOSITORY_WEB_BASE = 'https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/blob/main';
 const DEFAULT_SEARCH_RESULT_LIMIT = 10;
@@ -46,8 +44,6 @@ const DEFAULT_CORPUS_ROOTS = Object.freeze([
     'src/copilot/model-gateway/docs',
     'src/copilot/model-gateway/README.md',
 ]);
-
-const companyKnowledgeWorkspaceIo = getMcpWorkspaceIo();
 
 const DOCUMENT_EXTENSIONS = new Set(['.md', '.mdx', '.txt', '.json', '.jsonc', '.yaml', '.yml']);
 const SKIPPED_DIRECTORY_NAMES = new Set([
@@ -135,14 +131,15 @@ export function resetCompanyKnowledgeCorpusCacheForTests() {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {string} query
  * @returns {Promise<CompanyKnowledgeSearchResult[]>}
  */
-export async function searchCompanyKnowledge(query) {
+export async function searchCompanyKnowledge(workspace, query) {
     const normalizedQuery = normalizeSearchText(query).slice(0, MAX_QUERY_LENGTH);
     const tokens = tokenize(normalizedQuery);
     if (tokens.length === 0) return [];
-    const documents = await loadCompanyKnowledgeDocuments();
+    const documents = await loadCompanyKnowledgeDocuments(workspace);
     return documents
         .map((document) => ({ document, score: scoreDocument(document, normalizedQuery, tokens) }))
         .filter((entry) => entry.score > 0)
@@ -156,30 +153,33 @@ export async function searchCompanyKnowledge(query) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {string} id
  * @returns {Promise<CompanyKnowledgeDocument | null>}
  */
-export async function fetchCompanyKnowledgeDocument(id) {
+export async function fetchCompanyKnowledgeDocument(workspace, id) {
     const decodedPath = decodeCompanyKnowledgeDocumentId(id);
     if (!decodedPath) return null;
-    const documents = await loadCompanyKnowledgeDocuments();
+    const documents = await loadCompanyKnowledgeDocuments(workspace);
     return documents.find((document) => document.path === decodedPath && document.id === id) ?? null;
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {Promise<CompanyKnowledgeDocument[]>}
  */
-async function loadCompanyKnowledgeDocuments(env = process.env) {
+async function loadCompanyKnowledgeDocuments(workspace, env = process.env) {
     const roots = readCompanyKnowledgeCorpusRoots(env);
     const key = JSON.stringify({
+        workspaceRoot: workspace.workspaceRoot,
         roots,
         maxDocuments: readMaxDocuments(env),
         repositoryWebBase: readRepositoryWebBase(env),
     });
     const now = Date.now();
     if (corpusCache && corpusCache.key === key && corpusCache.expiresAt >= now) return corpusCache.documents;
-    const documents = await buildCompanyKnowledgeCorpus(roots, env);
+    const documents = await buildCompanyKnowledgeCorpus(workspace, roots, env);
     corpusCache = {
         key,
         expiresAt: now + readCorpusCacheTtlMs(env),
@@ -189,59 +189,61 @@ async function loadCompanyKnowledgeDocuments(env = process.env) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {string[]} roots
  * @param {NodeJS.ProcessEnv} env
  * @returns {Promise<CompanyKnowledgeDocument[]>}
  */
-async function buildCompanyKnowledgeCorpus(roots, env) {
+async function buildCompanyKnowledgeCorpus(workspace, roots, env) {
     /** @type {string[]} */
     const candidateFiles = [];
     const maxDocuments = readMaxDocuments(env);
     for (const root of roots) {
         if (candidateFiles.length >= maxDocuments) break;
-        const resolved = await resolveReadPath(root);
+        const resolved = await workspace.resolveReadPath(root);
         if (!resolved.ok) continue;
-        const rootStats = await safeStat(resolved.resolved);
+        const rootStats = await safeStat(workspace.io, resolved.resolved);
         if (!rootStats) continue;
         if (rootStats.isFile()) {
             if (isCompanyKnowledgeFile(resolved.resolved)) candidateFiles.push(resolved.resolved);
             continue;
         }
         if (rootStats.isDirectory()) {
-            await collectCompanyKnowledgeFiles(resolved.resolved, candidateFiles, maxDocuments, 0);
+            await collectCompanyKnowledgeFiles(workspace.io, resolved.resolved, candidateFiles, maxDocuments, 0);
         }
     }
 
     const uniqueFiles = uniqueStrings(candidateFiles).sort((left, right) =>
-        path.relative(getMcpWorkspaceRoot(), left).localeCompare(path.relative(getMcpWorkspaceRoot(), right)),
+        path.relative(workspace.workspaceRoot, left).localeCompare(path.relative(workspace.workspaceRoot, right)),
     );
     /** @type {CompanyKnowledgeDocument[]} */
     const documents = [];
     for (const filePath of uniqueFiles.slice(0, maxDocuments)) {
-        const document = await readCompanyKnowledgeDocument(filePath, env);
+        const document = await readCompanyKnowledgeDocument(workspace, filePath, env);
         if (document) documents.push(document);
     }
     return documents;
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['io']} workspaceIo
  * @param {string} directory
  * @param {string[]} files
  * @param {number} maxFiles
  * @param {number} depth
  * @returns {Promise<void>}
  */
-async function collectCompanyKnowledgeFiles(directory, files, maxFiles, depth) {
+async function collectCompanyKnowledgeFiles(workspaceIo, directory, files, maxFiles, depth) {
     if (files.length >= maxFiles || depth > 8) return;
-    const entries = (await companyKnowledgeWorkspaceIo.listDirectoryNamesFresh(directory)).entries;
+    const entries = (await workspaceIo.listDirectoryNamesFresh(directory)).entries;
     for (const entryName of entries) {
         if (files.length >= maxFiles) return;
         if (entryName.startsWith('.') || SKIPPED_DIRECTORY_NAMES.has(entryName)) continue;
         const fullPath = path.join(directory, entryName);
-        const info = (await companyKnowledgeWorkspaceIo.lstatPath(fullPath)).stats;
+        const info = (await workspaceIo.lstatPath(fullPath)).stats;
         if (info.isSymbolicLink()) continue;
         if (info.isDirectory()) {
-            await collectCompanyKnowledgeFiles(fullPath, files, maxFiles, depth + 1);
+            await collectCompanyKnowledgeFiles(workspaceIo, fullPath, files, maxFiles, depth + 1);
             continue;
         }
         if (info.isFile() && isCompanyKnowledgeFile(fullPath)) files.push(fullPath);
@@ -257,18 +259,19 @@ function isCompanyKnowledgeFile(filePath) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {string} filePath
  * @param {NodeJS.ProcessEnv} env
  * @returns {Promise<CompanyKnowledgeDocument | null>}
  */
-async function readCompanyKnowledgeDocument(filePath, env) {
-    const root = getMcpWorkspaceRoot();
+async function readCompanyKnowledgeDocument(workspace, filePath, env) {
+    const root = workspace.workspaceRoot;
     const relativePath = normalizeWorkspaceRelativePath(path.relative(root, filePath));
     if (!relativePath || relativePath.startsWith('../')) return null;
-    const fileStats = await safeStat(filePath);
+    const fileStats = await safeStat(workspace.io, filePath);
     if (!fileStats || !fileStats.isFile()) return null;
     const boundedReadBytes = Math.min(fileStats.size, MAX_DOCUMENT_BYTES);
-    const snapshot = await companyKnowledgeWorkspaceIo.readBytesFresh(filePath, { includeHash: true });
+    const snapshot = await workspace.io.readBytesFresh(filePath, { includeHash: true });
     const raw = snapshot.content;
     const truncatedByFileBudget = raw.byteLength > boundedReadBytes;
     const readBuffer = truncatedByFileBudget ? raw.subarray(0, boundedReadBytes) : raw;
@@ -454,19 +457,20 @@ function readPositiveIntegerEnv(env, name, fallback, minimum, maximum) {
 }
 
 /**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['io']} workspaceIo
  * @param {string} filePath
  * @returns {Promise<import('node:fs').Stats | null>}
  */
-async function safeStat(filePath) {
+async function safeStat(workspaceIo, filePath) {
     try {
-        return (await companyKnowledgeWorkspaceIo.lstatPath(filePath)).stats;
+        return (await workspaceIo.lstatPath(filePath)).stats;
     } catch {
         return null;
     }
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const companyKnowledgeTools = [
     {
@@ -493,8 +497,9 @@ export const companyKnowledgeTools = [
             'openai/toolInvocation/invoking': 'Buscando conhecimento...',
             'openai/toolInvocation/invoked': 'Busca concluida',
         },
-        handler: async ({ query }) => {
-            const results = await searchCompanyKnowledge(String(query ?? ''));
+        handler: async ({ query }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const results = await searchCompanyKnowledge(workspace, String(query ?? ''));
             const structured = { results };
             return okResult(structured, JSON.stringify(structured));
         },
@@ -521,8 +526,9 @@ export const companyKnowledgeTools = [
             'openai/toolInvocation/invoking': 'Lendo conhecimento...',
             'openai/toolInvocation/invoked': 'Leitura concluida',
         },
-        handler: async ({ id }) => {
-            const document = await fetchCompanyKnowledgeDocument(String(id ?? ''));
+        handler: async ({ id }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const document = await fetchCompanyKnowledgeDocument(workspace, String(id ?? ''));
             if (!document) {
                 return errorResult('Company Knowledge document not found.', {
                     code: 'COMPANY_KNOWLEDGE_DOCUMENT_NOT_FOUND',

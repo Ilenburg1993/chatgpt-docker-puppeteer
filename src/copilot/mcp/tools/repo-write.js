@@ -5,57 +5,56 @@
  * @module copilot/mcp/tools/repo-write
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
+import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
 import {
-    MCP_TOOL_EXECUTION_LIMITS,
-    appendMcpAuditEvent,
     boundedWriteAnnotations,
-    canRunCopilotValidatorInline,
     destructiveAnnotations,
     errorResult,
     estimateStructuredTextResultBytes,
-    getMcpWorkspaceIo,
-    getMcpWorkspaceRoot,
-    normalizeFocusedUnitTestFiles,
+    MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     readOnlyAnnotations,
-    resolveWritePath,
-    runCopilotValidatorInline,
-    toWorkspaceRelativePath,
+    requireMcpToolWorkspace,
     withResultExecutionHint,
     withResultSizeHint,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/protocol/tools';
+import {
+    canRunCopilotValidatorInline,
+    normalizeFocusedUnitTestFiles,
+    runCopilotValidatorInline,
+} from '#copilot/mcp/public/validation';
+import {
+    buildRepositoryPatchNextAction,
+    classifyRepositoryPatchFailure,
+    compactRepositoryPatchFailureRows,
+    createRepositoryPatchResultValidationOption,
+    readRepositoryPatchErrorDetails,
+    runRepositoryPatchTargetGroups,
+    summarizeRepositoryPatchFailures,
+} from '#copilot/mcp/public/workspace/repository/patch';
+
+import { clearRepoReadFileResultCacheForResolvedPath } from '#copilot/mcp/public/workspace/repository/read-cache';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
-import { clearRepoReadFileResultCacheForResolvedPath } from './repo-read-cache.js';
 
-const {
-    chmodFileLocked,
-    chmodFileLockedValidated,
-    createOrReplaceFileAtomic,
-    createOrReplaceFileAtomicValidated,
-    deleteFileLocked,
-    moveFileLocked,
-    moveFileLockedValidated,
-    patchTextBatchLocked,
-    patchTextBatchLockedValidated,
-    patchTextLocked,
-    patchTextLockedValidated,
-    listDirectoryNamesFresh,
-    lstatPath,
-    readBytesFresh,
-    readBytesRangeFresh,
-    readText,
-    statPath,
-    withIoResourceLock,
-    writeFileAtomic,
-    writeFileAtomicValidated,
-} = getMcpWorkspaceIo();
+/** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} RepoWriteWorkspaceCapability */
+/** @typedef {RepoWriteWorkspaceCapability['io']} RepoWriteIo */
+/** @typedef {Readonly<{ workspace: RepoWriteWorkspaceCapability; io: RepoWriteIo; workspaceRoot: string; quarantineDir: string }>} RepoWriteRuntime */
+
+/** @param {RepoWriteWorkspaceCapability} workspace @returns {RepoWriteRuntime} */
+function createRepoWriteRuntime(workspace) {
+    return Object.freeze({
+        workspace,
+        io: workspace.io,
+        workspaceRoot: workspace.workspaceRoot,
+        quarantineDir: path.join(workspace.workspaceRoot, 'src/copilot/.ai/quarantine'),
+    });
+}
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
-const QUARANTINE_DIR = path.join(getMcpWorkspaceRoot(), 'src/copilot/.ai/quarantine');
+
 const { maxOperations: MAX_BATCH_FILE_OPERATIONS } = MCP_TOOL_EXECUTION_LIMITS.repoFileBatch;
 const {
     maxBatchOperations: MAX_PATCH_BATCH_OPERATIONS,
@@ -71,44 +70,34 @@ const {
  * method as a compatibility fallback for internal mocks/legacy callers.
  *
  * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
- * @param {Parameters<typeof patchTextLocked>[1]} options
+ * @param {Parameters<RepoWriteIo['patchTextLocked']>[1]} options
  */
-function patchResolvedTarget(resolved, options) {
+function patchResolvedTarget(/** @type {RepoWriteRuntime} */ runtime, resolved, options) {
     return resolved.validatedWritePath
-        ? patchTextLockedValidated(resolved.validatedWritePath, options)
-        : patchTextLocked(resolved.resolved, options);
+        ? runtime.io.patchTextLockedValidated(resolved.validatedWritePath, options)
+        : runtime.io.patchTextLocked(resolved.resolved, options);
 }
 
 /**
  * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
- * @param {Parameters<typeof patchTextBatchLocked>[1]} options
+ * @param {Parameters<RepoWriteIo['createOrReplaceFileAtomic']>[1]} content
+ * @param {Parameters<RepoWriteIo['createOrReplaceFileAtomic']>[2]} options
  */
-function patchResolvedTargetBatch(resolved, options) {
+function createResolvedTarget(/** @type {RepoWriteRuntime} */ runtime, resolved, content, options) {
     return resolved.validatedWritePath
-        ? patchTextBatchLockedValidated(resolved.validatedWritePath, options)
-        : patchTextBatchLocked(resolved.resolved, options);
+        ? runtime.io.createOrReplaceFileAtomicValidated(resolved.validatedWritePath, content, options)
+        : runtime.io.createOrReplaceFileAtomic(resolved.resolved, content, options);
 }
 
 /**
  * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
- * @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content
- * @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options
+ * @param {Parameters<RepoWriteIo['writeFileAtomic']>[1]} content
+ * @param {Parameters<RepoWriteIo['writeFileAtomic']>[2]} options
  */
-function createResolvedTarget(resolved, content, options) {
+function writeResolvedTarget(/** @type {RepoWriteRuntime} */ runtime, resolved, content, options) {
     return resolved.validatedWritePath
-        ? createOrReplaceFileAtomicValidated(resolved.validatedWritePath, content, options)
-        : createOrReplaceFileAtomic(resolved.resolved, content, options);
-}
-
-/**
- * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
- * @param {Parameters<typeof writeFileAtomic>[1]} content
- * @param {Parameters<typeof writeFileAtomic>[2]} options
- */
-function writeResolvedTarget(resolved, content, options) {
-    return resolved.validatedWritePath
-        ? writeFileAtomicValidated(resolved.validatedWritePath, content, options)
-        : writeFileAtomic(resolved.resolved, content, options);
+        ? runtime.io.writeFileAtomicValidated(resolved.validatedWritePath, content, options)
+        : runtime.io.writeFileAtomic(resolved.resolved, content, options);
 }
 
 /**
@@ -117,12 +106,12 @@ function writeResolvedTarget(resolved, content, options) {
  *
  * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} source
  * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} destination
- * @param {Parameters<typeof moveFileLocked>[2]} options
+ * @param {Parameters<RepoWriteIo['moveFileLocked']>[2]} options
  */
-function moveResolvedTargets(source, destination, options) {
+function moveResolvedTargets(/** @type {RepoWriteRuntime} */ runtime, source, destination, options) {
     return source.validatedWritePath && destination.validatedWritePath
-        ? moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)
-        : moveFileLocked(source.resolved, destination.resolved, options);
+        ? runtime.io.moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)
+        : runtime.io.moveFileLocked(source.resolved, destination.resolved, options);
 }
 
 /**
@@ -247,7 +236,7 @@ function normalizePostPatchValidationRequests(requests) {
             throw new Error('postValidate testFile is valid only with unit-focused.');
         }
         return {
-            validator: /** @type {import('../control-plane/jobs.js').CopilotValidatorName} */ (request.validator),
+            validator: /** @type {import('#copilot/mcp/public/validation').CopilotValidatorName} */ (request.validator),
             ...(request.testFile ? { testFile: request.testFile } : {}),
             ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
             ...(request.waitMs === undefined ? {} : { waitMs: request.waitMs }),
@@ -258,13 +247,15 @@ function normalizePostPatchValidationRequests(requests) {
 
 /**
  * @param {ReturnType<typeof normalizePostPatchValidationRequests>} requests
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  */
-async function runPostPatchValidations(requests) {
+async function runPostPatchValidations(requests, workspace) {
     const startedAt = Date.now();
     const results = [];
     for (const [index, request] of requests.entries()) {
         try {
             const result = await runCopilotValidatorInline(request.validator, {
+                workspace,
                 ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
                 ...(request.waitMs === undefined ? {} : { waitMs: request.waitMs }),
                 ...(request.failureTailBytes === undefined ? {} : { failureTailBytes: request.failureTailBytes }),
@@ -484,28 +475,28 @@ function optionalInteger(value) {
 
 const MAX_QUARANTINE_METADATA_BYTES = 128 * 1024;
 
-/** @param {string} filePath */
-async function repoWriteStat(filePath) {
-    return (await statPath(filePath)).stats;
+/** @param {RepoWriteRuntime} runtime @param {string} filePath */
+async function repoWriteStat(runtime, filePath) {
+    return (await runtime.io.statPath(filePath)).stats;
 }
 
-/** @param {string} filePath */
-async function repoWriteLstat(filePath) {
-    return (await lstatPath(filePath)).stats;
+/** @param {RepoWriteRuntime} runtime @param {string} filePath */
+async function repoWriteLstat(runtime, filePath) {
+    return (await runtime.io.lstatPath(filePath)).stats;
 }
 
-/** @param {string} dirPath */
-async function repoWriteListDirectoryNames(dirPath) {
-    return (await listDirectoryNamesFresh(dirPath)).entries;
+/** @param {RepoWriteRuntime} runtime @param {string} dirPath */
+async function repoWriteListDirectoryNames(runtime, dirPath) {
+    return (await runtime.io.listDirectoryNamesFresh(dirPath)).entries;
 }
 
 /**
  * @param {string} filePath
  * @returns {Promise<boolean>}
  */
-async function pathExists(filePath) {
+async function pathExists(/** @type {RepoWriteRuntime} */ runtime, filePath) {
     try {
-        await repoWriteStat(filePath);
+        await repoWriteStat(runtime, filePath);
         return true;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -518,9 +509,9 @@ async function pathExists(filePath) {
  * @param {string} filePath
  * @returns {Promise<boolean>}
  */
-async function regularFileExists(filePath) {
+async function regularFileExists(/** @type {RepoWriteRuntime} */ runtime, filePath) {
     try {
-        const stats = await repoWriteLstat(filePath);
+        const stats = await repoWriteLstat(runtime, filePath);
         return stats.isFile() && !stats.isSymbolicLink();
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -533,9 +524,9 @@ async function regularFileExists(filePath) {
  * @param {string} candidate
  * @returns {boolean}
  */
-function isCanonicalWorkspaceRelativePath(candidate) {
+function isCanonicalWorkspaceRelativePath(/** @type {RepoWriteRuntime} */ runtime, candidate) {
     if (path.isAbsolute(candidate) || candidate !== path.normalize(candidate)) return false;
-    const root = path.resolve(getMcpWorkspaceRoot());
+    const root = path.resolve(runtime.workspaceRoot);
     const resolved = path.resolve(root, candidate);
     const relative = path.relative(root, resolved);
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -546,11 +537,11 @@ function isCanonicalWorkspaceRelativePath(candidate) {
  * @param {string | null} backupPath
  * @returns {boolean}
  */
-function isCanonicalQuarantineBackupPath(quarantineId, backupPath) {
+function isCanonicalQuarantineBackupPath(/** @type {RepoWriteRuntime} */ runtime, quarantineId, backupPath) {
     if (backupPath === null) return true;
-    if (!isCanonicalWorkspaceRelativePath(backupPath)) return false;
-    const resolved = path.resolve(getMcpWorkspaceRoot(), backupPath);
-    if (path.dirname(resolved) !== path.resolve(QUARANTINE_DIR)) return false;
+    if (!isCanonicalWorkspaceRelativePath(runtime, backupPath)) return false;
+    const resolved = path.resolve(runtime.workspaceRoot, backupPath);
+    if (path.dirname(resolved) !== path.resolve(runtime.quarantineDir)) return false;
     return new RegExp(
         `^${quarantineId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.restore-backup-[a-f0-9-]{36}\\.data$`,
     ).test(path.basename(resolved));
@@ -569,11 +560,11 @@ function buildQuarantineId(filePath) {
  * @param {string} quarantineId
  * @returns {{ dataPath: string; metadataPath: string }}
  */
-function resolveQuarantinePaths(quarantineId) {
+function resolveQuarantinePaths(/** @type {RepoWriteRuntime} */ runtime, quarantineId) {
     const normalized = quarantineIdSchema.parse(quarantineId);
     return {
-        dataPath: path.join(QUARANTINE_DIR, `${normalized}.data`),
-        metadataPath: path.join(QUARANTINE_DIR, `${normalized}.json`),
+        dataPath: path.join(runtime.quarantineDir, `${normalized}.data`),
+        metadataPath: path.join(runtime.quarantineDir, `${normalized}.json`),
     };
 }
 
@@ -582,8 +573,8 @@ function resolveQuarantinePaths(quarantineId) {
  * @param {string} metadataPath
  * @returns {Promise<void>}
  */
-async function writeQuarantineMetadataDefault(metadata, metadataPath) {
-    await createOrReplaceFileAtomic(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {
+async function writeQuarantineMetadataDefault(/** @type {RepoWriteRuntime} */ runtime, metadata, metadataPath) {
+    await runtime.io.createOrReplaceFileAtomic(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {
         createParentDirs: true,
         mode: 0o600,
         riskClass: 'high',
@@ -595,12 +586,12 @@ async function writeQuarantineMetadataDefault(metadata, metadataPath) {
     });
 }
 
-/** @type {(metadata: QuarantineMetadata, metadataPath: string) => Promise<void>} */
+/** @type {(runtime: RepoWriteRuntime, metadata: QuarantineMetadata, metadataPath: string) => Promise<void>} */
 let quarantineMetadataWriter = writeQuarantineMetadataDefault;
 
 export const repoWriteTestHarness = Object.freeze({
     /**
-     * @param {(metadata: QuarantineMetadata, metadataPath: string) => Promise<void>} writer
+     * @param {(runtime: RepoWriteRuntime, metadata: QuarantineMetadata, metadataPath: string) => Promise<void>} writer
      */
     setQuarantineMetadataWriter(writer) {
         quarantineMetadataWriter = writer;
@@ -616,17 +607,17 @@ export const repoWriteTestHarness = Object.freeze({
  * @param {string} metadataPath
  * @returns {Promise<void>}
  */
-async function writeQuarantineMetadata(metadata, metadataPath) {
-    await quarantineMetadataWriter(metadata, metadataPath);
+async function writeQuarantineMetadata(/** @type {RepoWriteRuntime} */ runtime, metadata, metadataPath) {
+    await quarantineMetadataWriter(runtime, metadata, metadataPath);
 }
 
 /**
  * @param {string} filePath
  * @returns {Promise<void>}
  */
-async function removeFileIfPresent(filePath) {
+async function removeFileIfPresent(/** @type {RepoWriteRuntime} */ runtime, filePath) {
     try {
-        await deleteFileLocked(filePath, { captureRollback: false });
+        await runtime.io.deleteFileLocked(filePath, { captureRollback: false });
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
@@ -637,16 +628,16 @@ async function removeFileIfPresent(filePath) {
  * @param {string} filePath
  * @returns {Promise<void>}
  */
-async function removeRegularFileIfPresent(filePath) {
-    if (!(await pathExists(filePath))) return;
-    if (!(await regularFileExists(filePath))) {
+async function removeRegularFileIfPresent(/** @type {RepoWriteRuntime} */ runtime, filePath) {
+    if (!(await pathExists(runtime, filePath))) return;
+    if (!(await regularFileExists(runtime, filePath))) {
         const error = /** @type {Error & { code?: string }} */ (
             new Error(`Refusing to remove non-regular quarantine artifact: ${filePath}`)
         );
         error.code = 'ERR_QUARANTINE_ARTIFACT_INVALID';
         throw error;
     }
-    await deleteFileLocked(filePath, { captureRollback: false });
+    await runtime.io.deleteFileLocked(filePath, { captureRollback: false });
 }
 
 /**
@@ -672,9 +663,9 @@ function createQuarantineRollbackError(primaryError, rollbackError, operation) {
  * @param {string} metadataPath
  * @returns {Promise<QuarantineMetadata | null>}
  */
-async function readQuarantineMetadataFile(metadataPath) {
+async function readQuarantineMetadataFile(/** @type {RepoWriteRuntime} */ runtime, metadataPath) {
     try {
-        const snapshot = await readBytesRangeFresh(metadataPath, {
+        const snapshot = await runtime.io.readBytesRangeFresh(metadataPath, {
             maxBytes: MAX_QUARANTINE_METADATA_BYTES,
             rejectSymlink: true,
         });
@@ -686,12 +677,13 @@ async function readQuarantineMetadataFile(metadataPath) {
             ...validation.data,
             transaction: validation.data.transaction ?? null,
         });
-        const expectedPaths = resolveQuarantinePaths(metadata.quarantineId);
+        const expectedPaths = resolveQuarantinePaths(runtime, metadata.quarantineId);
         if (path.resolve(metadataPath) !== path.resolve(expectedPaths.metadataPath)) return null;
-        if (metadata.metadataPath !== toWorkspaceRelativePath(expectedPaths.metadataPath)) return null;
-        if (metadata.quarantinePath !== toWorkspaceRelativePath(expectedPaths.dataPath)) return null;
-        if (!isCanonicalWorkspaceRelativePath(metadata.originalPath)) return null;
-        if (metadata.restoredPath !== null && !isCanonicalWorkspaceRelativePath(metadata.restoredPath)) return null;
+        if (metadata.metadataPath !== runtime.workspace.toRelativePath(expectedPaths.metadataPath)) return null;
+        if (metadata.quarantinePath !== runtime.workspace.toRelativePath(expectedPaths.dataPath)) return null;
+        if (!isCanonicalWorkspaceRelativePath(runtime, metadata.originalPath)) return null;
+        if (metadata.restoredPath !== null && !isCanonicalWorkspaceRelativePath(runtime, metadata.restoredPath))
+            return null;
         if (metadata.transaction?.kind === 'quarantine') {
             if (
                 metadata.transaction.destinationPath !== null ||
@@ -703,12 +695,14 @@ async function readQuarantineMetadataFile(metadataPath) {
         } else if (metadata.transaction?.kind === 'restore') {
             if (
                 metadata.transaction.destinationPath === null ||
-                !isCanonicalWorkspaceRelativePath(metadata.transaction.destinationPath)
+                !isCanonicalWorkspaceRelativePath(runtime, metadata.transaction.destinationPath)
             ) {
                 return null;
             }
         }
-        if (!isCanonicalQuarantineBackupPath(metadata.quarantineId, metadata.transaction?.backupPath ?? null)) {
+        if (
+            !isCanonicalQuarantineBackupPath(runtime, metadata.quarantineId, metadata.transaction?.backupPath ?? null)
+        ) {
             return null;
         }
         if (metadata.status === 'quarantining' && metadata.transaction?.kind !== 'quarantine') return null;
@@ -727,16 +721,16 @@ async function readQuarantineMetadataFile(metadataPath) {
  * @param {string} quarantineId
  * @returns {Promise<QuarantineMetadata | null>}
  */
-async function readQuarantineMetadata(quarantineId) {
+async function readQuarantineMetadata(/** @type {RepoWriteRuntime} */ runtime, quarantineId) {
     const parsedId = quarantineIdSchema.safeParse(quarantineId);
     if (!parsedId.success) return null;
-    const paths = resolveQuarantinePaths(parsedId.data);
-    const { value } = await withIoResourceLock(
+    const paths = resolveQuarantinePaths(runtime, parsedId.data);
+    const { value } = await runtime.io.withIoResourceLock(
         paths.metadataPath,
         async () => {
-            const metadata = await readQuarantineMetadataFile(paths.metadataPath);
+            const metadata = await readQuarantineMetadataFile(runtime, paths.metadataPath);
             if (!metadata || metadata.quarantineId !== parsedId.data) return null;
-            return reconcileQuarantineMetadata(metadata, paths);
+            return reconcileQuarantineMetadata(runtime, metadata, paths);
         },
         {
             operation: 'quarantine-reconcile',
@@ -750,8 +744,8 @@ async function readQuarantineMetadata(quarantineId) {
 /**
  * @returns {Promise<QuarantineMetadata[]>}
  */
-async function listQuarantineMetadata() {
-    const entries = await repoWriteListDirectoryNames(QUARANTINE_DIR).catch((error) => {
+async function listQuarantineMetadata(/** @type {RepoWriteRuntime} */ runtime) {
+    const entries = await repoWriteListDirectoryNames(runtime, runtime.quarantineDir).catch((error) => {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code === 'ENOENT' || code === 'ENOTDIR') return [];
         throw error;
@@ -763,7 +757,7 @@ async function listQuarantineMetadata() {
     for (let index = 0; index < metadataEntries.length; index += batchSize) {
         const batch = metadataEntries.slice(index, index + batchSize);
         const metadataBatch = await Promise.all(
-            batch.map((entry) => readQuarantineMetadata(entry.slice(0, -'.json'.length))),
+            batch.map((entry) => readQuarantineMetadata(runtime, entry.slice(0, -'.json'.length))),
         );
         for (const metadata of metadataBatch) {
             if (metadata) items.push(metadata);
@@ -776,8 +770,8 @@ async function listQuarantineMetadata() {
  * @param {string} filePath
  * @returns {Promise<string>}
  */
-async function sha256File(filePath) {
-    const snapshot = await readBytesFresh(filePath, { includeHash: true });
+async function sha256File(/** @type {RepoWriteRuntime} */ runtime, filePath) {
+    const snapshot = await runtime.io.readBytesFresh(filePath, { includeHash: true });
     return snapshot.contentHash ?? createHash('sha256').update(snapshot.content).digest('hex');
 }
 
@@ -786,11 +780,11 @@ async function sha256File(filePath) {
  * @param {QuarantineMetadata} metadata
  * @returns {Promise<boolean>}
  */
-async function fileMatchesQuarantineMetadata(filePath, metadata) {
-    if (!(await regularFileExists(filePath))) return false;
-    const stats = await repoWriteStat(filePath);
+async function fileMatchesQuarantineMetadata(/** @type {RepoWriteRuntime} */ runtime, filePath, metadata) {
+    if (!(await regularFileExists(runtime, filePath))) return false;
+    const stats = await repoWriteStat(runtime, filePath);
     if (metadata.sourceBytes > 0 && stats.size !== metadata.sourceBytes) return false;
-    if (metadata.sourceHash !== null && (await sha256File(filePath)) !== metadata.sourceHash) return false;
+    if (metadata.sourceHash !== null && (await sha256File(runtime, filePath)) !== metadata.sourceHash) return false;
     return true;
 }
 
@@ -801,28 +795,28 @@ async function fileMatchesQuarantineMetadata(filePath, metadata) {
  * @param {{ dataPath: string; metadataPath: string }} quarantinePaths
  * @returns {Promise<QuarantineMetadata | null>}
  */
-async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
+async function reconcileQuarantineMetadata(/** @type {RepoWriteRuntime} */ runtime, metadata, quarantinePaths) {
     if (metadata.status === 'quarantining') {
-        const original = await resolveWritePath(metadata.originalPath);
+        const original = await runtime.workspace.resolveWritePath(metadata.originalPath);
         if (!original.ok) return metadata;
         const [dataExists, originalExists] = await Promise.all([
-            regularFileExists(quarantinePaths.dataPath),
-            pathExists(original.resolved),
+            regularFileExists(runtime, quarantinePaths.dataPath),
+            pathExists(runtime, original.resolved),
         ]);
         if (dataExists && !originalExists) {
-            const dataStats = await repoWriteStat(quarantinePaths.dataPath);
+            const dataStats = await repoWriteStat(runtime, quarantinePaths.dataPath);
             const reconciled = /** @type {QuarantineMetadata} */ ({
                 ...metadata,
                 status: 'quarantined',
                 sourceBytes: dataStats.size,
-                sourceHash: await sha256File(quarantinePaths.dataPath),
+                sourceHash: await sha256File(runtime, quarantinePaths.dataPath),
                 transaction: null,
             });
-            await writeQuarantineMetadata(reconciled, quarantinePaths.metadataPath);
+            await writeQuarantineMetadata(runtime, reconciled, quarantinePaths.metadataPath);
             return reconciled;
         }
         if (!dataExists && originalExists) {
-            await removeFileIfPresent(quarantinePaths.metadataPath);
+            await removeFileIfPresent(runtime, quarantinePaths.metadataPath);
             return null;
         }
         return metadata;
@@ -831,12 +825,12 @@ async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
     if (metadata.status === 'restored' && metadata.transaction?.kind === 'restore') {
         const backupPath = metadata.transaction.backupPath;
         if (backupPath) {
-            const backup = await resolveWritePath(backupPath);
+            const backup = await runtime.workspace.resolveWritePath(backupPath);
             if (!backup.ok) return metadata;
-            await removeRegularFileIfPresent(backup.resolved);
+            await removeRegularFileIfPresent(runtime, backup.resolved);
         }
         const reconciled = /** @type {QuarantineMetadata} */ ({ ...metadata, transaction: null });
-        await writeQuarantineMetadata(reconciled, quarantinePaths.metadataPath);
+        await writeQuarantineMetadata(runtime, reconciled, quarantinePaths.metadataPath);
         return reconciled;
     }
 
@@ -846,40 +840,46 @@ async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
 
     const destinationPath = metadata.transaction.destinationPath;
     if (!destinationPath) return metadata;
-    const destination = await resolveWritePath(destinationPath);
+    const destination = await runtime.workspace.resolveWritePath(destinationPath);
     if (!destination.ok) return metadata;
-    const backup = metadata.transaction.backupPath ? await resolveWritePath(metadata.transaction.backupPath) : null;
+    const backup = metadata.transaction.backupPath
+        ? await runtime.workspace.resolveWritePath(metadata.transaction.backupPath)
+        : null;
     if (backup && !backup.ok) return metadata;
 
     const [dataPresent, destinationExists, backupPresent] = await Promise.all([
-        pathExists(quarantinePaths.dataPath),
-        pathExists(destination.resolved),
-        backup?.ok ? pathExists(backup.resolved) : Promise.resolve(false),
+        pathExists(runtime, quarantinePaths.dataPath),
+        pathExists(runtime, destination.resolved),
+        backup?.ok ? pathExists(runtime, backup.resolved) : Promise.resolve(false),
     ]);
-    const dataExists = dataPresent ? await regularFileExists(quarantinePaths.dataPath) : false;
+    const dataExists = dataPresent ? await regularFileExists(runtime, quarantinePaths.dataPath) : false;
     if (dataPresent && !dataExists) return metadata;
-    const backupExists = backup?.ok && backupPresent ? await regularFileExists(backup.resolved) : false;
+    const backupExists = backup?.ok && backupPresent ? await regularFileExists(runtime, backup.resolved) : false;
     if (backupPresent && !backupExists) return metadata;
-    if (dataExists && !(await fileMatchesQuarantineMetadata(quarantinePaths.dataPath, metadata))) {
+    if (dataExists && !(await fileMatchesQuarantineMetadata(runtime, quarantinePaths.dataPath, metadata))) {
         return metadata;
     }
 
-    if (!dataExists && destinationExists && (await fileMatchesQuarantineMetadata(destination.resolved, metadata))) {
+    if (
+        !dataExists &&
+        destinationExists &&
+        (await fileMatchesQuarantineMetadata(runtime, destination.resolved, metadata))
+    ) {
         const committed = /** @type {QuarantineMetadata} */ ({
             ...metadata,
             status: 'restored',
             restoredAt: metadata.restoredAt ?? new Date().toISOString(),
         });
-        await writeQuarantineMetadata(committed, quarantinePaths.metadataPath);
-        if (backup?.ok && backupExists) await removeRegularFileIfPresent(backup.resolved);
+        await writeQuarantineMetadata(runtime, committed, quarantinePaths.metadataPath);
+        if (backup?.ok && backupExists) await removeRegularFileIfPresent(runtime, backup.resolved);
         const reconciled = /** @type {QuarantineMetadata} */ ({ ...committed, transaction: null });
-        await writeQuarantineMetadata(reconciled, quarantinePaths.metadataPath);
+        await writeQuarantineMetadata(runtime, reconciled, quarantinePaths.metadataPath);
         return reconciled;
     }
 
     if (dataExists) {
         if (backup?.ok && backupExists && !destinationExists) {
-            await moveFileLocked(backup.resolved, destination.resolved, { overwrite: false });
+            await runtime.io.moveFileLocked(backup.resolved, destination.resolved, { overwrite: false });
         } else if (backupExists || (!metadata.transaction.destinationExisted && destinationExists)) {
             return metadata;
         }
@@ -890,7 +890,7 @@ async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
             restoredPath: null,
             transaction: null,
         });
-        await writeQuarantineMetadata(rolledBack, quarantinePaths.metadataPath);
+        await writeQuarantineMetadata(runtime, rolledBack, quarantinePaths.metadataPath);
         return rolledBack;
     }
 
@@ -899,17 +899,17 @@ async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
 
 /**
  * @param {{ resolved: string; relative: string }} source
- * @returns {Promise<{ metadata: QuarantineMetadata; moved: Awaited<ReturnType<typeof moveFileLocked>> }>}
+ * @returns {Promise<{ metadata: QuarantineMetadata; moved: Awaited<ReturnType<RepoWriteIo['moveFileLocked']>> }>}
  */
-async function quarantineResolvedFile(source) {
+async function quarantineResolvedFile(/** @type {RepoWriteRuntime} */ runtime, source) {
     const quarantineId = buildQuarantineId(source.relative);
-    const quarantinePaths = resolveQuarantinePaths(quarantineId);
+    const quarantinePaths = resolveQuarantinePaths(runtime, quarantineId);
     /** @type {QuarantineMetadata} */
     const journal = {
         quarantineId,
         originalPath: source.relative,
-        quarantinePath: toWorkspaceRelativePath(quarantinePaths.dataPath),
-        metadataPath: toWorkspaceRelativePath(quarantinePaths.metadataPath),
+        quarantinePath: runtime.workspace.toRelativePath(quarantinePaths.dataPath),
+        metadataPath: runtime.workspace.toRelativePath(quarantinePaths.metadataPath),
         createdAt: new Date().toISOString(),
         status: 'quarantining',
         restoredAt: null,
@@ -924,15 +924,17 @@ async function quarantineResolvedFile(source) {
         },
     };
 
-    const { value } = await withIoResourceLock(
+    const { value } = await runtime.io.withIoResourceLock(
         quarantinePaths.metadataPath,
         async () => {
-            await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
+            await writeQuarantineMetadata(runtime, journal, quarantinePaths.metadataPath);
             let moved;
             try {
-                moved = await moveFileLocked(source.resolved, quarantinePaths.dataPath, { overwrite: false });
+                moved = await runtime.io.moveFileLocked(source.resolved, quarantinePaths.dataPath, {
+                    overwrite: false,
+                });
             } catch (error) {
-                await removeFileIfPresent(quarantinePaths.metadataPath).catch(() => undefined);
+                await removeFileIfPresent(runtime, quarantinePaths.metadataPath).catch(() => undefined);
                 throw error;
             }
 
@@ -944,11 +946,11 @@ async function quarantineResolvedFile(source) {
                 transaction: null,
             });
             try {
-                await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
+                await writeQuarantineMetadata(runtime, metadata, quarantinePaths.metadataPath);
             } catch (error) {
                 try {
-                    await moveFileLocked(quarantinePaths.dataPath, source.resolved, { overwrite: false });
-                    await removeFileIfPresent(quarantinePaths.metadataPath);
+                    await runtime.io.moveFileLocked(quarantinePaths.dataPath, source.resolved, { overwrite: false });
+                    await removeFileIfPresent(runtime, quarantinePaths.metadataPath);
                 } catch (rollbackError) {
                     throw createQuarantineRollbackError(error, rollbackError, 'Quarantine metadata commit');
                 }
@@ -971,19 +973,19 @@ async function quarantineResolvedFile(source) {
  * @param {boolean} overwrite
  * @returns {Promise<{
  *     metadata: QuarantineMetadata;
- *     restored: Awaited<ReturnType<typeof moveFileLocked>>;
+ *     restored: Awaited<ReturnType<RepoWriteIo['moveFileLocked']>>;
  *     destinationPreviousHash: string | null;
  *     destinationPreviousBytes: number | null;
  *     cleanupPending: boolean;
  * }>}
  */
-async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
-    const quarantinePaths = resolveQuarantinePaths(quarantineId);
-    const { value } = await withIoResourceLock(
+async function restoreQuarantinedFile(/** @type {RepoWriteRuntime} */ runtime, quarantineId, destination, overwrite) {
+    const quarantinePaths = resolveQuarantinePaths(runtime, quarantineId);
+    const { value } = await runtime.io.withIoResourceLock(
         quarantinePaths.metadataPath,
         async () => {
-            const stored = await readQuarantineMetadataFile(quarantinePaths.metadataPath);
-            const metadata = stored ? await reconcileQuarantineMetadata(stored, quarantinePaths) : null;
+            const stored = await readQuarantineMetadataFile(runtime, quarantinePaths.metadataPath);
+            const metadata = stored ? await reconcileQuarantineMetadata(runtime, stored, quarantinePaths) : null;
             if (!metadata) {
                 const error = /** @type {Error & { code?: string }} */ (new Error('Quarantine metadata not found.'));
                 error.code = 'ERR_QUARANTINE_NOT_FOUND';
@@ -996,7 +998,7 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
                 error.code = 'ERR_QUARANTINE_NOT_RESTORABLE';
                 throw error;
             }
-            if (!(await fileMatchesQuarantineMetadata(quarantinePaths.dataPath, metadata))) {
+            if (!(await fileMatchesQuarantineMetadata(runtime, quarantinePaths.dataPath, metadata))) {
                 const error = /** @type {Error & { code?: string }} */ (
                     new Error('Quarantine data is missing, unsafe or does not match its manifest.')
                 );
@@ -1004,7 +1006,7 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
                 throw error;
             }
 
-            const destinationExists = await pathExists(destination.resolved);
+            const destinationExists = await pathExists(runtime, destination.resolved);
             if (destinationExists && !overwrite) {
                 const error = /** @type {Error & { code?: string }} */ (
                     new Error(`Destino ja existe: ${destination.relative}`)
@@ -1013,7 +1015,7 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
                 throw error;
             }
             const backupPath = destinationExists
-                ? path.join(QUARANTINE_DIR, `${quarantineId}.restore-backup-${randomUUID()}.data`)
+                ? path.join(runtime.quarantineDir, `${quarantineId}.restore-backup-${randomUUID()}.data`)
                 : null;
             /** @type {QuarantineMetadata} */
             const journal = {
@@ -1024,32 +1026,35 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
                 transaction: {
                     kind: 'restore',
                     destinationPath: destination.relative,
-                    backupPath: backupPath ? toWorkspaceRelativePath(backupPath) : null,
+                    backupPath: backupPath ? runtime.workspace.toRelativePath(backupPath) : null,
                     destinationExisted: destinationExists,
                 },
             };
-            await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
+            await writeQuarantineMetadata(runtime, journal, quarantinePaths.metadataPath);
 
             let backupMoved = false;
             let dataMoved = false;
-            /** @type {Awaited<ReturnType<typeof moveFileLocked>> | null} */
+            /** @type {Awaited<ReturnType<RepoWriteIo['moveFileLocked']>> | null} */
             let backupMove = null;
             try {
                 if (backupPath) {
-                    backupMove = await moveFileLocked(destination.resolved, backupPath, { overwrite: false });
+                    backupMove = await runtime.io.moveFileLocked(destination.resolved, backupPath, {
+                        overwrite: false,
+                    });
                     backupMoved = true;
                 }
-                const restored = await moveFileLocked(quarantinePaths.dataPath, destination.resolved, {
+                const restored = await runtime.io.moveFileLocked(quarantinePaths.dataPath, destination.resolved, {
                     overwrite: false,
                 });
                 dataMoved = true;
                 const committed = /** @type {QuarantineMetadata} */ ({ ...journal, status: 'restored' });
-                await writeQuarantineMetadata(committed, quarantinePaths.metadataPath);
+                await writeQuarantineMetadata(runtime, committed, quarantinePaths.metadataPath);
 
                 let cleanupPending = false;
                 try {
-                    if (backupPath) await removeRegularFileIfPresent(backupPath);
+                    if (backupPath) await removeRegularFileIfPresent(runtime, backupPath);
                     await writeQuarantineMetadata(
+                        runtime,
                         /** @type {QuarantineMetadata} */ ({ ...committed, transaction: null }),
                         quarantinePaths.metadataPath,
                     );
@@ -1069,12 +1074,14 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
             } catch (error) {
                 try {
                     if (dataMoved) {
-                        await moveFileLocked(destination.resolved, quarantinePaths.dataPath, { overwrite: false });
+                        await runtime.io.moveFileLocked(destination.resolved, quarantinePaths.dataPath, {
+                            overwrite: false,
+                        });
                     }
                     if (backupMoved && backupPath) {
-                        await moveFileLocked(backupPath, destination.resolved, { overwrite: false });
+                        await runtime.io.moveFileLocked(backupPath, destination.resolved, { overwrite: false });
                     }
-                    await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
+                    await writeQuarantineMetadata(runtime, metadata, quarantinePaths.metadataPath);
                 } catch (rollbackError) {
                     throw createQuarantineRollbackError(error, rollbackError, 'Quarantine restore');
                 }
@@ -1088,235 +1095,6 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
         },
     );
     return value;
-}
-
-/**
- * @param {Record<string, unknown>} operation
- * @param {number} index
- * @returns {Promise<Record<string, unknown>>}
- */
-async function planPatchBatchOperation(operation, index) {
-    const resolved = await resolveWritePath(String(operation['path'] ?? ''), { issueMutableCapability: true });
-    if (!resolved.ok)
-        return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
-    if (operation['replace_all'] === true && operation['occurrence_index'] !== undefined) {
-        return {
-            index,
-            success: false,
-            path: resolved.relative,
-            error: 'Use replace_all ou occurrence_index, nao ambos na mesma operacao.',
-            code: 'ERR_PATCH_CONFLICTING_MODE',
-        };
-    }
-    try {
-        const patch = await patchResolvedTarget(resolved, {
-            oldString: String(operation['old_string'] ?? ''),
-            newString: String(operation['new_string'] ?? ''),
-            replaceAll: operation['replace_all'] === true,
-            ...(optionalInteger(operation['expected_occurrences']) !== undefined
-                ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
-                : {}),
-            ...(optionalInteger(operation['occurrence_index']) !== undefined
-                ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
-                : {}),
-            ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-                ? { expectedHash: operation['expectedHash'] }
-                : {}),
-            dryRun: true,
-            allowNoop: operation['allowNoop'] === true,
-            diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
-            maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
-            computeDiff: operation['includeDiffPreview'] === true,
-            advisoryLimits: {
-                tool: 'repo_patch_batch_plan',
-                index,
-                oldStringChars: String(operation['old_string'] ?? '').length,
-                newStringChars: String(operation['new_string'] ?? '').length,
-                replaceAll: operation['replace_all'] === true,
-                occurrenceIndex: operation['occurrence_index'] ?? null,
-                expectedHash: operation['expectedHash'] ?? null,
-                dryRun: true,
-            },
-        });
-        return {
-            index,
-            success: true,
-            path: resolved.relative,
-            dryRun: true,
-            occurrences: patch.occurrences,
-            replacedOccurrences: patch.replacedOccurrences,
-            previousBytes: patch.previousBytes,
-            projectedBytes: patch.projectedBytes,
-            byteDelta: patch.byteDelta,
-            firstMatchLine: patch.firstMatchLine,
-            lastMatchLine: patch.lastMatchLine,
-            lineDelta: patch.lineDelta,
-            occurrenceIndex: patch.occurrenceIndex,
-            previousHash: patch.previousHash,
-            projectedHash: patch.contentHash,
-            noop: patch.noop,
-            ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
-                diff: patch.diffPreview,
-                truncated: patch.diffPreviewTruncated,
-                lines: patch.diffPreviewLines,
-                bytes: patch.diffPreviewBytes,
-                contextLines: patch.diffContextLines,
-            }),
-        };
-    } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-        const details = patchBatchErrorDetails(error);
-        const semantics = patchFailureSemantics(code, details, 'target');
-        return {
-            index,
-            success: false,
-            path: resolved.relative,
-            error: error instanceof Error ? error.message : String(error),
-            code,
-            ...semantics,
-            ...(Object.keys(details).length > 0 ? { details } : {}),
-            nextAction: patchBatchNextAction(code, details),
-        };
-    }
-}
-
-/**
- * @param {Record<string, unknown>} operation
- * @param {number} index
- * @returns {Promise<Record<string, unknown>>}
- */
-async function applyPatchBatchOperation(operation, index) {
-    const resolved = await resolveWritePath(String(operation['path'] ?? ''), { issueMutableCapability: true });
-    if (!resolved.ok)
-        return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
-    try {
-        const patch = await patchResolvedTarget(resolved, {
-            oldString: String(operation['old_string'] ?? ''),
-            newString: String(operation['new_string'] ?? ''),
-            replaceAll: operation['replace_all'] === true,
-            ...(optionalInteger(operation['expected_occurrences']) !== undefined
-                ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
-                : {}),
-            ...(optionalInteger(operation['occurrence_index']) !== undefined
-                ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
-                : {}),
-            ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-                ? { expectedHash: operation['expectedHash'] }
-                : {}),
-            dryRun: false,
-            captureRollback: false,
-            allowNoop: operation['allowNoop'] === true,
-            diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
-            maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
-            computeDiff: operation['includeDiffPreview'] === true,
-            ...durabilityOption(operation['durability']),
-            advisoryLimits: {
-                tool: 'repo_apply_patch_batch',
-                index,
-                oldStringChars: String(operation['old_string'] ?? '').length,
-                newStringChars: String(operation['new_string'] ?? '').length,
-                replaceAll: operation['replace_all'] === true,
-                occurrenceIndex: operation['occurrence_index'] ?? null,
-                expectedHash: operation['expectedHash'] ?? null,
-                dryRun: false,
-            },
-        });
-        clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
-        return {
-            index,
-            success: true,
-            path: resolved.relative,
-            dryRun: false,
-            occurrences: patch.occurrences,
-            replacedOccurrences: patch.replacedOccurrences,
-            previousBytes: patch.previousBytes,
-            projectedBytes: patch.projectedBytes,
-            bytesWritten: patch.bytesWritten,
-            byteDelta: patch.byteDelta,
-            firstMatchLine: patch.firstMatchLine,
-            lastMatchLine: patch.lastMatchLine,
-            lineDelta: patch.lineDelta,
-            occurrenceIndex: patch.occurrenceIndex,
-            previousHash: patch.previousHash,
-            contentHash: patch.contentHash,
-            noop: patch.noop,
-            traceId: patch.io.traceId ?? null,
-            ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
-                diff: patch.diffPreview,
-                truncated: patch.diffPreviewTruncated,
-                lines: patch.diffPreviewLines,
-                bytes: patch.diffPreviewBytes,
-                contextLines: patch.diffContextLines,
-            }),
-        };
-    } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-        const details = patchBatchErrorDetails(error);
-        const semantics = patchFailureSemantics(code, details, 'target');
-        return {
-            index,
-            success: false,
-            path: resolved.relative,
-            error: error instanceof Error ? error.message : String(error),
-            code,
-            ...semantics,
-            ...(Object.keys(details).length > 0 ? { details } : {}),
-            nextAction: patchBatchNextAction(code, details),
-        };
-    }
-}
-
-/** @param {Record<string, unknown>} operation */
-function readPatchExpectedHash(operation) {
-    return typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-        ? operation['expectedHash']
-        : null;
-}
-
-/**
- * @param {Record<string, unknown>} operation
- * @param {{ omitExpectedHash?: boolean }} [options]
- */
-function toLockedPatchBatchOperation(operation, options = {}) {
-    return {
-        oldString: String(operation['old_string'] ?? ''),
-        newString: String(operation['new_string'] ?? ''),
-        replaceAll: operation['replace_all'] === true,
-        ...(optionalInteger(operation['expected_occurrences']) !== undefined
-            ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
-            : {}),
-        ...(optionalInteger(operation['occurrence_index']) !== undefined
-            ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
-            : {}),
-        ...(!options.omitExpectedHash && readPatchExpectedHash(operation)
-            ? { expectedHash: /** @type {string} */ (readPatchExpectedHash(operation)) }
-            : {}),
-        allowNoop: operation['allowNoop'] === true,
-        diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
-        maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
-        computeDiff: operation['includeDiffPreview'] === true,
-    };
-}
-
-/**
- * Infer a target-baseline hash only when the first operation supplies a hash and every supplied hash in the group is
- * identical. Distinct hashes preserve the advanced per-operation virtual-state contract.
- *
- * @param {{ operation: Record<string, unknown>; index: number }[]} group
- */
-function buildLockedPatchBatchGroup(group) {
-    const firstHash = readPatchExpectedHash(group[0]?.operation ?? {});
-    const providedHashes = group
-        .map(({ operation }) => readPatchExpectedHash(operation))
-        .filter((value) => value !== null);
-    const baselineExpectedHash = firstHash && providedHashes.every((value) => value === firstHash) ? firstHash : null;
-    return {
-        expectedHashMode: baselineExpectedHash ? 'group-baseline' : 'per-operation',
-        ...(baselineExpectedHash ? { baselineExpectedHash } : {}),
-        operations: group.map(({ operation }) =>
-            toLockedPatchBatchOperation(operation, { omitExpectedHash: Boolean(baselineExpectedHash) }),
-        ),
-    };
 }
 
 /**
@@ -1342,209 +1120,6 @@ function compactPatchBatchSuccessRow(row) {
         noop: row['noop'] === true,
         replacedOccurrences: row['replacedOccurrences'],
         ...(typeof row['expectedHashMode'] === 'string' ? { expectedHashMode: row['expectedHashMode'] } : {}),
-    };
-}
-
-/** @param {unknown} error */
-function patchBatchErrorDetails(error) {
-    if (!error || typeof error !== 'object') return {};
-    const details = /** @type {Record<string, unknown>} */ (error)['details'];
-    return details && typeof details === 'object' && !Array.isArray(details)
-        ? /** @type {Record<string, unknown>} */ (details)
-        : {};
-}
-
-/**
- * Classify a patch failure independently from transport success. This metadata is advisory for recovery planning and
- * never weakens the mutation precondition that produced the error.
- *
- * @param {unknown} code
- * @param {Record<string, unknown>} [details]
- * @param {'operation' | 'target' | 'dependency-group'} [failureScope]
- */
-function patchFailureSemantics(code, details = {}, failureScope = 'target') {
-    const normalizedCode = typeof code === 'string' ? code : 'ERR_PATCH_UNKNOWN';
-    const convergenceCandidate = details['convergenceCandidate'] === true;
-    let failureClass = 'unknown';
-    let retryability = 'caller-refresh';
-    let mutationState = 'none';
-    let recoveryRequired = true;
-
-    if (normalizedCode === 'ERR_PATCH_NOT_FOUND') {
-        const virtualBatchState = details['currentStateKind'] === 'virtual-batch';
-        const exactContextMismatch =
-            Number(details['quoteEscapeNormalizedOccurrenceCount'] ?? 0) > 0 ||
-            Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0 ||
-            Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0;
-        failureClass = convergenceCandidate
-            ? 'already-converged-candidate'
-            : virtualBatchState
-              ? 'virtual-batch-context'
-              : exactContextMismatch
-                ? 'exact-context-mismatch'
-                : 'stale-context';
-        retryability =
-            convergenceCandidate || exactContextMismatch || virtualBatchState ? 'manual-decision' : 'caller-refresh';
-        mutationState = convergenceCandidate ? 'already-converged-candidate' : 'none';
-        recoveryRequired = !convergenceCandidate && !virtualBatchState;
-    } else if (
-        normalizedCode === 'ERR_PATCH_AMBIGUOUS_MATCH' ||
-        normalizedCode === 'ERR_PATCH_EXPECTED_OCCURRENCES' ||
-        normalizedCode === 'ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE'
-    ) {
-        failureClass = 'ambiguous-context';
-        retryability = 'manual-decision';
-    } else if (normalizedCode === 'EEXPECTEDHASH' || normalizedCode === 'ERR_PATH_DENIED') {
-        failureClass = 'integrity';
-        retryability = normalizedCode === 'EEXPECTEDHASH' ? 'caller-refresh' : 'manual-decision';
-    } else if (normalizedCode === 'ERR_PATCH_BATCH_GROUP_ABORTED') {
-        failureClass = 'dependency-abort';
-        retryability = 'non-retryable';
-        recoveryRequired = false;
-    } else if (normalizedCode === 'ERR_PATCH_NOOP') {
-        failureClass = 'already-converged';
-        retryability = 'non-retryable';
-        mutationState = 'already-converged';
-        recoveryRequired = false;
-    } else if (
-        normalizedCode === 'ERR_PATCH_CONFLICTING_MODE' ||
-        normalizedCode === 'ERR_PATCH_INVALID_OLD_STRING' ||
-        normalizedCode === 'ERR_PATCH_INVALID_NEW_STRING' ||
-        normalizedCode === 'ERR_PATCH_INVALID_OCCURRENCE_INDEX'
-    ) {
-        failureClass = 'shape-config';
-        retryability = 'non-retryable';
-    }
-
-    return {
-        failureClass,
-        failureScope,
-        retryability,
-        mutationState,
-        recoveryRequired,
-        ...(convergenceCandidate ? { convergenceCandidate: true } : {}),
-    };
-}
-
-/** @param {unknown} code @param {Record<string, unknown>} [details] */
-function patchBatchNextAction(code, details = {}) {
-    if (code === 'ERR_PATCH_AMBIGUOUS_MATCH') {
-        const lines = Array.isArray(details['occurrenceLines']) ? details['occurrenceLines'] : [];
-        return lines.length > 0
-            ? `Retry with occurrence_index=1..${String(lines.length)} using occurrenceLines=${JSON.stringify(lines)}, or send a more specific old_string.`
-            : 'Retry with occurrence_index or send a more specific old_string.';
-    }
-    if (code === 'ERR_PATCH_EXPECTED_OCCURRENCES') {
-        return 'Adjust expected_occurrences from the returned occurrence evidence, or refine old_string.';
-    }
-    if (code === 'ERR_PATCH_NOOP') {
-        return 'This operation is already a no-op. Remove it from the batch, change new_string, or use allowNoop=true when an intentional idempotent no-op is part of the plan.';
-    }
-    if (code === 'EEXPECTEDHASH')
-        return 'Refresh only this target hash and retry; other independent targets need not be repeated.';
-    if (code === 'ERR_PATH_DENIED')
-        return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
-    if (code === 'ERR_PATCH_NOT_FOUND') {
-        if (details['currentStateKind'] === 'virtual-batch') {
-            return 'The anchor is missing from the in-memory virtual state produced by earlier same-file batch operations. diskBaselineHash/diskBaselineBytes identify the unchanged locked file baseline; refine batch ordering/anchors instead of assuming external modification or rereading solely for staleness.';
-        }
-        if (details['convergenceCandidate'] === true) {
-            return 'Do not repeat the unchanged patch: new_string is already present exactly once. Treat this as a convergence candidate, or review intent using currentHash without rereading solely for diagnosis.';
-        }
-        if (Number(details['quoteEscapeNormalizedOccurrenceCount'] ?? 0) > 0) {
-            return 'old_string matches after removing literal quote escapes (for example \\" -> "). This is an exact-anchor encoding mismatch, not evidence of concurrent file modification. Retry with the exact source quotes using currentHash.';
-        }
-        if (Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0) {
-            return `old_string matches after line-ending normalization; retry with newlineStyle=${String(details['newlineStyle'] ?? 'current')} using the returned currentHash. This is an exact-context mismatch, not by itself evidence of concurrent modification.`;
-        }
-        if (Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0) {
-            return 'old_string matches after bounded whitespace normalization. This is an exact-context mismatch; use candidateLines/currentHash to refine the anchor without assuming concurrent modification.';
-        }
-        const candidateLines = Array.isArray(details['candidateLines']) ? details['candidateLines'] : [];
-        if (candidateLines.length > 0) {
-            return `Exact old_string is stale, but related fragments exist near candidateLines=${JSON.stringify(candidateLines)}. Inspect only that bounded region if needed, then retry this target; independent targets need not be repeated.`;
-        }
-        return 'Refresh only this target or refine old_string; other independent targets need not be repeated.';
-    }
-    return 'Retry only the failed target after inspecting its causal error.';
-}
-
-/** @param {Record<string, unknown>[]} rows */
-function compactPatchBatchFailureRows(rows) {
-    /** @type {Map<string, Record<string, unknown>[]>} */
-    const groups = new Map();
-    for (const row of rows) {
-        const key = typeof row['path'] === 'string' ? row['path'] : `#${String(row['index'] ?? groups.size)}`;
-        const group = groups.get(key) ?? [];
-        group.push(row);
-        groups.set(key, group);
-    }
-    return [...groups.values()].map((group) => {
-        const ordered = [...group].sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
-        const causal =
-            ordered.find((row) => row['causalFailure'] === true) ??
-            ordered.find((row) => row['code'] !== 'ERR_PATCH_BATCH_GROUP_ABORTED') ??
-            ordered[0] ??
-            {};
-        const details =
-            causal['details'] && typeof causal['details'] === 'object' && !Array.isArray(causal['details'])
-                ? /** @type {Record<string, unknown>} */ (causal['details'])
-                : {};
-        return {
-            index: causal['index'],
-            success: false,
-            path: causal['path'] ?? null,
-            code: causal['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
-            error: causal['error'] ?? causal['reason'] ?? 'Patch target failed.',
-            failureClass: causal['failureClass'] ?? 'unknown',
-            failureScope: causal['failureScope'] ?? 'target',
-            retryability: causal['retryability'] ?? 'caller-refresh',
-            mutationState: causal['mutationState'] ?? 'none',
-            recoveryRequired: causal['recoveryRequired'] !== false,
-            ...(causal['convergenceCandidate'] === true ? { convergenceCandidate: true } : {}),
-            affectedOperationIndices: ordered.map((row) => Number(row['index'] ?? 0)),
-            affectedOperationCount: ordered.length,
-            abortedOperationCount: ordered.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
-            ...(Object.keys(details).length > 0 ? { details } : {}),
-            nextAction:
-                typeof causal['nextAction'] === 'string'
-                    ? causal['nextAction']
-                    : patchBatchNextAction(causal['code'], details),
-        };
-    });
-}
-
-/** @param {Record<string, unknown>[]} rows */
-function summarizePatchBatchFailures(rows) {
-    const reported = compactPatchBatchFailureRows(rows);
-    /** @type {Record<string, number>} */
-    const causalByCode = {};
-    /** @type {Record<string, number>} */
-    const failureClassCounts = {};
-    /** @type {Record<string, number>} */
-    const retryabilityCounts = {};
-    let recoveryRequiredTargetCount = 0;
-    let convergenceCandidateCount = 0;
-    for (const row of reported) {
-        const code = String(row['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION');
-        causalByCode[code] = (causalByCode[code] ?? 0) + 1;
-        const failureClass = String(row['failureClass'] ?? 'unknown');
-        failureClassCounts[failureClass] = (failureClassCounts[failureClass] ?? 0) + 1;
-        const retryability = String(row['retryability'] ?? 'caller-refresh');
-        retryabilityCounts[retryability] = (retryabilityCounts[retryability] ?? 0) + 1;
-        if (row['recoveryRequired'] !== false) recoveryRequiredTargetCount += 1;
-        if (row['convergenceCandidate'] === true) convergenceCandidateCount += 1;
-    }
-    return {
-        failedOperationCount: rows.length,
-        failedTargetCount: reported.length,
-        causalFailureCount: reported.length,
-        abortedOperationCount: rows.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
-        causalByCode,
-        failureClassCounts,
-        retryabilityCounts,
-        recoveryRequiredTargetCount,
-        convergenceCandidateCount,
     };
 }
 
@@ -1589,182 +1164,6 @@ function summarizePatchBatchTargets(rows, dryRun) {
     });
 }
 
-/**
- * Run patch-batch planning/application while collapsing repeated same-file operations into one lock/read/write cycle.
- * Same-file operations are sequential and atomic; distinct files preserve the existing partial-batch behavior.
- *
- * @param {Record<string, unknown>[]} operations
- * @param {boolean} dryRun
- * @returns {Promise<Record<string, unknown>[]>}
- */
-async function runPatchBatchOperations(operations, dryRun) {
-    /** @type {Map<string, { operation: Record<string, unknown>; index: number }[]>} */
-    const groups = new Map();
-    for (const [index, operation] of operations.entries()) {
-        const key = String(operation['path'] ?? '');
-        const group = groups.get(key) ?? [];
-        group.push({ operation, index });
-        groups.set(key, group);
-    }
-
-    /** @type {Record<string, unknown>[]} */
-    const results = [];
-    for (const group of groups.values()) {
-        if (group.length === 1) {
-            const entry = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-            results.push(
-                dryRun
-                    ? await planPatchBatchOperation(entry.operation, entry.index)
-                    : await applyPatchBatchOperation(entry.operation, entry.index),
-            );
-            if (results.at(-1)?.['success'] !== true && !dryRun) break;
-            continue;
-        }
-
-        const first = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''), {
-            issueMutableCapability: true,
-        });
-        if (!resolved.ok) {
-            for (const entry of group) {
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: entry.operation['path'] ?? null,
-                    error: resolved.reason,
-                    code: resolved.code,
-                });
-            }
-            if (!dryRun) break;
-            continue;
-        }
-        const conflicting = group.find(
-            ({ operation }) => operation['replace_all'] === true && operation['occurrence_index'] !== undefined,
-        );
-        if (conflicting) {
-            for (const entry of group) {
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: resolved.relative,
-                    error: 'Same-file patch group aborted because one operation mixes replace_all and occurrence_index.',
-                    code:
-                        entry.index === conflicting.index
-                            ? 'ERR_PATCH_CONFLICTING_MODE'
-                            : 'ERR_PATCH_BATCH_GROUP_ABORTED',
-                    groupedSameFile: true,
-                });
-            }
-            if (!dryRun) break;
-            continue;
-        }
-
-        const lockedGroup = buildLockedPatchBatchGroup(group);
-        try {
-            const patch = await patchResolvedTargetBatch(resolved, {
-                operations: lockedGroup.operations,
-                ...(lockedGroup.baselineExpectedHash ? { baselineExpectedHash: lockedGroup.baselineExpectedHash } : {}),
-                dryRun,
-                captureRollback: false,
-                ...durabilityOption(first.operation['durability']),
-                advisoryLimits: {
-                    tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
-                    groupedSameFile: true,
-                    operationCount: group.length,
-                },
-            });
-            if (!dryRun) clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
-            for (const [groupIndex, entry] of group.entries()) {
-                const operationResult = /** @type {Record<string, unknown>} */ (patch.operations[groupIndex] ?? {});
-                const includeDiffPreview = entry.operation['includeDiffPreview'] === true;
-                results.push({
-                    index: entry.index,
-                    success: true,
-                    path: resolved.relative,
-                    dryRun,
-                    occurrences: operationResult['occurrences'],
-                    replacedOccurrences: operationResult['replacedOccurrences'],
-                    previousBytes: operationResult['previousBytes'],
-                    projectedBytes: operationResult['projectedBytes'],
-                    ...(dryRun
-                        ? { projectedHash: operationResult['contentHash'] }
-                        : {
-                              bytesWritten: groupIndex === group.length - 1 ? patch.bytesWritten : 0,
-                              batchBytesWritten: patch.bytesWritten,
-                              contentHash: operationResult['contentHash'],
-                              traceId: patch.io.traceId ?? null,
-                          }),
-                    byteDelta: operationResult['byteDelta'],
-                    firstMatchLine: operationResult['firstMatchLine'],
-                    lastMatchLine: operationResult['lastMatchLine'],
-                    lineDelta: operationResult['lineDelta'],
-                    occurrenceIndex: operationResult['occurrenceIndex'],
-                    previousHash: operationResult['previousHash'],
-                    noop: operationResult['noop'],
-                    groupedSameFile: true,
-                    expectedHashMode: lockedGroup.expectedHashMode,
-                    ...maybeDiffPreview(includeDiffPreview, {
-                        diff: String(operationResult['diffPreview'] ?? ''),
-                        truncated: operationResult['diffPreviewTruncated'] === true,
-                        lines: Number(operationResult['diffPreviewLines'] ?? 0),
-                        bytes: Number(operationResult['diffPreviewBytes'] ?? 0),
-                        contextLines: Number(operationResult['diffContextLines'] ?? 3),
-                    }),
-                });
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const errorRecord = /** @type {Record<string, unknown>} */ (
-                error && typeof error === 'object' ? error : {}
-            );
-            const originalCode = typeof errorRecord['code'] === 'string' ? errorRecord['code'] : undefined;
-            const failedGroupOperationIndex = Number.isInteger(errorRecord['operationIndex'])
-                ? Number(errorRecord['operationIndex'])
-                : null;
-            const failedEntry =
-                failedGroupOperationIndex !== null && failedGroupOperationIndex >= 0
-                    ? group[failedGroupOperationIndex]
-                    : undefined;
-            const failedOperationIndex = failedEntry?.index ?? null;
-            const completedOperationCount = Number.isInteger(errorRecord['completedOperationCount'])
-                ? Number(errorRecord['completedOperationCount'])
-                : null;
-            const failurePhase = typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
-            const details = patchBatchErrorDetails(error);
-            for (const [groupIndex, entry] of group.entries()) {
-                const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
-                const rowCode = causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED';
-                const semantics = patchFailureSemantics(
-                    rowCode,
-                    causal ? details : {},
-                    group.length > 1 ? 'dependency-group' : 'target',
-                );
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: resolved.relative,
-                    error: causal ? message : 'Same-file patch group aborted because another operation failed.',
-                    code: rowCode,
-                    ...semantics,
-                    ...(causal || originalCode === undefined ? {} : { originalCode }),
-                    groupedSameFile: true,
-                    groupAborted: true,
-                    expectedHashMode: lockedGroup.expectedHashMode,
-                    failedOperationIndex,
-                    failedGroupOperationIndex,
-                    completedOperationCount,
-                    failurePhase,
-                    causalFailure: causal,
-                    ...(causal && Object.keys(details).length > 0 ? { details } : {}),
-                    ...(causal ? { nextAction: patchBatchNextAction(originalCode, details) } : {}),
-                });
-            }
-            if (!dryRun) break;
-        }
-    }
-    return results.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
-}
-
 /** @param {Record<string, unknown>[]} operations */
 function inspectPatchBatchEnvelope(operations) {
     /** @type {number} */
@@ -1788,106 +1187,23 @@ function inspectPatchBatchEnvelope(operations) {
 }
 
 /**
- * Execute independent patch targets through the shared bulk scheduler. Same-path operations continue to use
- * runPatchBatchOperations, which collapses them into one patchTextBatchLocked lock/read/write cycle.
- *
- * @param {Record<string, unknown>[]} operations
- * @param {boolean} dryRun
- * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number }} [options]
- */
-async function runPatchBatchTargetGroups(operations, dryRun, options = {}) {
-    /** @type {{ path: string; entries: { operation: Record<string, unknown>; index: number }[] }[]} */
-    const groups = [];
-    /** @type {Map<string, (typeof groups)[number]>} */
-    const byPath = new Map();
-    for (const [index, operation] of operations.entries()) {
-        const pathKey = String(operation['path'] ?? '');
-        let group = byPath.get(pathKey);
-        if (!group) {
-            group = { path: pathKey, entries: [] };
-            byPath.set(pathKey, group);
-            groups.push(group);
-        }
-        group.entries.push({ operation, index });
-    }
-
-    const execution = await runBoundedOperationBatch(
-        groups,
-        async (group) => {
-            const local = await runPatchBatchOperations(
-                group.entries.map((entry) => entry.operation),
-                dryRun,
-            );
-            const rows = local.map((row) => {
-                const localIndex = Number(row['index'] ?? 0);
-                const originalIndex = group.entries[localIndex]?.index ?? localIndex;
-                return /** @type {Record<string, unknown>} */ ({ ...row, index: originalIndex });
-            });
-            return { path: group.path, success: rows.every((row) => row['success'] === true), rows };
-        },
-        {
-            concurrency: options.concurrency ?? 1,
-            failureMode: options.failureMode ?? 'best-effort',
-            maxItems: MAX_PATCH_BATCH_TARGETS,
-            isFailure: (group) => group.success !== true,
-        },
-    );
-
-    /** @type {Record<string, unknown>[]} */
-    const rows = [];
-    for (const executionRow of execution.results) {
-        const group = groups[executionRow.index];
-        if (!group) continue;
-        if (executionRow.status === 'skipped') {
-            for (const entry of group.entries) {
-                rows.push({
-                    index: entry.index,
-                    success: false,
-                    skipped: true,
-                    path: entry.operation['path'] ?? null,
-                    code: 'ERR_PATCH_BATCH_SKIPPED',
-                    reason: executionRow.reason,
-                });
-            }
-            continue;
-        }
-        if (executionRow.status === 'succeeded') {
-            rows.push(...executionRow.value.rows);
-            continue;
-        }
-        if ('value' in executionRow && executionRow.value) {
-            rows.push(...executionRow.value.rows);
-            continue;
-        }
-        for (const entry of group.entries) {
-            rows.push({
-                index: entry.index,
-                success: false,
-                path: entry.operation['path'] ?? null,
-                code: executionRow.code ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
-                error: executionRow.error ?? 'Patch target execution failed.',
-            });
-        }
-    }
-    return {
-        operations: rows.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0)),
-        execution,
-    };
-}
-
-/**
  * @param {unknown} operation
  * @param {number} index
  * @param {{ virtualFiles: Map<string, { relative: string; bytes: number }> }} [context]
  * @returns {Promise<Record<string, unknown>>}
  */
-async function previewBatchFileOperation(operation, index, context = { virtualFiles: new Map() }) {
+async function previewBatchFileOperation(
+    /** @type {RepoWriteRuntime} */ runtime,
+    operation,
+    index,
+    context = { virtualFiles: new Map() },
+) {
     const item = /** @type {Record<string, unknown>} */ (operation);
     const type = String(item['type'] ?? '');
     if (type === 'create_file') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const exists = await pathExists(resolved.resolved);
+        const exists = await pathExists(runtime, resolved.resolved);
         const bytes = Buffer.byteLength(String(item['content'] ?? ''), 'utf8');
         if (!exists) context.virtualFiles.set(resolved.resolved, { relative: resolved.relative, bytes });
         return {
@@ -1902,13 +1218,13 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
     if (type === 'move_file') {
         // A move mutates the source as well as the destination. Preflight must therefore use write policy on both sides,
         // matching the actual move facade instead of producing a read-only false green for the source.
-        const source = await resolveWritePath(String(item['source'] ?? ''));
+        const source = await runtime.workspace.resolveWritePath(String(item['source'] ?? ''));
         if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
-        const destination = await resolveWritePath(String(item['destination'] ?? ''));
+        const destination = await runtime.workspace.resolveWritePath(String(item['destination'] ?? ''));
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
         const virtualSource = context.virtualFiles.get(source.resolved);
-        const stats = virtualSource ? null : await repoWriteStat(source.resolved);
-        const destinationExists = await pathExists(destination.resolved);
+        const stats = virtualSource ? null : await repoWriteStat(runtime, source.resolved);
+        const destinationExists = await pathExists(runtime, destination.resolved);
         const virtualDestinationExists = context.virtualFiles.has(destination.resolved);
         if ((destinationExists || virtualDestinationExists) && item['overwrite'] !== true) {
             throw new Error(`operation ${index}: destination already exists: ${destination.relative}`);
@@ -1935,9 +1251,9 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
         };
     }
     if (type === 'set_executable') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await repoWriteStat(resolved.resolved);
+        const stats = await repoWriteStat(runtime, resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         const currentMode = stats.mode & 0o777;
         const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
@@ -1953,9 +1269,9 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
         };
     }
     if (type === 'quarantine_file' || type === 'remove_file') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await repoWriteStat(resolved.resolved);
+        const stats = await repoWriteStat(runtime, resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         return {
             index,
@@ -1981,14 +1297,14 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
  *     durationMs: number;
  * }>}
  */
-async function runFileBatchPreflight(operations) {
+async function runFileBatchPreflight(/** @type {RepoWriteRuntime} */ runtime, operations) {
     const startedAt = performance.now();
     /** @type {Record<string, unknown>[]} */
     const previews = [];
     const previewContext = { virtualFiles: new Map() };
     for (const [index, operation] of operations.entries()) {
         try {
-            previews.push(await previewBatchFileOperation(operation, index, previewContext));
+            previews.push(await previewBatchFileOperation(runtime, operation, index, previewContext));
         } catch (error) {
             return {
                 success: false,
@@ -2013,14 +1329,16 @@ async function runFileBatchPreflight(operations) {
  * @param {number} index
  * @returns {Promise<Record<string, unknown>>}
  */
-async function applyBatchFileOperation(operation, index) {
+async function applyBatchFileOperation(/** @type {RepoWriteRuntime} */ runtime, operation, index) {
     const item = /** @type {Record<string, unknown>} */ (operation);
     const type = String(item['type'] ?? '');
     if (type === 'create_file') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''), { issueMutableCapability: true });
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''), {
+            issueMutableCapability: true,
+        });
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
         const content = String(item['content'] ?? '');
-        const write = await createResolvedTarget(resolved, content, {
+        const write = await createResolvedTarget(runtime, resolved, content, {
             encoding: 'utf8',
             createParentDirs: item['createParentDirs'] !== false,
             failIfExists: true,
@@ -2038,14 +1356,18 @@ async function applyBatchFileOperation(operation, index) {
         };
     }
     if (type === 'move_file') {
-        const source = await resolveWritePath(String(item['source'] ?? ''), { issueMutableCapability: true });
+        const source = await runtime.workspace.resolveWritePath(String(item['source'] ?? ''), {
+            issueMutableCapability: true,
+        });
         if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
-        const destination = await resolveWritePath(String(item['destination'] ?? ''), { issueMutableCapability: true });
+        const destination = await runtime.workspace.resolveWritePath(String(item['destination'] ?? ''), {
+            issueMutableCapability: true,
+        });
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
         if (item['overwrite'] === true && item['confirmOverwrite'] !== true) {
             throw new Error(`operation ${index}: confirmOverwrite must be true when overwrite=true`);
         }
-        const moved = await moveResolvedTargets(source, destination, {
+        const moved = await moveResolvedTargets(runtime, source, destination, {
             overwrite: item['overwrite'] === true,
         });
         return {
@@ -2060,18 +1382,20 @@ async function applyBatchFileOperation(operation, index) {
         };
     }
     if (type === 'set_executable') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''), { issueMutableCapability: true });
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''), {
+            issueMutableCapability: true,
+        });
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await repoWriteStat(resolved.resolved);
+        const stats = await repoWriteStat(runtime, resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         const currentMode = stats.mode & 0o777;
         const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
         const changed = resolved.validatedWritePath
-            ? await chmodFileLockedValidated(resolved.validatedWritePath, targetMode, {
+            ? await runtime.io.chmodFileLockedValidated(resolved.validatedWritePath, targetMode, {
                   riskClass: 'medium',
                   advisoryLimits: { tool: 'repo_apply_file_batch', operation: type },
               })
-            : await chmodFileLocked(resolved.resolved, targetMode, {
+            : await runtime.io.chmodFileLocked(resolved.resolved, targetMode, {
                   riskClass: 'medium',
                   advisoryLimits: { tool: 'repo_apply_file_batch', operation: type },
               });
@@ -2089,20 +1413,20 @@ async function applyBatchFileOperation(operation, index) {
         };
     }
     if (type === 'quarantine_file') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await repoWriteStat(resolved.resolved);
+        const stats = await repoWriteStat(runtime, resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
-        const { metadata, moved } = await quarantineResolvedFile(resolved);
+        const { metadata, moved } = await quarantineResolvedFile(runtime, resolved);
         return { index, type, path: resolved.relative, ...metadata, traceId: moved.io.traceId ?? null };
     }
     if (type === 'remove_file') {
         if (item['confirm'] !== true) throw new Error(`operation ${index}: confirm must be true for remove_file`);
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await runtime.workspace.resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await repoWriteStat(resolved.resolved);
+        const stats = await repoWriteStat(runtime, resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
-        const removed = await deleteFileLocked(resolved.resolved);
+        const removed = await runtime.io.deleteFileLocked(resolved.resolved);
         return {
             index,
             type,
@@ -2122,7 +1446,7 @@ async function applyBatchFileOperation(operation, index) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
  */
 export const repoWriteTools = [
     {
@@ -2149,7 +1473,8 @@ export const repoWriteTools = [
                 ),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ operations, targetConcurrency }) => {
+        handler: async ({ operations, targetConcurrency }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
             const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
             const envelope = inspectPatchBatchEnvelope(normalizedOperations);
             if (!envelope.ok) {
@@ -2165,12 +1490,13 @@ export const repoWriteTools = [
                     },
                 });
             }
-            const run = await runPatchBatchTargetGroups(normalizedOperations, true, {
+            const run = await runRepositoryPatchTargetGroups(runtime.workspace, normalizedOperations, true, {
                 failureMode: 'best-effort',
                 concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
             });
             const planned = run.operations;
             const failed = planned.filter((operation) => operation['success'] !== true);
+            const failureSummary = summarizeRepositoryPatchFailures(failed);
             await appendMcpAuditEvent({
                 event: 'repo_patch_batch_plan',
                 tool: 'repo_patch_batch_plan',
@@ -2217,7 +1543,8 @@ export const repoWriteTools = [
             });
             return withResultExecutionHint(result, {
                 logicalOperations: normalizedOperations.length,
-                failedOperations: failed.length,
+                failedOperations: failureSummary.causalFailureCount,
+                skippedOperations: failureSummary.abortedOperationCount,
                 mode: 'patch-plan:best-effort',
             });
         },
@@ -2288,19 +1615,23 @@ export const repoWriteTools = [
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({
-            operations,
-            dryRun,
-            confirmBatch,
-            applyMode,
-            failureMode,
-            targetConcurrency,
-            resultMode,
-            includePreflightDetails,
-            postValidate,
-            postValidateOnPartial,
-            durability,
-        }) => {
+        handler: async (
+            {
+                operations,
+                dryRun,
+                confirmBatch,
+                applyMode,
+                failureMode,
+                targetConcurrency,
+                resultMode,
+                includePreflightDetails,
+                postValidate,
+                postValidateOnPartial,
+                durability,
+            },
+            operationContext,
+        ) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
             let postValidationRequests;
             try {
@@ -2345,14 +1676,19 @@ export const repoWriteTools = [
                 targetConcurrency ?? (effectiveApplyMode === 'per-target-fast' ? DEFAULT_PATCH_FAST_CONCURRENCY : 1);
 
             if (isDryRun) {
-                const dryRunResult = await runPatchBatchTargetGroups(normalizedOperations, true, {
-                    failureMode: 'best-effort',
-                    concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
-                });
+                const dryRunResult = await runRepositoryPatchTargetGroups(
+                    runtime.workspace,
+                    normalizedOperations,
+                    true,
+                    {
+                        failureMode: 'best-effort',
+                        concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
+                    },
+                );
                 const failed = dryRunResult.operations.filter((operation) => operation['success'] !== true);
-                const failureSummary = summarizePatchBatchFailures(failed);
+                const failureSummary = summarizeRepositoryPatchFailures(failed);
                 const outputFailures =
-                    resultSurface.resultMode === 'detailed' ? failed : compactPatchBatchFailureRows(failed);
+                    resultSurface.resultMode === 'detailed' ? failed : compactRepositoryPatchFailureRows(failed);
                 const outputOperations =
                     resultSurface.resultMode === 'detailed'
                         ? dryRunResult.operations
@@ -2402,8 +1738,8 @@ export const repoWriteTools = [
                 });
                 return withResultExecutionHint(result, {
                     logicalOperations: normalizedOperations.length,
-                    failedOperations: failed.length,
-                    skippedOperations: dryRunResult.execution.skippedCount,
+                    failedOperations: failureSummary.causalFailureCount,
+                    skippedOperations: dryRunResult.execution.skippedCount + failureSummary.abortedOperationCount,
                     mode: 'patch-dry-run:best-effort',
                 });
             }
@@ -2427,17 +1763,17 @@ export const repoWriteTools = [
                   : null;
             let preflight = null;
             if (effectiveApplyMode === 'global-preflight' && !singleTargetAtomicPreflightElision) {
-                preflight = await runPatchBatchTargetGroups(normalizedOperations, true, {
+                preflight = await runRepositoryPatchTargetGroups(runtime.workspace, normalizedOperations, true, {
                     failureMode: 'best-effort',
                     concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
                 });
                 const failedPreflight = preflight.operations.filter((operation) => operation['success'] !== true);
                 if (failedPreflight.length > 0) {
-                    const failureSummary = summarizePatchBatchFailures(failedPreflight);
+                    const failureSummary = summarizeRepositoryPatchFailures(failedPreflight);
                     const outputFailures =
                         resultSurface.resultMode === 'detailed'
                             ? failedPreflight
-                            : compactPatchBatchFailureRows(failedPreflight);
+                            : compactRepositoryPatchFailureRows(failedPreflight);
                     const structured = {
                         success: false,
                         dryRun: false,
@@ -2488,13 +1824,14 @@ export const repoWriteTools = [
                     });
                     return withResultExecutionHint(result, {
                         logicalOperations: normalizedOperations.length,
-                        failedOperations: failedPreflight.length,
+                        failedOperations: failureSummary.causalFailureCount,
+                        skippedOperations: failureSummary.abortedOperationCount,
                         mode: 'patch-apply:global-preflight-blocked',
                     });
                 }
             }
 
-            const applyRun = await runPatchBatchTargetGroups(normalizedOperations, false, {
+            const applyRun = await runRepositoryPatchTargetGroups(runtime.workspace, normalizedOperations, false, {
                 failureMode: effectiveFailureMode,
                 concurrency: effectiveConcurrency,
             });
@@ -2505,9 +1842,9 @@ export const repoWriteTools = [
                 (operation) => operation['success'] !== true && operation['skipped'] !== true,
             );
             const partial = succeeded.length > 0 && (failedApply.length > 0 || skipped.length > 0);
-            const failureSummary = summarizePatchBatchFailures(failedApply);
+            const failureSummary = summarizeRepositoryPatchFailures(failedApply);
             const outputFailures =
-                resultSurface.resultMode === 'detailed' ? failedApply : compactPatchBatchFailureRows(failedApply);
+                resultSurface.resultMode === 'detailed' ? failedApply : compactRepositoryPatchFailureRows(failedApply);
             const targetSummaries = summarizePatchBatchTargets(succeeded, false);
             const outputApplied =
                 resultSurface.resultMode === 'detailed'
@@ -2556,7 +1893,7 @@ export const repoWriteTools = [
                         skippedReason: 'partial-patch-apply',
                     };
                 } else {
-                    postValidation = await runPostPatchValidations(postValidationRequests);
+                    postValidation = await runPostPatchValidations(postValidationRequests, runtime.workspace);
                 }
                 await appendMcpAuditEvent({
                     event: 'repo_apply_patch_batch_post_validation',
@@ -2634,8 +1971,12 @@ export const repoWriteTools = [
             return withResultExecutionHint(result, {
                 logicalOperations:
                     normalizedOperations.length + (postValidation.ran ? postValidation.requestedCount : 0),
-                failedOperations: failedApply.length + (postValidation.ran ? postValidation.failedCount : 0),
-                skippedOperations: skipped.length + (postValidation.skipped ? postValidation.requestedCount : 0),
+                failedOperations:
+                    failureSummary.causalFailureCount + (postValidation.ran ? postValidation.failedCount : 0),
+                skippedOperations:
+                    skipped.length +
+                    failureSummary.abortedOperationCount +
+                    (postValidation.skipped ? postValidation.requestedCount : 0),
                 mode: `patch-apply:${effectiveApplyMode}:${effectiveFailureMode}${postValidation.ran ? ':post-validated' : ''}`,
             });
         },
@@ -2653,8 +1994,9 @@ export const repoWriteTools = [
                 ['describe']('Ordered file operations to validate and preview.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ operations }) => {
-            const preflight = await runFileBatchPreflight(operations);
+        handler: async ({ operations }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const preflight = await runFileBatchPreflight(runtime, operations);
             if (!preflight.success) {
                 return errorResult(preflight.error ?? 'File-batch preflight failed.', {
                     code: 'ERR_BATCH_FILE_PLAN_FAILED',
@@ -2723,7 +2065,8 @@ export const repoWriteTools = [
                 ['describe']('Include full successful preflight rows in a real apply response. Default: false.'),
         },
         annotations: destructiveAnnotations(),
-        handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }) => {
+        handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
             const startedAt = performance.now();
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
             const applyModeDecision = resolveFileBatchApplyMode(
@@ -2741,7 +2084,7 @@ export const repoWriteTools = [
 
             let preflight = null;
             if (isDryRun || effectiveApplyMode === 'global-preflight') {
-                preflight = await runFileBatchPreflight(operations);
+                preflight = await runFileBatchPreflight(runtime, operations);
                 if (!preflight.success) {
                     const skippedCount = Math.max(0, operations.length - preflight.previews.length - 1);
                     const result = errorResult(preflight.error ?? 'File-batch preflight failed.', {
@@ -2814,7 +2157,7 @@ export const repoWriteTools = [
             try {
                 for (const [index, operation] of operations.entries()) {
                     failureIndex = index;
-                    applied.push(await applyBatchFileOperation(operation, index));
+                    applied.push(await applyBatchFileOperation(runtime, operation, index));
                 }
             } catch (error) {
                 const skippedCount = Math.max(0, operations.length - applied.length - 1);
@@ -2904,21 +2247,18 @@ export const repoWriteTools = [
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({
-            path,
-            content,
-            expectedHash,
-            dryRun,
-            diffContextLines,
-            maxDiffLines,
-            includeDiffPreview,
-            durability,
-        }) => {
-            const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
+        handler: async (
+            { path, content, expectedHash, dryRun, diffContextLines, maxDiffLines, includeDiffPreview, durability },
+            operationContext,
+        ) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const resolved = await runtime.workspace.resolveWritePath(path, {
+                issueMutableCapability: dryRun !== true,
+            });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
             try {
-                const previous = await readText(resolved.resolved);
+                const previous = await runtime.io.readText(resolved.resolved);
                 const diff = buildInlineDiffPreview(previous.content, content, {
                     contextLines: optionalInteger(diffContextLines) ?? DEFAULT_DIFF_CONTEXT_LINES,
                     maxLines: optionalInteger(maxDiffLines) ?? DEFAULT_MAX_DIFF_LINES,
@@ -2943,7 +2283,7 @@ export const repoWriteTools = [
                     );
                 }
 
-                const write = await writeResolvedTarget(resolved, content, {
+                const write = await writeResolvedTarget(runtime, resolved, content, {
                     requireExists: true,
                     ...(typeof expectedHash === 'string' && expectedHash ? { expectedHash } : {}),
                     ...(durability ? { durability } : {}),
@@ -3011,8 +2351,14 @@ export const repoWriteTools = [
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview, durability }) => {
-            const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
+        handler: async (
+            { path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview, durability },
+            operationContext,
+        ) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const resolved = await runtime.workspace.resolveWritePath(path, {
+                issueMutableCapability: dryRun !== true,
+            });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
             const diff = buildInlineDiffPreview('', initialContent, {
@@ -3041,7 +2387,7 @@ export const repoWriteTools = [
                     );
                 }
 
-                const write = await createResolvedTarget(resolved, initialContent, {
+                const write = await createResolvedTarget(runtime, resolved, initialContent, {
                     encoding: 'utf8',
                     createParentDirs: createParentDirs !== false,
                     failIfExists: true,
@@ -3126,22 +2472,26 @@ export const repoWriteTools = [
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({
-            path,
-            old_string,
-            new_string,
-            replace_all,
-            expected_occurrences,
-            occurrence_index,
-            expectedHash,
-            dryRun,
-            allowNoop,
-            diffContextLines,
-            maxDiffLines,
-            includeDiffPreview,
-            durability,
-        }) => {
-            const resolved = await resolveWritePath(path, { issueMutableCapability: true });
+        handler: async (
+            {
+                path,
+                old_string,
+                new_string,
+                replace_all,
+                expected_occurrences,
+                occurrence_index,
+                expectedHash,
+                dryRun,
+                allowNoop,
+                diffContextLines,
+                maxDiffLines,
+                includeDiffPreview,
+                durability,
+            },
+            operationContext,
+        ) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const resolved = await runtime.workspace.resolveWritePath(path, { issueMutableCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (replace_all === true && occurrence_index !== undefined) {
                 return errorResult('Use replace_all ou occurrence_index, nao ambos na mesma chamada.', {
@@ -3150,7 +2500,7 @@ export const repoWriteTools = [
             }
 
             try {
-                const patch = await patchResolvedTarget(resolved, {
+                const patch = await patchResolvedTarget(runtime, resolved, {
                     oldString: old_string,
                     newString: new_string,
                     replaceAll: replace_all === true,
@@ -3167,6 +2517,7 @@ export const repoWriteTools = [
                     diffContextLines: optionalInteger(diffContextLines) ?? 3,
                     maxDiffLines: optionalInteger(maxDiffLines) ?? 160,
                     computeDiff: includeDiffPreview === true,
+                    ...createRepositoryPatchResultValidationOption(resolved.relative),
                     ...(durability ? { durability } : {}),
                     advisoryLimits: {
                         tool: 'repo_apply_patch',
@@ -3235,8 +2586,8 @@ export const repoWriteTools = [
                 });
             } catch (error) {
                 const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-                const details = patchBatchErrorDetails(error);
-                const semantics = patchFailureSemantics(code, details, 'target');
+                const details = readRepositoryPatchErrorDetails(error);
+                const semantics = classifyRepositoryPatchFailure(code, details, 'target');
                 await appendMcpAuditEvent({
                     event: 'repo_apply_patch_failed',
                     tool: 'repo_apply_patch',
@@ -3253,7 +2604,7 @@ export const repoWriteTools = [
                     code,
                     ...semantics,
                     ...(Object.keys(details).length > 0 ? { details } : {}),
-                    nextAction: patchBatchNextAction(code, details),
+                    nextAction: buildRepositoryPatchNextAction(code, details),
                 });
             }
         },
@@ -3274,11 +2625,12 @@ export const repoWriteTools = [
             dryRun: z.boolean().optional()['describe']('Validate without moving. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }) => {
+        handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
             const issueMutableCapability = dryRun !== true;
-            const src = await resolveWritePath(source, { issueMutableCapability });
+            const src = await runtime.workspace.resolveWritePath(source, { issueMutableCapability });
             if (!src.ok) return errorResult(src.reason, { ...src, field: 'source' });
-            const dst = await resolveWritePath(destination, { issueMutableCapability });
+            const dst = await runtime.workspace.resolveWritePath(destination, { issueMutableCapability });
             if (!dst.ok) return errorResult(dst.reason, { ...dst, field: 'destination' });
             if (overwrite === true && confirmOverwrite !== true) {
                 return errorResult('confirmOverwrite deve ser true quando overwrite=true.', {
@@ -3287,8 +2639,8 @@ export const repoWriteTools = [
             }
 
             try {
-                const sourceStats = await repoWriteStat(src.resolved);
-                const destinationExists = await pathExists(dst.resolved);
+                const sourceStats = await repoWriteStat(runtime, src.resolved);
+                const destinationExists = await pathExists(runtime, dst.resolved);
                 if (destinationExists && overwrite !== true) {
                     return errorResult(`Destino ja existe: ${dst.relative}`, { code: 'EEXIST' });
                 }
@@ -3311,7 +2663,7 @@ export const repoWriteTools = [
                     });
                 }
 
-                const moved = await moveResolvedTargets(src, dst, { overwrite: overwrite === true });
+                const moved = await moveResolvedTargets(runtime, src, dst, { overwrite: overwrite === true });
                 await appendMcpAuditEvent({
                     event: 'repo_move_file_applied',
                     tool: 'repo_move_file',
@@ -3363,10 +2715,11 @@ export const repoWriteTools = [
             limit: z.number().int().min(1).max(200).optional()['describe']('Maximum items returned. Default: 50.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ status, limit }) => {
+        handler: async ({ status, limit }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
             const filter = status === 'quarantined' || status === 'restored' ? status : 'all';
             const max = Math.max(1, Math.min(200, Number(limit ?? 50)));
-            const items = (await listQuarantineMetadata())
+            const items = (await listQuarantineMetadata(runtime))
                 .filter((item) => (filter === 'all' ? true : item.status === filter))
                 .slice(0, max);
             return okResult({
@@ -3389,8 +2742,9 @@ export const repoWriteTools = [
                 ['describe']('Compute SHA-256 for stored data if present. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ quarantineId, includeHash }) => {
-            const metadata = await readQuarantineMetadata(String(quarantineId));
+        handler: async ({ quarantineId, includeHash }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const metadata = await readQuarantineMetadata(runtime, String(quarantineId));
             if (!metadata) {
                 return errorResult('Quarantine metadata not found.', {
                     code: 'ERR_QUARANTINE_NOT_FOUND',
@@ -3398,10 +2752,11 @@ export const repoWriteTools = [
                     quarantineId,
                 });
             }
-            const quarantinePaths = resolveQuarantinePaths(metadata.quarantineId);
-            const dataExists = await regularFileExists(quarantinePaths.dataPath);
-            const dataStats = dataExists ? await repoWriteStat(quarantinePaths.dataPath) : null;
-            const dataHash = dataExists && includeHash !== false ? await sha256File(quarantinePaths.dataPath) : null;
+            const quarantinePaths = resolveQuarantinePaths(runtime, metadata.quarantineId);
+            const dataExists = await regularFileExists(runtime, quarantinePaths.dataPath);
+            const dataStats = dataExists ? await repoWriteStat(runtime, quarantinePaths.dataPath) : null;
+            const dataHash =
+                dataExists && includeHash !== false ? await sha256File(runtime, quarantinePaths.dataPath) : null;
             return okResult({
                 success: true,
                 quarantineId: metadata.quarantineId,
@@ -3423,12 +2778,13 @@ export const repoWriteTools = [
             dryRun: z.boolean().optional()['describe']('Validate without moving. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ path: inputPath, dryRun }) => {
-            const resolved = await resolveWritePath(inputPath);
+        handler: async ({ path: inputPath, dryRun }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const resolved = await runtime.workspace.resolveWritePath(inputPath);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
             try {
-                const stats = await repoWriteStat(resolved.resolved);
+                const stats = await repoWriteStat(runtime, resolved.resolved);
                 if (!stats.isFile()) {
                     return errorResult('repo_quarantine_file move somente arquivos regulares.', {
                         path: resolved.relative,
@@ -3436,7 +2792,7 @@ export const repoWriteTools = [
                     });
                 }
                 const quarantineId = buildQuarantineId(resolved.relative);
-                const quarantinePaths = resolveQuarantinePaths(quarantineId);
+                const quarantinePaths = resolveQuarantinePaths(runtime, quarantineId);
                 if (dryRun === true) {
                     await appendMcpAuditEvent({
                         event: 'repo_quarantine_file_dry_run',
@@ -3450,13 +2806,13 @@ export const repoWriteTools = [
                         dryRun: true,
                         path: resolved.relative,
                         quarantineId,
-                        quarantinePath: toWorkspaceRelativePath(quarantinePaths.dataPath),
-                        metadataPath: toWorkspaceRelativePath(quarantinePaths.metadataPath),
+                        quarantinePath: runtime.workspace.toRelativePath(quarantinePaths.dataPath),
+                        metadataPath: runtime.workspace.toRelativePath(quarantinePaths.metadataPath),
                         previousBytes: stats.size,
                     });
                 }
 
-                const { metadata, moved } = await quarantineResolvedFile(resolved);
+                const { metadata, moved } = await quarantineResolvedFile(runtime, resolved);
                 await appendMcpAuditEvent({
                     event: 'repo_quarantine_file_applied',
                     tool: 'repo_quarantine_file',
@@ -3503,8 +2859,9 @@ export const repoWriteTools = [
             dryRun: z.boolean().optional()['describe']('Validate without restoring. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ quarantineId, destinationPath, overwrite, confirmOverwrite, dryRun }) => {
-            const metadata = await readQuarantineMetadata(String(quarantineId));
+        handler: async ({ quarantineId, destinationPath, overwrite, confirmOverwrite, dryRun }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const metadata = await readQuarantineMetadata(runtime, String(quarantineId));
             if (!metadata) {
                 return errorResult('Quarantine metadata not found.', {
                     code: 'ERR_QUARANTINE_NOT_FOUND',
@@ -3525,16 +2882,16 @@ export const repoWriteTools = [
                     code: 'ERR_RESTORE_CONFIRM_OVERWRITE_REQUIRED',
                 });
             }
-            const destination = await resolveWritePath(
+            const destination = await runtime.workspace.resolveWritePath(
                 typeof destinationPath === 'string' && destinationPath ? destinationPath : metadata.originalPath,
             );
             if (!destination.ok) return errorResult(destination.reason, destination);
 
             try {
                 if (dryRun === true) {
-                    const quarantinePaths = resolveQuarantinePaths(metadata.quarantineId);
-                    const quarantineStats = await repoWriteStat(quarantinePaths.dataPath);
-                    const destinationExists = await pathExists(destination.resolved);
+                    const quarantinePaths = resolveQuarantinePaths(runtime, metadata.quarantineId);
+                    const quarantineStats = await repoWriteStat(runtime, quarantinePaths.dataPath);
+                    const destinationExists = await pathExists(runtime, destination.resolved);
                     if (destinationExists && overwrite !== true) {
                         return errorResult(`Destino ja existe: ${destination.relative}`, { code: 'EEXIST' });
                     }
@@ -3563,7 +2920,7 @@ export const repoWriteTools = [
                     destinationPreviousHash,
                     destinationPreviousBytes,
                     cleanupPending,
-                } = await restoreQuarantinedFile(metadata.quarantineId, destination, overwrite === true);
+                } = await restoreQuarantinedFile(runtime, metadata.quarantineId, destination, overwrite === true);
                 await appendMcpAuditEvent({
                     event: 'repo_restore_quarantined_file_applied',
                     tool: 'repo_restore_quarantined_file',
@@ -3614,8 +2971,9 @@ export const repoWriteTools = [
             dryRun: z.boolean().optional()['describe']('Validate without deleting. Default: false.'),
         },
         annotations: destructiveAnnotations(),
-        handler: async ({ path, confirm, dryRun }) => {
-            const resolved = await resolveWritePath(path);
+        handler: async ({ path, confirm, dryRun }, operationContext) => {
+            const runtime = createRepoWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const resolved = await runtime.workspace.resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (confirm !== true) {
                 return errorResult('confirm deve ser true para remover arquivo.', {
@@ -3624,7 +2982,7 @@ export const repoWriteTools = [
             }
 
             try {
-                const stats = await repoWriteStat(resolved.resolved);
+                const stats = await repoWriteStat(runtime, resolved.resolved);
                 if (!stats.isFile()) {
                     return errorResult('repo_remove_file remove somente arquivos regulares.', {
                         path: resolved.relative,
@@ -3646,7 +3004,7 @@ export const repoWriteTools = [
                     });
                 }
 
-                const removed = await deleteFileLocked(resolved.resolved);
+                const removed = await runtime.io.deleteFileLocked(resolved.resolved);
                 await appendMcpAuditEvent({
                     event: 'repo_remove_file_applied',
                     tool: 'repo_remove_file',

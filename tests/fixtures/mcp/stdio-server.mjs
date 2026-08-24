@@ -1,23 +1,21 @@
 // @ts-check
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 
 const server = /** @type {any} */ (new McpServer({ name: 'fixture-stdio-mcp', version: '0.0.0' }));
 
-server.tool(
+server.registerTool(
     'echo',
-    'Echo back the provided message',
-    { message: z.string() },
+    { description: 'Echo back the provided message', inputSchema: z.object({ message: z.string() }) },
     async (/** @type {{ message: string }} */ { message }) => {
         return { content: [{ type: 'text', text: message }] };
     },
 );
 
-server.tool(
+server.registerTool(
     'add',
-    'Add two numbers',
-    { a: z.number(), b: z.number() },
+    { description: 'Add two numbers', inputSchema: z.object({ a: z.number(), b: z.number() }) },
     async (/** @type {{ a: number; b: number }} */ { a, b }) => {
         return { content: [{ type: 'text', text: String(a + b) }] };
     },

@@ -5,30 +5,21 @@
  * @module copilot/mcp/tools/tools-status
  */
 
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
+import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
 import {
-    MCP_AUTH_SCOPES,
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
-    isBaselineMcpOutputSchema,
     okResult,
-    readMcpAuthConfig,
-    readMcpSchemaConvergenceState,
     readOnlyAnnotations,
-} from '#copilot/mcp/control-plane';
-import { buildToolPayloadAudit } from '../scripts/tool-payload-audit.js';
+} from '#copilot/mcp/public/protocol/tools';
 
-const MAX_POWER_REPO_SCOPES = [
-    MCP_AUTH_SCOPES.read,
-    MCP_AUTH_SCOPES.write,
-    MCP_AUTH_SCOPES.validate,
-    MCP_AUTH_SCOPES.admin,
-];
-
-/** @type {() => import('../registry.js').McpToolDefinition[]} */
+/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
 let toolsProvider = () => [];
 
 /**
- * @param {() => import('../registry.js').McpToolDefinition[]} provider
+ * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
  * @returns {void}
  */
 export function bindMcpToolsStatusProvider(provider) {
@@ -161,7 +152,7 @@ function summarizeTool(tool = /** @type {any} */ ({})) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpToolsStatusTool = {
     name: 'mcp_tools_status',
@@ -178,10 +169,9 @@ export const mcpToolsStatusTool = {
         const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
         const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
         const auth = readMcpAuthConfig();
-        const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
-        const outputSchemaCount = tools.filter((tool) => tool.outputSchema !== undefined).length;
-        const baselineOutputSchemaCount = tools.filter((tool) => isBaselineMcpOutputSchema(tool.outputSchema)).length;
-        const specificOutputSchemaCount = outputSchemaCount - baselineOutputSchemaCount;
+        const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
+        const specificOutputSchemaCount = tools.filter((tool) => tool.outputSchema !== undefined).length;
+        const missingSpecificOutputSchemaCount = Math.max(0, summaries.length - specificOutputSchemaCount);
         const securityMetadataCount = summaries.filter(
             (tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0,
         ).length;
@@ -203,11 +193,10 @@ export const mcpToolsStatusTool = {
             openWorldCount: openWorld.length,
             idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
             metadataCoverage: {
-                outputSchemaPolicy: 'baseline-plus-specific',
-                outputSchemaCount,
-                baselineOutputSchemaCount,
+                outputSchemaPolicy: 'explicit-specific-only',
                 specificOutputSchemaCount,
-                outputSchemaComplete: outputSchemaCount === summaries.length,
+                missingSpecificOutputSchemaCount,
+                outputSchemaComplete: specificOutputSchemaCount === summaries.length,
                 securityMetadataCount,
                 securityComplete: securityMetadataCount === summaries.length,
             },
@@ -217,7 +206,10 @@ export const mcpToolsStatusTool = {
             destructiveTools: destructive.map((tool) => tool.name),
             openWorldTools: openWorld.map((tool) => tool.name),
             hostApprovalProfile: {
-                oauthGrantsAllRepoScopesByDefault: maxPowerRepoScopesByDefault,
+                oauthInitialScopeProfile: auth.initialScopeProfile,
+                oauthInitialScopes: [...auth.initialScopes],
+                oauthStepUpPreferred: auth.stepUpPreferred,
+                oauthBroadInitialGrantCompatibility: broadInitialGrant,
                 writeActionsMayStillPrompt: true,
                 preferredStrategy:
                     'Use the direct bounded one-shot tool when intent is clear; use plan tools only when preview, escalation, or a separate approval boundary adds information.',
@@ -262,7 +254,7 @@ function clampScore(value, max) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpAutonomyPowerScoreTool = {
     name: 'mcp_autonomy_power_score',
@@ -286,7 +278,7 @@ export const mcpAutonomyPowerScoreTool = {
                 : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0)
                       .length / summaries.length;
         const auth = readMcpAuthConfig();
-        const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
+        const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
         const scoreParts = {
             toolSurface: clampScore((summaries.length / 66) * 18, 18),
             lowFrictionReads: clampScore((readOnly.length / Math.max(1, summaries.length)) * 18, 18),
@@ -308,9 +300,7 @@ export const mcpAutonomyPowerScoreTool = {
                 auth.enforcement === 'off'
                     ? 6
                     : auth.staticBearerConfigured || (auth.expectedIssuer && auth.jwksUri)
-                      ? maxPowerRepoScopesByDefault
-                          ? 10
-                          : 7
+                      ? 10
                       : 4,
                 10,
             ),
@@ -323,9 +313,15 @@ export const mcpAutonomyPowerScoreTool = {
         if (auth.enforcement !== 'off' && !auth.staticBearerConfigured && !(auth.expectedIssuer && auth.jwksUri)) {
             blockers.push('Auth enforcement is enabled without a configured static token or OAuth/JWKS verifier.');
         }
-        if (!maxPowerRepoScopesByDefault) {
-            blockers.push('OAuth initial scopes are not max-power for the canonical ChatGPT connector.');
-        }
+        const authAdvisories = broadInitialGrant
+            ? [
+                  'OAuth uses the max-autonomy initial grant by default so the workspace does not spend round-trips on reauthorization. Per-tool required scopes and runtime authorization remain explicit contracts; host-side approval prompts are a separate client policy.',
+              ]
+            : auth.stepUpPreferred
+              ? [
+                    'OAuth is explicitly running in least-privilege mode and therefore expects per-tool step-up when broader authority is needed; this is opt-in for this workspace.',
+                ]
+              : [];
         return okResult({
             success: true,
             score,
@@ -349,11 +345,14 @@ export const mcpAutonomyPowerScoreTool = {
                 enforcement: auth.enforcement,
                 authorizationServersConfigured: auth.authorizationServers.length > 0,
                 initialScopes: [...auth.initialScopes],
-                maxPowerRepoScopesByDefault,
+                initialScopeProfile: auth.initialScopeProfile,
+                stepUpPreferred: auth.stepUpPreferred,
+                broadInitialGrant,
                 jwksUriConfigured: Boolean(auth.jwksUri),
                 staticBearerConfigured: auth.staticBearerConfigured,
             },
             blockers,
+            authAdvisories,
             nextActions:
                 blockers.length === 0
                     ? ['Run mcp_golden_prompts in a real ChatGPT session and compare observed prompt friction.']

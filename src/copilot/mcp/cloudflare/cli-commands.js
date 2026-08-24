@@ -1,9 +1,9 @@
 // @ts-check
 /** Command registry for the Cloudflare MCP CLI. */
-import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
-import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { formatChatGptConnectorAuthentication } from '#copilot/mcp/public/connection';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 import process from 'node:process';
-import { getCanonicalMcpTools } from '../registry.js';
 import { probeHealth } from './cli-probe.js';
 import {
     assessCloudflaredCompatibility,
@@ -204,8 +204,12 @@ async function runStatus({ env }) {
 }
 
 /** @param {CloudflareCliContext} context */
-function runQuick({ env }) {
-    runQuickTunnel(readCloudflareTunnelConfig(env), env);
+async function runQuick({ env }) {
+    const result = await runQuickTunnel(readCloudflareTunnelConfig(env), env, {
+        onStdout: (chunk) => process.stdout.write(chunk),
+        onConnectorUrl: (url) => process.stderr.write(`[copilot-mcp-cloudflare] quick tunnel URL: ${url}\n`),
+    });
+    applyForegroundProcessExit(result);
 }
 /** @param {CloudflareCliContext} context */
 async function runSmoke({ env }) {
@@ -245,13 +249,14 @@ async function runRestart({ env }) {
     await writeJsonAndSetExit(await startManagedStack({ config: readCloudflareTunnelConfig(env), env, restart: true }));
 }
 /** @param {CloudflareCliContext} context */
-function runRun({ env }) {
+async function runRun({ env }) {
     const config = readCloudflareTunnelConfig(env);
-    runCloudflared(
+    const result = await runCloudflared(
         buildManagedTunnelArgs(env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config),
         config.transportProtocol,
         env,
     );
+    applyForegroundProcessExit(result);
 }
 
 /** @param {CloudflareCliContext} context */
@@ -275,6 +280,17 @@ async function runEdgePolicyApply({ argv }) {
 /** @param {CloudflareCliContext} context */
 async function runEdgeBackupCreate({ args }) {
     await writeJsonAndSetExit(await createCloudflareEdgeBackup({ ...(args[0] ? { label: args[0] } : {}) }));
+}
+
+/**
+ * CLI-only projection from a truthful foreground process observation to Node exit status.
+ *
+ * @param {{ ok: boolean; exitCode: number | null; signal: NodeJS.Signals | null; error: string | null }} result
+ */
+function applyForegroundProcessExit(result) {
+    if (result.ok) return;
+    if (result.error) process.stderr.write(`[copilot-mcp-cloudflare] ${result.error}\n`);
+    process.exitCode = typeof result.exitCode === 'number' && result.exitCode !== 0 ? result.exitCode : 1;
 }
 
 /** @returns {Promise<void>} */

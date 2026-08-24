@@ -8,24 +8,21 @@
  *
  * @module copilot/mcp/adapters/http-stateful-router
  */
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { randomUUID } from 'node:crypto';
-import { logMcp } from '../control-plane/audit.js';
-import { resolveMcpSessionAuthBinding } from '../control-plane/auth.js';
-import {
-    createMcpInMemoryEventStore,
-    createSqliteMcpEventStore,
-    parseMcpEventId,
-} from '../control-plane/event-store.js';
-import { maybeSendMcpToolsListChangedNotification } from '../control-plane/schema-convergence.js';
+import { resolveMcpSessionAuthBinding } from '#copilot/mcp/public/auth';
+import { logMcp } from '#copilot/mcp/public/observability';
+import { maybeSendMcpToolsListChangedNotification } from '#copilot/mcp/public/protocol/catalog';
 import {
     createDefaultMcpHttpSessionRuntimeWithSqliteStore,
+    createMcpInMemoryEventStore,
+    createSqliteMcpEventStore,
     getDefaultMcpHttpSessionRuntime,
+    getDefaultMcpHttpStreamRegistry,
     hashMcpHttpSessionId,
-} from '../control-plane/session-runtime.js';
-import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
-import { createCopilotMcpServer } from '../server.js';
+    parseMcpEventId,
+} from '#copilot/mcp/public/transport/http/stateful';
+import { randomUUID } from 'node:crypto';
 import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.js';
 
 /**
@@ -42,14 +39,14 @@ import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.j
  *
  * @typedef {{ error: string; error_description: string }} McpTransportError
  *
- * @typedef {import('../control-plane/session-runtime.js').McpHttpSessionAuthBinding} McpHttpSessionAuthBinding
+ * @typedef {import('#copilot/mcp/public/transport/http/stateful').McpHttpSessionAuthBinding} McpHttpSessionAuthBinding
  *
- * @typedef {import('../control-plane/auth.js').McpSessionAuthBindingResolution} StatefulRouterAuthBindingResolution
+ * @typedef {import('#copilot/mcp/public/auth').McpSessionAuthBindingResolution} StatefulRouterAuthBindingResolution
  *
  * @typedef {{
- *     connect: (transport: unknown) => Promise<void>;
- *     close: () => Promise<void> | void;
- *     sendToolListChanged?: () => Promise<void> | void;
+ *     connect: import('@modelcontextprotocol/server').McpServer['connect'];
+ *     close: import('@modelcontextprotocol/server').McpServer['close'];
+ *     sendToolListChanged?: import('@modelcontextprotocol/server').McpServer['sendToolListChanged'];
  * }} StatefulRouterServer
  *
  * @typedef {{ handled: true; mode: 'stateful'; kind: 'initialize' | 'session-bound' }} StatefulRouterResult
@@ -58,10 +55,8 @@ import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.j
 /**
  * @template {StatefulRouterRequestLike} TReq
  * @template {StatefulRouterResponseLike} TRes
- * @typedef {{
+ * @typedef {Parameters<import('@modelcontextprotocol/server').McpServer['connect']>[0] & {
  *     handleRequest: (req: TReq, res: TRes, body?: unknown) => Promise<void>;
- *     close: () => Promise<void> | void;
- *     send?: (message: unknown) => Promise<unknown> | unknown;
  * }} StatefulRouterTransport
  */
 
@@ -73,20 +68,22 @@ import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.j
  * @property {TRes} res
  * @property {URL} url
  * @property {unknown} parsedMcpBody
- * @property {import('../control-plane/auth.js').McpAuthContext} authContext
+ * @property {import('#copilot/mcp/public/auth').McpAuthContext} authContext
  * @property {string} protocolVersion
  * @property {boolean} [useSqliteStore]
+ * @property {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} [database]
+ * @property {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} [workspace]
  * @property {ReturnType<typeof getDefaultMcpHttpSessionRuntime>} [runtime]
  * @property {ReturnType<typeof getDefaultMcpHttpStreamRegistry>} [streamRegistry]
  * @property {(req: TReq, name: string) => string | undefined} readHeader
  * @property {(res: TRes, statusCode: number, error: McpTransportError) => void} writeTransportError
- * @property {(options: { authContext: import('../control-plane/auth.js').McpAuthContext }) => StatefulRouterServer} [createServer]
+ * @property {(options: { authContext: import('#copilot/mcp/public/auth').McpAuthContext; workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability }) => StatefulRouterServer} [createServer]
  * @property {(
- *     options: import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions,
+ *     options: import('@modelcontextprotocol/node').StreamableHTTPServerTransportOptions,
  * ) => StatefulRouterTransport<TReq, TRes>} [createTransport]
- * @property {() => import('../control-plane/event-store.js').McpSdkCompatibleEventStore} [createEventStore]
+ * @property {() => import('#copilot/mcp/public/transport/http/stateful').McpSdkCompatibleEventStore} [createEventStore]
  * @property {(
- *     authContext: import('../control-plane/auth.js').McpAuthContext,
+ *     authContext: import('#copilot/mcp/public/auth').McpAuthContext,
  *     url: URL,
  * ) => Promise<StatefulRouterAuthBindingResolution> | StatefulRouterAuthBindingResolution} [resolveAuthBinding]
  */
@@ -107,7 +104,7 @@ export async function handleStatefulMcpHttpRequest(options) {
         options.runtime ??
         (options.useSqliteStore === false
             ? getDefaultMcpHttpSessionRuntime()
-            : createDefaultMcpHttpSessionRuntimeWithSqliteStore());
+            : await createDefaultMcpHttpSessionRuntimeWithSqliteStore(requireStatefulDatabase(options)));
 
     if (method === 'POST' && initializeRequest) {
         if (sessionId) {
@@ -122,7 +119,7 @@ export async function handleStatefulMcpHttpRequest(options) {
             writeAuthBindingFailure(options, authBinding);
             return { handled: true, mode: 'stateful', kind: 'initialize' };
         }
-        if (!hasStatefulSessionCapacity(runtime)) {
+        if (!(await hasStatefulSessionCapacity(runtime))) {
             options.writeTransportError(options.res, 503, {
                 error: 'server_overloaded',
                 error_description:
@@ -157,7 +154,7 @@ export async function handleStatefulMcpHttpRequest(options) {
         }
     }
 
-    const session = runtime.get(sessionId);
+    const session = await runtime.get(sessionId);
     if (!session) {
         options.writeTransportError(options.res, 404, {
             error: 'session_not_found',
@@ -181,7 +178,7 @@ export async function handleStatefulMcpHttpRequest(options) {
     }
 
     if (method === 'GET' && writeStatefulSseProbeIfRequested(options)) {
-        runtime.touch(sessionId);
+        await runtime.touch(sessionId);
         return { handled: true, mode: 'stateful', kind: 'session-bound' };
     }
 
@@ -198,10 +195,16 @@ export async function handleStatefulMcpHttpRequest(options) {
         );
         if (method === 'DELETE') {
             streamRegistry.closeBySession(sessionId, 'session_closed');
-            runtime.terminate(sessionId, 'client_delete');
+            const termination = await runtime.terminate(sessionId, 'client_delete');
+            if (termination.state === 'close_failed') {
+                logMcp('ERROR', 'MCP session DELETE completed with resource close failure.', {
+                    sessionIdPresent: true,
+                    closeErrorCount: termination.errorCount,
+                });
+            }
             writeNoContentIfResponseOpen(options.res);
         } else {
-            runtime.touch(sessionId);
+            await runtime.touch(sessionId);
             if (stream) streamRegistry.touch(stream.streamKey);
         }
     } finally {
@@ -360,18 +363,18 @@ function validateLastEventIdHeader(options) {
 
 /**
  * @param {ReturnType<typeof getDefaultMcpHttpSessionRuntime>} runtime
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function hasStatefulSessionCapacity(runtime) {
-    runtime.sweepExpired();
+async function hasStatefulSessionCapacity(runtime) {
+    await runtime.sweepExpired();
     const snapshot = runtime.snapshot();
     const policy =
         snapshot['policy'] && typeof snapshot['policy'] === 'object'
             ? /** @type {{ maxSessions?: unknown }} */ (snapshot['policy'])
             : {};
-    const activeSessions = Number(snapshot['activeSessions'] ?? 0);
+    const ownedSessions = Number(snapshot['ownedSessions'] ?? snapshot['activeSessions'] ?? 0);
     const maxSessions = Number(policy.maxSessions ?? 0);
-    return maxSessions <= 0 || activeSessions < maxSessions;
+    return maxSessions <= 0 || ownedSessions < maxSessions;
 }
 
 /**
@@ -383,20 +386,23 @@ function hasStatefulSessionCapacity(runtime) {
  * @returns {Promise<void>}
  */
 async function handleStatefulInitialize(options, runtime, authBinding) {
-    const createServer =
-        options.createServer ??
-        ((serverOptions) =>
-            /** @type {StatefulRouterServer} */ (/** @type {unknown} */ (createCopilotMcpServer(serverOptions))));
+    const createServer = options.createServer;
+    if (typeof createServer !== 'function') {
+        throw new TypeError('Stateful MCP HTTP routing requires an injected server factory.');
+    }
     const createTransport =
         options.createTransport ??
         ((transportOptions) =>
             /** @type {StatefulRouterTransport<TReq, TRes>} */ (
-                /** @type {unknown} */ (new StreamableHTTPServerTransport(transportOptions))
+                /** @type {unknown} */ (new NodeStreamableHTTPServerTransport(transportOptions))
             ));
     const createEventStore = options.createEventStore ?? (() => createDefaultStatefulEventStore(options));
-    const server = createServer({ authContext: options.authContext });
+    const server = createServer({
+        authContext: options.authContext,
+        ...(options.workspace ? { workspace: options.workspace } : {}),
+    });
     const rawEventStore = createEventStore();
-    const eventStore = /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').EventStore} */ (
+    const eventStore = /** @type {import('@modelcontextprotocol/server').EventStore} */ (
         /** @type {unknown} */ (rawEventStore)
     );
     /** @type {string | null} */
@@ -434,7 +440,7 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
             void maybeSendMcpToolsListChangedNotification(server);
         }
     } catch (error) {
-        if (initializedSessionId) runtime.terminate(initializedSessionId, 'runtime_error');
+        if (initializedSessionId) await runtime.terminate(initializedSessionId, 'runtime_error');
         else {
             await safeClose(transport);
             await safeClose(server);
@@ -452,10 +458,24 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
  * @template {StatefulRouterRequestLike} TReq
  * @template {StatefulRouterResponseLike} TRes
  * @param {StatefulRouterOptions<TReq, TRes>} options
- * @returns {import('../control-plane/event-store.js').McpSdkCompatibleEventStore}
+ * @returns {import('#copilot/mcp/public/transport/http/stateful').McpSdkCompatibleEventStore}
  */
 function createDefaultStatefulEventStore(options) {
-    return options.useSqliteStore === false ? createMcpInMemoryEventStore() : createSqliteMcpEventStore();
+    return options.useSqliteStore === false
+        ? createMcpInMemoryEventStore()
+        : createSqliteMcpEventStore({ db: requireStatefulDatabase(options) });
+}
+
+/**
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
+ */
+function requireStatefulDatabase(options) {
+    if (!options.database) {
+        throw new Error('Stateful MCP HTTP persistence requires an injected database capability.');
+    }
+    return options.database;
 }
 
 /**

@@ -7,10 +7,12 @@ import {
     maybeSendMcpToolsListChangedNotification,
     readMcpSchemaConvergenceState,
     recordMcpDescriptorObservation,
-    recordMcpToolsListChangedNotification,
     recordMcpToolsListObserved,
+} from '#copilot/mcp/public/protocol/catalog';
+import {
+    recordMcpToolsListChangedNotification,
     resetMcpSchemaConvergenceStateForTests,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/testing/mcp/protocol/catalog';
 import {
     createCopilotMcpServer,
     getCopilotMcpServerFactoryStatus,

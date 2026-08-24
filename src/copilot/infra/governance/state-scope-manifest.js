@@ -18,6 +18,12 @@ const state = (descriptor) => Object.freeze(descriptor);
 
 export const INFRA_STATE_SCOPE_MANIFEST = Object.freeze([
     state({
+        path: 'cache/ttl/service.js',
+        scope: 'process',
+        rationale:
+            'Weak process-local registry exposes aggregate TTL-cache observability only; cache data and lifecycle remain owned by each cache instance.',
+    }),
+    state({
         path: 'composition/process/service.js',
         scope: 'process',
         rationale: 'Monotonic diagnostic ID sequence only; no operational authority or resource is shared.',

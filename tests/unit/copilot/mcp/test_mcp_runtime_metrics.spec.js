@@ -6,16 +6,15 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
-import {
-    readMcpIndexAutoBuildConfig,
-    readMcpMetricsSnapshot,
-    recordMcpToolMetric,
-    resetMcpIndexAutoBuildStateForTests,
-    resetMcpMetricsForTests,
-    resetMcpWorkspaceSmokeSummaryForTests,
-} from '#copilot/mcp/control-plane';
-import { mcpRuntimeHealthTool } from '#copilot/mcp/tools';
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { readMcpIndexAutoBuildConfig } from '#copilot/mcp/public/indexing/auto-build';
+import { readMcpMetricsSnapshot, recordMcpToolMetric } from '#copilot/mcp/public/observability';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { resetMcpWorkspaceSmokeSummaryForTests } from '#copilot/testing/mcp/diagnostics/workspace-smoke';
+import { resetMcpIndexAutoBuildStateForTests } from '#copilot/testing/mcp/indexing/auto-build';
+import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
 import { resetMcpStartupMaintenanceForTests } from '#copilot/testing/mcp/runtime/startup-maintenance';
+import { mcpRuntimeHealthTool } from '#copilot/testing/mcp/tools/runtime-health';
 
 describe('copilot MCP runtime metrics', () => {
     beforeEach(() => {
@@ -113,110 +112,131 @@ describe('copilot MCP runtime metrics', () => {
             phases: { authorization: 2, handler: 8 },
         });
 
-        const result = await mcpRuntimeHealthTool.handler({});
-
-        assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent['success'], true);
-        assert.equal(result.structuredContent['ok'], true);
-        assert.equal(typeof result.structuredContent['workspaceRoot'], 'string');
-        assert.ok(result.structuredContent['operationalSignals']);
-        assert.ok(result.structuredContent['operationalSignals'].indexAutoBuild);
-        assert.equal(typeof result.structuredContent['operationalSignals'].nodeRuntime?.nodeVersion, 'string');
-        assert.equal(
-            typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.enabled,
-            'boolean',
+        const processHost = createComposedMcpProcessHost({
+            hostId: 'runtime-health-unit-process-host',
+            backgroundServices: false,
+        });
+        await processHost.prepare();
+        const operationContext = createMcpToolOperationContext(
+            {
+                mcpReq: {
+                    id: 'runtime-health-unit',
+                    method: 'tools/call',
+                    signal: new AbortController().signal,
+                    _meta: { caller: 'test_mcp_runtime_metrics' },
+                    envelope: { protocol: '2026' },
+                },
+            },
+            { workspace: processHost.workspace },
         );
-        assert.equal(
-            typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.directoryKnown,
-            'boolean',
-        );
-        assert.deepEqual(result.structuredContent['operationalSignals'].startupMaintenance, {
-            scheduled: false,
-            running: false,
-            completed: false,
-            scheduledAt: null,
-            startedAt: null,
-            completedAt: null,
-            success: null,
-            error: null,
-            staleQuickTunnelStateRemoved: false,
-            detachedLiveRunsReaped: 0,
-            detachedLiveRunReaperFailures: 0,
-        });
-        assert.ok(result.structuredContent['indexStats']);
-        const metrics =
-            /**
-             * @type {{
-             *     totals: { calls: number };
-             *     phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
-             *     slowestTool: { name: string; calls: number; averageMs: number | null } | null;
-             *     slowestPhase: { tool: string; phase: string; calls: number; averageMs: number | null } | null;
-             *     ioCache?: {
-             *         l1?: Record<string, unknown>;
-             *         coherence?: Record<string, unknown>;
-             *     };
-             *     ioProcess?: {
-             *         ownership?: { expected?: boolean; complete?: boolean };
-             *         authority?: { mutable?: Record<string, unknown> } | null;
-             *         lockTimeouts?: number;
-             *         alertCount?: number;
-             *     };
-             *     ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
-             *     ioParser?: {
-             *         fileContextSize?: number;
-             *         fileContextHashComputations?: number;
-             *         fileContextHashReuses?: number;
-             *         workerFailures?: number;
-             *     };
-             *     aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
-             * }}
-             */ (result.structuredContent['metrics']);
-        assert.equal(metrics.totals.calls, 2);
-        assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
-        assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');
-        assert.equal(metrics.ioProcess?.ownership?.expected, true);
-        assert.equal(metrics.ioProcess?.ownership?.complete, true);
-        assert.equal(typeof metrics.ioProcess?.authority?.mutable?.['accepted'], 'number');
-        assert.equal(typeof metrics.ioProcess?.lockTimeouts, 'number');
-        assert.ok(metrics.ioCachePlan);
-        assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
-        assert.equal(typeof metrics.ioCachePlan?.recommendationCount, 'number');
-        assert.equal(typeof metrics.ioParser?.fileContextSize, 'number');
-        assert.equal(typeof metrics.ioParser?.fileContextHashComputations, 'number');
-        assert.equal(typeof metrics.ioParser?.fileContextHashReuses, 'number');
-        assert.equal(typeof metrics.ioParser?.workerFailures, 'number');
-        assert.equal(typeof metrics.aiArtifacts?.jobs?.['cleanupCandidateCount'], 'number');
-        assert.equal(typeof metrics.aiArtifacts?.rollback?.['enabled'], 'boolean');
-        assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);
-        assert.deepEqual(metrics.phaseTotals['handler'], {
-            calls: 2,
-            totalDurationMs: 12,
-            averageMs: 6,
-        });
-        assert.deepEqual(metrics.phaseTotals['authorization'], {
-            calls: 2,
-            totalDurationMs: 3,
-            averageMs: 2,
-        });
-        assert.deepEqual(metrics.slowestPhase, {
-            tool: 'repo_status',
-            phase: 'handler',
-            calls: 1,
-            averageMs: 8,
-            lastMs: 8,
-        });
-        assert.equal(metrics.slowestTool?.name, 'repo_status');
-        assert.equal(result.structuredContent['metrics']?.['slowestTools'], undefined);
-        assert.equal(result.structuredContent['metrics']?.['slowestPhases'], undefined);
-        assert.equal(result.structuredContent['metrics']?.['ioCacheBenchmark'], undefined);
-        assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 6 * 1024);
+        try {
+            const result = await mcpRuntimeHealthTool.handler({}, operationContext);
 
-        const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true });
-        assert.equal(detailed.isError, undefined);
-        assert.equal(detailed.structuredContent?.['detailsAvailable'], undefined);
-        const detailedMetrics = /** @type {Record<string, unknown>} */ (detailed.structuredContent?.['metrics']);
-        assert.equal(typeof detailedMetrics['tools'], 'object');
-        assert.equal(typeof detailedMetrics['ioCache'], 'object');
+            assert.equal(result.isError, undefined);
+            assert.equal(result.structuredContent['success'], true);
+            assert.equal(result.structuredContent['ok'], true);
+            assert.equal(typeof result.structuredContent['workspaceRoot'], 'string');
+            assert.ok(result.structuredContent['operationalSignals']);
+            assert.ok(result.structuredContent['operationalSignals'].indexAutoBuild);
+            assert.equal(typeof result.structuredContent['operationalSignals'].nodeRuntime?.nodeVersion, 'string');
+            assert.equal(
+                typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.enabled,
+                'boolean',
+            );
+            assert.equal(
+                typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.directoryKnown,
+                'boolean',
+            );
+            assert.deepEqual(result.structuredContent['operationalSignals'].startupMaintenance, {
+                scheduled: false,
+                running: false,
+                completed: false,
+                scheduledAt: null,
+                startedAt: null,
+                completedAt: null,
+                success: null,
+                error: null,
+                staleQuickTunnelStateRemoved: false,
+                detachedLiveRunsReaped: 0,
+                detachedLiveRunReaperFailures: 0,
+            });
+            assert.ok(result.structuredContent['indexStats']);
+            const metrics =
+                /**
+                 * @type {{
+                 *     totals: { calls: number };
+                 *     phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
+                 *     slowestTool: { name: string; calls: number; averageMs: number | null } | null;
+                 *     slowestPhase: { tool: string; phase: string; calls: number; averageMs: number | null } | null;
+                 *     ioCache?: {
+                 *         l1?: Record<string, unknown>;
+                 *         coherence?: Record<string, unknown>;
+                 *     };
+                 *     ioProcess?: {
+                 *         ownership?: { expected?: boolean; complete?: boolean };
+                 *         authority?: { mutable?: Record<string, unknown> } | null;
+                 *         lockTimeouts?: number;
+                 *         alertCount?: number;
+                 *     };
+                 *     ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
+                 *     ioParser?: {
+                 *         fileContextSize?: number;
+                 *         fileContextHashComputations?: number;
+                 *         fileContextHashReuses?: number;
+                 *         workerFailures?: number;
+                 *     };
+                 *     aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
+                 * }}
+                 */ (result.structuredContent['metrics']);
+            assert.equal(metrics.totals.calls, 2);
+            assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
+            assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');
+            assert.equal(metrics.ioProcess?.ownership?.expected, true);
+            assert.equal(metrics.ioProcess?.ownership?.complete, true);
+            assert.equal(typeof metrics.ioProcess?.authority?.mutable?.['accepted'], 'number');
+            assert.equal(typeof metrics.ioProcess?.lockTimeouts, 'number');
+            assert.ok(metrics.ioCachePlan);
+            assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
+            assert.equal(typeof metrics.ioCachePlan?.recommendationCount, 'number');
+            assert.equal(typeof metrics.ioParser?.fileContextSize, 'number');
+            assert.equal(typeof metrics.ioParser?.fileContextHashComputations, 'number');
+            assert.equal(typeof metrics.ioParser?.fileContextHashReuses, 'number');
+            assert.equal(typeof metrics.ioParser?.workerFailures, 'number');
+            assert.equal(typeof metrics.aiArtifacts?.jobs?.['cleanupCandidateCount'], 'number');
+            assert.equal(typeof metrics.aiArtifacts?.rollback?.['enabled'], 'boolean');
+            assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);
+            assert.deepEqual(metrics.phaseTotals['handler'], {
+                calls: 2,
+                totalDurationMs: 12,
+                averageMs: 6,
+            });
+            assert.deepEqual(metrics.phaseTotals['authorization'], {
+                calls: 2,
+                totalDurationMs: 3,
+                averageMs: 2,
+            });
+            assert.deepEqual(metrics.slowestPhase, {
+                tool: 'repo_status',
+                phase: 'handler',
+                calls: 1,
+                averageMs: 8,
+                lastMs: 8,
+            });
+            assert.equal(metrics.slowestTool?.name, 'repo_status');
+            assert.equal(result.structuredContent['metrics']?.['slowestTools'], undefined);
+            assert.equal(result.structuredContent['metrics']?.['slowestPhases'], undefined);
+            assert.equal(result.structuredContent['metrics']?.['ioCacheBenchmark'], undefined);
+            assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 6 * 1024);
+
+            const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true }, operationContext);
+            assert.equal(detailed.isError, undefined);
+            assert.equal(detailed.structuredContent?.['detailsAvailable'], undefined);
+            const detailedMetrics = /** @type {Record<string, unknown>} */ (detailed.structuredContent?.['metrics']);
+            assert.equal(typeof detailedMetrics['tools'], 'object');
+            assert.equal(typeof detailedMetrics['ioCache'], 'object');
+        } finally {
+            await processHost.dispose();
+        }
     });
 
     it('parses MCP index auto-build environment limits', () => {

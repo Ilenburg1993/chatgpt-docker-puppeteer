@@ -10,15 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '#copilot/mcp';
-import { startHttpMcpServer } from '#copilot/mcp/adapters';
-import {
-    buildChatGptConnectorProfile,
-    buildCloudflareTunnelRunbook,
-    buildSecureTunnelRunbook,
-    normalizeMcpUrl,
-    validatePublicConnectorUrl,
-} from '#copilot/mcp/connection';
+import { startHttpMcpServer } from '#copilot/mcp/public/adapters/http1';
 import {
     authorizeMcpToolCall,
     buildBuiltInDevOAuthClientMetadata,
@@ -31,10 +23,24 @@ import {
     parseBearerToken,
     readDevOAuthPersistenceStatus,
     readMcpAuthConfig,
-    resetDevOAuthRuntimeForTests,
     scopesForMcpTool,
     securitySchemesForMcpTool,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/auth';
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import {
+    buildChatGptConnectorProfile,
+    buildCloudflareTunnelRunbook,
+    buildSecureTunnelRunbook,
+    normalizeMcpUrl,
+    validatePublicConnectorUrl,
+} from '#copilot/mcp/public/connection';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import { resetDevOAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
+
+const CONNECTION_PROFILE_WORKSPACE = createComposedMcpProcessHost({
+    hostId: 'mcp-connection-profile-workspace',
+    backgroundServices: false,
+}).workspace;
 
 describe('copilot MCP ChatGPT connection profile', () => {
     it('normalizes connector URLs to /mcp', () => {
@@ -220,7 +226,11 @@ describe('copilot MCP ChatGPT connection profile', () => {
             'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
             'COPILOT_MCP_ALLOWED_ORIGINS',
         ]);
-        const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0 });
+        const server = await startHttpMcpServer({
+            host: '127.0.0.1',
+            port: 0,
+            workspace: CONNECTION_PROFILE_WORKSPACE,
+        });
         try {
             const address = server.address();
             assert.ok(address && typeof address === 'object');
@@ -321,7 +331,11 @@ describe('copilot MCP ChatGPT connection profile', () => {
             'COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK',
             'COPILOT_MCP_ALLOWED_ORIGINS',
         ]);
-        const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0 });
+        const server = await startHttpMcpServer({
+            host: '127.0.0.1',
+            port: 0,
+            workspace: CONNECTION_PROFILE_WORKSPACE,
+        });
         try {
             const address = server.address();
             assert.ok(address && typeof address === 'object');

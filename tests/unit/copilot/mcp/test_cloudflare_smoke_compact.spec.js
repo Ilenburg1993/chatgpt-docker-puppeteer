@@ -1,13 +1,13 @@
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
-} from '#copilot/mcp/cloudflare';
+} from '#copilot/mcp/public/cloudflare/errors';
 import {
     isCloudflaredOriginErrorLine,
     isCloudflaredTunnelTransportErrorLine,
     parseConnectorSmokeJsonOutput,
     summarizeConnectorSmokeReport,
-} from '#copilot/mcp/tools';
+} from '#copilot/testing/mcp/tools/cloudflare-smoke';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 

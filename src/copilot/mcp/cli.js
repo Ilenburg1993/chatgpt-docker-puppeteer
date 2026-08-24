@@ -19,15 +19,15 @@ import { fileURLToPath } from 'node:url';
 
 enableCopilotNodeCompileCache(readCopilotNodeCompileCacheConfig(process.env));
 
-/** @typedef {typeof import('#copilot/mcp/control-plane').logMcp} McpLogger */
+/** @typedef {typeof import('#copilot/mcp/public/observability').logMcp} McpLogger */
 /** @type {McpLogger | null} */
 let cachedLogMcp = null;
 
 /** @returns {Promise<McpLogger>} */
 async function getLogMcp() {
     if (cachedLogMcp) return cachedLogMcp;
-    const controlPlane = await import('#copilot/mcp/control-plane');
-    const logger = controlPlane.logMcp;
+    const observability = await import('#copilot/mcp/public/observability');
+    const logger = observability.logMcp;
     cachedLogMcp = logger;
     return logger;
 }
@@ -42,6 +42,9 @@ const SHUTDOWN_GRACE_MS = 5000;
  *     | import('node:https').Server
  *     | import('node:http2').Http2Server
  *     | import('node:http2').Http2SecureServer} ClosableMcpServer
+ * @typedef {ReturnType<typeof import('#copilot/mcp/public/composition/process-host').createComposedMcpProcessHost>} CliMcpProcessHost
+ * @typedef {{ server: ClosableMcpServer; processHost: CliMcpProcessHost }} McpHttpRuntime
+ * @typedef {Awaited<ReturnType<typeof import('#copilot/mcp/public/adapters/stdio').startStdioMcpServer>>} McpStdioRuntime
  */
 
 /**
@@ -93,25 +96,31 @@ async function main() {
     const transport = parseTransport(process.argv.slice(2));
     const logMcp = await getLogMcp();
     if (transport === 'stdio') {
-        await startStdioTransport();
+        await startStdioTransport(logMcp);
         return;
     }
-    const server = await startHttpTransport(transport, logMcp);
-    installHttpShutdownHandlers(server, transport, logMcp);
+    const runtime = await startHttpTransport(transport, logMcp);
+    installHttpShutdownHandlers(runtime, transport, logMcp);
 }
 
 /**
+ * @param {McpLogger} logMcp
  * @returns {Promise<void>}
  */
-async function startStdioTransport() {
+async function startStdioTransport(logMcp) {
     const restoreStdout = redirectStdoutDuringBootstrap();
+    const { createComposedMcpProcessHost } = await import('#copilot/mcp/public/composition/process-host');
+    const processHost = createComposedMcpProcessHost({ hostId: 'mcp-stdio-process-host' });
     try {
-        const { startStdioMcpServer } = await import('#copilot/mcp/adapters');
+        const { startStdioMcpServer } = await import('#copilot/mcp/public/adapters/stdio');
+        await processHost.prepare();
         flushCopilotNodeCompileCache();
         restoreStdout();
-        await startStdioMcpServer();
+        const runtime = await startStdioMcpServer({ processHost, workspace: processHost.workspace });
+        installStdioShutdownHandlers(runtime, logMcp);
     } catch (error) {
         restoreStdout();
+        await processHost.dispose().catch(() => undefined);
         throw error;
     }
 }
@@ -119,23 +128,89 @@ async function startStdioTransport() {
 /**
  * @param {'http' | 'http2'} transport
  * @param {McpLogger} logMcp
- * @returns {Promise<ClosableMcpServer>}
+ * @returns {Promise<McpHttpRuntime>}
  */
 async function startHttpTransport(transport, logMcp) {
-    const adapters = await import('#copilot/mcp/adapters');
-    const server = transport === 'http2' ? await adapters.startHttp2McpServer() : await adapters.startHttpMcpServer();
-    flushCopilotNodeCompileCache();
-    logMcp('INFO', 'MCP HTTP server started.', { transport });
-    return server;
+    const [{ createComposedMcpProcessHost, readComposedMcpSqliteDatabase }, startServer] = await Promise.all([
+        import('#copilot/mcp/public/composition/process-host'),
+        transport === 'http2'
+            ? import('#copilot/mcp/public/adapters/http2').then((module) => module.startHttp2McpServer)
+            : import('#copilot/mcp/public/adapters/http1').then((module) => module.startHttpMcpServer),
+    ]);
+    const processHost = createComposedMcpProcessHost({ hostId: `mcp-${transport}-process-host` });
+    try {
+        await processHost.prepare();
+        const database = readComposedMcpSqliteDatabase();
+        const adapterOptions = {
+            processHost,
+            workspace: processHost.workspace,
+            ...(database ? { database } : {}),
+        };
+        const server = await startServer(adapterOptions);
+        flushCopilotNodeCompileCache();
+        logMcp('INFO', 'MCP HTTP server started.', {
+            transport,
+            processHost: processHost.snapshot(),
+        });
+        return { server, processHost };
+    } catch (error) {
+        await processHost.dispose().catch((disposeError) => {
+            logMcp('ERROR', 'MCP process host cleanup failed after HTTP startup failure.', {
+                transport,
+                error: disposeError instanceof Error ? disposeError.message : String(disposeError),
+            });
+        });
+        throw error;
+    }
 }
 
 /**
- * @param {ClosableMcpServer} server
+ * @param {McpStdioRuntime} runtime
+ * @param {McpLogger} logMcp
+ */
+function installStdioShutdownHandlers(runtime, logMcp) {
+    let closing = false;
+    const shutdown = (/** @type {NodeJS.Signals} */ signal) => {
+        if (closing) return;
+        closing = true;
+        process.exitCode = 0;
+        logMcp('INFO', 'Stopping MCP stdio server.', { signal });
+        const timeout = setTimeout(() => {
+            logMcp('ERROR', 'Timed out while stopping MCP stdio server.', {
+                signal,
+                timeoutMs: SHUTDOWN_GRACE_MS,
+            });
+            process.exit(1);
+        }, SHUTDOWN_GRACE_MS);
+        timeout.unref();
+        void runtime
+            .close()
+            .then(() => {
+                clearTimeout(timeout);
+                logMcp('INFO', 'MCP stdio server and process host stopped cleanly.', { signal });
+                process.exit(0);
+            })
+            .catch((error) => {
+                clearTimeout(timeout);
+                logMcp('ERROR', 'MCP stdio teardown failed.', {
+                    signal,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+                process.exit(1);
+            });
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+}
+
+/**
+ * @param {McpHttpRuntime} runtime
  * @param {'http' | 'http2'} transport
  * @param {McpLogger} logMcp
  * @returns {void}
  */
-function installHttpShutdownHandlers(server, transport, logMcp) {
+function installHttpShutdownHandlers(runtime, transport, logMcp) {
+    const { server, processHost } = runtime;
     let closing = false;
     const shutdown = (/** @type {NodeJS.Signals} */ signal) => {
         if (closing) return;
@@ -152,16 +227,35 @@ function installHttpShutdownHandlers(server, transport, logMcp) {
         }, SHUTDOWN_GRACE_MS);
         timeout.unref();
         server.close((error) => {
-            clearTimeout(timeout);
-            if (error) {
-                logMcp('ERROR', 'Failed to stop MCP HTTP server cleanly.', {
-                    transport,
-                    signal,
-                    error: error instanceof Error ? error.message : String(error),
-                });
-                process.exit(1);
-            }
-            process.exit(0);
+            void (async () => {
+                clearTimeout(timeout);
+                if (error) {
+                    logMcp('ERROR', 'Failed to stop MCP HTTP server cleanly.', {
+                        transport,
+                        signal,
+                        error: error instanceof Error ? error.message : String(error),
+                        processHost: processHost.snapshot(),
+                    });
+                    process.exit(1);
+                }
+                try {
+                    await processHost.dispose();
+                    logMcp('INFO', 'MCP HTTP server and process host stopped cleanly.', {
+                        transport,
+                        signal,
+                        processHost: processHost.snapshot(),
+                    });
+                    process.exit(0);
+                } catch (disposeError) {
+                    logMcp('ERROR', 'MCP process host failed to reach terminal disposal.', {
+                        transport,
+                        signal,
+                        error: disposeError instanceof Error ? disposeError.message : String(disposeError),
+                        processHost: processHost.snapshot(),
+                    });
+                    process.exit(1);
+                }
+            })();
         });
     };
     process.once('SIGINT', shutdown);

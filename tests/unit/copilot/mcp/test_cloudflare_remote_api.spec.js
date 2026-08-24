@@ -1,10 +1,10 @@
-import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/cloudflare';
+import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/public/cloudflare/remote';
+import { getCloudflareClient } from '#copilot/testing/mcp/cloudflare/remote';
 import { describe, expect, it } from 'vitest';
-import { getCloudflareClient } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
 import { compactCloudflareRemoteAudit } from '../../../../src/copilot/mcp/tools/cloudflare-remote.js';
 
 /**
- * @returns {import('#copilot/mcp/cloudflare').CloudflareRemoteApiConfig}
+ * @returns {import('#copilot/mcp/public/cloudflare/remote').CloudflareRemoteApiConfig}
  */
 function testRemoteConfig() {
     return {

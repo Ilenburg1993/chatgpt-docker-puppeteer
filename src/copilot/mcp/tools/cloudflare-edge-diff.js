@@ -5,11 +5,12 @@
  * @module copilot/mcp/tools/cloudflare-edge-diff
  */
 
-import { diffCloudflareEdgePolicy } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { diffCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge-diff';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgePolicyDiffTool = {
     name: 'mcp_cloudflare_edge_policy_diff',

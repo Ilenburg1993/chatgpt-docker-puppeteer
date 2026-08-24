@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
-import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
+import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/public/integrations/http';
 
 /** @type {http.Server[]} */
 const servers = [];
@@ -64,6 +64,40 @@ describe('MCP HTTP client', () => {
         assert.equal(result.rawBody, '{"ok":true}');
         assert.equal(result.attempts, 2);
         assert.equal(calls, 2);
+    });
+
+    it('keeps the local timeout active when a caller signal is also provided', async () => {
+        const baseUrl = await startServer((_request, _response) => {
+            // Intentionally leave the response open until fetch cancellation closes the request.
+        });
+        const controller = new AbortController();
+        const startedAt = Date.now();
+        const result = await mcpFetchText(`${baseUrl}/slow`, { timeoutMs: 50, signal: controller.signal });
+        assert.equal(result.ok, false);
+        assert.equal(result.status, 0);
+        assert.ok(Date.now() - startedAt < 1000, JSON.stringify(result));
+        assert.equal(controller.signal.aborted, false);
+    });
+
+    it('stops retry backoff immediately when caller cancellation arrives', async () => {
+        let calls = 0;
+        const baseUrl = await startServer((_request, response) => {
+            calls += 1;
+            response.writeHead(530).end('retry');
+        });
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(new Error('cancel-retries')), 50).unref();
+        const result = await mcpFetchTextWithRetry(`${baseUrl}/retry`, {
+            attempts: 5,
+            delayMs: 500,
+            timeoutMs: 1000,
+            signal: controller.signal,
+        });
+        assert.equal(result.ok, false);
+        assert.equal(result.status, 0);
+        assert.equal(result.attempts, 1);
+        assert.match(String(result.error), /cancel-retries/u);
+        assert.equal(calls, 1);
     });
 
     it('rejects invalid UTF-8 and enforces response byte budgets', async () => {

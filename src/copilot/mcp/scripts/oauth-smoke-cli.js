@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { getCanonicalMcpTools } from '../registry.js';
-import { runMcpOAuthSmoke } from './oauth-smoke.js';
+import { runMcpOAuthSmoke } from '#copilot/mcp/public/diagnostics/oauth-smoke';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 
 const report = await runMcpOAuthSmoke({
     localToolNames: getCanonicalMcpTools().map((tool) => tool.name),

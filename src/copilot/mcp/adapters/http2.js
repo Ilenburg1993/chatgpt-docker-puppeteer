@@ -12,7 +12,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { logMcp } from '#copilot/mcp/control-plane';
+import { logMcp } from '#copilot/mcp/public/observability';
 import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
 import { createSecureServer, constants as http2Constants } from 'node:http2';
 import { isIP } from 'node:net';
@@ -21,8 +21,6 @@ import {
     configureHttp2ServerTiming,
     createMcpHttpRequestHandler,
     MCP_PATH,
-    notifyMcpHttpStarted,
-    prepareMcpHttpRuntime,
     readMcpHttpSessionRuntimeState,
 } from './http-shared.js';
 
@@ -92,6 +90,9 @@ const ENCRYPTED_PRIVATE_KEY_PATTERN = /^-----BEGIN ENCRYPTED PRIVATE KEY-----/u;
  * @typedef {{
  *     activeSessions: Set<import('node:http2').ServerHttp2Session>;
  *     closing: boolean;
+ *     closed: boolean;
+ *     closeCallbacks: ((error?: Error) => void)[];
+ *     terminalError: Error | null;
  *     createdAt: number;
  *     acceptedSessions: number;
  *     rejectedSessions: number;
@@ -216,14 +217,43 @@ export function readMcpHttp2ServerPolicy(env = process.env) {
 }
 
 /**
- * @param {{ host?: string; port?: number }} [opts]
+ * @typedef {{
+ *     host?: string;
+ *     port?: number;
+ *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>;
+ *     database?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
+ *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ * }} McpHttp2StartOptions
+ */
+
+/**
+ * @param {McpHttp2StartOptions} opts
+ * @returns {import('#copilot/mcp/public/workspace').McpWorkspaceCapability}
+ */
+function requireHttp2WorkspaceCapability(opts) {
+    const processHostWorkspace =
+        /** @type {{ workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability } | undefined} */ (
+            opts.processHost
+        )?.workspace;
+    if (opts.workspace && processHostWorkspace && opts.workspace !== processHostWorkspace) {
+        throw new TypeError('MCP HTTP/2 received divergent workspace capabilities.');
+    }
+    const workspace = opts.workspace ?? processHostWorkspace;
+    if (!workspace) throw new TypeError('MCP HTTP/2 requires a composition-owned workspace capability.');
+    return workspace;
+}
+
+/**
+ * @param {McpHttp2StartOptions} [opts]
  * @returns {Promise<McpHttp2SecureServer>}
  */
 export async function startHttp2McpServer(opts = {}) {
+    const workspace = requireHttp2WorkspaceCapability(opts);
     const host = normalizeListenHost(opts.host ?? process.env['COPILOT_MCP_HOST'] ?? DEFAULT_HTTP2_HOST);
     const port = normalizeListenPort(opts.port ?? Number(process.env['COPILOT_MCP_PORT'] ?? DEFAULT_HTTP2_PORT));
     const policy = readMcpHttp2ServerPolicy();
     assertLoopbackBindAllowed(host, policy);
+    await opts.processHost?.prepare();
     const tlsIo = createConfiguredFsIo(
         createConfiguredFsGrant({
             id: 'mcp.adapters.http2.tls-material',
@@ -238,7 +268,14 @@ export async function startHttp2McpServer(opts = {}) {
     const tlsReport = validateTlsMaterial(cert, key, policy);
 
     const protocolState = createMcpHttpProtocolState(policy.allowHTTP1 ? 'h2-compat' : 'h2');
-    const requestHandler = createMcpHttpRequestHandler({ host, port, protocolState, publicScheme: 'https' });
+    const requestHandler = createMcpHttpRequestHandler({
+        host,
+        port,
+        protocolState,
+        publicScheme: 'https',
+        workspace,
+        ...(opts.database ? { database: opts.database } : {}),
+    });
     const http2Server = /** @type {McpHttp2SecureServer} */ (
         createSecureServer(buildHttp2SecureServerOptions(policy, cert, key), async (req, res) => {
             recordMcpHttpProtocolRequest(protocolState, req);
@@ -246,10 +283,17 @@ export async function startHttp2McpServer(opts = {}) {
         })
     );
 
-    const runtime = installHttp2RuntimeGuards(http2Server, policy);
+    /** @type {{ value: Awaited<ReturnType<NonNullable<typeof opts.processHost>['acquire']>> | null }} */
+    const processHostLease = { value: null };
+    const runtime = installHttp2RuntimeGuards(http2Server, policy, requestHandler, () => processHostLease.value);
     const timingPolicy = configureHttp2ServerTiming(http2Server);
-    await prepareMcpHttpRuntime();
     await listenHttp2Server(http2Server, host, port);
+    try {
+        processHostLease.value = opts.processHost ? await opts.processHost.acquire({ reason: 'http2-listener' }) : null;
+    } catch (error) {
+        await closeHttp2ServerAfterStartupFailure(http2Server);
+        throw error;
+    }
     logMcp('INFO', 'MCP HTTP/2 server listening.', {
         adapter: { name: MCP_HTTP2_ADAPTER_NAME, version: MCP_HTTP2_ADAPTER_VERSION },
         url: `https://${host}:${port}${MCP_PATH}`,
@@ -263,7 +307,6 @@ export async function startHttp2McpServer(opts = {}) {
         },
         runtime: summarizeHttp2Runtime(runtime),
     });
-    await notifyMcpHttpStarted();
     return http2Server;
 }
 
@@ -322,13 +365,18 @@ function buildHttp2SecureServerOptions(policy, cert, key) {
 /**
  * @param {McpHttp2SecureServer} server
  * @param {McpHttp2ServerPolicy} policy
+ * @param {ReturnType<typeof createMcpHttpRequestHandler>} requestHandler
+ * @param {() => Awaited<ReturnType<ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>['acquire']>> | null} getProcessHostLease
  * @returns {McpHttp2RuntimeState}
  */
-function installHttp2RuntimeGuards(server, policy) {
+function installHttp2RuntimeGuards(server, policy, requestHandler, getProcessHostLease) {
     /** @type {McpHttp2RuntimeState} */
     const runtime = {
         activeSessions: new Set(),
         closing: false,
+        closed: false,
+        closeCallbacks: [],
+        terminalError: null,
         createdAt: Date.now(),
         acceptedSessions: 0,
         rejectedSessions: 0,
@@ -417,13 +465,21 @@ function installHttp2RuntimeGuards(server, policy) {
     });
 
     const close = server.close.bind(server);
-    server.closeGracefully = (callback) => closeHttp2ServerGracefully(runtime, policy, close, callback);
+    server.closeGracefully = (callback) =>
+        closeHttp2ServerGracefully(runtime, policy, close, requestHandler, getProcessHostLease, callback);
     server.close = /** @type {typeof server.close} */ (
         (callback) => {
-            closeHttp2ServerGracefully(runtime, policy, close, callback);
+            closeHttp2ServerGracefully(runtime, policy, close, requestHandler, getProcessHostLease, callback);
             return server;
         }
     );
+    Object.defineProperty(server, Symbol.asyncDispose, {
+        configurable: true,
+        value: () =>
+            new Promise((resolve, reject) => {
+                server.close((error) => (error ? reject(error) : resolve(undefined)));
+            }),
+    });
     return runtime;
 }
 
@@ -431,14 +487,17 @@ function installHttp2RuntimeGuards(server, policy) {
  * @param {McpHttp2RuntimeState} runtime
  * @param {McpHttp2ServerPolicy} policy
  * @param {(callback?: (err?: Error) => void) => McpHttp2SecureServer} close
+ * @param {ReturnType<typeof createMcpHttpRequestHandler>} requestHandler
+ * @param {() => Awaited<ReturnType<ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>['acquire']>> | null} getProcessHostLease
  * @param {(error?: Error) => void} [callback]
  * @returns {void}
  */
-function closeHttp2ServerGracefully(runtime, policy, close, callback) {
-    if (runtime.closing) {
-        if (callback) setImmediate(callback);
-        return;
+function closeHttp2ServerGracefully(runtime, policy, close, requestHandler, getProcessHostLease, callback) {
+    if (callback) {
+        if (runtime.closed) setImmediate(() => callback(runtime.terminalError ?? undefined));
+        else runtime.closeCallbacks.push(callback);
     }
+    if (runtime.closing || runtime.closed) return;
     runtime.closing = true;
     logMcp('INFO', 'Closing MCP HTTP/2 server sessions.', {
         activeSessions: runtime.activeSessions.size,
@@ -466,9 +525,47 @@ function closeHttp2ServerGracefully(runtime, policy, close, callback) {
         }
     }
 
-    close((error) => {
+    const complete = async (/** @type {Error | undefined} */ transportError) => {
         clearTimeout(destroyTimer);
-        callback?.(error);
+        const failures = transportError ? [transportError] : [];
+        try {
+            await requestHandler.close();
+        } catch (error) {
+            failures.push(asCloseError(error, 'MCP HTTP/2 request handler close failed'));
+        }
+        try {
+            await getProcessHostLease()?.release();
+        } catch (error) {
+            failures.push(asCloseError(error, 'MCP HTTP/2 process-host lease release failed'));
+        }
+        runtime.terminalError = combineHttp2CloseFailures(failures);
+        runtime.closed = true;
+        const callbacks = runtime.closeCallbacks.splice(0);
+        for (const pending of callbacks) pending(runtime.terminalError ?? undefined);
+    };
+    try {
+        close((error) => void complete(error));
+    } catch (error) {
+        void complete(asCloseError(error, 'MCP HTTP/2 listener close failed'));
+    }
+}
+
+/** @param {unknown} error @param {string} fallback */
+function asCloseError(error, fallback) {
+    return error instanceof Error ? error : new Error(`${fallback}: ${String(error)}`);
+}
+
+/** @param {Error[]} failures */
+function combineHttp2CloseFailures(failures) {
+    if (failures.length === 0) return null;
+    if (failures.length === 1) return failures[0] ?? null;
+    return new AggregateError(failures, 'MCP HTTP/2 shutdown failed.');
+}
+
+/** @param {McpHttp2SecureServer} server */
+function closeHttp2ServerAfterStartupFailure(server) {
+    return new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve(undefined)));
     });
 }
 

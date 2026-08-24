@@ -16,35 +16,44 @@
  *
  * @module copilot/mcp/adapters/http-shared
  */
+import { NodeStreamableHTTPServerTransport, toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
+import { isLegacyRequest } from '@modelcontextprotocol/server';
 
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createHash, randomUUID } from 'node:crypto';
-import { isIP } from 'node:net';
-import { buildChatGptConnectorProfile } from '../connection/profile.js';
-import { logMcp } from '../control-plane/audit.js';
-import { readMcpAuthJwksWarmupState, scheduleMcpAuthJwksWarmup } from '../control-plane/auth-jwks-warmup.js';
-import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
-import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
-import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
+import {
+    buildProtectedResourceMetadata,
+    handleBuiltInDevOAuthRequest,
+    parseBearerToken,
+    readMcpAuthConfig,
+    readMcpAuthJwksWarmupState,
+} from '#copilot/mcp/public/auth';
+import { buildChatGptConnectorProfile } from '#copilot/mcp/public/connection';
+import { readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
 import {
     activateMcpHttpRequestActivity,
     activateMcpHttpToolRequestTiming,
+    logMcp,
     readMcpMetricsSnapshot,
     recordMcpHttpRequestRpcMethod,
     recordMcpHttpTransportMode,
     runWithMcpHttpToolTimingContext,
-} from '../control-plane/metrics.js';
-import { scheduleOpenAiEndpointLatencyMonitor } from '../control-plane/openai-endpoint-monitor.js';
-import { startMcpWorkspaceExternalWatch } from '../control-plane/paths.js';
-import { scheduleMcpRoundTripAnalyticsMonitor } from '../control-plane/round-trip-analytics-monitor.js';
-import { recordMcpToolsListObserved } from '../control-plane/schema-convergence.js';
+} from '#copilot/mcp/public/observability';
+import { recordMcpToolsListObserved } from '#copilot/mcp/public/protocol/catalog';
 import {
+    MCP_PROTOCOL_LEGACY_DEFAULT_VERSION,
+    MCP_PROTOCOL_LEGACY_MISSING_HEADER_FALLBACK_VERSION,
+    MCP_PROTOCOL_LEGACY_SUPPORTED_VERSIONS,
+    MCP_PROTOCOL_MODERN_VERSION,
+} from '#copilot/mcp/public/protocol/version';
+import { readMcpStartupMaintenanceState } from '#copilot/mcp/public/runtime/startup-maintenance';
+import { createCopilotMcpServer } from '#copilot/mcp/public/server';
+import { createMcpModernHttpHandler } from '#copilot/mcp/public/transport/http/modern';
+import {
+    getDefaultMcpHttpStreamRegistry,
     readMcpHttpStatefulSessionPolicy,
     readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
-} from '../control-plane/session-runtime.js';
-import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
-import { readMcpStartupMaintenanceState, scheduleMcpStartupMaintenance } from '../runtime/startup-maintenance.js';
-import { createCopilotMcpServer } from '../server.js';
+} from '#copilot/mcp/public/transport/http/stateful';
+import { createHash, randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
 import { handleStatefulMcpHttpRequest } from './http-stateful-router.js';
@@ -93,9 +102,6 @@ const MAX_REQUEST_TARGET_LENGTH = 4096;
 const MAX_AUTHORITY_LENGTH = 255;
 const PUBLIC_METADATA_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=300';
 const NO_STORE_CACHE_CONTROL = 'no-store, no-transform';
-const MCP_PROTOCOL_VERSION = '2025-11-25';
-const MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION = '2025-03-26';
-const DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS = /** @type {const} */ (['2025-11-25', '2025-06-18', '2025-03-26']);
 const PROTOCOL_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** @type {Map<string, { windowStartMs: number; count: number }>} */
@@ -107,6 +113,7 @@ const anonymousMcpRateLimitBuckets = new Map();
  * @typedef {import('node:http').ServerResponse | import('node:http2').Http2ServerResponse} McpHttpResponse
  *
  * @typedef {import('./http-protocol.js').McpHttpProtocolState} McpHttpProtocolState
+ * @typedef {((req: McpHttpRequest, res: McpHttpResponse) => Promise<void>) & { close: () => Promise<void> }} McpHttpRequestHandler
  *
  * @typedef {{
  *     methods: string[];
@@ -237,7 +244,10 @@ export function readMcpHttpSessionRuntimeState() {
  *     cloudflareHttp2ToOriginExpected: true;
  *     statelessMcpTransport: boolean;
  *     statefulSessionRuntime: boolean;
- *     protocolVersion: string;
+ *     protocolMode: 'dual-era';
+ *     modernProtocolVersion: string;
+ *     legacyDefaultProtocolVersion: string;
+ *     legacySupportedProtocolVersions: string[];
  *     supportedProtocolVersions: string[];
  *     strictAcceptHeaders: boolean;
  *     strictContentType: boolean;
@@ -253,8 +263,11 @@ export function readMcpHttpTransportPolicy(env = process.env) {
         cloudflareHttp2ToOriginExpected: true,
         statelessMcpTransport: !sessionPolicy.enabled,
         statefulSessionRuntime: sessionPolicy.enabled,
-        protocolVersion: MCP_PROTOCOL_VERSION,
-        supportedProtocolVersions: readSupportedMcpProtocolVersions(env),
+        protocolMode: 'dual-era',
+        modernProtocolVersion: MCP_PROTOCOL_MODERN_VERSION,
+        legacyDefaultProtocolVersion: MCP_PROTOCOL_LEGACY_DEFAULT_VERSION,
+        legacySupportedProtocolVersions: readSupportedLegacyMcpProtocolVersions(env),
+        supportedProtocolVersions: [MCP_PROTOCOL_MODERN_VERSION, ...readSupportedLegacyMcpProtocolVersions(env)],
         strictAcceptHeaders: readStrictMcpAcceptHeaders(env),
         strictContentType: readStrictMcpContentType(env),
         maxRequestBodyBytes: readMaxMcpRequestBodyBytes(env),
@@ -353,11 +366,45 @@ export function configureHttp2ServerTiming(http2Server, env = process.env) {
 }
 
 /**
- * @param {{ host: string; port: number; protocolState: McpHttpProtocolState; publicScheme?: 'http' | 'https' }} options
- * @returns {(req: McpHttpRequest, res: McpHttpResponse) => Promise<void>}
+ * @param {{
+ *     host: string;
+ *     port: number;
+ *     protocolState: McpHttpProtocolState;
+ *     publicScheme?: 'http' | 'https';
+ *     database?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
+ *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ * }} options
+ * @returns {McpHttpRequestHandler}
  */
 export function createMcpHttpRequestHandler(options) {
-    return async (req, res) => {
+    const modernMcpHandler = createMcpModernHttpHandler(
+        (context) =>
+            createCopilotMcpServer({
+                authContext: buildAuthContextFromWebRequest(context.requestInfo),
+                ...(options.workspace ? { workspace: options.workspace } : {}),
+            }),
+        {
+            onerror: (error) => {
+                logMcp('ERROR', 'MCP 2026 handler error.', {
+                    error: error.message,
+                });
+            },
+        },
+    );
+    const modernNodeHandler = toNodeHandler(modernMcpHandler, {
+        onerror: (error) => {
+            logMcp('ERROR', 'MCP 2026 Node adapter error.', {
+                error: error.message,
+            });
+        },
+    });
+
+    /**
+     * @param {McpHttpRequest} req
+     * @param {McpHttpResponse} res
+     * @returns {Promise<void>}
+     */
+    const requestHandler = async (req, res) => {
         const requestReceivedAt = Date.now();
         const requestTimingId = randomUUID();
         const edgeColo = readCloudflareRayColo(readHeader(req, 'cf-ray'));
@@ -462,11 +509,6 @@ export function createMcpHttpRequestHandler(options) {
                             writeMcpTransportError(res, envelopeError.statusCode, envelopeError.error);
                             return;
                         }
-                        const protocolVersionError = validateMcpProtocolVersionHeader(req);
-                        if (protocolVersionError) {
-                            writeMcpTransportError(res, 400, protocolVersionError);
-                            return;
-                        }
                         const acceptHeaderError = validateMcpAcceptHeader(req);
                         if (acceptHeaderError) {
                             writeMcpTransportError(res, 406, acceptHeaderError);
@@ -509,7 +551,8 @@ export function createMcpHttpRequestHandler(options) {
                                 if (rpcMethod === 'tools/list') {
                                     recordMcpToolsListObserved({
                                         protocolVersion:
-                                            readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                                            readHeader(req, 'mcp-protocol-version') ??
+                                            MCP_PROTOCOL_LEGACY_DEFAULT_VERSION,
                                     });
                                 }
                                 const toolCallName = readMcpToolCallName(parsedMcpBody);
@@ -521,6 +564,37 @@ export function createMcpHttpRequestHandler(options) {
                                         res.once('close', finishTimingOnce);
                                     }
                                 }
+                            }
+
+                            const webRequest = await toWebRequest(
+                                /** @type {import('@modelcontextprotocol/node').NodeIncomingMessageLike} */ (
+                                    /** @type {unknown} */ (req)
+                                ),
+                                parsedMcpBody,
+                            );
+                            const legacyRequest = await isLegacyRequest(webRequest, parsedMcpBody);
+                            if (!legacyRequest) {
+                                recordMcpHttpTransportMode('modern-2026');
+                                await modernNodeHandler(
+                                    /** @type {import('@modelcontextprotocol/node').NodeIncomingMessageLike} */ (
+                                        /** @type {unknown} */ (req)
+                                    ),
+                                    /** @type {import('@modelcontextprotocol/node').NodeServerResponseLike} */ (
+                                        /** @type {unknown} */ (res)
+                                    ),
+                                    parsedMcpBody,
+                                );
+                                return;
+                            }
+
+                            const protocolVersionError = validateMcpProtocolVersionHeader(req);
+                            if (protocolVersionError) {
+                                writeMcpTransportError(res, 400, protocolVersionError);
+                                return;
+                            }
+
+                            const sessionPolicy = readMcpHttpSessionPolicy();
+                            if (sessionPolicy.enabled && String(req.method ?? '').toUpperCase() === 'POST') {
                                 const postSessionContract = classifyMcpPostSessionRequirement({
                                     method: req.method,
                                     sessionId: readHeader(req, 'mcp-session-id') ?? null,
@@ -537,7 +611,7 @@ export function createMcpHttpRequestHandler(options) {
                                     }
                                     logMcp(
                                         'WARN',
-                                        'MCP POST request violates future stateful session contract; report-only during Faixa 1.',
+                                        'MCP compatibility request violates the 2025 stateful session contract.',
                                         {
                                             kind: postSessionContract.kind,
                                             initializeRequest: postSessionContract.initializeRequest,
@@ -546,7 +620,7 @@ export function createMcpHttpRequestHandler(options) {
                                     );
                                 }
                             }
-                            const sessionPolicy = readMcpHttpSessionPolicy();
+
                             if (sessionPolicy.enabled) {
                                 recordMcpHttpTransportMode('stateful');
                                 await handleStatefulMcpHttpRequest({
@@ -555,19 +629,25 @@ export function createMcpHttpRequestHandler(options) {
                                     url,
                                     parsedMcpBody,
                                     authContext: buildAuthContext(req, url),
-                                    protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                                    protocolVersion:
+                                        readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_LEGACY_DEFAULT_VERSION,
+                                    ...(options.database ? { database: options.database } : {}),
+                                    ...(options.workspace ? { workspace: options.workspace } : {}),
                                     readHeader,
                                     writeTransportError: writeMcpTransportError,
+                                    createServer: (serverOptions) => createCopilotMcpServer(serverOptions),
                                 });
                                 return;
                             }
                             recordMcpHttpTransportMode('stateless-fallback');
-                            logMcp('WARN', 'MCP HTTP stateless fallback request handled.', {
-                                sessionPolicyReason: sessionPolicy.reason,
-                                statefulRequested: sessionPolicy.requested,
-                                statelessCompat: sessionPolicy.statelessCompat,
-                            });
-                            await handleMcpRequest(req, res, url, parsedMcpBody);
+                            if (sessionPolicy.requested || sessionPolicy.statelessCompat) {
+                                logMcp('WARN', 'MCP HTTP compatibility fallback request handled.', {
+                                    sessionPolicyReason: sessionPolicy.reason,
+                                    statefulRequested: sessionPolicy.requested,
+                                    statelessCompat: sessionPolicy.statelessCompat,
+                                });
+                            }
+                            await handleMcpRequest(req, res, url, parsedMcpBody, options.workspace);
                         } catch (error) {
                             logMcp('ERROR', 'Error handling MCP HTTP request.', {
                                 error: error instanceof Error ? error.message : String(error),
@@ -599,48 +679,10 @@ export function createMcpHttpRequestHandler(options) {
             },
         );
     };
-}
 
-/**
- * Bind process-scoped application infra before the MCP origin starts accepting traffic. Failure remains degradable: the
- * origin can serve non-SQLite surfaces while health/index status reports the missing provider explicitly.
- *
- * @returns {Promise<Readonly<{ configured: boolean; revision: number }> | null>}
- */
-export async function prepareMcpHttpRuntime() {
-    try {
-        const { bootstrapApplicationInfraSqliteProvider } = await import('#copilot/boot/application-infra');
-        return await bootstrapApplicationInfraSqliteProvider();
-    } catch (error) {
-        logMcp('WARN', 'MCP application infra SQLite bootstrap failed; continuing in degraded mode.', {
-            error: error instanceof Error ? error.message : String(error),
-        });
-        return null;
-    }
-}
-
-/**
- * Start runtime-owned services only after application infra bootstrap and socket listen have completed. The external
- * watcher is awaited because it registers a lifecycle-owned resource; fire-and-forget registration could race an
- * immediate server shutdown/runtime dispose and resurrect work against an already-disposed WorkspaceInfra.
- *
- * Optional monitors remain scheduled after the owned watcher reaches a settled state.
- *
- * @returns {Promise<void>}
- */
-export async function notifyMcpHttpStarted() {
-    try {
-        await startMcpWorkspaceExternalWatch();
-    } catch (error) {
-        logMcp('WARN', 'Workspace external watcher could not be started.', {
-            error: error instanceof Error ? error.message : String(error),
-        });
-    }
-    startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
-    scheduleMcpAuthJwksWarmup();
-    scheduleMcpStartupMaintenance();
-    scheduleOpenAiEndpointLatencyMonitor();
-    scheduleMcpRoundTripAnalyticsMonitor();
+    return Object.assign(requestHandler, {
+        close: () => modernMcpHandler.close(),
+    });
 }
 
 /**
@@ -816,12 +858,12 @@ function normalizeAllowedOriginCandidate(value) {
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {string[]}
  */
-function readSupportedMcpProtocolVersions(env = process.env) {
+function readSupportedLegacyMcpProtocolVersions(env = process.env) {
     const configured = String(env['COPILOT_MCP_SUPPORTED_PROTOCOL_VERSIONS'] ?? '')
         .split(',')
         .map((item) => item.trim())
         .filter((item) => PROTOCOL_VERSION_PATTERN.test(item));
-    return configured.length > 0 ? [...new Set(configured)] : [...DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS];
+    return configured.length > 0 ? [...new Set(configured)] : [...MCP_PROTOCOL_LEGACY_SUPPORTED_VERSIONS];
 }
 
 /**
@@ -838,10 +880,10 @@ function readStrictMcpAcceptHeaders(env = process.env) {
  */
 function chooseMcpProtocolVersion(req) {
     const requested = readHeader(req, 'mcp-protocol-version');
-    if (!requested) return MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION;
-    return PROTOCOL_VERSION_PATTERN.test(requested) && readSupportedMcpProtocolVersions().includes(requested)
+    if (!requested) return MCP_PROTOCOL_LEGACY_MISSING_HEADER_FALLBACK_VERSION;
+    return PROTOCOL_VERSION_PATTERN.test(requested) && readSupportedLegacyMcpProtocolVersions().includes(requested)
         ? requested
-        : MCP_PROTOCOL_VERSION;
+        : MCP_PROTOCOL_LEGACY_DEFAULT_VERSION;
 }
 
 /**
@@ -932,7 +974,7 @@ function validateMcpProtocolVersionHeader(req) {
     if (!PROTOCOL_VERSION_PATTERN.test(value)) {
         return { error: 'invalid_request', error_description: 'Invalid MCP-Protocol-Version header.' };
     }
-    if (!readSupportedMcpProtocolVersions().includes(value)) {
+    if (!readSupportedLegacyMcpProtocolVersions().includes(value)) {
         return {
             error: 'unsupported_protocol_version',
             error_description: `Unsupported MCP protocol version: ${value}.`,
@@ -1289,7 +1331,7 @@ function writeMcpRateLimited(res, retryAfterSeconds) {
 
 /**
  * @param {McpHttpRequest} req
- * @param {import('../control-plane/auth.js').McpAuthConfig} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {boolean}
  */
 function shouldIssueMcpUnauthorizedChallenge(req, config) {
@@ -1299,7 +1341,7 @@ function shouldIssueMcpUnauthorizedChallenge(req, config) {
 
 /**
  * @param {McpHttpResponse} res
- * @param {import('../control-plane/auth.js').McpAuthConfig} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {void}
  */
 function writeMcpUnauthorizedChallenge(res, config) {
@@ -1460,7 +1502,7 @@ function readMcpToolCallName(body) {
 /**
  * @param {McpHttpRequest} req
  * @param {URL} url
- * @returns {import('../control-plane/auth.js').McpAuthContext}
+ * @returns {import('#copilot/mcp/public/auth').McpAuthContext}
  */
 function buildAuthContext(req, url) {
     const authorizationHeader = readHeader(req, 'authorization');
@@ -1473,31 +1515,62 @@ function buildAuthContext(req, url) {
 }
 
 /**
+ * Project a web-standard MCP request into the existing resource-server authorization context.
+ * Authentication remains owned by the auth layer; the modern transport only preserves the request
+ * data required for that decision.
+ *
+ * @param {Request | undefined} request
+ * @returns {import('#copilot/mcp/public/auth').McpAuthContext}
+ */
+function buildAuthContextFromWebRequest(request) {
+    if (!request) return { bearerToken: null };
+    return {
+        bearerToken: parseBearerToken(request.headers.get('authorization') ?? undefined),
+        headers: Object.fromEntries(request.headers.entries()),
+        method: request.method,
+        url: request.url,
+    };
+}
+
+/**
  * @param {McpHttpRequest} req
  * @param {McpHttpResponse} res
  * @param {URL} url
  * @param {unknown} [parsedMcpBody]
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} [workspace]
  * @returns {Promise<void>}
  */
-async function handleMcpRequest(req, res, url, parsedMcpBody) {
-    const server = createCopilotMcpServer({ authContext: buildAuthContext(req, url) });
-    const transport = new StreamableHTTPServerTransport(
-        /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */ (
+async function handleMcpRequest(req, res, url, parsedMcpBody, workspace) {
+    const server = createCopilotMcpServer({
+        authContext: buildAuthContext(req, url),
+        ...(workspace ? { workspace } : {}),
+    });
+    const transport = new NodeStreamableHTTPServerTransport(
+        /** @type {import('@modelcontextprotocol/node').StreamableHTTPServerTransportOptions} */ (
             /** @type {unknown} */ ({ sessionIdGenerator: undefined, enableJsonResponse: true })
         ),
     );
-    let closed = false;
+    /** @type {Promise<void> | null} */
+    let closePromise = null;
     const closeOnce = () => {
-        if (closed) return;
-        closed = true;
-        void transport.close();
-        void server.close();
+        if (closePromise) return closePromise;
+        closePromise = (async () => {
+            const results = await Promise.allSettled([transport.close(), server.close()]);
+            const failures = results.filter((result) => result.status === 'rejected');
+            if (failures.length > 0) {
+                logMcp('ERROR', 'MCP stateless request resource close failed.', {
+                    closeFailureCount: failures.length,
+                });
+            }
+        })();
+        return closePromise;
     };
-    res.on('close', closeOnce);
+    const observeResponseClose = () => {
+        void closeOnce();
+    };
+    res.once('close', observeResponseClose);
     try {
-        await server.connect(
-            /** @type {import('@modelcontextprotocol/sdk/shared/transport.js').Transport} */ (transport),
-        );
+        await server.connect(/** @type {import('@modelcontextprotocol/server').Transport} */ (transport));
         if (parsedMcpBody === undefined) {
             await transport.handleRequest(
                 /** @type {import('node:http').IncomingMessage} */ (req),
@@ -1511,7 +1584,7 @@ async function handleMcpRequest(req, res, url, parsedMcpBody) {
             );
         }
     } finally {
-        if (res.writableEnded) closeOnce();
+        if (res.writableEnded) await closeOnce();
     }
 }
 

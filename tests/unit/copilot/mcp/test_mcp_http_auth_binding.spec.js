@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
-import { createMcpHttpSessionRuntime } from '#copilot/mcp/control-plane';
+import { handleStatefulMcpHttpRequest } from '#copilot/mcp/public/adapters/http-stateful';
+import { createMcpHttpSessionRuntime } from '#copilot/testing/mcp/transport/http/stateful';
 import {
     createMcpTransportErrorCollector,
     fakeMcpTransport,

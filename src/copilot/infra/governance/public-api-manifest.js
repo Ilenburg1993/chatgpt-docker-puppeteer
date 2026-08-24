@@ -32,6 +32,7 @@ function authority(pathAuthority, acceptsOperationalRawPath = false, issuer = fa
 const PUBLIC_API_AUTHORITY = Object.freeze({
     '#copilot/infra/public/cache/keys': authority('none'),
     '#copilot/infra/public/cache/tiering': authority('none'),
+    '#copilot/infra/public/cache/ttl': authority('none'),
     '#copilot/infra/public/composition/database/sqlite': authority('configured-bound', true, true),
     '#copilot/infra/public/composition/filesystem/configured': authority('configured-bound', true, true),
     '#copilot/infra/public/composition/process': authority('none'),
@@ -112,6 +113,16 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
         lifecycle: 'none',
         costTier: 'micro',
         exports: ['aggregateIoCacheTierStats', 'buildIoCacheTierPlan'],
+    }),
+    definePublicApi({
+        alias: '#copilot/infra/public/cache/ttl',
+        target: './src/copilot/infra/public/cache/ttl/index.js',
+        audience: 'runtime',
+        privilege: 'read-write',
+        stability: 'stable',
+        lifecycle: 'process',
+        costTier: 'micro',
+        exports: ['TtlCache', 'createTtlCache', 'getTtlCacheStats'],
     }),
     definePublicApi({
         alias: '#copilot/infra/public/concurrency/resilience',

@@ -8,19 +8,22 @@
  * @module copilot/mcp/connection/profile
  */
 
-import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import {
+    DEFAULT_PUBLIC_MCP_URL,
+    MCP_PATH,
+    buildResourceFromMcpUrl,
+    hasAsciiControlChars,
+    normalizeMcpUrl,
+} from './url.js';
 
 const DEFAULT_LOCAL_HTTP_ORIGIN_URL = 'http://127.0.0.1:3333';
 const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = 'https://127.0.0.1:3333';
 const DEFAULT_LOCAL_MCP_URL = `${DEFAULT_LOCAL_HTTP_ORIGIN_URL}/mcp`;
-const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
 const DEFAULT_CLOUDFLARE_ORIGIN_URL = DEFAULT_LOCAL_HTTP_ORIGIN_URL;
 const DEFAULT_CLOUDFLARE_HTTP2_ORIGIN_URL = DEFAULT_LOCAL_HTTP2_ORIGIN_URL;
 const DEFAULT_TUNNEL_ID_PLACEHOLDER = 'tunnel_<preencher>';
 const MAX_URL_LENGTH = 2048;
-const MAX_HOSTNAME_LENGTH = 253;
-const MAX_PATH_LENGTH = 256;
-const MCP_PATH = '/mcp';
 
 export const CHATGPT_CONNECTOR_NAME = 'Repo DevContainer MCP';
 
@@ -354,75 +357,6 @@ export function buildCloudflareTunnelRunbook(options = {}) {
 }
 
 /**
- * Normalize a candidate MCP URL into an absolute URL ending in /mcp. This helper is intentionally forgiving because it
- * is used for form helpers; use validatePublicConnectorUrl for strict public connector checks.
- *
- * @param {string} url
- * @returns {string}
- */
-export function normalizeMcpUrl(url) {
-    const trimmed = String(url || '').trim();
-    if (!trimmed || trimmed.length > MAX_URL_LENGTH || hasAsciiControlChars(trimmed)) return DEFAULT_PUBLIC_MCP_URL;
-    try {
-        const parsed = new URL(trimmed);
-        if (parsed.username || parsed.password) return DEFAULT_PUBLIC_MCP_URL;
-        parsed.hash = '';
-        parsed.search = '';
-        parsed.pathname = normalizeMcpPath(parsed.pathname);
-        return parsed
-            .toString()
-            .replace(/\/+$/u, '')
-            .replace(/\/mcp$/u, MCP_PATH);
-    } catch {
-        const withoutTrailingSlash = trimmed.replace(/\/+$/u, '');
-        return `${withoutTrailingSlash}${withoutTrailingSlash.endsWith(MCP_PATH) ? '' : MCP_PATH}`;
-    }
-}
-
-/**
- * @param {string} url
- * @returns {{ ok: true; normalizedUrl: string; resource: string } | { ok: false; reason: string; normalizedUrl: string }}
- */
-export function validatePublicConnectorUrl(url) {
-    const normalized = normalizeMcpUrl(url);
-    if (normalized.length > MAX_URL_LENGTH)
-        return { ok: false, reason: 'Connector URL is too long.', normalizedUrl: normalized };
-    let parsed;
-    try {
-        parsed = new URL(normalized);
-    } catch {
-        return { ok: false, reason: 'Connector URL must be an absolute URL.', normalizedUrl: normalized };
-    }
-    if (parsed.protocol !== 'https:') {
-        return { ok: false, reason: 'ChatGPT connector URL must be HTTPS.', normalizedUrl: normalized };
-    }
-    if (parsed.username || parsed.password) {
-        return { ok: false, reason: 'Connector URL must not contain credentials.', normalizedUrl: normalized };
-    }
-    if (parsed.search || parsed.hash) {
-        return {
-            ok: false,
-            reason: 'Connector URL must not contain query string or fragment.',
-            normalizedUrl: normalized,
-        };
-    }
-    if (!isValidHostname(parsed.hostname)) {
-        return { ok: false, reason: 'Connector URL hostname is invalid.', normalizedUrl: normalized };
-    }
-    if (isLocalHostname(parsed.hostname)) {
-        return {
-            ok: false,
-            reason: 'Public ChatGPT connector URL must not use localhost or loopback.',
-            normalizedUrl: normalized,
-        };
-    }
-    if (parsed.pathname !== MCP_PATH) {
-        return { ok: false, reason: 'ChatGPT connector URL must end exactly with /mcp.', normalizedUrl: normalized };
-    }
-    return { ok: true, normalizedUrl: normalized, resource: buildResourceFromMcpUrl(normalized) };
-}
-
-/**
  * @param {{ publicMcpUrl?: string; localMcpUrl?: string }} [options]
  * @returns {Http2PlusProfile}
  */
@@ -625,7 +559,7 @@ function buildChatGptSmokePrompts() {
         'Chame mcp_cloudflare_remote_audit e confirme que a rota remota está sincronizada com o origin.',
         'Chame mcp_cloudflare_metrics_snapshot e procure sinais de instabilidade do tunnel.',
         'Liste a árvore de src/copilot/mcp com repo_tree.',
-        'Leia src/copilot/mcp/registry.js linhas 1 a 120 com repo_read_file e informe o sha256.',
+        'Leia src/copilot/mcp/registry/runtime.js linhas 1 a 120 com repo_read_file e informe o sha256.',
         'Faça repo_symbol_search name=registerCanonicalMcpTools path=src/copilot/mcp.',
         'Chame project_doctor.',
         'Consulte mcp_validation_plan sem suite: o default deve ser inspect-first/no-validator; forneça testFile explícito somente quando um teste focado agregar evidência.',
@@ -745,34 +679,6 @@ function normalizeOriginUrl(value, fallback) {
 }
 
 /**
- * @param {string} pathname
- * @returns {string}
- */
-function normalizeMcpPath(pathname) {
-    const normalized = String(pathname || '/').replace(/\/+$/u, '');
-    if (!normalized || normalized === '/') return MCP_PATH;
-    if (normalized === MCP_PATH || normalized.endsWith(MCP_PATH)) return normalized;
-    const next = `${normalized}${MCP_PATH}`;
-    return next.length <= MAX_PATH_LENGTH ? next : MCP_PATH;
-}
-
-/**
- * @param {string} mcpUrl
- * @returns {string}
- */
-function buildResourceFromMcpUrl(mcpUrl) {
-    try {
-        const parsed = new URL(normalizeMcpUrl(mcpUrl));
-        parsed.pathname = parsed.pathname.replace(/\/mcp$/u, '').replace(/\/+$/u, '');
-        parsed.search = '';
-        parsed.hash = '';
-        return parsed.toString().replace(/\/+$/u, '');
-    } catch {
-        return DEFAULT_PUBLIC_MCP_URL.replace(/\/mcp$/u, '');
-    }
-}
-
-/**
  * @param {string | undefined} value
  * @param {boolean} fallback
  * @returns {boolean}
@@ -785,45 +691,6 @@ function readBooleanEnv(value, fallback) {
     if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
     if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
     return fallback;
-}
-
-/**
- * @param {string} hostname
- * @returns {boolean}
- */
-function isValidHostname(hostname) {
-    const normalized = hostname.toLowerCase().replace(/\.+$/u, '');
-    if (!normalized || normalized.length > MAX_HOSTNAME_LENGTH || normalized.includes('_')) return false;
-    if (normalized === 'localhost' || normalized === '::1' || normalized === '[::1]') return true;
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/u.test(normalized)) return true;
-    return normalized.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label));
-}
-
-/**
- * @param {string} hostname
- * @returns {boolean}
- */
-function isLocalHostname(hostname) {
-    const normalized = hostname.toLowerCase().replace(/\.+$/u, '');
-    return (
-        normalized === 'localhost' ||
-        normalized === '127.0.0.1' ||
-        normalized === '::1' ||
-        normalized === '[::1]' ||
-        normalized.endsWith('.localhost')
-    );
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function hasAsciiControlChars(value) {
-    for (let index = 0; index < value.length; index += 1) {
-        const code = value.charCodeAt(index);
-        if (code <= 31 || code === 127) return true;
-    }
-    return false;
 }
 
 /**

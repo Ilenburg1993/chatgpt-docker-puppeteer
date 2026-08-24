@@ -2,7 +2,7 @@
 
 import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 
-import { createOAuthReplayStore, OAUTH_REPLAY_NAMESPACES } from '#copilot/mcp/control-plane';
+import { createOAuthReplayStore, OAUTH_REPLAY_NAMESPACES } from '#copilot/testing/mcp/auth';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';

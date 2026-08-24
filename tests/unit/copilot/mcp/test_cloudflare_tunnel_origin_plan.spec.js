@@ -1,4 +1,7 @@
-import { applyCloudflareTunnelOriginPlan, buildCloudflareTunnelOriginPlan } from '#copilot/mcp/cloudflare';
+import {
+    applyCloudflareTunnelOriginPlan,
+    buildCloudflareTunnelOriginPlan,
+} from '#copilot/mcp/public/cloudflare/tunnel-origin';
 import { describe, expect, it } from 'vitest';
 
 const BASE_ENV = {

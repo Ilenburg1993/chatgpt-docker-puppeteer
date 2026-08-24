@@ -80,6 +80,31 @@ describe('infra/filesystem/invalidation/external-watch runtime ownership', () =>
         expect(stats?.filtered).toBeGreaterThanOrEqual(1);
     });
 
+    it('reference-counts watcher leases and stops only when the final consumer releases', async () => {
+        const root = await createTempDir();
+        const runtime = createTestRuntime();
+        const workspace = runtime.workspace(root);
+
+        const first = await workspace.acquireExternalWatch(root, { enabled: true });
+        const second = await workspace.acquireExternalWatch(root, { enabled: true });
+        expect(first).toMatchObject({ started: true, reused: false, leases: 1 });
+        expect(second).toMatchObject({ started: true, reused: true, leases: 2 });
+        expect(workspace.externalWatchStats()[0]).toMatchObject({ watching: true, leases: 2 });
+        expect(workspace.lifecycleSnapshot()).toMatchObject({ activeExternalWatchers: 1, externalWatchLeases: 2 });
+
+        expect(first.release()).toBe(true);
+        expect(first.release()).toBe(false);
+        expect(workspace.externalWatchStats()[0]).toMatchObject({ watching: true, leases: 1 });
+
+        expect(second.release()).toBe(true);
+        expect(workspace.externalWatchStats()[0]).toMatchObject({ watching: false, leases: 0 });
+        expect(workspace.lifecycleSnapshot()).toMatchObject({ activeExternalWatchers: 0, externalWatchLeases: 0 });
+
+        const restarted = await workspace.acquireExternalWatch(root, { enabled: true });
+        expect(restarted).toMatchObject({ started: true, reused: false, leases: 1 });
+        expect(restarted.release()).toBe(true);
+    });
+
     it('suprime hint do mesmo evento quando invalidation canônica da instância já o cobriu', async () => {
         const root = await createTempDir();
         const file = join(root, 'canonical.js');

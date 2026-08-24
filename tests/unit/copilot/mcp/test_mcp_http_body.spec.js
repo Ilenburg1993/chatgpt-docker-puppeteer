@@ -12,7 +12,7 @@ import {
     isMcpInitializeRequestBody,
     normalizeMcpSessionId,
     readMcpHttpJsonBody,
-} from '#copilot/mcp/adapters';
+} from '#copilot/mcp/public/adapters/http-body';
 
 /**
  * @param {string | Buffer} body

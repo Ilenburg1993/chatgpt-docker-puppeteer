@@ -10,7 +10,8 @@
  */
 
 import { readBoundedResponseJson } from '#copilot/infra/public/platform/http-response';
-import { createTtlCache } from '#copilot/mcp/control-plane';
+
+import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
@@ -22,7 +23,7 @@ const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
 const DYNAMIC_MCP_PATHS = ['/mcp', '/oauth/', '/.well-known/', '/health'];
 const DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS = 60_000;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const configAuditCache = createTtlCache({
     name: 'cloudflare-config-audit',
     ttlMs: DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS,

@@ -30,6 +30,17 @@
       }
     },
     {
+      "alias": "#copilot/infra/public/cache/ttl",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.27,
+        "wallMs": 57.383,
+        "rssMiB": 56.352,
+        "rssDeltaMiB": 0.75
+      }
+    },
+    {
       "alias": "#copilot/infra/public/composition/database/sqlite",
       "audience": "composition",
       "costTier": "micro",

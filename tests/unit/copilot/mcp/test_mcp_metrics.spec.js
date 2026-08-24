@@ -14,9 +14,9 @@ import {
     recordMcpToolInteractionEnd,
     recordMcpToolInteractionStart,
     recordMcpToolMetric,
-    resetMcpMetricsForTests,
     runWithMcpHttpToolTimingContext,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/observability';
+import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
 
 beforeEach(() => {
     resetMcpMetricsForTests();

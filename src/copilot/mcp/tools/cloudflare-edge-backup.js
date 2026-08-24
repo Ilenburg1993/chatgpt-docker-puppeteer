@@ -5,12 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-edge-backup
  */
 
-import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/cloudflare';
-import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/public/cloudflare/edge-backup';
+
+import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgeBackupCreateTool = {
     name: 'mcp_cloudflare_edge_backup_create',
@@ -35,7 +36,7 @@ export const mcpCloudflareEdgeBackupCreateTool = {
 };
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareEdgeBackupsListTool = {
     name: 'mcp_cloudflare_edge_backups_list',

@@ -7,7 +7,7 @@ import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { createMcpLatencyHistoryRuntime } from '../../../../src/copilot/mcp/control-plane/latency-history.js';
+import { createMcpLatencyHistoryRuntime } from '#copilot/testing/mcp/diagnostics/latency';
 
 describe('MCP latency history persistence', () => {
     it('serializes concurrent append/trim cycles through one bound configured store', async () => {

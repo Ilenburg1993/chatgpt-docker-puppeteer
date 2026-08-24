@@ -2,7 +2,7 @@
 /** Tests for runtime-owned cached AI artifact diagnostics. */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { createAiArtifactsRuntime } from '#copilot/mcp/control-plane';
+import { createAiArtifactsRuntime } from '#copilot/testing/mcp/maintenance';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

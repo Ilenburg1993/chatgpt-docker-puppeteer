@@ -3,7 +3,9 @@
  * High-power terminal/process tools for the workspace MCP.
  *
  * These tools intentionally expose arbitrary command execution within the operating-system boundary of the MCP process.
- * No command, executable, shell, cwd, environment key or destination allowlist is applied here.
+ * No command, executable, shell, cwd, explicit environment key or destination allowlist is applied here. Generic
+ * execution inherits only a non-credential operational environment; credential-bearing variables require explicit
+ * injection by the caller/owning operation.
  *
  * @module copilot/mcp/tools/terminal
  */
@@ -14,12 +16,15 @@ import {
     controlTerminalSession,
     executeTerminalCommand,
     executeTerminalCommandBatch,
-    okResult,
     openTerminalSession,
+    readTerminalSession,
+} from '#copilot/mcp/public/process/terminal';
+import {
+    okResult,
     openWorldDestructiveAnnotations,
     readOnlyAnnotations,
-    readTerminalSession,
-} from '#copilot/mcp/control-plane';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 
 const envSchema = z.record(z.string(), z.union([z.string(), z.null()]));
 
@@ -47,7 +52,12 @@ const commandSpecShape = {
         .optional()
         .describe('Arbitrary absolute cwd or path relative to the workspace root.'),
     env: envSchema.optional().describe('Environment overrides. null removes a variable.'),
-    inheritEnv: z.boolean().optional().describe('Inherit the MCP process environment. Default: true.'),
+    inheritEnv: z
+        .boolean()
+        .optional()
+        .describe(
+            'Inherit the safe operational environment projection. Default: true; ambient credentials are never inherited.',
+        ),
     stdin: z
         .string()
         .max(16 * 1024 * 1024)
@@ -69,8 +79,202 @@ const commandSpecShape = {
         .describe('Retained tail bytes per stdout/stderr stream. Default: 1MiB.'),
 };
 const commandSpecSchema = z.object(commandSpecShape);
+
+const terminalEnvironmentProjectionSchema = z.object({
+    policyVersion: z.string(),
+    inheritance: z.enum(['operational', 'none']),
+    ambientCredentialInheritance: z.literal(false),
+    inheritedKeyCount: z.number().int().min(0),
+    explicitOverrideCount: z.number().int().min(0),
+    removedOverrideCount: z.number().int().min(0),
+});
+
+const terminalCapabilitiesSchema = z.object({
+    terminalControlVersion: z.number().int().min(1),
+    arbitraryCommands: z.boolean(),
+    arbitraryShell: z.boolean(),
+    arbitraryExecutable: z.boolean(),
+    arbitraryCwd: z.boolean(),
+    arbitraryEnvironment: z.boolean(),
+    ambientCredentialInheritance: z.literal(false),
+    defaultEnvironmentInheritance: z.literal('operational-projection'),
+    explicitEnvironmentOverrides: z.boolean(),
+    stdin: z.boolean(),
+    persistentSessions: z.boolean(),
+    multipleSessions: z.boolean(),
+    signals: z.boolean(),
+    processGroups: z.boolean(),
+    pty: z.boolean(),
+    ptyModule: z.string().nullable(),
+    defaultShell: z.string(),
+    maxSessions: z.number().int().min(1),
+    maxBatchCommands: z.number().int().min(1),
+    maxBatchConcurrency: z.number().int().min(1),
+    defaultBatchResultBudgetBytes: z.number().int().min(1),
+    maxBatchResultBudgetBytes: z.number().int().min(1),
+    maxExecOutputBytes: z.number().int().min(1),
+    maxSessionBufferBytes: z.number().int().min(1),
+    osBoundary: z.string(),
+});
+
+const terminalSessionSchema = z.object({
+    id: z.string(),
+    backend: z.enum(['pipe', 'pty']),
+    command: z.string(),
+    args: z.array(z.string()),
+    cwd: z.string(),
+    pid: z.number().int().nullable(),
+    startedAt: z.string(),
+    endedAt: z.string().nullable(),
+    status: z.enum(['running', 'exited', 'failed']),
+    exitCode: z.number().int().nullable(),
+    signal: z.union([z.string(), z.number()]).nullable(),
+    environmentProjection: terminalEnvironmentProjectionSchema,
+    bufferLimitBytes: z.number().int().min(0),
+    bufferedBytes: z.number().int().min(0),
+    droppedBytes: z.number().int().min(0),
+    nextSeq: z.number().int().min(1),
+});
+
+const terminalEventSchema = z.object({
+    seq: z.number().int().min(1),
+    stream: z.enum(['stdout', 'stderr', 'pty', 'system']),
+    data: z.string(),
+    bytes: z.number().int().min(0),
+    at: z.string(),
+});
+
+const terminalOneShotResultSchema = z.object({
+    success: z.boolean(),
+    terminalControlVersion: z.number().int().min(1),
+    mode: z.literal('one-shot'),
+    shell: z.boolean(),
+    executable: z.string(),
+    args: z.array(z.string()),
+    cwd: z.string(),
+    pid: z.number().int().nullable(),
+    exitCode: z.number().int().nullable(),
+    signal: z.string().nullable(),
+    timedOut: z.boolean(),
+    cancelled: z.boolean().optional(),
+    cancellationSource: z.enum(['caller', 'deadline', 'unknown']).nullable().optional(),
+    durationMs: z.number().min(0),
+    environmentProjection: terminalEnvironmentProjectionSchema,
+    stdout: z.string(),
+    stderr: z.string(),
+    stdoutBytesObserved: z.number().int().min(0),
+    stderrBytesObserved: z.number().int().min(0),
+    stdoutTruncated: z.boolean(),
+    stderrTruncated: z.boolean(),
+    error: z.string().optional(),
+});
+
+const terminalBatchRowSchema = z.object({
+    index: z.number().int().min(0),
+    success: z.boolean(),
+    skipped: z.boolean().optional(),
+    reason: z.string().optional(),
+    error: z.string().optional(),
+    terminalControlVersion: z.number().int().min(1).optional(),
+    mode: z.literal('one-shot').optional(),
+    shell: z.boolean().optional(),
+    executable: z.string().optional(),
+    args: z.array(z.string()).optional(),
+    cwd: z.string().optional(),
+    pid: z.number().int().nullable().optional(),
+    exitCode: z.number().int().nullable().optional(),
+    signal: z.string().nullable().optional(),
+    timedOut: z.boolean().optional(),
+    cancelled: z.boolean().optional(),
+    cancellationSource: z.enum(['caller', 'deadline', 'unknown']).nullable().optional(),
+    durationMs: z.number().min(0).optional(),
+    environmentProjection: terminalEnvironmentProjectionSchema.optional(),
+    stdout: z.string().optional(),
+    stderr: z.string().optional(),
+    stdoutBytesObserved: z.number().int().min(0).optional(),
+    stderrBytesObserved: z.number().int().min(0).optional(),
+    stdoutTruncated: z.boolean().optional(),
+    stderrTruncated: z.boolean().optional(),
+});
+
+const terminalExecOutputSchema = z.union([
+    terminalOneShotResultSchema,
+    z.object({
+        success: z.boolean(),
+        batch: z.literal(true),
+        requestCount: z.number().int().min(1),
+        succeededCount: z.number().int().min(0),
+        failedCount: z.number().int().min(0),
+        concurrency: z.number().int().min(1),
+        failureMode: z.enum(['best-effort', 'fail-fast']),
+        resultBudgetBytes: z.number().int().min(1),
+        perStreamOutputBudgetBytes: z.number().int().min(1),
+        results: z.array(terminalBatchRowSchema),
+    }),
+    z.object({
+        success: z.literal(false),
+        code: z.string(),
+        hint: z.string().optional(),
+    }),
+]);
+
+const terminalSessionControlOutputSchema = z.object({
+    success: z.boolean(),
+    code: z.string().optional(),
+    hint: z.string().optional(),
+    error: z.string().optional(),
+    action: z.enum(['open', 'write', 'eof', 'resize', 'signal', 'close', 'forget']).nullable().optional(),
+    sessionId: z.string().optional(),
+    session: terminalSessionSchema.optional(),
+    capabilities: terminalCapabilitiesSchema.optional(),
+    forgotten: z.boolean().optional(),
+    bytesWritten: z.number().int().min(0).optional(),
+    cols: z.number().int().min(1).optional(),
+    rows: z.number().int().min(1).optional(),
+    signal: z.string().optional(),
+    alreadyClosed: z.boolean().optional(),
+    maxSessions: z.number().int().min(1).optional(),
+    runningSessions: z.number().int().min(0).optional(),
+    backend: z.enum(['pipe', 'pty']).optional(),
+    command: z.string().optional(),
+    cwd: z.string().optional(),
+});
+
+const terminalSessionReadOutputSchema = z.object({
+    success: z.boolean(),
+    code: z.string().optional(),
+    sessionId: z.string().nullable().optional(),
+    capabilities: terminalCapabilitiesSchema.optional(),
+    total: z.number().int().min(0).optional(),
+    running: z.number().int().min(0).optional(),
+    sessions: z.array(terminalSessionSchema).optional(),
+    session: terminalSessionSchema.optional(),
+    afterSeq: z.number().int().min(0).optional(),
+    nextSeq: z.number().int().min(0).optional(),
+    earliestAvailableSeq: z.number().int().min(1).optional(),
+    cursorBehindRetention: z.boolean().optional(),
+    returnedBytes: z.number().int().min(0).optional(),
+    hasMore: z.boolean().optional(),
+    events: z.array(terminalEventSchema).optional(),
+});
+
 const TERMINAL_EXEC_RESULT_LIMIT_BYTES = 40 * 1024 * 1024;
 const TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES = 12 * 1024 * 1024;
+
+/**
+ * Reduce the wire OperationContext to the authority actually required by the process owner.
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/process/terminal').TerminalExecutionRuntime}
+ */
+function terminalExecutionRuntime(operationContext) {
+    const workspace = requireMcpToolWorkspace(operationContext);
+    if (!operationContext) throw new TypeError('Terminal tool execution requires an OperationContext.');
+    return Object.freeze({
+        workspaceRoot: workspace.workspaceRoot,
+        signal: operationContext.signal,
+        cancellationSource: operationContext.cancellationSource,
+    });
+}
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isRecord(value) {
@@ -112,13 +316,13 @@ function terminalResult(payload) {
     return okResult(payload, JSON.stringify(compact, null, 2));
 }
 
-/** @type {import('../registry.js').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
 export const terminalTools = [
     {
         name: 'terminal_exec',
         title: 'Execute arbitrary terminal commands',
         description:
-            'Execute any shell command or executable permitted by the MCP process OS identity. Supports one-shot or batched execution, arbitrary cwd/env/stdin, optional no-timeout mode, bounded output tails, and process-group termination. No command allowlist is applied.',
+            'Execute any shell command or executable permitted by the MCP process OS identity. Supports one-shot or batched execution, arbitrary cwd/explicit env/stdin, optional no-timeout mode, bounded output tails, and process-group termination. Default ambient inheritance is operational-only and excludes parent credentials; no command allowlist is applied.',
         inputSchema: {
             command: commandSpecShape.command.optional(),
             args: commandSpecShape.args,
@@ -155,9 +359,11 @@ export const terminalTools = [
                 .optional()
                 .describe('Aggregate retained stdout/stderr budget across a batch. Default: 8MiB.'),
         },
+        outputSchema: terminalExecOutputSchema,
         annotations: openWorldDestructiveAnnotations(),
         maxResultBytes: TERMINAL_EXEC_RESULT_LIMIT_BYTES,
-        handler: async (input = {}) => {
+        handler: async (input = {}, operationContext) => {
+            const runtime = terminalExecutionRuntime(operationContext);
             const value = isRecord(input) ? input : {};
             if (Array.isArray(value['batch'])) {
                 if (value['command'] !== undefined) {
@@ -168,7 +374,7 @@ export const terminalTools = [
                     });
                 }
                 return terminalResult(
-                    await executeTerminalCommandBatch(value['batch'], {
+                    await executeTerminalCommandBatch(value['batch'], runtime, {
                         ...(typeof value['batchConcurrency'] === 'number'
                             ? { concurrency: value['batchConcurrency'] }
                             : {}),
@@ -189,7 +395,10 @@ export const terminalTools = [
                 });
             }
             return terminalResult(
-                await executeTerminalCommand(/** @type {Parameters<typeof executeTerminalCommand>[0]} */ (value)),
+                await executeTerminalCommand(
+                    /** @type {Parameters<typeof executeTerminalCommand>[0]} */ (value),
+                    runtime,
+                ),
             );
         },
     },
@@ -217,7 +426,12 @@ export const terminalTools = [
                 .max(32 * 1024)
                 .optional(),
             env: envSchema.optional(),
-            inheritEnv: z.boolean().optional(),
+            inheritEnv: z
+                .boolean()
+                .optional()
+                .describe(
+                    'Inherit the safe operational environment projection. Default: true; ambient credentials are never inherited.',
+                ),
             backend: z
                 .enum(['auto', 'pipe', 'pty'])
                 .optional()
@@ -254,12 +468,17 @@ export const terminalTools = [
                 .optional()
                 .describe('Grace period before SIGKILL on close. Default: 1500ms.'),
         },
+        outputSchema: terminalSessionControlOutputSchema,
         annotations: openWorldDestructiveAnnotations(),
-        handler: async (input = {}) => {
+        handler: async (input = {}, operationContext) => {
             const value = isRecord(input) ? input : {};
             if (value['action'] === 'open') {
+                const runtime = terminalExecutionRuntime(operationContext);
                 return terminalResult(
-                    await openTerminalSession(/** @type {Parameters<typeof openTerminalSession>[0]} */ (value)),
+                    await openTerminalSession(
+                        /** @type {Parameters<typeof openTerminalSession>[0]} */ (value),
+                        runtime,
+                    ),
                 );
             }
             if (!value['sessionId']) {
@@ -298,6 +517,7 @@ export const terminalTools = [
                 .optional()
                 .describe('Maximum sessions returned by list. Default: 50.'),
         },
+        outputSchema: terminalSessionReadOutputSchema,
         annotations: readOnlyAnnotations(),
         maxResultBytes: TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES,
         handler: async (input = {}) =>

@@ -11,12 +11,10 @@
 
 import {
     errorResult,
-    getMcpWorkspaceIndexing,
-    getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
-    resolveReadPath,
-} from '#copilot/mcp/control-plane';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod';
@@ -27,11 +25,10 @@ const DEFAULT_CONTEXT_FILES = 40;
 const DEFAULT_CONTEXT_BYTES = 16 * 1024;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_MCP_WORKING_SETS = 8;
-const MCP_SCOPE_CONTEXT = getMcpWorkspaceIndexing().context;
-const { declareScope, findSymbol, getScopeContext } = MCP_SCOPE_CONTEXT;
-
-/** @typedef {ReturnType<typeof MCP_SCOPE_CONTEXT.declareScope>} McpScopeHandle */
-/** @type {Map<string, { handle: McpScopeHandle; createdAtMs: number; lastAccessAtMs: number }>} */
+/** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} McpWorkspaceCapability */
+/** @typedef {ReturnType<McpWorkspaceCapability['indexing']['context']['declareScope']>} McpScopeHandle */
+/** @typedef {McpWorkspaceCapability['indexing']['context']} McpScopeContext */
+/** @type {Map<string, { handle: McpScopeHandle; context: McpScopeContext; workspaceRoot: string; createdAtMs: number; lastAccessAtMs: number }>} */
 const mcpWorkingSets = new Map();
 
 function pruneStaleOwnedWorkingSets() {
@@ -63,13 +60,13 @@ function getOwnedWorkingSet(workingSetId) {
     return entry;
 }
 
-/** @param {string} absolutePath */
-function toRepoPath(absolutePath) {
-    return relative(getMcpWorkspaceRoot(), absolutePath).replace(/\\/gu, '/');
+/** @param {string} workspaceRoot @param {string} absolutePath */
+function toRepoPath(workspaceRoot, absolutePath) {
+    return relative(workspaceRoot, absolutePath).replace(/\\/gu, '/');
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const repoWorkingSetTool = {
     name: 'repo_working_set',
@@ -150,33 +147,37 @@ export const repoWorkingSetTool = {
             ['describe']('Maximum symbol matches for action=find. Default: 50.'),
     },
     annotations: { ...readOnlyAnnotations(), idempotentHint: false },
-    handler: async ({
-        action,
-        workingSetId,
-        path,
-        maxFiles,
-        maxBytes,
-        contextMode,
-        concurrency,
-        parseSymbols,
-        indexMode,
-        selectionMode,
-        seedPaths,
-        seedSymbols,
-        include,
-        exclude,
-        modifiedPaths,
-        symbol,
-        exactMatch,
-        maxResults,
-    }) => {
+    handler: async (
+        {
+            action,
+            workingSetId,
+            path,
+            maxFiles,
+            maxBytes,
+            contextMode,
+            concurrency,
+            parseSymbols,
+            indexMode,
+            selectionMode,
+            seedPaths,
+            seedSymbols,
+            include,
+            exclude,
+            modifiedPaths,
+            symbol,
+            exactMatch,
+            maxResults,
+        },
+        operationContext,
+    ) => {
+        const workspace = requireMcpToolWorkspace(operationContext);
         if (action === 'open') {
-            const resolved = await resolveReadPath((path ?? '').trim() || DEFAULT_PATH);
+            const resolved = await workspace.resolveReadPath((path ?? '').trim() || DEFAULT_PATH);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             /** @type {string[]} */
             const preferredPaths = [];
             for (const candidate of seedPaths ?? []) {
-                const seed = await resolveReadPath(candidate);
+                const seed = await workspace.resolveReadPath(candidate);
                 if (!seed.ok) return errorResult(seed.reason, seed);
                 const fromRoot = relative(resolved.resolved, seed.resolved);
                 if (
@@ -195,10 +196,11 @@ export const repoWorkingSetTool = {
             evictOldestOwnedWorkingSetIfNeeded();
             const id = `mcp-ws-${randomUUID()}`;
             const now = Date.now();
-            const handle = declareScope({
+            const scopeContext = workspace.indexing.context;
+            const handle = scopeContext.declareScope({
                 sessionId: id,
                 directory: resolved.resolved,
-                workspaceRoot: getMcpWorkspaceRoot(),
+                workspaceRoot: workspace.workspaceRoot,
                 maxFiles: maxFiles ?? DEFAULT_MAX_FILES,
                 parseSymbols: parseSymbols ?? true,
                 indexMode: indexMode ?? 'auto',
@@ -211,7 +213,13 @@ export const repoWorkingSetTool = {
                 recursive: true,
                 silent: true,
             });
-            mcpWorkingSets.set(id, { handle, createdAtMs: now, lastAccessAtMs: now });
+            mcpWorkingSets.set(id, {
+                handle,
+                context: scopeContext,
+                workspaceRoot: workspace.workspaceRoot,
+                createdAtMs: now,
+                lastAccessAtMs: now,
+            });
             const stats = await handle.awaitReady();
             if (!handle.snapshot()) {
                 mcpWorkingSets.delete(id);
@@ -222,12 +230,12 @@ export const repoWorkingSetTool = {
             const effectiveContextMode = contextMode ?? 'auto';
             const contextIncluded = effectiveContextMode !== 'omit';
             const context = contextIncluded
-                ? getScopeContext(handle.sessionId, {
+                ? scopeContext.getScopeContext(handle.sessionId, {
                       maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                       maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
                   })
                 : null;
-            const repoPath = toRepoPath(resolved.resolved);
+            const repoPath = toRepoPath(workspace.workspaceRoot, resolved.resolved);
             const structured = {
                 workingSetId: id,
                 path: repoPath,
@@ -254,7 +262,7 @@ export const repoWorkingSetTool = {
         }
 
         if (action === 'context') {
-            const context = getScopeContext(owned.handle.sessionId, {
+            const context = owned.context.getScopeContext(owned.handle.sessionId, {
                 maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                 maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
             });
@@ -282,10 +290,11 @@ export const repoWorkingSetTool = {
             if (!symbol)
                 return errorResult('action=find requires symbol.', { code: 'ERR_WORKING_SET_SYMBOL_REQUIRED' });
             const limit = maxResults ?? 50;
-            const matches = findSymbol(owned.handle.sessionId, symbol, { exactMatch })
+            const matches = owned.context
+                .findSymbol(owned.handle.sessionId, symbol, { exactMatch })
                 .slice(0, limit)
                 .map((entry) => ({
-                    path: toRepoPath(entry.filePath),
+                    path: toRepoPath(owned.workspaceRoot, entry.filePath),
                     symbol: entry.symbol,
                 }));
             return okResult(
@@ -300,7 +309,7 @@ export const repoWorkingSetTool = {
             if (modifiedPaths && modifiedPaths.length > 0) {
                 resolvedPaths = [];
                 for (const candidate of modifiedPaths) {
-                    const resolved = await resolveReadPath(candidate);
+                    const resolved = await workspace.resolveReadPath(candidate);
                     if (!resolved.ok) return errorResult(resolved.reason, resolved);
                     resolvedPaths.push(resolved.resolved);
                 }
@@ -311,7 +320,7 @@ export const repoWorkingSetTool = {
                 effectiveContextMode === 'include' ||
                 (effectiveContextMode === 'auto' && (result.refreshed > 0 || result.removed > 0 || result.failed > 0));
             const context = contextIncluded
-                ? getScopeContext(owned.handle.sessionId, {
+                ? owned.context.getScopeContext(owned.handle.sessionId, {
                       maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
                       maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
                   })

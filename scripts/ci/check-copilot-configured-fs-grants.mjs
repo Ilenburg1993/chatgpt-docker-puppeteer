@@ -39,7 +39,7 @@ const FACTORIES = new Set(['createConfiguredFsGrant', 'createConfiguredFsIo']);
 const CLASSIFICATIONS = new Set([
     'agent-state',
     'infra-owner',
-    'mcp-control-plane',
+    'mcp-owner',
     'model-gateway-state',
     'observability-state',
     'runtime-config',

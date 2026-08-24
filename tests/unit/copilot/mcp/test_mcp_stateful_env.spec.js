@@ -8,7 +8,7 @@ import { existsSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync 
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
-import { buildStatefulProcessEnv, ensureStatefulEnvFile } from '../../../../src/copilot/mcp/scripts/stateful-env.js';
+import { buildStatefulProcessEnv, ensureStatefulEnvFile } from '#copilot/testing/mcp/transport/http/stateful/bootstrap';
 
 const testEnvPath = 'src/copilot/.ai/mcp/unit-stateful-session.env';
 const absoluteTestEnvPath = resolve(process.cwd(), testEnvPath);
@@ -37,6 +37,37 @@ describe('MCP stateful env manager', () => {
         assert.equal(env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'], 'true');
         assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
         assert.equal(typeof env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'], 'string');
+    });
+
+    it('projects only operational plus stateful session authority from parent and persisted env state', async () => {
+        rmSync(absoluteTestEnvPath, { force: true });
+        await ensureStatefulEnvFile(testEnvPath);
+        const original = readFileSync(absoluteTestEnvPath, 'utf8');
+        writeFileSync(
+            absoluteTestEnvPath,
+            `${original.trimEnd()}\nCOPILOT_MCP_STATIC_BEARER_TOKEN='file-static-secret'\nFUTURE_FILE_SECRET='file-future-secret'\n`,
+            { mode: 0o600 },
+        );
+        const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
+            PATH: process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin',
+            LANG: 'C.UTF-8',
+            COPILOT_MCP_HTTP_SESSION_TTL_MS: '123456',
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'parent-static-secret',
+            CLOUDFLARE_TUNNEL_TOKEN: 'parent-cloudflare-secret',
+            FUTURE_PROVIDER_SUPER_SECRET: 'parent-future-secret',
+        });
+
+        const env = await buildStatefulProcessEnv(testEnvPath, { parentEnv });
+
+        assert.equal(env['PATH'], parentEnv['PATH']);
+        assert.equal(env['LANG'], 'C.UTF-8');
+        assert.equal(env['COPILOT_MCP_HTTP_SESSION_TTL_MS'], '123456');
+        assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
+        assert.equal(typeof env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'], 'string');
+        assert.equal(env['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
+        assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
+        assert.equal(env['FUTURE_PROVIDER_SUPER_SECRET'], undefined);
+        assert.equal(env['FUTURE_FILE_SECRET'], undefined);
     });
 
     it('rejects absolute paths and lexical traversal outside the MCP state root', async () => {

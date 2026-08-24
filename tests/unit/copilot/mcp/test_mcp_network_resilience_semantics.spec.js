@@ -3,13 +3,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { summarizeCloudflaredOperationalCounters } from '../../../../src/copilot/mcp/cloudflare/metrics-histograms.js';
+import { summarizeCloudflaredOperationalCounters } from '#copilot/mcp/public/cloudflare/metrics-histograms';
 import {
     buildComparison,
     buildTransportMetricDelta,
     classifyTransportWindow,
-} from '../../../../src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js';
-import { buildDevcontainerNetworkFindings } from '../../../../src/copilot/mcp/tools/devcontainer-network-posture.js';
+} from '#copilot/testing/mcp/cloudflare/transport-benchmark';
+import { buildDevcontainerNetworkFindings } from '#copilot/testing/mcp/diagnostics/devcontainer-network';
 
 describe('MCP network resilience semantics', () => {
     it('parses cloudflared response_by_code status_code labels and accumulates duplicate samples', () => {

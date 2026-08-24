@@ -1,5 +1,8 @@
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { buildCloudflareEdgeBackupFileName, createCloudflareEdgeBackupStore } from '#copilot/mcp/cloudflare';
+import {
+    buildCloudflareEdgeBackupFileName,
+    createCloudflareEdgeBackupStore,
+} from '#copilot/mcp/public/cloudflare/edge-backup';
 import { mkdtemp, readFile, rm, stat, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

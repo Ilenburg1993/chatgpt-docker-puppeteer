@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { createTtlCache, getTtlCacheStats } from '#copilot/mcp/control-plane';
+import { createTtlCache, getTtlCacheStats } from '#copilot/infra/public/cache/ttl';
 
 describe('MCP TTL cache', () => {
     it('returns cached values until their TTL expires', () => {

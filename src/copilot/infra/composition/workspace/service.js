@@ -61,13 +61,72 @@ export function createWorkspaceInfra(options) {
     let io;
     /** @type {ReturnType<typeof createWorkspaceIndexing> | undefined} */
     let indexing;
-    /** @type {Map<string, ReturnType<typeof createIoExternalWatcher>>} */
+    /** @type {Map<string, { watcher: ReturnType<typeof createIoExternalWatcher>; leases: number }>} */
     const externalWatchers = new Map();
     /** @type {Promise<void> | null} */
     let disposePromise = null;
 
     function assertActive() {
         if (lifecycle.state !== 'active') throw new Error(`WorkspaceInfra(${workspaceId}) is ${lifecycle.state}.`);
+    }
+
+    /**
+     * Acquire a reference-counted lease for one canonical external-watch root. Consumers may share the same watcher,
+     * but each successful acquisition owns exactly one release. Releasing the final lease stops the watcher without
+     * disposing the WorkspaceInfra or sibling capabilities.
+     *
+     * @param {string} [rootPath]
+     * @param {Parameters<ReturnType<typeof createIoExternalWatcher>['start']>[0]} [watchOptions]
+     */
+    async function acquireExternalWatch(rootPath = workspaceRoot, watchOptions = {}) {
+        assertActive();
+        if (!options.coherenceRuntime) {
+            throw new Error(`WorkspaceInfra(${workspaceId}) requires runtime coherence to start external watch.`);
+        }
+        const approvedRoot = await authority.resolvePath(rootPath, 'scan');
+        let entry = externalWatchers.get(approvedRoot);
+        if (!entry) {
+            const watcher = createIoExternalWatcher(approvedRoot, {
+                invalidationBus: options.coherenceRuntime.invalidation,
+                ...(options.workspaceConfig ? { config: options.workspaceConfig.externalWatch } : {}),
+            });
+            entry = { watcher, leases: 0 };
+            externalWatchers.set(approvedRoot, entry);
+            const ownedEntry = entry;
+            lifecycle.register(`external-watch:${approvedRoot}`, () => {
+                ownedEntry.leases = 0;
+                ownedEntry.watcher.stop();
+                externalWatchers.delete(approvedRoot);
+            });
+        }
+        const result = entry.watcher.start(watchOptions);
+        if (!result.started) {
+            return Object.freeze({
+                ...result,
+                root: approvedRoot,
+                leases: entry.leases,
+                stats: entry.watcher.getStats(),
+                release: () => false,
+            });
+        }
+        entry.leases += 1;
+        let released = false;
+        const ownedEntry = entry;
+        return Object.freeze({
+            ...result,
+            root: approvedRoot,
+            leases: entry.leases,
+            stats: entry.watcher.getStats(),
+            release() {
+                if (released) return false;
+                released = true;
+                const current = externalWatchers.get(approvedRoot);
+                if (current !== ownedEntry) return false;
+                ownedEntry.leases = Math.max(0, ownedEntry.leases - 1);
+                if (ownedEntry.leases === 0) ownedEntry.watcher.stop();
+                return true;
+            },
+        });
     }
 
     return Object.freeze({
@@ -148,35 +207,17 @@ export function createWorkspaceInfra(options) {
             return indexing;
         },
         /**
-         * Start or reuse an external watcher whose canonical real root has passed this workspace authority.
-         *
-         * @param {string} [rootPath]
-         * @param {Parameters<ReturnType<typeof createIoExternalWatcher>['start']>[0]} [watchOptions]
+         * Acquire or reuse a workspace-owned external watcher. `startExternalWatch` remains as a source-compatible alias;
+         * new lifecycle-aware consumers should use the lease-oriented name explicitly.
          */
-        async startExternalWatch(rootPath = workspaceRoot, watchOptions = {}) {
-            assertActive();
-            if (!options.coherenceRuntime) {
-                throw new Error(`WorkspaceInfra(${workspaceId}) requires runtime coherence to start external watch.`);
-            }
-            const approvedRoot = await authority.resolvePath(rootPath, 'scan');
-            let watcher = externalWatchers.get(approvedRoot);
-            if (!watcher) {
-                watcher = createIoExternalWatcher(approvedRoot, {
-                    invalidationBus: options.coherenceRuntime.invalidation,
-                    ...(options.workspaceConfig ? { config: options.workspaceConfig.externalWatch } : {}),
-                });
-                externalWatchers.set(approvedRoot, watcher);
-                const ownedWatcher = watcher;
-                lifecycle.register(`external-watch:${approvedRoot}`, () => {
-                    ownedWatcher.stop();
-                    externalWatchers.delete(approvedRoot);
-                });
-            }
-            const result = watcher.start(watchOptions);
-            return Object.freeze({ ...result, root: approvedRoot, stats: watcher.getStats() });
-        },
+        acquireExternalWatch,
+        startExternalWatch: acquireExternalWatch,
         externalWatchStats() {
-            return Object.freeze([...externalWatchers.values()].map((watcher) => watcher.getStats()));
+            return Object.freeze(
+                [...externalWatchers.values()].map((entry) =>
+                    Object.freeze({ ...entry.watcher.getStats(), leases: entry.leases }),
+                ),
+            );
         },
         /**
          * Register derived state against this workspace's runtime-owned coherence bus.
@@ -207,6 +248,8 @@ export function createWorkspaceInfra(options) {
                 generation,
                 config: options.workspaceConfig ?? null,
                 externalWatchers: externalWatchers.size,
+                activeExternalWatchers: [...externalWatchers.values()].filter((entry) => entry.leases > 0).length,
+                externalWatchLeases: [...externalWatchers.values()].reduce((total, entry) => total + entry.leases, 0),
                 materializedCapabilities: Object.freeze({
                     readIo: readIo !== undefined,
                     mutationIo: mutationIo !== undefined,

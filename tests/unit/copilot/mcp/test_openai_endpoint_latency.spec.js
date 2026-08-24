@@ -1,11 +1,10 @@
 // @ts-check
 
 import {
-    buildOpenAiEndpointLatencySnapshot,
     compareOpenAiEndpointLatencyToBaseline,
-    summarizeNumbers,
     summarizeOpenAiEndpointLatencyHistory,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/diagnostics/latency';
+import { buildOpenAiEndpointLatencySnapshot, summarizeNumbers } from '#copilot/testing/mcp/diagnostics/latency';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 

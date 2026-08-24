@@ -1,11 +1,11 @@
 // @ts-check
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { createBoundConfiguredJsonlStore } from '#copilot/testing/mcp/diagnostics/latency';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createBoundConfiguredJsonlStore } from '../../../../src/copilot/mcp/control-plane/persistence/index.js';
 
 /** @type {string[]} */
 const roots = [];

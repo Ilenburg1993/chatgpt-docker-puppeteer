@@ -11,15 +11,13 @@
  * @module copilot/mcp/adapters/http
  */
 
-import { logMcp } from '#copilot/mcp/control-plane';
+import { logMcp } from '#copilot/mcp/public/observability';
 import { createServer } from 'node:http';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
 import {
     MCP_PATH,
     configureHttp1ServerTiming,
     createMcpHttpRequestHandler,
-    notifyMcpHttpStarted,
-    prepareMcpHttpRuntime,
     readMcpHttpServerTimingPolicy,
     readMcpHttpSessionPolicy,
     readMcpHttpSessionRuntimeState,
@@ -139,11 +137,44 @@ export function readMcpHttp1ServerPolicy(env = process.env, opts = {}) {
 }
 
 /**
- * @param {{ host?: string; port?: number }} [opts]
+ * @typedef {{
+ *     host?: string;
+ *     port?: number;
+ *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>;
+ *     database?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
+ *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ * }} McpHttp1StartOptions
+ */
+
+/**
+ * Resolve the explicit workspace authority for the listener. A composed process host may carry the same capability,
+ * but adapters never discover or manufacture one themselves.
+ *
+ * @param {McpHttp1StartOptions} opts
+ * @param {string} transportName
+ * @returns {import('#copilot/mcp/public/workspace').McpWorkspaceCapability}
+ */
+function requireHttpWorkspaceCapability(opts, transportName) {
+    const processHostWorkspace =
+        /** @type {{ workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability } | undefined} */ (
+            opts.processHost
+        )?.workspace;
+    if (opts.workspace && processHostWorkspace && opts.workspace !== processHostWorkspace) {
+        throw new TypeError(`MCP ${transportName} received divergent workspace capabilities.`);
+    }
+    const workspace = opts.workspace ?? processHostWorkspace;
+    if (!workspace) throw new TypeError(`MCP ${transportName} requires a composition-owned workspace capability.`);
+    return workspace;
+}
+
+/**
+ * @param {McpHttp1StartOptions} [opts]
  * @returns {Promise<import('node:http').Server>}
  */
 export async function startHttpMcpServer(opts = {}) {
+    const workspace = requireHttpWorkspaceCapability(opts, 'HTTP/1.1');
     const policy = readMcpHttp1ServerPolicy(process.env, opts);
+    await opts.processHost?.prepare();
     assertHttp1Policy(policy);
     warnIfHttp1ConflictsWithHttp2ProjectDefault(policy);
 
@@ -153,6 +184,8 @@ export async function startHttpMcpServer(opts = {}) {
         port: policy.port,
         protocolState,
         publicScheme: 'http',
+        workspace,
+        ...(opts.database ? { database: opts.database } : {}),
     });
 
     const httpServer = createServer(
@@ -180,11 +213,18 @@ export async function startHttpMcpServer(opts = {}) {
 
     installHttp1SocketGuards(httpServer, policy);
     installHttp1ProtocolGuards(httpServer, policy);
-    installHttp1GracefulClose(httpServer, policy);
+    /** @type {{ value: Awaited<ReturnType<NonNullable<typeof opts.processHost>['acquire']>> | null }} */
+    const processHostLease = { value: null };
+    installHttp1GracefulClose(httpServer, policy, requestHandler, () => processHostLease.value);
 
     const timingPolicy = configureHttp1ServerTiming(httpServer);
-    await prepareMcpHttpRuntime();
     await listenHttpServer(httpServer, policy.host, policy.port);
+    try {
+        processHostLease.value = opts.processHost ? await opts.processHost.acquire({ reason: 'http1-listener' }) : null;
+    } catch (error) {
+        await closeHttp1ServerAfterStartupFailure(httpServer);
+        throw error;
+    }
     logMcp('INFO', 'MCP HTTP/1.1 fallback server listening.', {
         adapter: { name: MCP_HTTP1_ADAPTER_NAME, version: MCP_HTTP1_ADAPTER_VERSION },
         url: `http://${formatHostForUrl(policy.host)}:${policy.port}${MCP_PATH}`,
@@ -193,7 +233,6 @@ export async function startHttpMcpServer(opts = {}) {
         policy: sanitizeHttp1PolicyForLog(policy),
         standardTransport: 'https-http2-plus',
     });
-    await notifyMcpHttpStarted();
     return httpServer;
 }
 
@@ -334,14 +373,25 @@ function installHttp1ProtocolGuards(server, policy) {
  *
  * @param {import('node:http').Server} server
  * @param {McpHttp1ServerPolicy} policy
+ * @param {ReturnType<typeof createMcpHttpRequestHandler>} requestHandler
+ * @param {() => Awaited<ReturnType<ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>['acquire']>> | null} getProcessHostLease
  * @returns {void}
  */
-function installHttp1GracefulClose(server, policy) {
+function installHttp1GracefulClose(server, policy, requestHandler, getProcessHostLease) {
     const originalClose = server.close.bind(server);
+    /** @type {((error?: Error) => void)[]} */
+    const callbacks = [];
     let closing = false;
+    let closed = false;
+    let terminalError = /** @type {Error | undefined} */ (undefined);
+
     server.close = /** @type {typeof server.close} */ (
         (callback) => {
-            if (closing) return originalClose(callback);
+            if (typeof callback === 'function') {
+                if (closed) setImmediate(() => callback(terminalError));
+                else callbacks.push(callback);
+            }
+            if (closing || closed) return server;
             closing = true;
             logMcp('INFO', 'Closing MCP HTTP/1.1 fallback server.', {
                 adapter: { name: MCP_HTTP1_ADAPTER_NAME, version: MCP_HTTP1_ADAPTER_VERSION },
@@ -356,18 +406,64 @@ function installHttp1GracefulClose(server, policy) {
             }, policy.shutdownDestroyAfterMs);
             destroyTimer.unref();
 
-            const wrappedCallback = (/** @type {Error | undefined} */ error) => {
+            const complete = async (/** @type {Error | undefined} */ transportError) => {
                 clearTimeout(destroyTimer);
-                if (typeof callback === 'function') callback(error);
+                const failures = transportError ? [transportError] : [];
+                try {
+                    await requestHandler.close();
+                } catch (error) {
+                    failures.push(asError(error, 'MCP HTTP request handler close failed'));
+                }
+                try {
+                    await getProcessHostLease()?.release();
+                } catch (error) {
+                    failures.push(asError(error, 'MCP process-host lease release failed'));
+                }
+                terminalError = combineCloseFailures(failures, 'MCP HTTP/1.1 shutdown failed.');
+                closed = true;
+                closing = false;
+                for (const pending of callbacks.splice(0)) pending(terminalError);
             };
 
-            const result = originalClose(wrappedCallback);
-            if (typeof server.closeIdleConnections === 'function') {
-                server.closeIdleConnections();
+            try {
+                originalClose((error) => void complete(error));
+            } catch (error) {
+                void complete(asError(error, 'MCP HTTP/1.1 listener close failed'));
             }
-            return result;
+            if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+            return server;
         }
     );
+
+    Object.defineProperty(server, Symbol.asyncDispose, {
+        configurable: true,
+        value: () =>
+            new Promise((resolve, reject) => {
+                server.close((error) => (error ? reject(error) : resolve(undefined)));
+            }),
+    });
+}
+
+/** @param {unknown} error @param {string} fallback */
+function asError(error, fallback) {
+    return error instanceof Error ? error : new Error(`${fallback}: ${String(error)}`);
+}
+
+/** @param {Error[]} failures @param {string} message */
+function combineCloseFailures(failures, message) {
+    if (failures.length === 0) return undefined;
+    if (failures.length === 1) return failures[0];
+    return new AggregateError(failures, message);
+}
+
+/**
+ * @param {import('node:http').Server} server
+ * @returns {Promise<void>}
+ */
+function closeHttp1ServerAfterStartupFailure(server) {
+    return new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+    });
 }
 
 /**

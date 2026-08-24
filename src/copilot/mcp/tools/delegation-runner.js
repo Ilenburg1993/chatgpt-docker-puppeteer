@@ -5,28 +5,26 @@
  * @module copilot/mcp/tools/delegation-runner
  */
 
-import { TRANSPORT_BENCHMARK_STATE_PATH, readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
+import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
 import {
-    IO_CACHE_BENCHMARK_STATE_PATH,
-    appendMcpAuditEvent,
+    TRANSPORT_BENCHMARK_STATE_PATH,
+    spawnCloudflareTransportBenchmark,
+} from '#copilot/mcp/public/cloudflare/transport-benchmark';
+import { scheduleIoCacheBenchmark } from '#copilot/mcp/public/diagnostics/io-cache';
+import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
+import { appendMcpAuditEvent, readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import {
     boundedWriteAnnotations,
     errorResult,
-    getMcpWorkspaceRoot,
-    normalizeFocusedUnitTestFiles,
     okResult,
-    readMcpMetricsSnapshot,
-    spawnValidatorJob,
-} from '#copilot/mcp/control-plane';
-import { spawn } from 'node:child_process';
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
+import { normalizeFocusedUnitTestFiles, spawnValidatorJob } from '#copilot/mcp/public/validation';
+import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
 import { randomUUID } from 'node:crypto';
-import process from 'node:process';
 import { z } from 'zod';
 import { buildMcpCapabilitiesSummary } from './meta.js';
-import { repoStatusHandler } from './repo-status.js';
-import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
-const TRANSPORT_BENCHMARK_RUNNER = 'src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js';
-const IO_CACHE_BENCHMARK_RUNNER = 'src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js';
 const missionSchema = z.enum([
     'diagnose-mcp',
     'validate-focused',
@@ -108,7 +106,7 @@ function buildMissionPlan(mission) {
 }
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const delegateToRepoAutonomyRunnerTool = {
     name: 'delegate_to_repo_autonomy_runner',
@@ -126,7 +124,7 @@ export const delegateToRepoAutonomyRunnerTool = {
         timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Validator timeout ms.'),
     },
     annotations: boundedWriteAnnotations(),
-    handler: async ({ mission, testFile, dryRun, timeoutMs }) => {
+    handler: async ({ mission, testFile, dryRun, timeoutMs }, operationContext) => {
         const selectedMission = String(mission);
         const isFocused = selectedMission === 'validate-focused';
         const isDryRun = dryRun !== false;
@@ -170,20 +168,21 @@ export const delegateToRepoAutonomyRunnerTool = {
             });
         }
 
+        const workspace = requireMcpToolWorkspace(operationContext);
+
         if (selectedMission === 'diagnose-mcp') {
-            const status = await repoStatusHandler();
-            const smoke = await mcpSmokeWorkspaceTool.handler({});
+            const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
+            const smoke = await runMcpWorkspaceSmoke(workspace);
             return okResult({
-                success:
-                    status.structuredContent?.['success'] === true && smoke.structuredContent?.['success'] === true,
+                success: status.success === true && smoke.success === true,
                 mission: selectedMission,
                 dryRun: false,
                 executed: true,
                 plan,
                 results: {
-                    status: status.structuredContent,
+                    status,
                     capabilities: buildMcpCapabilitiesSummary(),
-                    smoke: smoke.structuredContent,
+                    smoke,
                     metrics: readMcpMetricsSnapshot(),
                 },
             });
@@ -196,6 +195,7 @@ export const delegateToRepoAutonomyRunnerTool = {
                 });
             }
             const job = await spawnValidatorJob('unit-focused', {
+                workspace,
                 testFiles: [focusedTestFile],
                 ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
             });
@@ -212,19 +212,15 @@ export const delegateToRepoAutonomyRunnerTool = {
         }
 
         if (selectedMission === 'benchmark-io-cache') {
-            const requestId = `mcp-io-cache-benchmark-${randomUUID()}`;
-            const child = spawn(process.execPath, [IO_CACHE_BENCHMARK_RUNNER, '--request-id', requestId], {
-                cwd: getMcpWorkspaceRoot(),
-                env: process.env,
-                detached: true,
-                stdio: 'ignore',
+            const scheduled = await scheduleIoCacheBenchmark({
+                workspaceRoot: workspace.workspaceRoot,
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
             });
-            child.unref();
             await appendMcpAuditEvent({
                 event: 'mcp_io_cache_benchmark_scheduled',
                 tool: 'delegate_to_repo_autonomy_runner',
-                requestId,
-                runnerPid: child.pid ?? null,
+                requestId: scheduled.requestId,
+                runnerPid: scheduled.runnerPid,
             });
             return okResult({
                 success: true,
@@ -233,9 +229,9 @@ export const delegateToRepoAutonomyRunnerTool = {
                 executed: true,
                 scheduled: true,
                 plan,
-                requestId,
-                stateFile: IO_CACHE_BENCHMARK_STATE_PATH,
-                runnerPid: child.pid ?? null,
+                requestId: scheduled.requestId,
+                stateFile: scheduled.stateFile,
+                runnerPid: scheduled.runnerPid,
                 autoEnable: false,
                 isolatedDb: true,
                 nextStep:
@@ -247,23 +243,13 @@ export const delegateToRepoAutonomyRunnerTool = {
             const config = readCloudflareTunnelConfig();
             const controlProfile = config.transportProtocol;
             const requestId = `mcp-transport-benchmark-${randomUUID()}`;
-            const child = spawn(
-                process.execPath,
-                [TRANSPORT_BENCHMARK_RUNNER, '--request-id', requestId, '--control-profile', controlProfile],
-                {
-                    cwd: getMcpWorkspaceRoot(),
-                    env: process.env,
-                    detached: true,
-                    stdio: 'ignore',
-                },
-            );
-            child.unref();
+            const { runnerPid } = await spawnCloudflareTransportBenchmark({ requestId, controlProfile });
             await appendMcpAuditEvent({
                 event: 'mcp_transport_benchmark_scheduled',
                 tool: 'delegate_to_repo_autonomy_runner',
                 requestId,
                 controlProfile,
-                runnerPid: child.pid ?? null,
+                runnerPid,
             });
             return okResult({
                 success: true,
@@ -275,7 +261,7 @@ export const delegateToRepoAutonomyRunnerTool = {
                 requestId,
                 controlProfile,
                 stateFile: TRANSPORT_BENCHMARK_STATE_PATH,
-                runnerPid: child.pid ?? null,
+                runnerPid,
                 autoPromotion: false,
                 note: 'The detached runner may cause transient connector interruptions while switching profiles; it always attempts to restore the initial control.',
                 nextStep:
@@ -284,10 +270,10 @@ export const delegateToRepoAutonomyRunnerTool = {
         }
 
         if (selectedMission === 'validate-mcp-full') {
-            const job = await spawnValidatorJob(
-                'suite-mcp-full',
-                timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) },
-            );
+            const job = await spawnValidatorJob('suite-mcp-full', {
+                workspace,
+                ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
+            });
             return okResult({
                 success: true,
                 mission: selectedMission,
@@ -300,15 +286,15 @@ export const delegateToRepoAutonomyRunnerTool = {
             });
         }
 
-        const status = await repoStatusHandler();
+        const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
         return okResult({
-            success: status.structuredContent?.['success'] === true,
+            success: status.success === true,
             mission: selectedMission,
             dryRun: false,
             executed: true,
             plan,
             results: {
-                status: status.structuredContent,
+                status,
                 capabilities: buildMcpCapabilitiesSummary(),
                 metrics: readMcpMetricsSnapshot(),
             },

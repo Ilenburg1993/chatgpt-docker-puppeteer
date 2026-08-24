@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { getCanonicalMcpTools } from '../registry.js';
-import { buildToolPayloadAudit } from './tool-payload-audit.js';
+import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 
 process.stdout.write(`${JSON.stringify(await buildToolPayloadAudit({ tools: getCanonicalMcpTools() }), null, 2)}\n`);

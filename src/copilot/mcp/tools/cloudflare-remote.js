@@ -9,11 +9,12 @@
  * @module copilot/mcp/tools/cloudflare-remote
  */
 
-import { auditCloudflareRemoteTunnel } from '#copilot/mcp/cloudflare';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { auditCloudflareRemoteTunnel } from '#copilot/mcp/public/cloudflare/remote';
+
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('../registry.js').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
  */
 export const mcpCloudflareRemoteAuditTool = {
     name: 'mcp_cloudflare_remote_audit',

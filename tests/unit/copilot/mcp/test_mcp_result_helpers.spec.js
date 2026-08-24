@@ -7,7 +7,7 @@ import {
     getResultSizeHint,
     okResult,
     withResultSizeHint,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/protocol/tools';
 
 describe('MCP result helpers', () => {
     it('keeps result-size hints outside enumerable payload fields', () => {

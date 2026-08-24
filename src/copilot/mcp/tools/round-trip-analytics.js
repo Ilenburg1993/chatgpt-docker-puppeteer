@@ -5,10 +5,11 @@
  * @module copilot/mcp/tools/round-trip-analytics
  */
 
-import { boundedWriteAnnotations, okResult, readMcpRoundTripAnalytics } from '#copilot/mcp/control-plane';
+import { readMcpRoundTripAnalytics } from '#copilot/mcp/public/diagnostics/latency';
+import { boundedWriteAnnotations, okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpRoundTripAnalyticsTool = {
     name: 'mcp_round_trip_analytics',
     title: 'MCP round-trip analytics',

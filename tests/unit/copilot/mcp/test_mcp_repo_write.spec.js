@@ -9,23 +9,56 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
-import { repoWriteTestHarness, repoWriteTools } from '#copilot/mcp/tools';
+import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { repoWriteTestHarness, repoWriteTools } from '#copilot/testing/mcp/tools/repo-write';
 
 import {
     getValidatedMutableWorkspacePathStats,
     resetValidatedMutableWorkspacePathStatsForTest,
 } from '#copilot/infra/public/testing';
-const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
-const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
-const applyFileBatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch');
-const writeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_write_file');
-const createFileTool = repoWriteTools.find((tool) => tool.name === 'repo_create_file');
-const moveFileTool = repoWriteTools.find((tool) => tool.name === 'repo_move_file');
-const listQuarantineTool = repoWriteTools.find((tool) => tool.name === 'repo_list_quarantine');
-const inspectQuarantinedFileTool = repoWriteTools.find((tool) => tool.name === 'repo_inspect_quarantined_file');
-const quarantineFileTool = repoWriteTools.find((tool) => tool.name === 'repo_quarantine_file');
-const restoreQuarantinedFileTool = repoWriteTools.find((tool) => tool.name === 'repo_restore_quarantined_file');
-const removeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_remove_file');
+const TEST_PROCESS_HOST = createComposedMcpProcessHost({
+    hostId: 'mcp-repo-write-unit-process-host',
+    backgroundServices: false,
+});
+const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
+    {
+        mcpReq: {
+            id: 'mcp-repo-write-unit',
+            method: 'tools/call',
+            signal: new AbortController().signal,
+            _meta: { caller: 'test_mcp_repo_write' },
+            envelope: { protocol: '2026' },
+        },
+    },
+    { workspace: TEST_WORKSPACE },
+);
+
+/** @param {string} name */
+function findRepoWriteTool(name) {
+    const definition = repoWriteTools.find((tool) => tool.name === name);
+    assert.ok(definition, `missing repo write tool ${name}`);
+    return {
+        ...definition,
+        handler: /** @type {typeof definition.handler} */ (
+            (input) => definition.handler(input, TOOL_OPERATION_CONTEXT)
+        ),
+    };
+}
+
+const applyPatchTool = findRepoWriteTool('repo_apply_patch');
+const applyPatchBatchTool = findRepoWriteTool('repo_apply_patch_batch');
+const applyFileBatchPlanTool = findRepoWriteTool('repo_apply_file_batch_plan');
+const applyFileBatchTool = findRepoWriteTool('repo_apply_file_batch');
+const writeFileTool = findRepoWriteTool('repo_write_file');
+const createFileTool = findRepoWriteTool('repo_create_file');
+const moveFileTool = findRepoWriteTool('repo_move_file');
+const listQuarantineTool = findRepoWriteTool('repo_list_quarantine');
+const inspectQuarantinedFileTool = findRepoWriteTool('repo_inspect_quarantined_file');
+const quarantineFileTool = findRepoWriteTool('repo_quarantine_file');
+const restoreQuarantinedFileTool = findRepoWriteTool('repo_restore_quarantined_file');
+const removeFileTool = findRepoWriteTool('repo_remove_file');
 
 describe('copilot MCP repo write tools', () => {
     afterEach(() => {
@@ -458,14 +491,14 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(filePath, 'still here\n', 'utf8');
 
         let writeCount = 0;
-        repoWriteTestHarness.setQuarantineMetadataWriter(async (metadata, metadataPath) => {
+        repoWriteTestHarness.setQuarantineMetadataWriter(async (runtime, metadata, metadataPath) => {
             writeCount += 1;
             if (writeCount === 2) {
                 const error = /** @type {Error & { code?: string }} */ (new Error('simulated metadata failure'));
                 error.code = 'EIO';
                 throw error;
             }
-            await repoWriteTestHarness.writeQuarantineMetadataDefault(metadata, metadataPath);
+            await repoWriteTestHarness.writeQuarantineMetadataDefault(runtime, metadata, metadataPath);
         });
 
         const result = await quarantineFileTool.handler({ path: filePath });
@@ -495,14 +528,14 @@ describe('copilot MCP repo write tools', () => {
         const quarantineId = String(quarantined.structuredContent['quarantineId']);
 
         let writeCount = 0;
-        repoWriteTestHarness.setQuarantineMetadataWriter(async (metadata, metadataPath) => {
+        repoWriteTestHarness.setQuarantineMetadataWriter(async (runtime, metadata, metadataPath) => {
             writeCount += 1;
             if (writeCount === 2) {
                 const error = /** @type {Error & { code?: string }} */ (new Error('simulated restore commit failure'));
                 error.code = 'EIO';
                 throw error;
             }
-            await repoWriteTestHarness.writeQuarantineMetadataDefault(metadata, metadataPath);
+            await repoWriteTestHarness.writeQuarantineMetadataDefault(runtime, metadata, metadataPath);
         });
 
         const result = await restoreQuarantinedFileTool.handler({
@@ -716,6 +749,48 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.structuredContent['dryRun'], true);
         assert.equal(result.structuredContent['bytesWritten'], 0);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'one\ntwo\n');
+    });
+
+    it('rejects an invalid JSON patch before atomic publish and preserves the original bytes', async () => {
+        assert.ok(applyPatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'guarded.json');
+        const initial = '{\n  "value": 1\n}\n';
+        await fs.writeFile(filePath, initial, 'utf8');
+
+        const result = await applyPatchTool.handler({
+            path: filePath,
+            old_string: '"value": 1',
+            new_string: '"value":',
+        });
+
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent['code'], 'ERR_PATCH_INVALID_JSON_RESULT');
+        const failure = /** @type {Record<string, unknown>} */ (result.structuredContent['details']);
+        assert.equal(failure['failureClass'], 'result-validation');
+        assert.equal(failure['mutationState'], 'none');
+        assert.equal(failure['recoveryRequired'], false);
+        assert.equal(await fs.readFile(filePath, 'utf8'), initial);
+    });
+
+    it('validates the final JSON state of an atomic same-file patch batch, not transient virtual states', async () => {
+        assert.ok(applyPatchBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'atomic-guarded.json');
+        await fs.writeFile(filePath, '{\n  "a": 1,\n  "b": 2\n}\n', 'utf8');
+
+        const result = await applyPatchBatchTool.handler({
+            operations: [
+                { path: filePath, old_string: '"a": 1,', new_string: '"a":,' },
+                { path: filePath, old_string: '"a":,', new_string: '"a": 3,' },
+            ],
+            dryRun: false,
+            confirmBatch: true,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(await fs.readFile(filePath, 'utf8'), '{\n  "a": 3,\n  "b": 2\n}\n');
     });
 
     it('rejects paths outside the workspace', async () => {

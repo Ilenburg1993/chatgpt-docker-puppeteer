@@ -9,15 +9,14 @@ import {
     appendOpenAiEndpointLatencySnapshot,
     compareOpenAiEndpointLatencyToBaseline,
     measureOpenAiEndpointLatency,
-    okResult,
-    openWorldBoundedWriteAnnotations,
     readOpenAiEndpointLatencyHistory,
     readOpenAiEndpointLatencyMonitorState,
     summarizeOpenAiEndpointLatencyHistory,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/public/diagnostics/latency';
+import { okResult, openWorldBoundedWriteAnnotations } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('../registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
 export const mcpOpenAiEndpointLatencyTool = {
     name: 'mcp_openai_endpoint_latency',
     title: 'OpenAI endpoint latency observer',

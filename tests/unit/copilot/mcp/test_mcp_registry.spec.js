@@ -10,9 +10,9 @@ import {
     getCanonicalMcpToolSurfaceState,
     getCanonicalMcpTools,
     readMcpRegistryRuntimeState,
-    resetCanonicalMcpToolsCacheForTests,
-} from '#copilot/mcp';
-import { getAdvertisedMcpToolNames } from '#copilot/mcp/tools';
+} from '#copilot/mcp/public/registry';
+import { getAdvertisedMcpToolNames } from '#copilot/mcp/public/tools/capabilities';
+import { resetCanonicalMcpToolsCacheForTests } from '#copilot/testing/mcp/registry';
 
 describe('copilot MCP registry', () => {
     it('exposes the initial read-only tool surface', () => {
@@ -255,15 +255,17 @@ describe('copilot MCP registry', () => {
         assert.equal(tools.find((tool) => tool.name === 'terminal_session_read')?.maxResultBytes, 12 * 1024 * 1024);
     });
 
-    it('keeps security metadata and a baseline output schema registry-wide while preserving specific schemas', () => {
+    it('keeps security metadata registry-wide and publishes only explicit specific output schemas', () => {
         const tools = getCanonicalMcpTools();
         const outputSchemaTools = tools
             .filter((tool) => tool.outputSchema !== undefined)
             .map((tool) => tool.name)
             .sort();
-        assert.equal(outputSchemaTools.length, tools.length);
-        assert.equal(outputSchemaTools.includes('fetch'), true);
-        assert.equal(outputSchemaTools.includes('search'), true);
+        assert.ok(outputSchemaTools.length > 0);
+        assert.ok(outputSchemaTools.length < tools.length);
+        for (const name of ['fetch', 'search', 'repo_status', 'git_status', 'git_diff', 'git_log', 'git_branch_info']) {
+            assert.equal(outputSchemaTools.includes(name), true, `missing specific output schema: ${name}`);
+        }
 
         for (const tool of tools) {
             assert.ok(tool._meta, `missing _meta: ${tool.name}`);

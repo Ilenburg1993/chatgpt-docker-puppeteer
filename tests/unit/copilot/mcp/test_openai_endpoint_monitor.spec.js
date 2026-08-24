@@ -2,9 +2,10 @@
 
 import {
     readOpenAiEndpointLatencyMonitorState,
-    resetOpenAiEndpointLatencyMonitorForTests,
     scheduleOpenAiEndpointLatencyMonitor,
-} from '#copilot/mcp/control-plane';
+    stopOpenAiEndpointLatencyMonitor,
+} from '#copilot/mcp/public/diagnostics/latency';
+import { resetOpenAiEndpointLatencyMonitorForTests } from '#copilot/testing/mcp/diagnostics/latency';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
@@ -12,7 +13,7 @@ afterEach(() => resetOpenAiEndpointLatencyMonitorForTests());
 
 /**
  * @param {number} [ttfbMs]
- * @returns {import('../../../../src/copilot/mcp/control-plane/openai-endpoint-latency.js').OpenAiEndpointLatencySnapshot}
+ * @returns {import('#copilot/mcp/public/diagnostics/latency').OpenAiEndpointLatencySnapshot}
  */
 function snapshot(ttfbMs = 100) {
     return {
@@ -92,6 +93,48 @@ describe('OpenAI endpoint latency monitor', () => {
         assert.equal(state.scheduled, true);
         assert.equal(callbacks.length, 1);
         assert.equal(state.lastSnapshot?.targets[0]?.ttfbP50Ms, 100);
+    });
+
+    it('stops an in-flight generation without allowing stale work to resurrect the monitor', async () => {
+        /** @type {(() => void)[]} */
+        const callbacks = [];
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
+        /** @type {(value: { snapshot: ReturnType<typeof snapshot>; samples: [] }) => void} */
+        let releaseMeasurement = () => {
+            throw new Error('measurement resolver was not installed');
+        };
+        scheduleOpenAiEndpointLatencyMonitor({
+            enabled: true,
+            initialDelayMs: 0,
+            intervalMs: 60_000,
+            setTimeoutFn,
+            measureFn: () =>
+                new Promise((resolve) => {
+                    releaseMeasurement = resolve;
+                }),
+            persistFn: async () => {
+                throw new Error('stale monitor generation must not persist after stop');
+            },
+        });
+        callbacks.shift()?.();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(readOpenAiEndpointLatencyMonitorState().running, true);
+
+        const stopping = stopOpenAiEndpointLatencyMonitor();
+        assert.equal(readOpenAiEndpointLatencyMonitorState().enabled, false);
+        releaseMeasurement({ snapshot: snapshot(), samples: [] });
+        await stopping;
+
+        const state = readOpenAiEndpointLatencyMonitorState();
+        assert.equal(state.enabled, false);
+        assert.equal(state.running, false);
+        assert.equal(state.scheduled, false);
+        assert.equal(callbacks.length, 0);
     });
 
     it('records failure without throwing and still schedules the next cycle', async () => {

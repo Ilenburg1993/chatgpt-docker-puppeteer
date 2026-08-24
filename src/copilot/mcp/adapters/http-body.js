@@ -1,4 +1,5 @@
 // @ts-check
+import { isInitializeRequest } from '@modelcontextprotocol/server';
 /**
  * Bounded MCP JSON body helpers for Streamable HTTP.
  *
@@ -10,8 +11,6 @@
  */
 
 import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/platform/buffer';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-
 export const DEFAULT_MCP_HTTP_BODY_MAX_BYTES = 2 * 1024 * 1024;
 
 const DEFAULT_ENCODING = 'utf8';

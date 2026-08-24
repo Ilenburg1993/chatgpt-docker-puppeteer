@@ -1,16 +1,20 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'vitest';
+import { afterEach, describe, it, vi } from 'vitest';
 
-import { createCloudflareManagedProcessController } from '../../../../src/copilot/mcp/cloudflare/cli-process.js';
+import {
+    createCloudflareManagedProcessController,
+    observeForegroundCloudflared,
+} from '#copilot/testing/mcp/cloudflare';
 
 /** @param {string} dir */
 function processConfig(dir) {
-    return /** @type {import('../../../../src/copilot/mcp/cloudflare/config.js').CloudflareTunnelConfig} */ (
+    return /** @type {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} */ (
         /** @type {unknown} */ ({
             mcpHttpPidFile: path.join(dir, 'mcp-http.pid'),
             mcpHttpLogFile: path.join(dir, 'mcp-http.log'),
@@ -19,6 +23,10 @@ function processConfig(dir) {
         })
     );
 }
+
+afterEach(() => {
+    vi.unstubAllEnvs();
+});
 
 describe('MCP Cloudflare bound process supervision', () => {
     it('rotates an oversized detached-process log through the controller-bound exact paths', async () => {
@@ -76,6 +84,80 @@ describe('MCP Cloudflare bound process supervision', () => {
                     // Already terminated by rollback.
                 }
             }
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('never publishes metadata or PID when the OS rejects detached spawn', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-detached-spawn-error-'));
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
+        const metadataFile = `${config.mcpHttpPidFile}.json`;
+        try {
+            await assert.rejects(
+                controller.mcpHttp.ensure({
+                    name: 'spawn-error-test',
+                    command: `definitely-not-a-command-${Date.now()}`,
+                    args: [],
+                }),
+                /ENOENT|spawn/u,
+            );
+            await assert.rejects(fs.access(config.mcpHttpPidFile), /ENOENT/u);
+            await assert.rejects(fs.access(metadataFile), /ENOENT/u);
+        } finally {
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('treats foreground exit as non-terminal until the physical close event is observed', async () => {
+        class FakeChild extends EventEmitter {
+            pid = 424242;
+            /** @returns {boolean} */
+            kill() {
+                return true;
+            }
+        }
+        const fake = new FakeChild();
+        const child = /** @type {import('node:child_process').ChildProcess} */ (/** @type {unknown} */ (fake));
+        let settled = false;
+        const observed = observeForegroundCloudflared(child).then((result) => {
+            settled = true;
+            return result;
+        });
+
+        fake.emit('exit', 0, null);
+        await Promise.resolve();
+        assert.equal(settled, false);
+
+        fake.emit('close', 0, null);
+        const result = await observed;
+        assert.equal(settled, true);
+        assert.deepEqual(result, { ok: true, exitCode: 0, signal: null, error: null });
+    });
+
+    it('does not reintroduce parent credentials when a managed child has no explicit environment', async () => {
+        vi.stubEnv('AURELIN_TEST_AMBIENT_SECRET', 'must-not-cross-managed-process-boundary');
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-managed-env-'));
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
+        try {
+            await controller.mcpHttp.ensure({
+                name: 'managed-env-test',
+                command: process.execPath,
+                args: [
+                    '-e',
+                    'process.stdout.write(JSON.stringify({secret:process.env.AURELIN_TEST_AMBIENT_SECRET??null,path:Boolean(process.env.PATH)}));setInterval(()=>{},1000)',
+                ],
+            });
+            const deadline = Date.now() + 2_000;
+            let output = '';
+            while (Date.now() < deadline && !output.includes('"path":true')) {
+                output = await controller.mcpHttp.readLogTail(4096);
+                if (!output.includes('"path":true')) await new Promise((resolve) => setTimeout(resolve, 25));
+            }
+            assert.deepEqual(JSON.parse(output.trim()), { secret: null, path: true });
+        } finally {
+            await controller.mcpHttp.stop();
             await fs.rm(dir, { recursive: true, force: true });
         }
     });

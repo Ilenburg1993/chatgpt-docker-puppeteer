@@ -1,6 +1,6 @@
 // @ts-check
 /** HTTP, OAuth and MCP probe helpers for Cloudflare MCP CLI. */
-import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
+import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/public/integrations/http';
 import https from 'node:https';
 
 const DEFAULT_TIMEOUT_MS = 10_000;

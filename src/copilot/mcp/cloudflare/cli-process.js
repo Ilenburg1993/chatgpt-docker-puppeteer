@@ -9,6 +9,8 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { signalProcessTreeDetailed } from '#copilot/mcp/public/process/supervision';
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -47,7 +49,8 @@ const MAX_LOG_TAIL_BYTES = 1024 * 1024;
 
 /** @returns {CloudflaredVersion} */
 export function readCloudflaredVersion() {
-    const result = spawnSync('cloudflared', ['--version'], { encoding: 'utf8' });
+    const { env } = buildMcpChildEnvironment();
+    const result = spawnSync('cloudflared', ['--version'], { encoding: 'utf8', env });
     if (result.error) return { ok: false, error: result.error.message };
     if (result.status !== 0)
         return { ok: false, error: result.stderr.trim() || `cloudflared exited with ${result.status}` };
@@ -107,8 +110,9 @@ function compareVersions(left, right) {
  * Metadata and the single rotated log generation are derived inside this owner and included in the exact-path grant.
  *
  * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @param {{ env?: NodeJS.ProcessEnv }} [options]
  */
-export function createCloudflareManagedProcessController(config) {
+export function createCloudflareManagedProcessController(config, options = {}) {
     const mcpHttpPaths = createBoundProcessPaths('mcpHttp', 'mcp-http', config.mcpHttpPidFile, config.mcpHttpLogFile);
     const cloudflaredPaths = createBoundProcessPaths(
         'cloudflared',
@@ -138,8 +142,9 @@ export function createCloudflareManagedProcessController(config) {
         }),
     );
 
-    const mcpHttp = createBoundProcessFacade(mcpHttpPaths, io);
-    const cloudflared = createBoundProcessFacade(cloudflaredPaths, io);
+    const stopTimeoutMs = readStopTimeoutMs(options.env ?? process.env);
+    const mcpHttp = createBoundProcessFacade(mcpHttpPaths, io, stopTimeoutMs);
+    const cloudflared = createBoundProcessFacade(cloudflaredPaths, io, stopTimeoutMs);
     return Object.freeze({
         mcpHttp,
         cloudflared,
@@ -185,8 +190,9 @@ function flatResolvedProcessPaths(paths) {
 /**
  * @param {BoundProcessPaths} paths
  * @param {ReturnType<typeof createConfiguredFsIo>} io
+ * @param {number} stopTimeoutMs
  */
-function createBoundProcessFacade(paths, io) {
+function createBoundProcessFacade(paths, io, stopTimeoutMs) {
     return Object.freeze({
         name: paths.name,
         pidFile: paths.pidFile,
@@ -195,7 +201,7 @@ function createBoundProcessFacade(paths, io) {
         rotatedLogFile: paths.rotatedLogFile,
         status: () => readBoundPidFileStatus(paths, io),
         ensure: (/** @type {BoundDetachedProcessOptions} */ options) => ensureBoundDetachedProcess(paths, io, options),
-        stop: () => stopBoundPidFileProcess(paths, io),
+        stop: () => stopBoundPidFileProcess(paths, io, stopTimeoutMs),
         readMetadata: () => readBoundProcessMetadata(paths, io),
         rotateLogIfOversized: (/** @type {{maxBytes?:number}} */ options = {}) =>
             rotateBoundProcessLogIfOversized(paths, io, options),
@@ -307,17 +313,19 @@ async function ensureBoundDetachedProcess(paths, io, options) {
     await Promise.all(parentDirectories.map((directory) => io.mkdirPath(directory, { recursive: true })));
     await rotateBoundProcessLogIfOversized(paths, io);
     const logSink = await io.openDetachedAppendSink(paths.resolvedLogFile, { mode: 0o600 });
+    /** @type {import('node:child_process').ChildProcess | undefined} */
     let child;
     try {
         child = spawn(options.command, options.args, {
             detached: true,
             stdio: ['ignore', logSink.handle.fd, logSink.handle.fd],
-            env: { ...process.env, ...(options.env ?? {}) },
+            env: options.env ?? buildMcpChildEnvironment().env,
         });
+        await waitForChildSpawn(child);
     } finally {
         await logSink.handle.close();
     }
-    if (!child.pid) throw new Error(`Could not start ${options.name}`);
+    if (!child?.pid) throw new Error(`Could not start ${options.name}`);
     child.unref();
 
     try {
@@ -358,35 +366,38 @@ async function ensureBoundDetachedProcess(paths, io, options) {
     };
 }
 
+/** @param {import('node:child_process').ChildProcess} child */
+function waitForChildSpawn(child) {
+    return new Promise((resolvePromise, rejectPromise) => {
+        /** @param {Error} error */
+        const onError = (error) => {
+            child.off('spawn', onSpawn);
+            rejectPromise(error);
+        };
+        const onSpawn = () => {
+            child.off('error', onError);
+            resolvePromise(undefined);
+        };
+        child.once('error', onError);
+        child.once('spawn', onSpawn);
+    });
+}
+
 /** @param {number} pid */
 async function terminateDetachedProcess(pid) {
-    try {
-        process.kill(-pid, 'SIGTERM');
-    } catch {
-        try {
-            process.kill(pid, 'SIGTERM');
-        } catch {
-            return;
-        }
-    }
+    const initial = signalProcessTreeDetailed(pid, 'SIGTERM', { processGroup: true });
+    if (!initial.delivered) return;
     if (await waitForPidExit(pid, DEFAULT_KILL_TIMEOUT_MS)) return;
-    try {
-        process.kill(-pid, 'SIGKILL');
-    } catch {
-        try {
-            process.kill(pid, 'SIGKILL');
-        } catch {
-            // Process exited between the wait and the forced kill.
-        }
-    }
+    signalProcessTreeDetailed(pid, 'SIGKILL', { processGroup: true });
     await waitForPidExit(pid, DEFAULT_KILL_TIMEOUT_MS);
 }
 
 /**
  * @param {BoundProcessPaths} paths
  * @param {ReturnType<typeof createConfiguredFsIo>} io
+ * @param {number} stopTimeoutMs
  */
-async function stopBoundPidFileProcess(paths, io) {
+async function stopBoundPidFileProcess(paths, io, stopTimeoutMs) {
     const status = await readBoundPidFileStatus(paths, io);
     if (!status.pid) {
         return {
@@ -402,35 +413,34 @@ async function stopBoundPidFileProcess(paths, io) {
     }
     let processGroupSignalled = false;
     let forcedKilled = false;
+    /** @type {'process-group' | 'pid' | 'child' | 'none'} */
+    let terminationTarget = 'none';
+    /** @type {'process-group' | 'pid' | 'child' | 'none'} */
+    let forceKillTarget = 'none';
     const startedAt = Date.now();
     if (status.alive) {
-        try {
-            process.kill(-status.pid, 'SIGTERM');
-            processGroupSignalled = true;
-        } catch {
-            try {
-                process.kill(status.pid, 'SIGTERM');
-            } catch (error) {
-                return {
-                    pidFile: paths.pidFile,
-                    pid: status.pid,
-                    wasAlive: true,
-                    stopped: false,
-                    error: error instanceof Error ? error.message : String(error),
-                    processGroupSignalled,
-                    forcedKilled,
-                    stopWaitMs: Date.now() - startedAt,
-                };
-            }
+        const initial = signalProcessTreeDetailed(status.pid, 'SIGTERM', { processGroup: true });
+        terminationTarget = initial.target;
+        processGroupSignalled = initial.target === 'process-group';
+        if (!initial.delivered && isPidAlive(status.pid)) {
+            return {
+                pidFile: paths.pidFile,
+                pid: status.pid,
+                wasAlive: true,
+                stopped: false,
+                error: 'process-termination-signal-not-delivered',
+                processGroupSignalled,
+                terminationTarget,
+                forceKillTarget,
+                forcedKilled,
+                stopWaitMs: Date.now() - startedAt,
+            };
         }
-        let stopped = await waitForPidExit(status.pid, readStopTimeoutMs(process.env));
+        let stopped = await waitForPidExit(status.pid, stopTimeoutMs);
         if (!stopped) {
             forcedKilled = true;
-            try {
-                process.kill(processGroupSignalled ? -status.pid : status.pid, 'SIGKILL');
-            } catch {
-                // Process may have exited between the timeout and SIGKILL.
-            }
+            const forced = signalProcessTreeDetailed(status.pid, 'SIGKILL', { processGroup: true });
+            forceKillTarget = forced.target;
             stopped = await waitForPidExit(status.pid, DEFAULT_KILL_TIMEOUT_MS);
         }
         if (!stopped) {
@@ -441,6 +451,8 @@ async function stopBoundPidFileProcess(paths, io) {
                 stopped: false,
                 error: 'process-still-alive-after-stop-timeout',
                 processGroupSignalled,
+                terminationTarget,
+                forceKillTarget,
                 forcedKilled,
                 stopWaitMs: Date.now() - startedAt,
             };
@@ -457,6 +469,8 @@ async function stopBoundPidFileProcess(paths, io) {
         stopped: true,
         error: null,
         processGroupSignalled,
+        terminationTarget,
+        forceKillTarget,
         forcedKilled,
         stopWaitMs: Date.now() - startedAt,
     };
