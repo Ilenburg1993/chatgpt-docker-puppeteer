@@ -357,6 +357,20 @@
       "reason": "Owns one exact OpenAI endpoint-latency JSONL history; per-call path redirection is not exposed."
     },
     {
+      "file": "src/copilot/mcp/integrations/model-gateway/live-runs/environment.js",
+      "classification": "mcp-owner",
+      "grants": [
+        {
+          "id": "mcp.model-gateway.live-environment-authority",
+          "pathMode": "exact",
+          "operations": ["read"],
+          "symlinkPolicy": "deny",
+          "durability": ["file-and-directory"]
+        }
+      ],
+      "reason": "Binds the single .env.local read used during process-host prepare to build the opaque Model Gateway live-run environment authority; consumers receive only bounded environment projections and cannot retarget filesystem access."
+    },
+    {
       "file": "src/copilot/mcp/observability/audit/service.js",
       "classification": "mcp-owner",
       "grants": [

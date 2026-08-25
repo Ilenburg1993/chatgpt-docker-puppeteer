@@ -3,7 +3,6 @@
 
 /** @typedef {import('../client/evidence.js').ClientThinkingMode} ClientThinkingMode */
 /** @typedef {import('../client/evidence.js').ClientLatencyEvidenceEntry} ClientLatencyEvidenceEntry */
-/** @typedef {import('../dashboard/public/index.js').McpLatencyDashboardSnapshot} McpLatencyDashboardSnapshot */
 /** @typedef {import('../openai/latency.js').OpenAiEndpointLatencySnapshot} OpenAiEndpointLatencySnapshot */
 /** @typedef {import('../config.js').McpLatencyProcessConfig} McpLatencyProcessConfig */
 /** @typedef {import('../config.js').McpLatencyDashboardPolicy} McpLatencyDashboardPolicy */
@@ -24,12 +23,6 @@ export {
     summarizeClientLatencyNumbers,
 } from '../client/evidence.js';
 export {
-    DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH,
-    appendMcpLatencyDashboardSnapshot,
-    compareMcpLatencyDashboardSnapshots,
-    readMcpLatencyDashboardHistory,
-} from '../dashboard/public/index.js';
-export {
     DEFAULT_OPENAI_ENDPOINT_LATENCY_HISTORY_RELATIVE_PATH,
     OPENAI_ENDPOINT_LATENCY_TARGETS,
     appendOpenAiEndpointLatencySnapshot,
@@ -43,12 +36,3 @@ export {
     scheduleOpenAiEndpointLatencyMonitor,
     stopOpenAiEndpointLatencyMonitor,
 } from '../openai/monitor.js';
-export {
-    MCP_ROUND_TRIP_NORMALIZER_VERSION,
-    createMcpRoundTripAnalytics,
-    createMcpRoundTripAnalyticsCapability,
-    readMcpRoundTripAnalyticsMonitorState,
-    readMcpRoundTripAnalyticsSnapshot,
-    scheduleMcpRoundTripAnalyticsMonitor,
-    stopMcpRoundTripAnalyticsMonitor,
-} from '../round-trip/public/index.js';

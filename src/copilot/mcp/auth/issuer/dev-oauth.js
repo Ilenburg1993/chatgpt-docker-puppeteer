@@ -18,7 +18,6 @@ import {
     exportJWK,
     exportPKCS8,
     generateKeyPair,
-    importJWK,
     importPKCS8,
     jwtVerify,
     SignJWT,
@@ -29,6 +28,16 @@ import { request as httpsRequest } from 'node:https';
 import { BlockList, isIP } from 'node:net';
 import { OAUTH_REPLAY_NAMESPACES } from '../persistence/replay-store.js';
 import { DEV_OAUTH_CONFIG_DEFAULTS, resolveDevOAuthProcessConfig } from './config.js';
+import {
+    createDevOAuthDpopRuntime,
+    DEV_OAUTH_DPOP_SIGNING_ALGORITHMS as DPOP_SIGNING_ALGORITHMS,
+    isValidDevOAuthDpopJkt as isValidDpopJkt,
+    DEV_OAUTH_MAX_DPOP_JKT_LENGTH as MAX_DPOP_JKT_LENGTH,
+    normalizeDevOAuthDpopJkt as normalizeDpopJkt,
+} from './dpop/runtime.js';
+import { firstHeaderValue, normalizeHostname } from './http-values.js';
+import { createDevOAuthRequestBudgetRuntime } from './request-budget/runtime.js';
+import { createDevOAuthResponseRuntime } from './response/runtime.js';
 
 export const DEV_OAUTH_IMPLEMENTATION_VERSION = '1.7.0';
 export const DEV_OAUTH_IMPLEMENTATION_NAME = 'copilot-mcp-dev-oauth';
@@ -69,7 +78,6 @@ const MAX_PKCE_CODE_CHALLENGE_LENGTH = 128;
 const MIN_PKCE_CODE_CHALLENGE_LENGTH = 43;
 const MAX_PKCE_CODE_VERIFIER_LENGTH = 128;
 const MIN_PKCE_CODE_VERIFIER_LENGTH = 43;
-const MAX_REQUEST_BUDGET_SUBJECT_LENGTH = 128;
 const MAX_REQUEST_BODY_BYTES = 64 * 1024;
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 const JSON_CONTENT_TYPE = 'application/json';
@@ -85,15 +93,6 @@ const CLAUDE_CONNECTOR_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback';
 const PRIVATE_KEY_JWT_MAX_TTL_SECONDS = 5 * 60;
 const PRIVATE_KEY_JWT_CLOCK_TOLERANCE_SECONDS = 30;
 const PRIVATE_KEY_JWT_REPLAY_CACHE_MAX_ENTRIES = 2000;
-const DPOP_MAX_TTL_SECONDS = 5 * 60;
-const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
-const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
-const DPOP_NONCE_TTL_MS = 5 * 60 * 1000;
-const MAX_DPOP_NONCES = 2000;
-const MAX_DPOP_NONCE_LENGTH = 256;
-const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
-const MAX_DPOP_JKT_LENGTH = 256;
-const DPOP_SIGNING_ALGORITHMS = /** @type {const} */ (['ES256', 'RS256']);
 const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
 const REFRESH_TOKEN_GRANT = 'refresh_token';
 const REFRESH_TOKEN_PREFIX = 'rt_';
@@ -188,8 +187,6 @@ export function createDevOAuthRuntime(options = {}) {
      */
     let keyMaterialPromise = null;
     let keyMaterialConfigKey = /** @type {string | null} */ (null);
-    /** @type {WeakMap<import('node:http').ServerResponse, import('./config.js').DevOAuthProcessConfig>} */
-    const responseIssuerConfigs = new WeakMap();
 
     /**
      * @type {Map<
@@ -237,17 +234,24 @@ export function createDevOAuthRuntime(options = {}) {
     /** @type {Map<string, { jwks: { keys: Record<string, unknown>[] }; expiresAt: number }>} */
     const clientAssertionJwksCache = new Map();
 
-    /** @type {Map<string, { count: number; resetAt: number }>} */
-    const requestBudgets = new Map();
+    const responseRuntime = createDevOAuthResponseRuntime();
+    const {
+        bindConfig: bindDevOAuthResponseConfig,
+        redirect,
+        setBearerChallenge,
+        setDpopChallenge,
+        writeCorsPreflight,
+        writeJson,
+    } = responseRuntime;
+    const requestBudgetRuntime = createDevOAuthRequestBudgetRuntime({ writeJson: responseRuntime.writeJson });
+    const dpopRuntime = createDevOAuthDpopRuntime({
+        rememberReplay: (replayKey, expiresAtMs) =>
+            rememberPersistentOAuthReplay(OAUTH_REPLAY_NAMESPACES.issuerDpop, replayKey, expiresAtMs),
+    });
+    const { issueNonce: issueDpopNonce, resolveBindingForRequest: resolveDpopBindingForRequest } = dpopRuntime;
 
     /** @type {Map<string, number>} */
     const privateKeyJwtReplayCache = new Map();
-
-    /** @type {Map<string, number>} */
-    const dpopReplayCache = new Map();
-
-    /** @type {Map<string, number>} */
-    const dpopNonces = new Map();
 
     /**
      * @type {Map<
@@ -543,8 +547,8 @@ export function createDevOAuthRuntime(options = {}) {
         }
 
         const budgetName = resolveDevOAuthBudgetName(req.method, url.pathname);
-        if (budgetName && !consumeDevOAuthBudget(req, budgetName, issuerConfig)) {
-            writeRateLimitExceeded(req, res, budgetName, issuerConfig);
+        if (budgetName && !requestBudgetRuntime.consume(req, budgetName, issuerConfig)) {
+            requestBudgetRuntime.writeExceeded(req, res, budgetName, issuerConfig);
             return true;
         }
 
@@ -697,6 +701,7 @@ export function createDevOAuthRuntime(options = {}) {
     async function buildDevOAuthStatus(config, issuerConfig) {
         const persistence = await readDevOAuthPersistenceStatus(issuerConfig);
         const { kid, alg, publicJwks, legacyKeyCount } = await getKeyMaterial(issuerConfig);
+        const dpopState = dpopRuntime.state();
         return {
             issuer: config.resource,
             subject: DEV_OAUTH_SUBJECT,
@@ -722,15 +727,15 @@ export function createDevOAuthRuntime(options = {}) {
             clientMetadataCacheEntries: clientMetadataDocumentCache.size,
             clientAssertionJwksCacheEntries: clientAssertionJwksCache.size,
             privateKeyJwtReplayCacheEntries: privateKeyJwtReplayCache.size,
-            dpopReplayCacheEntries: dpopReplayCache.size,
-            dpopNonceEntries: dpopNonces.size,
+            dpopReplayCacheEntries: dpopState.replayEntries,
+            dpopNonceEntries: dpopState.nonceEntries,
             oauthReplayPersistence: readPersistentOAuthReplayStatus(),
             pushedAuthorizationRequests: pushedAuthorizationRequests.size,
             parEnabled: true,
             pushedAuthorizationRequestTtlMs: PAR_REQUEST_TTL_MS,
             consumedRefreshTokenHashes: consumedRefreshTokenHashes.size,
             revokedRefreshTokenFamilies: revokedRefreshTokenFamilies.size,
-            requestBudgetEntries: requestBudgets.size,
+            requestBudgetEntries: requestBudgetRuntime.size(),
             persistence,
         };
     }
@@ -1655,221 +1660,6 @@ export function createDevOAuthRuntime(options = {}) {
 
     /**
      * @param {import('node:http').IncomingMessage} req
-     * @param {import('../resource-server/service.js').McpAuthConfig} config
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     * @returns {Promise<
-     *     { ok: true; jkt: string } | { ok: true; jkt: '' } | { ok: false; error: string; errorCode?: string }
-     * >}
-     */
-    async function resolveDpopBindingForRequest(req, config, issuerConfig) {
-        const proof = firstHeaderValue(req.headers['dpop']);
-        if (!proof) return { ok: true, jkt: '' };
-        if (!isDevOAuthDpopEnabled(issuerConfig)) return { ok: false, error: 'DPoP is not enabled for this issuer.' };
-        return verifyDpopProof(
-            proof,
-            { method: String(req.method ?? 'POST').toUpperCase(), htu: `${config.resource}/oauth/token` },
-            issuerConfig,
-        );
-    }
-
-    /**
-     * @param {string} proof
-     * @param {{ method: string; htu: string }} expected
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     * @returns {Promise<{ ok: true; jkt: string } | { ok: false; error: string; errorCode?: string }>}
-     */
-    async function verifyDpopProof(proof, expected, issuerConfig) {
-        if (!proof || proof.length > MAX_DPOP_PROOF_LENGTH || hasControlCharacters(proof)) {
-            return { ok: false, error: 'DPoP proof is missing or too large.' };
-        }
-        try {
-            const header = decodeJwtHeader(proof);
-            const jwk = header['jwk'];
-            const alg = String(header['alg'] ?? '');
-            const typ = String(header['typ'] ?? '').toLowerCase();
-            if (isDpopTypRequired(issuerConfig) && typ !== 'dpop+jwt') {
-                return { ok: false, error: 'DPoP proof typ must be dpop+jwt.' };
-            }
-            if (!DPOP_SIGNING_ALGORITHMS.includes(/** @type {'ES256' | 'RS256'} */ (alg))) {
-                return { ok: false, error: 'DPoP proof uses an unsupported signing algorithm.' };
-            }
-            if (!jwk || typeof jwk !== 'object' || Array.isArray(jwk)) {
-                return { ok: false, error: 'DPoP proof is missing an embedded public JWK.' };
-            }
-            if (hasPrivateJwkFields(/** @type {Record<string, unknown>} */ (jwk))) {
-                return { ok: false, error: 'DPoP proof JWK must be public.' };
-            }
-            const key = await importJWK(/** @type {Record<string, unknown>} */ (jwk), alg);
-            const verified = await jwtVerify(proof, key, {
-                algorithms: [...DPOP_SIGNING_ALGORITHMS],
-                clockTolerance: DPOP_CLOCK_TOLERANCE_SECONDS,
-                maxTokenAge: `${DPOP_MAX_TTL_SECONDS}s`,
-            });
-            const payload = verified.payload;
-            const htm = String(payload['htm'] ?? '').toUpperCase();
-            const htu = normalizeDpopHtu(String(payload['htu'] ?? ''));
-            const expectedHtu = normalizeDpopHtu(expected.htu);
-            const iat = Number(payload.iat);
-            const jti = typeof payload.jti === 'string' ? payload.jti : '';
-            if (!Number.isFinite(iat)) return { ok: false, error: 'DPoP proof iat is missing.' };
-            if (htm !== expected.method.toUpperCase()) return { ok: false, error: 'DPoP proof htm does not match.' };
-            if (htu !== expectedHtu) return { ok: false, error: 'DPoP proof htu does not match.' };
-            if (!jti || jti.length > 256 || hasControlCharacters(jti))
-                return { ok: false, error: 'DPoP proof jti is missing or invalid.' };
-            if (isDpopNonceRequired(issuerConfig)) {
-                const nonce = typeof payload['nonce'] === 'string' ? payload['nonce'] : '';
-                if (!isValidDpopNonce(nonce)) {
-                    return {
-                        ok: false,
-                        error: 'Authorization server requires nonce in DPoP proof.',
-                        errorCode: 'use_dpop_nonce',
-                    };
-                }
-            }
-            const publicJwk = /** @type {Record<string, unknown>} */ ({ ...jwk });
-            for (const privateField of ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth']) delete publicJwk[privateField];
-            const jkt = await calculateJwkThumbprint(publicJwk);
-            pruneDpopReplayCache();
-            const replayKey = `${jkt}:${jti}`;
-            if (dpopReplayCache.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
-            const expMs = Number(payload.exp) ? Number(payload.exp) * 1000 : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
-            const persistentReplay = rememberPersistentOAuthReplay(
-                OAUTH_REPLAY_NAMESPACES.issuerDpop,
-                replayKey,
-                expMs,
-            );
-            if (!persistentReplay.available) {
-                return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
-            }
-            if (persistentReplay.replay) return { ok: false, error: 'DPoP proof replay detected.' };
-            dpopReplayCache.set(replayKey, expMs);
-            trimDpopReplayCache(DPOP_REPLAY_CACHE_MAX_ENTRIES);
-            return { ok: true, jkt };
-        } catch (error) {
-            return {
-                ok: false,
-                error:
-                    error instanceof Error
-                        ? sanitizeLogString(error.message, 240)
-                        : 'DPoP proof could not be verified.',
-            };
-        }
-    }
-
-    /**
-     * @param {string} jwt
-     * @returns {Record<string, unknown>}
-     */
-    function decodeJwtHeader(jwt) {
-        const [encoded] = jwt.split('.', 1);
-        if (!encoded) throw new Error('JWT header is missing.');
-        return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-    }
-
-    /**
-     * @param {Record<string, unknown>} jwk
-     * @returns {boolean}
-     */
-    function hasPrivateJwkFields(jwk) {
-        return ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth'].some((field) =>
-            Object.prototype.hasOwnProperty.call(jwk, field),
-        );
-    }
-
-    /**
-     * @param {string} value
-     * @returns {string}
-     */
-    function normalizeDpopHtu(value) {
-        try {
-            const url = new URL(value);
-            url.hash = '';
-            return url.toString();
-        } catch {
-            return '';
-        }
-    }
-
-    /**
-     * @param {number} [nowMs]
-     * @returns {number}
-     */
-    function pruneDpopReplayCache(nowMs = Date.now()) {
-        let removed = 0;
-        for (const [key, expiresAt] of dpopReplayCache) {
-            if (expiresAt <= nowMs) {
-                dpopReplayCache.delete(key);
-                removed += 1;
-            }
-        }
-        return removed;
-    }
-
-    /**
-     * @param {number} maxSize
-     * @returns {void}
-     */
-    function trimDpopReplayCache(maxSize) {
-        if (dpopReplayCache.size <= maxSize) return;
-        const oldest = [...dpopReplayCache.entries()].sort((left, right) => left[1] - right[1]);
-        for (const [key] of oldest) {
-            if (dpopReplayCache.size <= maxSize) break;
-            dpopReplayCache.delete(key);
-        }
-    }
-
-    /**
-     * @returns {string}
-     */
-    function issueDpopNonce() {
-        pruneDpopNonces();
-        trimDpopNonces(MAX_DPOP_NONCES - 1);
-        const nonce = randomUUID().replace(/-/gu, '');
-        dpopNonces.set(nonce, Date.now() + DPOP_NONCE_TTL_MS);
-        return nonce;
-    }
-
-    /**
-     * @param {string} nonce
-     * @returns {boolean}
-     */
-    function isValidDpopNonce(nonce) {
-        if (!nonce || nonce.length > MAX_DPOP_NONCE_LENGTH || hasControlCharacters(nonce)) return false;
-        pruneDpopNonces();
-        const expiresAt = dpopNonces.get(nonce);
-        return Number.isFinite(expiresAt) && Number(expiresAt) > Date.now();
-    }
-
-    /**
-     * @param {number} [nowMs]
-     * @returns {number}
-     */
-    function pruneDpopNonces(nowMs = Date.now()) {
-        let removed = 0;
-        for (const [nonce, expiresAt] of dpopNonces) {
-            if (expiresAt <= nowMs) {
-                dpopNonces.delete(nonce);
-                removed += 1;
-            }
-        }
-        return removed;
-    }
-
-    /**
-     * @param {number} maxSize
-     * @returns {void}
-     */
-    function trimDpopNonces(maxSize) {
-        if (dpopNonces.size <= maxSize) return;
-        const oldest = [...dpopNonces.entries()].sort((left, right) => left[1] - right[1]);
-        for (const [nonce] of oldest) {
-            if (dpopNonces.size <= maxSize) break;
-            dpopNonces.delete(nonce);
-        }
-    }
-
-    /**
-     * @param {import('node:http').IncomingMessage} req
      * @param {import('node:http').ServerResponse} res
      * @param {import('../resource-server/service.js').McpAuthConfig} config
      * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
@@ -2272,10 +2062,9 @@ export function createDevOAuthRuntime(options = {}) {
         registeredClients.clear();
         clientMetadataDocumentCache.clear();
         clientAssertionJwksCache.clear();
-        requestBudgets.clear();
+        requestBudgetRuntime.reset();
         privateKeyJwtReplayCache.clear();
-        dpopReplayCache.clear();
-        dpopNonces.clear();
+        dpopRuntime.reset();
         pushedAuthorizationRequests.clear();
         renewCredentials.clear();
         consumedRefreshTokenHashes.clear();
@@ -2316,139 +2105,6 @@ export function createDevOAuthRuntime(options = {}) {
         if (method === 'GET' && pathname === '/oauth/userinfo') return 'userinfo';
         return null;
     }
-    /**
-     * @param {import('node:http').IncomingMessage} req
-     * @param {string} name
-     * @param {number} [nowMs]
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     * @returns {boolean}
-     */
-    function consumeDevOAuthBudget(req, name, issuerConfig, nowMs = Date.now()) {
-        pruneExpiredRequestBudgets(nowMs);
-        const subject = readRequestBudgetSubject(req, issuerConfig);
-        const key = `${name}:${subject}`;
-        const current = requestBudgets.get(key);
-        const limit = readRequestBudgetLimit(name, issuerConfig);
-        const windowMs = readRequestBudgetWindowMs(issuerConfig);
-        if (!current || current.resetAt <= nowMs) {
-            requestBudgets.set(key, { count: 1, resetAt: nowMs + windowMs });
-            return true;
-        }
-        current.count += 1;
-        return current.count <= limit;
-    }
-    /** @param {string} name @param {import('./config.js').DevOAuthProcessConfig} issuerConfig */
-    function readRequestBudgetLimit(name, issuerConfig) {
-        return issuerConfig.rateLimit.limits[name] ?? 60;
-    }
-
-    /** @param {import('./config.js').DevOAuthProcessConfig} issuerConfig */
-    function readRequestBudgetWindowMs(issuerConfig) {
-        return issuerConfig.rateLimit.windowMs;
-    }
-
-    /**
-     * @param {import('node:http').IncomingMessage} req
-     * @param {import('node:http').ServerResponse} res
-     * @param {string} name
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     * @returns {void}
-     */
-    function writeRateLimitExceeded(req, res, name, issuerConfig) {
-        const subject = readRequestBudgetSubject(req, issuerConfig);
-        const current = requestBudgets.get(`${name}:${subject}`);
-        const nowMs = Date.now();
-        const retryAfterSeconds = Math.max(1, Math.ceil(((current?.resetAt ?? nowMs + 1000) - nowMs) / 1000));
-        const limit = readRequestBudgetLimit(name, issuerConfig);
-        res.setHeader('Retry-After', String(retryAfterSeconds));
-        res.setHeader('X-RateLimit-Limit', String(limit));
-        res.setHeader('X-RateLimit-Remaining', '0');
-        res.setHeader('X-RateLimit-Reset', String(Math.floor((current?.resetAt ?? nowMs) / 1000)));
-        writeJson(res, 429, { error: 'temporarily_unavailable' });
-    }
-
-    /**
-     * @param {number} [nowMs]
-     * @returns {number}
-     */
-    function pruneExpiredRequestBudgets(nowMs = Date.now()) {
-        let removed = 0;
-        for (const [key, budget] of requestBudgets) {
-            if (budget.resetAt <= nowMs) {
-                requestBudgets.delete(key);
-                removed += 1;
-            }
-        }
-        return removed;
-    }
-
-    /**
-     * @param {import('node:http').IncomingMessage} req
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     * @returns {string}
-     */
-    function readRequestBudgetSubject(req, issuerConfig) {
-        const cloudflareIp = firstHeaderValue(req.headers['cf-connecting-ip']);
-        if (isTrustedCloudflareHeaderRequest(req, issuerConfig) && isSafeRequestBudgetSubject(cloudflareIp))
-            return cloudflareIp;
-
-        if (isDevOAuthXForwardedForTrusted(issuerConfig)) {
-            const forwardedFor = firstHeaderValue(req.headers['x-forwarded-for']);
-            const forwardedSubject = forwardedFor.split(',')[0]?.trim() || '';
-            if (isSafeRequestBudgetSubject(forwardedSubject)) return forwardedSubject;
-        }
-
-        const remoteAddress = String(req.socket?.remoteAddress ?? 'unknown');
-        return isSafeRequestBudgetSubject(remoteAddress) ? remoteAddress : 'unknown';
-    }
-    /**
-     * @param {string} value
-     * @returns {boolean}
-     */
-    function isSafeRequestBudgetSubject(value) {
-        return Boolean(
-            value && value.length <= MAX_REQUEST_BUDGET_SUBJECT_LENGTH && /^[A-Za-z0-9:._\-[\]]+$/u.test(value),
-        );
-    }
-
-    /**
-     * @param {import('node:http').IncomingMessage} req
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     */
-    function isTrustedCloudflareHeaderRequest(req, issuerConfig) {
-        if (issuerConfig.proxyTrust.cloudflareHeaders === 'always') return true;
-        if (issuerConfig.proxyTrust.cloudflareHeaders === 'never') return false;
-        return isLoopbackSocketAddress(String(req.socket?.remoteAddress ?? ''));
-    }
-
-    /**
-     * @param {string} address
-     * @returns {boolean}
-     */
-    function isLoopbackSocketAddress(address) {
-        const normalized = normalizeHostname(address);
-        return (
-            normalized === 'localhost' ||
-            normalized === '127.0.0.1' ||
-            normalized === '::1' ||
-            normalized === '::ffff:127.0.0.1'
-        );
-    }
-
-    /** @param {import('./config.js').DevOAuthProcessConfig} issuerConfig */
-    function isDevOAuthXForwardedForTrusted(issuerConfig) {
-        return issuerConfig.proxyTrust.xForwardedFor;
-    }
-
-    /**
-     * @param {string | string[] | undefined} value
-     * @returns {string}
-     */
-    function firstHeaderValue(value) {
-        const raw = Array.isArray(value) ? value[0] : value;
-        return String(raw ?? '').trim();
-    }
-
     /**
      * @param {number} [maxSize]
      * @param {number} [nowMs]
@@ -2699,25 +2355,6 @@ export function createDevOAuthRuntime(options = {}) {
         if (/^rtf_[A-Fa-f0-9-]{36}$/u.test(normalized)) return normalized;
         if (/^legacy_[a-f0-9]{16}$/u.test(normalized)) return normalized;
         return '';
-    }
-
-    /**
-     * @param {unknown} value
-     * @returns {string}
-     */
-    function normalizeDpopJkt(value) {
-        const normalized = String(value ?? '').trim();
-        return isValidDpopJkt(normalized) ? normalized : '';
-    }
-
-    /**
-     * @param {string} value
-     * @returns {boolean}
-     */
-    function isValidDpopJkt(value) {
-        return Boolean(
-            value && value.length <= MAX_DPOP_JKT_LENGTH && value.length >= 32 && /^[A-Za-z0-9_-]+$/u.test(value),
-        );
     }
 
     /**
@@ -3971,14 +3608,6 @@ export function createDevOAuthRuntime(options = {}) {
 
     /**
      * @param {string} hostname
-     * @returns {string}
-     */
-    function normalizeHostname(hostname) {
-        return hostname.toLowerCase().replace(/^\[/u, '').replace(/\]$/u, '').replace(/\.$/u, '');
-    }
-
-    /**
-     * @param {string} hostname
      * @returns {boolean}
      */
     function isLocalOrPrivateHostname(hostname) {
@@ -4096,163 +3725,6 @@ export function createDevOAuthRuntime(options = {}) {
         const octets = match.slice(1).map((item) => Number(item));
         if (octets.some((item) => !Number.isInteger(item) || item < 0 || item > 255)) return null;
         return /** @type {[number, number, number, number]} */ (octets);
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @returns {string}
-     */
-    function ensureResponseRequestId(res) {
-        const existing = res.getHeader('x-request-id');
-        if (existing) return String(existing);
-        const requestId = randomUUID();
-        res.setHeader('X-Request-Id', requestId);
-        return requestId;
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @param {import('../resource-server/service.js').McpAuthConfig} config
-     * @param {string} [error]
-     * @param {string} [description]
-     * @param {string} [scope]
-     * @returns {void}
-     */
-    function setBearerChallenge(res, config, error = '', description = '', scope = '') {
-        /** @type {[string, string][]} */
-        const params = [['realm', config.resource]];
-        if (error) params.push(['error', error]);
-        if (description) params.push(['error_description', description]);
-        if (scope) params.push(['scope', scope]);
-        res.setHeader(
-            'WWW-Authenticate',
-            `Bearer ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`,
-        );
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @param {string} error
-     * @param {string} description
-     * @returns {void}
-     */
-    function setDpopChallenge(res, error, description) {
-        /** @type {[string, string][]} */
-        const params = [['error', error]];
-        if (description) params.push(['error_description', description]);
-        res.setHeader(
-            'WWW-Authenticate',
-            `DPoP ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`,
-        );
-    }
-
-    /**
-     * @param {string} value
-     * @returns {string}
-     */
-    function quoteAuthParam(value) {
-        return `"${String(value).replace(/["\\]/gu, '\\$&')}"`;
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @param {import('./config.js').DevOAuthProcessConfig} issuerConfig
-     */
-    function bindDevOAuthResponseConfig(res, issuerConfig) {
-        responseIssuerConfigs.set(res, issuerConfig);
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @returns {import('./config.js').DevOAuthProcessConfig}
-     */
-    function requireDevOAuthResponseConfig(res) {
-        const issuerConfig = responseIssuerConfigs.get(res);
-        if (!issuerConfig) throw new TypeError('Dev OAuth response is missing its process configuration generation.');
-        return issuerConfig;
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @param {number} status
-     * @param {unknown} body
-     * @returns {void}
-     */
-    function writeJson(res, status, body) {
-        ensureResponseRequestId(res);
-        const issuerConfig = requireDevOAuthResponseConfig(res);
-        const payload = `${JSON.stringify(body, null, 2)}\n`;
-        res.writeHead(status, {
-            ...securityHeaders(),
-            ...devOAuthCorsHeaders(issuerConfig),
-            'content-type': 'application/json; charset=utf-8',
-            'content-length': Buffer.byteLength(payload),
-            'cache-control': 'no-store, no-transform',
-            pragma: 'no-cache',
-            expires: '0',
-            'x-content-type-options': 'nosniff',
-        });
-        res.end(payload);
-    }
-
-    /** @param {import('node:http').ServerResponse} res */
-    function writeCorsPreflight(res) {
-        ensureResponseRequestId(res);
-        const issuerConfig = requireDevOAuthResponseConfig(res);
-        res.writeHead(204, {
-            ...securityHeaders(),
-            ...devOAuthCorsHeaders(issuerConfig),
-            'access-control-allow-methods': 'GET, POST, OPTIONS',
-            'access-control-allow-headers':
-                'accept, authorization, content-type, dpop, mcp-session-id, mcp-protocol-version, x-requested-with',
-            'access-control-max-age': '600',
-            'content-length': '0',
-        });
-        res.end();
-    }
-
-    /**
-     * @returns {Record<string, string>}
-     */
-    function securityHeaders() {
-        return {
-            'strict-transport-security': 'max-age=31536000; includeSubDomains',
-            'content-security-policy':
-                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
-            'referrer-policy': 'no-referrer',
-            'x-frame-options': 'DENY',
-            'cross-origin-resource-policy': 'same-origin',
-            'cross-origin-opener-policy': 'same-origin',
-        };
-    }
-
-    /** @param {import('./config.js').DevOAuthProcessConfig} issuerConfig */
-    function devOAuthCorsHeaders(issuerConfig) {
-        const origin = issuerConfig.corsOrigin;
-        if (!origin) return {};
-        return {
-            'access-control-allow-origin': origin,
-            'access-control-expose-headers': 'location, www-authenticate, dpop-nonce, x-request-id',
-            vary: origin === '*' ? 'Access-Control-Request-Method, Access-Control-Request-Headers' : 'Origin',
-        };
-    }
-
-    /**
-     * @param {import('node:http').ServerResponse} res
-     * @param {URL} target
-     */
-    function redirect(res, target) {
-        ensureResponseRequestId(res);
-        const issuerConfig = requireDevOAuthResponseConfig(res);
-        res.writeHead(302, {
-            ...securityHeaders(),
-            ...devOAuthCorsHeaders(issuerConfig),
-            location: target.toString(),
-            'cache-control': 'no-store, no-transform',
-            pragma: 'no-cache',
-            expires: '0',
-        });
-        res.end();
     }
 
     /**
@@ -4407,20 +3879,23 @@ export function createDevOAuthRuntime(options = {}) {
         readPersistenceStatus: readDevOAuthPersistenceStatus,
         resetForTests: resetDevOAuthRuntimeForTests,
         testHarness: devOAuthTestHarness,
-        readState: () => ({
-            authorizationCodes: authorizationCodes.size,
-            pushedAuthorizationRequests: pushedAuthorizationRequests.size,
-            registeredClients: registeredClients.size,
-            clientMetadataCacheEntries: clientMetadataDocumentCache.size,
-            clientAssertionJwksCacheEntries: clientAssertionJwksCache.size,
-            requestBudgetEntries: requestBudgets.size,
-            privateKeyJwtReplayEntries: privateKeyJwtReplayCache.size,
-            dpopReplayEntries: dpopReplayCache.size,
-            dpopNonceEntries: dpopNonces.size,
-            renewCredentials: renewCredentials.size,
-            consumedRefreshTokenHashes: consumedRefreshTokenHashes.size,
-            revokedRefreshTokenFamilies: revokedRefreshTokenFamilies.size,
-            replay: replay.status(),
-        }),
+        readState: () => {
+            const dpopState = dpopRuntime.state();
+            return {
+                authorizationCodes: authorizationCodes.size,
+                pushedAuthorizationRequests: pushedAuthorizationRequests.size,
+                registeredClients: registeredClients.size,
+                clientMetadataCacheEntries: clientMetadataDocumentCache.size,
+                clientAssertionJwksCacheEntries: clientAssertionJwksCache.size,
+                requestBudgetEntries: requestBudgetRuntime.size(),
+                privateKeyJwtReplayEntries: privateKeyJwtReplayCache.size,
+                dpopReplayEntries: dpopState.replayEntries,
+                dpopNonceEntries: dpopState.nonceEntries,
+                renewCredentials: renewCredentials.size,
+                consumedRefreshTokenHashes: consumedRefreshTokenHashes.size,
+                revokedRefreshTokenFamilies: revokedRefreshTokenFamilies.size,
+                replay: replay.status(),
+            };
+        },
     });
 }

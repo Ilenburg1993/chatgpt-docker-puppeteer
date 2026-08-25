@@ -7,9 +7,16 @@ import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { createMcpLatencyHistoryRuntime } from '#copilot/testing/mcp/diagnostics/latency';
+import { createMcpLatencyHistoryRuntime } from '#copilot/testing/mcp/diagnostics/latency/dashboard';
 
 describe('MCP latency history persistence', () => {
+    it('rejects a relative file binding instead of resolving it from ambient cwd', () => {
+        assert.throws(
+            () => createMcpLatencyHistoryRuntime({ filePath: 'relative/history.jsonl', io: /** @type {never} */ ({}) }),
+            /already-resolved absolute filePath/,
+        );
+    });
+
     it('serializes concurrent append/trim cycles through one bound configured store', async () => {
         const id = randomUUID();
         const filePath = path.join(process.cwd(), 'src/copilot/.ai/mcp', `latency-history-test-${id}.jsonl`);

@@ -269,11 +269,13 @@ describe('commands/diagnose', () => {
     it('inclui health, issues e status transversais do agente', async () => {
         const previousEnv = {
             COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+            COPILOT_BYOK_PROFILE: process.env['COPILOT_BYOK_PROFILE'],
             COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
             COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
             COPILOT_BYOK_API_KEY: process.env['COPILOT_BYOK_API_KEY'],
             OPEN_ROUTER_KEY: process.env['OPEN_ROUTER_KEY'],
         };
+        delete process.env['COPILOT_BYOK_PROFILE'];
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'openrouter';
         process.env['COPILOT_BYOK_MODEL'] = 'deepseek/deepseek-v4-flash:free';

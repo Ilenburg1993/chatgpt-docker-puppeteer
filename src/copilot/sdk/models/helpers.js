@@ -8,7 +8,6 @@
 
 import { SdkConfigError } from '#copilot/sdk/errors';
 import { log } from '../logger.js';
-import { getModelListClient } from './client-provider.js';
 import { modelSelector } from './registry.js';
 
 import { toError } from '#copilot/infra/public/platform/error';
@@ -80,16 +79,18 @@ export async function clearModelsCacheAsync() {
 // ─── Listagem e filtragem ────────────────────────────────────────────────────
 
 /**
- * Lista todos os modelos disponíveis usando o cliente SDK ativo.
+ * Lista todos os modelos disponíveis usando uma capability explícita de aquisição do cliente SDK.
  *
- * AB.2: resultado cacheado por 5 minutos para evitar requisições repetidas. Equivale a `client.listModels()` mas usa o
- * cliente singleton gerenciado. Deduplica requisições concorrentes via `_inflightRequest`.
+ * AB.2: resultado cacheado por 5 minutos para evitar requisições repetidas. O domínio `models` possui apenas cache e
+ * normalização; a authority para adquirir/conectar o cliente é injetada pelo owner `session`, preservando dependência
+ * unidirecional `session -> models`. Deduplica requisições concorrentes via `_inflightRequest`.
  *
+ * @param {(overrides?: object) => Promise<{ listModels: () => Promise<ModelInfo[]> }>} getClient
  * @param {object} [clientOverrides={}] - Overrides opcionais para o cliente. Default is `{}`
  * @param {boolean} [forceRefresh=false] - Ignorar cache e buscar lista atualizada. Default is `false`
  * @returns {Promise<ModelInfo[]>}
  */
-export async function listModels(clientOverrides = {}, forceRefresh = false) {
+export async function listModelsWithClient(getClient, clientOverrides = {}, forceRefresh = false) {
     const now = Date.now();
     const persistentCacheEnabled = isPersistentModelCacheEnabled();
     // L1: Check memória (5min TTL)
@@ -119,7 +120,7 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
         return _inflightRequest;
     }
 
-    const client = await getModelListClient(clientOverrides);
+    const client = await getClient(clientOverrides);
     // Guardar Promise em voo para deduplicação (L3: network fetch)
     _inflightRequest = (async () => {
         try {

@@ -685,7 +685,7 @@ async function projectRepoFileBatchWorkflow(runtime, workflow, operations, inclu
  * Build one repo-write tool set with instance-local fault-injection dependencies. Production uses the canonical
  * defaults; tests can create an isolated tool set without mutating process-global state observed by other requests.
  *
- * @param {{ quarantineMetadataWriter?: RepoWriteQuarantineMetadataInterceptor }} [options]
+ * @param {{ quarantineMetadataWriter?: RepoWriteQuarantineMetadataInterceptor; quarantineDir?: string }} [options]
  * @returns {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export function createRepoWriteTools(options = {}) {
@@ -709,6 +709,7 @@ export function createRepoWriteTools(options = {}) {
             requireMcpToolAuditCapability(operationContext),
             quarantineMetadataWriter,
             operationContext?.signal,
+            options.quarantineDir ? { quarantineDir: options.quarantineDir } : {},
         );
 
     return [

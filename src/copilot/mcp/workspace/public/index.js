@@ -9,7 +9,11 @@
  */
 
 export { createMcpWorkspaceCapability } from '../contracts/capability.js';
-export { MCP_WORKSPACE_ROOT, toMcpWorkspaceRelativePath } from '../contracts/root.js';
+export {
+    MCP_WORKSPACE_ROOT,
+    resolveMcpWorkspaceIdentityPath,
+    toMcpWorkspaceRelativePath,
+} from '../contracts/root.js';
 
 /** @typedef {import('../contracts/capability.js').McpWorkspaceCapability} McpWorkspaceCapability */
 /** @typedef {import('../contracts/capability.js').McpPathOk} McpPathOk */

@@ -4,6 +4,10 @@ export {
     buildInfraMutableStateReport,
     buildInfraPublicApiCostReport,
     buildInfraPublicAuthorityReport,
+    buildPublicSurfaceCostReport,
     buildStaticImportClosure,
+    createStaticImportClosureAnalyzer,
+    listStaticModuleEdges,
+    listStaticModuleSpecifiers,
     INFRA_PUBLIC_API_MANIFEST,
 } from '../../../governance/index.js';

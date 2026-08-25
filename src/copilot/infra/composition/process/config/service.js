@@ -14,8 +14,8 @@ import { readCopilotNodeCompileCacheConfig } from '../../../platform/node/index.
 import { readInfraConfig } from '../../runtime/index.js';
 import { readProcessRuntimePolicyConfig } from './policy.js';
 
-/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env */
-export function readProcessInfraConfig(env) {
+/** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env @param {{workspaceRoot?:string|null}} [options] */
+export function readProcessInfraConfig(env, options = {}) {
     const runtimePolicy = readProcessRuntimePolicyConfig(env);
     return Object.freeze({
         eventBus: runtimePolicy.eventBus,
@@ -27,6 +27,6 @@ export function readProcessInfraConfig(env) {
             budget: readIoSearchBudgetConfig(env),
             subprocess: readSearchSubprocessProcessConfig(env),
         }),
-        runtimeDefaults: readInfraConfig(env),
+        runtimeDefaults: readInfraConfig(env, { workspaceRoot: options.workspaceRoot ?? null }),
     });
 }

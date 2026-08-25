@@ -4,8 +4,8 @@ import {
     readMcpRoundTripAnalyticsMonitorState,
     scheduleMcpRoundTripAnalyticsMonitor,
     stopMcpRoundTripAnalyticsMonitor,
-} from '#copilot/mcp/public/diagnostics/latency';
-import { resetMcpRoundTripAnalyticsMonitorForTests } from '#copilot/testing/mcp/diagnostics/latency';
+} from '#copilot/mcp/public/diagnostics/latency/round-trip';
+import { resetMcpRoundTripAnalyticsMonitorForTests } from '#copilot/testing/mcp/diagnostics/latency/round-trip';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 

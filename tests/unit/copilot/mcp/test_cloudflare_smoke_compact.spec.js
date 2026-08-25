@@ -1,7 +1,7 @@
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
-} from '#copilot/mcp/public/cloudflare/errors';
+} from '#copilot/testing/mcp/cloudflare/errors';
 import {
     parseConnectorSmokeJsonOutput,
     summarizeConnectorSmokeReport,
@@ -18,7 +18,9 @@ describe('cloudflare connector smoke compact mode', () => {
         const source = await readFile('src/copilot/mcp/connection/connector-smoke.js', 'utf8');
 
         expect(source).toContain('runCanonicalConnectorSmoke({');
-        expect(source).not.toContain("spawn(process.execPath, ['src/copilot/mcp/cloudflare/cli.js', 'smoke']");
+        expect(source).not.toContain(
+            "spawn(process.execPath, ['src/copilot/mcp/composition/cloudflare-cli/cli.js', 'smoke']",
+        );
     });
 
     it('suppresses remote tool names from both legacy and authenticated tool-list projections', async () => {

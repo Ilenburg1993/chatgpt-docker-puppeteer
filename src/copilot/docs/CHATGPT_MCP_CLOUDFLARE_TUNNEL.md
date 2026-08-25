@@ -162,7 +162,7 @@ Arquivos:
 
 ```text
 src/copilot/mcp/cloudflare/config.js
-src/copilot/mcp/cloudflare/cli.js
+src/copilot/mcp/composition/cloudflare-cli/cli.js
 ```
 
 O CLI:

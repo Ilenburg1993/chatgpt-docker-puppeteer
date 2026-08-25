@@ -1868,8 +1868,11 @@ seus próprios barriers.
 
 - [x] executar a suíte canônica sem validators concorrentes e reproduzir o resultado no mesmo
       worktree, inclusive com artifacts operacionais históricos ainda presentes;
-- [ ] tornar a área física de quarantine usada por testes completamente namespaced por run/test ou
-      injetável quando isso não prejudicar a prova do path de produção;
+- [x] tornar a área física de quarantine usada por testes completamente namespaced por run/test ou
+      injetável quando isso não prejudicar a prova do path de produção — `createRepoWriteRuntime`
+      preserva `.ai/quarantine` em production e aceita apenas override absoluto descendente dessa
+      raiz; `test_mcp_repo_write` usa `.ai/quarantine/test-runs/<UUID>` e limpa o namespace após
+      cada teste;
 - [x] impedir, no rollback focal de quarantine, que a assertion enumere artifacts de runs
       anteriores;
 - [x] extinguir o `repoWriteTestHarness`/metadata-writer global e substituir por dependency por
@@ -1900,8 +1903,9 @@ timeout.
       `#copilot/mcp/public/cloudflare/plan-capabilities-audit` e foi depois consolidada, sem shim,
       na surface coesa `#copilot/mcp/public/cloudflare/posture` durante a Faixa J;
 - [x] adicionar ratchet AST que falha para computed import MCP novo/não declarado;
-- [ ] ampliar a prova para validar target/owner de qualquer computed import que venha a ser
-      deliberadamente declarado.
+- [x] fechar a política em **computed import = proibido**; lazy loading deliberado exige specifier
+      literal, entrada bijetiva no dynamic graph e validação de membrane/owner quando o target é
+      MCP.
 
 ### B.2 Model Gateway
 
@@ -1915,16 +1919,31 @@ timeout.
 ### B.3 Dynamic edge governance
 
 - [x] adicionar scan AST de computed imports e import authorities relevantes;
-- [ ] classificar optional loaders fora do corpus já representado;
+- [x] classificar todos os literal/optional loaders runtime atuais por AST;
 - [x] classificar worker-thread import authorities MCP atuais — zero;
-- [x] classificar os 16 módulos MCP que importam `child_process`;
-- [x] criar dynamic/process graph manifest inicial;
-- [x] gate fail-closed para computed import não registrado e child/worker authority drift;
-- [ ] enriquecer o manifest de processo com executable/cwd/env/credentials/signal/terminality por
+- [x] classificar os **15 módulos atuais** que importam `child_process` (16 na fotografia anterior à
+      consolidação física de launchers);
+- [x] criar e evoluir o dynamic/process graph manifest para schema v3;
+- [x] gate fail-closed para computed import, literal-lazy, child/worker authority e deepest-owner
+      drift;
+- [x] enriquecer o manifest de processo com executable/cwd/env/credentials/signal/terminality por
       launcher;
-- [ ] validar owner/membrane de future computed edge explicitamente, além do ratchet de presença.
+- [x] validar owner/membrane de toda lazy edge MCP; computed edge futura não é exceção autorizável,
+      devendo ser convertida para specifier literal governado.
 
-**Gate B:** zero dependency runtime invisível ao modelo arquitetural.
+**Checkpoint B v3 — 2026-08-25:** o scan AST separa JSDoc `import()` de loading runtime e encontrou
+**15 ocorrências literal-dynamic / 14 pares source+specifier / 0 computed imports**. As edges foram
+classificadas em MCP-public, cross-domain-public ou external package e recebem `sourceOwnerId`,
+`targetOwnerId` quando MCP, audience, `loadPolicy`, expected count e rationale. Relative dynamic
+cross-owner foi eliminado em favor de alias público exato. Os **15 process-authority files / 22
+launcher contracts** agora declaram `executableAuthority`, `cwdAuthority`, `environmentAuthority`,
+`credentialAuthority`, `signalPolicy`, `terminality`, completion/cancellation/process-group e bound;
+`ownerId` precisa ser o owner mais profundo. `architecture-contract-check.js` terminou com **0
+failed checks** em ~**1,5 s** após a transformação.
+
+**Gate B: FECHADO.** Não existe dependency runtime invisível: computed loading é proibido, lazy
+loading literal é bijetivamente governado e subprocess authority possui owner e lifecycle
+explícitos.
 
 ---
 
@@ -1933,10 +1952,10 @@ timeout.
 ### C.1 Schema
 
 - [x] definir e materializar `ownerId`, `path`, `parentOwnerId`, `kind` e `protectedBoundary`;
-- [ ] enriquecer authority classes;
-- [ ] tornar public/testing audiences atributos explícitos por owner;
-- [ ] definir allowed owner dependencies declarativas;
-- [ ] definir cost/state/config policy hooks.
+- [x] enriquecer authority classes;
+- [x] tornar public/testing audiences atributos explícitos por owner;
+- [x] definir allowed owner dependencies declarativas;
+- [x] definir cost/state/config policy hooks.
 
 ### C.2 Inventário
 
@@ -1944,8 +1963,9 @@ timeout.
 - [x] registrar primeira onda de children com boundary/autonomy já demonstrada;
 - [x] marcar taxonomies e `entrypoint-space` explicitamente;
 - [x] manter subpastas privadas sem owner apenas por existirem fisicamente;
-- [ ] completar classificação de children quando state/config/lifecycle manifests trouxerem nova
-      evidência.
+- [x] completar a classificação de children para a evidência state/config/process/surface atualmente
+      materializada; novas authorities só entram se resolverem para `owner` concreto ou
+      `entrypoint-space` explícito, nunca taxonomy implícita.
 
 ### C.3 Derivação de gates
 
@@ -1953,10 +1973,25 @@ timeout.
 - [x] stale top-level owner entry falha;
 - [x] top-level MCP root não classificado falha;
 - [x] parent graph é validado e ciclos falham;
-- [ ] derivar public/testing surface ownership do manifest em vez de apenas validar targets
+- [x] derivar public/testing surface ownership do manifest em vez de apenas validar targets
       existentes.
 
-**Gate C:** a arquitetura não depende da memória de quem executou a campanha 2.4.
+**Checkpoint C v2 — 2026-08-25:** `copilot-mcp-owners.json` passou a schema v2 com quatro campos
+derivados por owner: `audiences`, `authorityClasses`, `policyHooks` e `allowedDependencies`. O grafo
+estático usa a mesma resolução canônica de package imports/relative imports do cost engine e separa
+`import` de `reexport`. Antes do ratchet, a auditoria encontrou dois SCCs reais: um de **16
+owners**, reduzido a 6 após mover o launcher Cloudflare para `composition/cloudflare-cli`, e
+eliminado ao promover o contrato leaf de URL a `mcp.connection.url`; o SCC
+`latency -> dashboard/round-trip -> latency` foi eliminado removendo reexports parent→child e
+criando surfaces exatas de round-trip e testing. Estado final medido: **68 owners / 211 direct owner
+dependencies / 0 SCC / 0 mismatch**, gate ~**0,46–0,59 s**. Surface governance ficou em **75 public
+/ 44 testing / 0 violações** (~0,31 s). Authorities de config/process podem pertencer a
+`entrypoint-space` explícito; surface/cost/state exigem owner concreto. O comando
+`copilot:mcp:owner-governance:rederive` só grava o manifest quando não há violations nem ciclos, e
+`copilot:mcp:owner-governance:check` integra o architecture barrier.
+
+**Gate C: FECHADO.** A arquitetura de owners, audiences, authorities, hooks e dependências diretas é
+machine-readable, acíclica e fail-closed; não depende da memória de quem executou a campanha 2.4.
 
 ---
 
@@ -1973,9 +2008,26 @@ timeout.
 - [x] ratchet fail-closed: authority desconhecida/stale ou aumento acima do ceiling falha;
 - [x] eliminar import-time/leaf env reads que eram migration targets; os reads remanescentes são
       parser-default, environment-projector ou process-entrypoint deliberados;
-- [ ] `MCP_WORKSPACE_ROOT` continua merecendo inventário próprio de identity authority; não é
-      `process.env` e portanto não bloqueia o Gate D já fechado.
+- [x] `MCP_WORKSPACE_ROOT` possui inventário próprio de identity authority, separado de
+      `process.env`, com derivação canônica por `import.meta.url`, consumers exatos e baseline de
+      `process.cwd()` igual a zero.
 
+> **Checkpoint 2026-08-25 — Faixa D, workspace identity authority.** Foi materializado
+> `config/architecture/copilot-mcp-workspace-identity.json`: **21 consumer files / 26 symbol imports
+> / 0 ambient cwd calls**. O mesmo AST do architecture barrier valida definição, exports consumidos,
+> owner mais profundo, stale/new consumers e uma allowlist de cwd deliberadamente vazia. Paths
+> relativos de Cloudflare (token/state/PID/log) e audit são ancorados na geração contra
+> `MCP_WORKSPACE_ROOT`; bindings que já prometem identidade absoluta (latency stores, index journal,
+> artifacts e quarantine) agora rejeitam input relativo em vez de reinterpretá-lo pelo cwd. A
+> composição genérica `ApplicationInfraHost -> ProcessInfra -> InfraRuntime` passou a encaminhar
+> `defaultWorkspaceRoot` até `readIoRollbackPolicy`, sem criar dependência Infra -> MCP. A auditoria
+> AST reduziu **19** `path.resolve(x)` de um argumento para exatamente **1** em todo MCP — a própria
+> derivação canônica de `MCP_WORKSPACE_ROOT`. O grafo foi rederivado em **68 owners / 218 direct
+> dependencies / 0 SCC / 0 mismatch**. Strict TS7, lint, architecture gate e **117 testes focais**
+> (111 MCP/Infra + 6 ApplicationInfraHost) passaram. O aumento intencional da closure de
+> `#copilot/mcp/public/cloudflare/config` de 6 para 7 módulos foi rebaselined com o headroom
+> canônico de 1,5x: **7 módulos / ceiling 11**, sem violations de cost/import purity.
+>
 > **Checkpoint 2026-08-24 — Faixa D, geração processual 1.** A métrica de `process.env` passa a ser
 > AST, não grep textual. O checker prova correspondência fail-closed entre código e manifest,
 > ceiling por authority e contagem **exata** para `migration-target`: qualquer redução precisa
@@ -2127,7 +2179,9 @@ tratado como mecanismo válido de reconfiguração do runtime existente.
       deliberados.
 
 **Gate D: FECHADO.** Configuração operacional agora é input explícito de geração/owner; ambient env
-remanescente só existe em authorities declaradas e ratcheted.
+remanescente só existe em authorities declaradas e ratcheted. Workspace identity é governada por
+manifest separado, deriva da localização do módulo e não do diretório de lançamento do processo; o
+baseline MCP de `process.cwd()` é zero.
 
 ---
 
@@ -2336,21 +2390,42 @@ fail-closed contra retorno da topologia anterior.
 - [x] `max-autonomy` default preservado e exercitado pelo shadow moderno 2026;
 - [x] modern + compat HTTP shadow continua verde.
 
-### H.4 Leafification física ainda aberta
+### H.4 Leafification física — fechada por fronteiras stateful estáveis
 
-Ownership/state lifecycle está resolvido, mas `auth/issuer/dev-oauth.js` continua um arquivo grande
-e coeso em torno de uma state machine complexa. A próxima decomposição física deve ocorrer somente
-por função estável — por exemplo metadata/routes, client metadata/CIMD-DCR, token families, DPoP e
-persistence — mantendo a instância lexical explícita. Não criar service locator, facade genérica nem
-múltiplos singletons para “reduzir LOC”.
+Ownership/state lifecycle permanece centrado em uma única `createDevOAuthRuntime()`, mas três
+facetas que possuíam state/policy próprios foram extraídas sem fragmentar a identidade da state
+machine:
 
-- [ ] separar facetas físicas apenas quando a fronteira preserve a mesma runtime instance;
-- [ ] evitar que a divisão reintroduza cross-module globals;
-- [ ] manter o hotspot budget como headroom secundário, não como critério de separação.
+- `issuer/request-budget/runtime.js`: `Map` de budgets, proxy-trust subject derivation e resposta
+  429;
+- `issuer/response/runtime.js`: `WeakMap<ServerResponse, DevOAuthProcessConfig>`, CORS/security
+  headers, challenges e writers JSON/redirect;
+- `issuer/dpop/runtime.js`: replay cache, nonce state, proof verification e JKT normalization, com a
+  capability de replay persistente explicitamente injetada pelo parent.
 
-**Gate H de state/config ownership: FECHADO.** O comportamento OAuth/modern shadow e a suíte
-canônica permanecem verdes. A leafification física continua como trabalho estrutural, mas não
-representa mais state/config authority implícita.
+Cada sub-runtime é criada exatamente uma vez dentro de `createDevOAuthRuntime()` e não possui
+mutable state em module scope. `dev-oauth.js` caiu de aproximadamente **184 KiB para 164.430 bytes**
+como efeito colateral da separação; o tamanho não foi usado como critério para criar fronteiras. A
+investigação de `private_key_jwt`/client assertion mostrou o ponto de parada: separar esse domínio
+agora exigiria atravessar o mesmo pipeline SSRF/CIMD, metadata normalization, logging e replay com
+uma dependency bag larga ou duplicação de policy, portanto essa divisão foi deliberadamente
+rejeitada.
+
+- [x] separar facetas físicas apenas quando a fronteira preserve a mesma runtime instance;
+- [x] evitar que a divisão reintroduza cross-module globals;
+- [x] manter o hotspot budget como headroom secundário, não como critério de separação.
+
+> **Checkpoint 2026-08-25 — H.4.** Foram provados: zero mutable declarations no module scope dos
+> três leaves; isolamento real de request-budget entre duas gerações concorrentes (`register=1`, A
+> recebe 429 sem contaminar B); isolamento de nonce/replay DPoP entre runtimes e fail-closed quando
+> persistence replay fica indisponível. `typecheck:strict:src.copilot` está verde; a suíte focal
+> auth/SSRF/modern+compat passou **37/37 testes**; owner governance ficou em **68 owners / 218
+> direct dependencies / 0 SCC / 0 mismatch**; public surface/cost/import-purity e architecture
+> checker têm zero violações; lint Copilot está verde.
+
+**Gate H: FECHADO.** State/config ownership e leafification física agora possuem fronteiras
+explícitas por geração, sem service locator, singleton mutável cross-module ou decomposição
+orientada apenas a LOC.
 
 ---
 
@@ -2392,8 +2467,18 @@ representa mais state/config authority implícita.
 - [x] classificar 131 tools por output-contract class;
 - [x] specific schema onde estável — 10/131;
 - [x] intentional-untyped com rationale — 121/131;
-- [ ] ampliar parity tests de `structuredContent` onde houver stable specific contract;
+- [x] ampliar parity tests de `structuredContent` onde houver stable specific contract — matriz
+      exaustiva 10/10 executa handlers reais e valida o payload contra o schema publicado;
 - [x] zero generic passthrough.
+
+> **Checkpoint 2026-08-25 — I.4 parity executável.**
+> `test_mcp_specific_output_schema_parity.spec.js` ratcheta o conjunto exato de specific schemas e
+> exercita `repo_status`, quatro Git reads, `terminal_exec`, `terminal_session_control`,
+> `terminal_session_read`, `search` e `fetch`. A prova usa sucesso real: Git/repo snapshots do
+> workspace, terminal one-shot e sessão com teardown, e Company Knowledge search→fetch. Para cada
+> chamada, o `structuredContent` retornado é submetido ao próprio Zod/raw-shape `outputSchema` da
+> definição canônica. Resultado: **10/10 contracts cobertos, 4/4 testes verdes** e
+> `typecheck:strict:src.copilot` verde.
 
 ### Checkpoint I — geração Tool Contract semântico
 
@@ -2816,12 +2901,12 @@ Claude continua opcional/aberto se permanecer consumer suportado; L.3 permanece 
 
 ### M.1 Public closure cost
 
-- [ ] static closure por public surface;
-- [ ] module/source-byte/external-package budgets;
-- [ ] cost tiers;
-- [ ] cold import wall/RSS;
-- [ ] transitive import-side-effect checks;
-- [ ] rebaseline justificado.
+- [x] static closure por public surface;
+- [x] module/source-byte/external-package budgets;
+- [x] cost tiers;
+- [x] cold import wall/RSS;
+- [x] transitive import-side-effect checks;
+- [x] rebaseline justificado.
 
 **Snapshot M.1 pré-publicação — 2026-08-25:** a auditoria de closure foi executada sobre os **81
 exact public aliases MCP** atuais reutilizando o analyzer AST canônico de Infra
@@ -2837,21 +2922,97 @@ M.1 retoma por esse ponto: primitive compartilhada -> manifest MCP explícito ->
 cold wall/RSS -> import purity transitiva. Broad closures atuais são dívida medida, não modelo a ser
 normalizado por rebaseline.
 
+**Checkpoint M.1 implementado — 2026-08-25:** a mecânica foi separada da policy. O novo engine
+`infra/governance/public-api-cost-engine.js` possui apenas parsing/resolução/closure e avaliação de
+budgets; Infra mantém seu manifest/baseline e MCP ganhou `copilot-mcp-public-api-manifest.json` +
+`copilot-mcp-public-api-cost-baseline.json`, inicialmente com bijeção exata dos **81 aliases** e
+headroom **1,5x**. Após a racionalização M.2, o manifest/baseline caiu causalmente a **74 aliases**;
+a Faixa C elevou o estado atual a **75** ao substituir o aggregate circular de latência por uma
+surface exata `diagnostics/latency/round-trip`, sem reintroduzir compat broad. O snapshot inicial
+permaneceu **47 micro / 14 standard / 20 heavy**, agora machine-enforced contra module count, source
+bytes, pacotes externos novos e static imports não resolvidos. O checker MCP reutiliza uma única
+closure cacheada e custa ~**4,48 s** para toda a surface.
+
+Cold import foi decomposto em primitive compartilhada
+`scripts/analysis/lib/public-api-cold-import.mjs`; o script Infra caiu de ~16,3 KiB para ~7,4 KiB
+sem alterar sua CLI. A baseline inicial mediu **10 hot public entrypoints**; após M.2 extinguir o
+aggregate `#copilot/mcp/public/transport/http/stateful`, o ratchet atual possui **9 entrypoints**
+explicitamente marcados no manifest e a entrada cold-import stale foi removida, sem substituição
+artificial. A medição inicial (2 samples, 0 warmup) levou **20,78 s**, portanto
+`copilot:mcp:cold-import:check` é deliberadamente um gate raro; sua validação estrutural custa
+apenas ~**0,15 s** e pode participar do architecture barrier.
+
+A import purity transitiva foi fechada como **zero-baseline**, não por exceções. Um detector AST de
+alta confiança percorre os **999 arquivos** alcançáveis pelos aliases MCP e proíbe side-effect-only
+imports, top-level await/execution, mutação de `process.env`, timers/fetch/process lifecycle,
+`listen`, subprocess/fs-write/Worker conhecidos. A primeira auditoria encontrou um único efeito
+real: `src/copilot/sdk/session/client.js` registrava `setModelListClientProvider(getClient)` no
+import-time. O registry mutável foi extinto. Uma primeira substituição por reverse edge lazy
+`models -> session` eliminou o side effect, mas o barrier global detectou corretamente que o ciclo
+semântico permanecia. A forma final é unidirecional: `sdk/models/helpers.js` expõe
+`listModelsWithClient(getClient, ...)`, sem authority para adquirir cliente; `sdk/session/client.js`
+injeta sua própria capability e publica `listModels`. Os ports transitórios
+`models/session-client-port.js`, `models/session-resolution-adapter.js` e
+`session/model-resolution-port.js` foram removidos, pois o lifecycle atual preserva `model="auto"`
+nativo do SDK e não possui consumer operacional para resolução local paralela. O gate final voltou a
+**0 findings** sem singleton, service locator ou reverse edge. Não há baseline de exceções a manter.
+
 ### M.2 Alias rationalization
 
-- [ ] revisar 81 public aliases contra owner/consumers;
-- [ ] revisar 37 testing aliases;
-- [ ] tratar a única direct-testing exception atual (`#copilot/testing/mcp/cli`);
-- [ ] eliminar aliases sem authority/consumer;
-- [ ] não recriar broad barrel.
+- [x] revisar a surface pública contra owner/consumers — **81 -> 74 em M.2; 75 atuais** após a split
+      exata de `latency/round-trip` na Faixa C;
+- [x] revisar testing aliases — **37 -> 42 em M.2; 44 atuais**, com duas membranes exatas adicionais
+      para dashboard/round-trip;
+- [x] extinguir a direct-testing exception `#copilot/testing/mcp/cli -> cli.js`;
+- [x] eliminar/demover aliases sem consumer operacional/authority concreta;
+- [x] não recriar broad barrel.
+
+**Checkpoint M.2 implementado — 2026-08-25:** a auditoria consumer-driven mostrou seis aliases
+públicos cujo único consumer era teste (`adapters/http-protocol`, `cloudflare/errors`,
+`cloudflare/origin-profile`, `cloudflare/routes`, `openai`, `tools/capabilities`). Todos foram
+demovidos para membranes `testing/` próprias e os antigos public membranes foram removidos, sem
+shims. Em seguida o aggregate `#copilot/mcp/public/transport/http/stateful` também foi extinto: seu
+único consumer era um unit test, enquanto produção já dependia das micro-surfaces `stateful/config`,
+`stateful/runtime`, `stateful/bootstrap` e correlatas. A surface pública caiu **81 -> 74**.
+
+A antiga exceção `#copilot/testing/mcp/cli -> ./src/copilot/mcp/cli.js` foi eliminada
+estruturalmente: parsing de transport foi extraído para `cli/transport.js`;
+`#copilot/testing/mcp/cli` aponta agora para `cli/testing/index.js`, evitando importar o executable
+e seu compile-cache bootstrap em testes. A nova pasta recebeu owner explícito `mcp.cli`.
+
+O gate `copilot:mcp:surface-governance:check` faz scan **one-pass** dos consumers e correlaciona
+cada alias exato ao owner mais específico. Ele exige membrane correta, consumer, owner concreto,
+public com consumer operacional e testing sem leakage para runtime. A primeira execução custou
+**0,29 s** e revelou ownership incompleto; foram criados owners concretos para os subdomínios reais
+e `diagnostics/latency` foi corrigido de `taxonomy` para `owner`, pois possui
+runtime/config/evidence/ persistence próprios além de child owners. Após a transformação final, o
+gate percorreu **3.110 arquivos em 0,24 s**, com **74 public / 42 testing / 0 violações**. Não há
+alias MCP exato sem consumer nem testing target fora de `/testing/`.
 
 ### M.3 Docs/resíduos
 
-- [ ] corrigir `src/copilot/README.md` sobre `core/`;
-- [ ] classificar docs como live/historical/superseded/runbook;
-- [ ] limpar comentários de fases quando não forem história útil;
-- [ ] remover `tools/shared/` se continuar vazio;
-- [ ] atualizar MCP README depois das mudanças efetivas.
+- [x] corrigir `src/copilot/README.md` sobre `core/`;
+- [x] classificar docs como live/historical/superseded/runbook;
+- [x] limpar comentários de fases quando não forem história útil — auditoria MCP não encontrou
+      dívida relevante;
+- [x] remover `tools/shared/` se continuar vazio;
+- [x] atualizar MCP README depois das mudanças efetivas.
+
+**Checkpoint M.3 implementado — 2026-08-25:** o README raiz deixou de declarar a pasta `core/`
+extinta e passou a listar `mcp/` como camada canônica. `docs/INDEX.md` foi atualizado para 25/08 e
+agora classifica explicitamente princípios 2.4 e o pós-campanha de 24/08 como **CANÔNICO / ATIVO**,
+a auditoria MCP de 23/08 como **HISTÓRICO / SUPERADO PARCIALMENTE**, a extinção de Core como
+**HISTÓRICO / CONCLUÍDO** e roadmaps predecessores como históricos/superados parcialmente. Runbooks
+ficam classificados como **RUNBOOK ATIVO** somente enquanto seus comandos continuarem válidos e não
+conflitarem com a 2.4.
+
+O README MCP ganhou a disciplina live de surfaces; o snapshot atual pós-Faixa C é **75 public / 44
+testing**, membranes físicas, consumer/owner gate, cost/import-purity gate e cold-import raro. A
+documentação de `repo_search_text.contextLines` foi corrigida para o limite atual de **48**. A
+auditoria física removeu diretórios vazios remanescentes (`tools/shared`, `tools/public`,
+`openai/public` e dois `testing/` Cloudflare vazios). Busca focalizada por comentários de fases/IDs
+históricos no código MCP não encontrou dívida editorial a remover; portanto nenhum comentário útil
+foi reescrito por cosmética.
 
 **Gate M:** surfaces são consumer-driven/cost-governed e docs live descrevem a arquitetura
 existente.
@@ -2867,6 +3028,15 @@ existente.
 - [x] manifests/gates após cada mudança estrutural relevante;
 - [x] wire surface preservada em 131 tools nas mudanças de auth/composition;
 - [x] fault-injection/cancellation completo — Gate F fechado com focused matrix e suíte canônica.
+
+**Política de tempo de validação — 2026-08-25:** validação geral deixa de ser reflexo após cada
+onda. O default é prova causal/focalizada, com duração registrada; suites amplas ficam reservadas a
+mudança cross-cutting de alto risco ou barrier de publicação. Referências observadas nesta fase: MCP
+static cost+purity ~**4,48 s**, TS7 strict ~**2,72 s**, focused matrix M.1/SDK **130/130** ~**6,05
+s**, cold-baseline structural ~**0,15 s**, host-real LLM-B readiness ~**8,0 s**, cold baseline 10x2
+~**20,78 s** e `mcp-fast` ~**50 s**. Logo, os quatro primeiros são adequados conforme causalidade;
+cold measurement e `mcp-fast` são raros. Operações longas usam terminal persistente/cursor para não
+amarrar uma execução longa a um request MCP one-shot.
 
 ### N.2 Global barrier
 
@@ -2917,8 +3087,8 @@ governada.
       de reauth;
 - [x] Cloudflare readiness;
 - [x] modern/compat telemetry;
-- [ ] LLM-B readiness — control plane íntegro, mas runtime selector permanece sem env/runtime proof
-      selecionável;
+- [x] LLM-B readiness — geração publicada usa a mesma environment authority dos live runs e
+      seleciona 7/7 runtime routes + 3/3 terminal routes;
 - [x] ChatGPT real;
 - [ ] Claude real se suportado.
 
@@ -2958,10 +3128,10 @@ process-over-file precedence, separação provider/model/read-only e zero secret
 focused boundaries/tools **71/71** antes da centralização e **17/17** focais após a centralização;
 TS7 strict, lint e architecture verdes sem rebaseline (owners/boundaries 57/37, state 25/52/0, env
 38/61/0, ciclos 0). Um `ProcessHost` composto com a nova authority preparada executou o readiness
-real com `success=true` e **`ok=true`**. A barreira canônica final `mcp-fast`, executada por terminal
-persistente/cursor sobre o source definitivo, fechou **97/97 test files e 563/563 tests**, além do
-strict, em ~50,8 s, com exit 0 e zero dropped output. O checkbox LLM-B permanece aberto somente até
-reload da geração publicada e prova pela tool real.
+real com `success=true` e **`ok=true`**. A barreira canônica final `mcp-fast`, executada por
+terminal persistente/cursor sobre o source definitivo, fechou **97/97 test files e 563/563 tests**,
+além do strict, em ~50,8 s, com exit 0 e zero dropped output. O checkbox LLM-B permanece aberto
+somente até reload da geração publicada e prova pela tool real.
 
 **Incidente de transporte da sessão:** inicialmente apareceu logo após uma prova de cancellation,
 mas a mesma sequência
@@ -2976,11 +3146,13 @@ Para trabalho longo, preferir jobs/sessões persistentes + cursor; não introduz
 transport/cancellation no servidor sem nova evidência. Se reincidir, capturar timestamp + continuity
 telemetry e correlacionar origin/Cloudflare.
 
-**Checkpoint de promoção LLM-B pendente — 2026-08-25:** o delta de environment authority está
-localmente certificado e pronto para publicação. Ordem obrigatória: commit/push -> confirmar
-`main == origin/main` -> reload controlado -> `mcp_connector_smoke_refresh` ->
-`llmb_live_readiness` pela geração nova. Somente um `ok=true` da tool real autoriza fechar o item
-LLM-B acima; não usar o probe composto local como substituto da prova host-real.
+**Checkpoint de promoção LLM-B fechado — 2026-08-25:** o delta foi publicado no commit `c367fb623`
+(`fix(mcp): align LLM-B readiness environment authority`) e sincronizado com `origin/main`; o reload
+`current -> quic` promoveu exatamente esse HEAD. `mcp_runtime_health` mostrou `main@c367fb623`,
+`dirty=false` e `runtimeSourceDrift=false`. A tool **real** `llmb_live_readiness` retornou `ok=true`
+em ~**8,0 s**, com **7/7 runtime routes** e **3/3 terminal routes** selecionadas, env-ready e sem
+blockers, além de paridade/redaction/integrity verdes. N.3 LLM-B está encerrado; nenhum smoke geral
+adicional foi executado porque a prova causal era suficiente.
 
 ### N.4 Git
 
@@ -3020,9 +3192,22 @@ própria sessão. Depois de commit/push e upstream sincronizado, a sequência ca
    explicitamente suportado e exercitado;
 8. somente então acumular a janela L.2 de 7 dias/100 requests para zero-use qualificado; L.3 não
    remove 2025/DCR antes desse gate;
-9. com N.3 certificado, retomar M.1 exatamente do snapshot 81 aliases / 47 micro / 14 standard / 20
-   heavy, aplicando a primitive compartilhada de cost governance que ficou apenas em preflight neste
-   checkpoint; depois seguir M.2 e M.3.
+9. M.1–M.3 já estão certificados no source atual; após novas ondas pós-publicação, não regressar ao
+   snapshot histórico de 81 aliases. Revalidar os manifests/surfaces correntes, publicar o delta e
+   promover exatamente o novo HEAD antes de novos gates host-real.
+
+**Barrier pós-publicação recertificado — 2026-08-25:** o delta aberto depois de `c367fb623` fechou
+identity/surface governance, hermeticidade de authorities, leafification H.4 e parity I.4. O issuer
+OAuth mantém uma única `createDevOAuthRuntime()`, mas request budget, response policy e DPoP
+replay/nonces passaram a sub-runtimes generation-owned sem mutable state em module scope. A suíte
+auth/security/modern+compat ficou verde (**37/37**), e a nova matriz de output parity executa
+sucesso real dos **10/10** tools com schema específico e valida cada `structuredContent` contra o
+schema publicado. Owner governance: **68 owners / 218 dependências diretas / 0 SCC / 0 mismatch**;
+public surface: **75 aliases**, com cost/import-purity sem violações. O release source formatado
+fechou Prettier, zero suppressions (**0 em 3.563 arquivos ativos**) e `mcp-fast`: strict TS7 +
+**100/100 test files, 577/577 testes**. Este barrier autoriza commit/push do source; promoção/reload
+do runtime e revalidação do conector pertencem ao checkpoint seguinte e devem provar o novo HEAD
+publicado, não bloquear a publicação do source já certificado.
 
 **Gate N:** source, gates, runtime, host e upstream contam a mesma história.
 
@@ -3037,8 +3222,8 @@ A Arquitetura 2.4 pode ser considerada encerrada em seu ideal quando:
 - [x] dynamic/worker/subprocess edges estão governados;
 - [x] owner ontology é machine-readable e fail-closed;
 - [ ] parenthood/taxonomy distinction é verificável;
-- [ ] public/testing surfaces pertencem a owners conhecidos;
-- [ ] testing white-box exceptions são explícitas;
+- [x] public/testing surfaces pertencem a owners conhecidos;
+- [x] testing white-box exceptions são explícitas;
 - [x] env touchpoints estão confinados (0 migration targets);
 - [x] `McpProcessConfig` e projections são imutáveis;
 - [x] todo mutable state top-level MCP relevante possui scope/lifecycle (0 migration targets);
@@ -3057,16 +3242,16 @@ A Arquitetura 2.4 pode ser considerada encerrada em seu ideal quando:
 - [x] output schemas são verdadeiros ou sua ausência é deliberada/classificada com rationale;
 - [ ] wire hotspots claros são leaf adapters;
 - [ ] Cloudflare possui children coerentes quando justificados;
-- [ ] public closure/cold-import costs são ratcheted;
-- [ ] import purity é avaliada transitivamente;
+- [x] public closure/cold-import costs são ratcheted;
+- [x] import purity é avaliada transitivamente;
 - [ ] index readiness não depende de full safety scan foreground desnecessário;
-- [ ] round-trip/recovery é medido end-to-end;
+- [x] round-trip/recovery é medido end-to-end;
 - [x] cache hints modernos possuem freshness proof local e host-real completas;
-- [ ] compat 2025/DCR têm consumer + telemetry + exit condition ou foram removidos;
+- [x] compat 2025/DCR têm consumer + telemetry + exit condition ou foram removidos;
 - [x] modern 2026 permanece primário;
 - [x] `max-autonomy` permanece decisão explícita enquanto for a política adotada;
-- [ ] docs live descrevem o `HEAD`;
-- [ ] historical docs estão claramente históricos;
+- [x] docs live descrevem o `HEAD`;
+- [x] historical docs estão claramente históricos;
 - [x] global validation barrier está verde;
 - [x] connector real foi revalidado depois das transformações;
 - [x] `main == origin/main` após publicação;

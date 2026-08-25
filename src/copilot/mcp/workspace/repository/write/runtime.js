@@ -13,18 +13,34 @@ import path from 'node:path';
  * @param {NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']>} audit
  * @param {RepoWriteQuarantineMetadataWriter} quarantineMetadataWriter
  * @param {AbortSignal} [signal]
+ * @param {{ quarantineDir?: string }} [options]
  * @returns {RepoWriteRuntime}
  */
-export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWriter, signal) {
+export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWriter, signal, options = {}) {
+    const quarantineDir = resolveRepoWriteQuarantineDir(workspace.workspaceRoot, options.quarantineDir);
     return Object.freeze({
         workspace,
         io: workspace.io,
         workspaceRoot: workspace.workspaceRoot,
-        quarantineDir: path.join(workspace.workspaceRoot, 'src/copilot/.ai/quarantine'),
+        quarantineDir,
         quarantineMetadataWriter,
         audit,
         ...(signal ? { signal } : {}),
     });
+}
+
+/** @param {string} workspaceRoot @param {string | undefined} configuredDir */
+function resolveRepoWriteQuarantineDir(workspaceRoot, configuredDir) {
+    if (!path.isAbsolute(workspaceRoot)) throw new TypeError('Repo write workspaceRoot must be absolute.');
+    const canonicalRoot = path.join(path.normalize(workspaceRoot), 'src/copilot/.ai/quarantine');
+    if (configuredDir === undefined) return canonicalRoot;
+    if (!path.isAbsolute(configuredDir)) throw new TypeError('Repo write quarantineDir override must be absolute.');
+    const candidate = path.normalize(configuredDir);
+    const relative = path.relative(canonicalRoot, candidate);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new TypeError('Repo write quarantineDir override must remain inside the canonical quarantine root.');
+    }
+    return candidate;
 }
 
 /** @param {RepoWriteRuntime} runtime */

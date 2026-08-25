@@ -56,7 +56,8 @@ const MAX_QUARANTINE_METADATA_BYTES = 128 * 1024;
  */
 function isCanonicalWorkspaceRelativePath(/** @type {RepoWriteRuntime} */ runtime, candidate) {
     if (path.isAbsolute(candidate) || candidate !== path.normalize(candidate)) return false;
-    const root = path.resolve(runtime.workspaceRoot);
+    if (!path.isAbsolute(runtime.workspaceRoot)) throw new Error('Repo write runtime workspaceRoot must be absolute.');
+    const root = path.normalize(runtime.workspaceRoot);
     const resolved = path.resolve(root, candidate);
     const relative = path.relative(root, resolved);
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -71,7 +72,8 @@ function isCanonicalQuarantineBackupPath(/** @type {RepoWriteRuntime} */ runtime
     if (backupPath === null) return true;
     if (!isCanonicalWorkspaceRelativePath(runtime, backupPath)) return false;
     const resolved = path.resolve(runtime.workspaceRoot, backupPath);
-    if (path.dirname(resolved) !== path.resolve(runtime.quarantineDir)) return false;
+    if (!path.isAbsolute(runtime.quarantineDir)) throw new Error('Repo write runtime quarantineDir must be absolute.');
+    if (path.dirname(resolved) !== path.normalize(runtime.quarantineDir)) return false;
     return new RegExp(
         `^${quarantineId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.restore-backup-[a-f0-9-]{36}\\.data$`,
     ).test(path.basename(resolved));
@@ -206,7 +208,8 @@ async function readQuarantineMetadataFile(/** @type {RepoWriteRuntime} */ runtim
             transaction: validation.data.transaction ?? null,
         });
         const expectedPaths = resolveQuarantinePaths(runtime, metadata.quarantineId);
-        if (path.resolve(metadataPath) !== path.resolve(expectedPaths.metadataPath)) return null;
+        if (!path.isAbsolute(metadataPath) || !path.isAbsolute(expectedPaths.metadataPath)) return null;
+        if (path.normalize(metadataPath) !== path.normalize(expectedPaths.metadataPath)) return null;
         if (metadata.metadataPath !== runtime.workspace.toRelativePath(expectedPaths.metadataPath)) return null;
         if (metadata.quarantinePath !== runtime.workspace.toRelativePath(expectedPaths.dataPath)) return null;
         if (!isCanonicalWorkspaceRelativePath(runtime, metadata.originalPath)) return null;

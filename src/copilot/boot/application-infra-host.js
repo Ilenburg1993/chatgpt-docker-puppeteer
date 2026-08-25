@@ -50,6 +50,7 @@ export function createApplicationInfraHost(options = {}) {
     const processInfra = createProcessInfra({
         processId,
         activateProcessPolicies: options.activateProcessPolicies === true,
+        ...(defaultWorkspaceRoot ? { workspaceRoot: defaultWorkspaceRoot } : {}),
         ...(options.env ? { env: options.env } : {}),
     });
     const runtime = processInfra.createRuntime({ runtimeId });

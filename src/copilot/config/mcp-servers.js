@@ -60,7 +60,7 @@ export const MCP_SERVERS = {
     'copilot-local': {
         type: 'stdio',
         command: 'node',
-        args: ['src/copilot/mcp/cli.js', '--transport', 'stdio'],
+        args: ['src/copilot/mcp/cli/index.js', '--transport', 'stdio'],
         timeout: MCP_STDIO_TIMEOUT_MS,
     },
 

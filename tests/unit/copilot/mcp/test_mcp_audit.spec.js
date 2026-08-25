@@ -1,6 +1,7 @@
 // @ts-check
 /** Tests for explicit process-host-owned MCP audit capabilities. */
 
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { createMcpAuditCapability, readMcpAuditProcessConfig } from '#copilot/testing/mcp/observability';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -12,10 +13,14 @@ describe('copilot MCP audit capability', () => {
     it('keeps the default artifact identity under src/copilot/.ai after owner relocation', () => {
         const config = readMcpAuditProcessConfig({});
         const audit = createMcpAuditCapability(config);
-        assert.equal(config.filePath, path.join(process.cwd(), 'src/copilot/.ai/audit/mcp-tool-calls.jsonl'));
+        assert.equal(config.filePath, path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/audit/mcp-tool-calls.jsonl'));
         assert.equal(audit.filePath, config.filePath);
         assert.equal(Object.isFrozen(config), true);
         assert.equal(Object.isFrozen(audit), true);
+        assert.equal(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: 'src/copilot/.ai/audit/custom.jsonl' }).filePath,
+            path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/audit/custom.jsonl'),
+        );
     });
 
     it('appends and bounded-reads JSONL events from one explicit capability', async () => {

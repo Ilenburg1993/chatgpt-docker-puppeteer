@@ -8,6 +8,7 @@
  * @module copilot/mcp/observability/audit/config
  */
 
+import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +36,7 @@ export const DEFAULT_MCP_AUDIT_FILE = path.join(DEFAULT_MCP_AUDIT_DIR, 'mcp-tool
  * @returns {McpAuditProcessConfig}
  */
 export function readMcpAuditProcessConfig(env = process.env) {
-    const filePath = path.resolve(
+    const filePath = resolveMcpWorkspaceIdentityPath(
         String(env['COPILOT_MCP_AUDIT_FILE'] ?? DEFAULT_MCP_AUDIT_FILE).trim() || DEFAULT_MCP_AUDIT_FILE,
     );
     const disabled = readBoolean(env['COPILOT_MCP_AUDIT_DISABLED'], false);

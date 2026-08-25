@@ -13,12 +13,12 @@ import {
     getCanonicalMcpTools,
     readMcpRegistryRuntimeState,
 } from '#copilot/mcp/public/registry';
-import { getAdvertisedMcpToolNames } from '#copilot/mcp/public/tools/capabilities';
 import { buildMcpWireToolCatalog, readMcpToolContractCoverage } from '#copilot/mcp/public/tools/catalog';
 import {
     resetCanonicalMcpToolsCacheForTests,
     runToolHandlerWithCancellationForTests,
 } from '#copilot/testing/mcp/registry';
+import { getAdvertisedMcpToolNames } from '#copilot/testing/mcp/tools/capabilities';
 
 /** @param {AbortController} controller */
 function testOperationContext(controller) {

@@ -35,7 +35,7 @@ function normalizeConfiguredPath(value) {
 /**
  * Project one immutable runtime configuration from an explicit environment snapshot.
  * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} env
- * @param {{mutationAuditLogPath?:string|null}} [overrides]
+ * @param {{mutationAuditLogPath?:string|null; workspaceRoot?:string|null}} [overrides]
  */
 export function readInfraConfig(env, overrides = {}) {
     const mutationAuditLogPath =
@@ -56,7 +56,7 @@ export function readInfraConfig(env, overrides = {}) {
         workspace: readWorkspaceInfraConfig(env),
         telemetry: Object.freeze({ advisoryBudget: readIoAdvisoryBudgetConfig(env) }),
         mutationAudit: Object.freeze({ filePath: mutationAuditLogPath }),
-        rollback: readIoRollbackPolicy(env),
+        rollback: readIoRollbackPolicy(env, overrides.workspaceRoot ?? process.cwd()),
         capacityPreflight: readIoCapacityPreflightConfig(env),
         debugIoL2: env['DEBUG_IO_L2'] === '1',
     });

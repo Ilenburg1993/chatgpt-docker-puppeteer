@@ -10,7 +10,7 @@
  */
 
 import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
-import { DEFAULT_PUBLIC_MCP_URL, MCP_PATH, normalizeMcpUrl } from './url.js';
+import { DEFAULT_PUBLIC_MCP_URL, MCP_PATH, normalizeMcpUrl } from '#copilot/mcp/public/connection/url';
 
 const DEFAULT_LOCAL_HTTP_ORIGIN_URL = 'http://127.0.0.1:3333';
 const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = 'https://127.0.0.1:3333';

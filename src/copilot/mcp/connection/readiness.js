@@ -17,6 +17,7 @@ import {
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
 } from '#copilot/mcp/public/cloudflare/tunnel';
+import { normalizeMcpUrl, validatePublicConnectorUrl } from '#copilot/mcp/public/connection/url';
 import { readMcpReloadState, summarizeMcpReloadState } from '#copilot/mcp/public/runtime/reload';
 import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful/config';
 import { buildConnectionAuthReadiness } from './oauth-diagnostics.js';
@@ -27,7 +28,6 @@ import {
     buildSecureTunnelRunbook,
     formatChatGptConnectorAuthentication,
 } from './profile.js';
-import { normalizeMcpUrl, validatePublicConnectorUrl } from './url.js';
 
 /**
  * @param {import('./config.js').McpConnectionRuntimeConfig} runtimeConfig

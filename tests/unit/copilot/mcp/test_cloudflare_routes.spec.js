@@ -6,7 +6,7 @@ import {
     buildCloudflareMcpPathExpression,
     buildCloudflareOAuthTokenExpression,
     buildCloudflarePublicMetadataCacheExpression,
-} from '#copilot/mcp/public/cloudflare/routes';
+} from '#copilot/testing/mcp/cloudflare/routes';
 import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/routes', () => {

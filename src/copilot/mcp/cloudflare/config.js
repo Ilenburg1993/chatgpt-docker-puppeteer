@@ -17,6 +17,7 @@
  */
 
 import { normalizeMcpUrl, validatePublicConnectorUrl } from '#copilot/mcp/public/connection/url';
+import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
 
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 export const DEFAULT_CLOUDFLARE_H2_ORIGIN_URL = 'https://127.0.0.1:3333';
@@ -109,9 +110,10 @@ export function readCloudflareTunnelConfig(env) {
     const defaultPublicUrl = mode === 'named-permanent' ? `https://${publicHostname}/mcp` : undefined;
     const publicInput = env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'] ?? defaultPublicUrl;
     const publicMcpUrl = publicInput ? normalizePublicMcpUrl(publicInput, mode, publicHostname) : undefined;
-    const tunnelTokenFile = normalizeOptionalPath(
+    const tunnelTokenPath = normalizeOptionalPath(
         env['CLOUDFLARE_TUNNEL_TOKEN_FILE'] ?? DEFAULT_CLOUDFLARE_TUNNEL_TOKEN_FILE,
     );
+    const tunnelTokenFile = tunnelTokenPath ? resolveMcpWorkspaceIdentityPath(tunnelTokenPath) : undefined;
     const config = {
         originUrl,
         originTransport,
@@ -136,18 +138,20 @@ export function readCloudflareTunnelConfig(env) {
         ),
         metricsAddr: normalizeMetricsAddr(env['COPILOT_MCP_CLOUDFLARE_METRICS_ADDR']),
         loglevel: normalizeLogLevel(env['COPILOT_MCP_CLOUDFLARE_LOGLEVEL']),
-        stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE'], DEFAULT_QUICK_TUNNEL_STATE_FILE),
-        smokeStateFile: normalizeStateFile(
-            env['COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE'],
-            DEFAULT_CONNECTOR_SMOKE_STATE_FILE,
+        stateFile: resolveMcpWorkspaceIdentityPath(
+            normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE'], DEFAULT_QUICK_TUNNEL_STATE_FILE),
         ),
-        managedTunnelPidFile: normalizeStateFile(
-            env['COPILOT_MCP_CLOUDFLARE_PID_FILE'],
-            DEFAULT_MANAGED_TUNNEL_PID_FILE,
+        smokeStateFile: resolveMcpWorkspaceIdentityPath(
+            normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE'], DEFAULT_CONNECTOR_SMOKE_STATE_FILE),
         ),
-        mcpHttpPidFile: normalizeStateFile(env['COPILOT_MCP_HTTP_PID_FILE'], DEFAULT_MCP_HTTP_PID_FILE),
-        managedTunnelLogFile: DEFAULT_MANAGED_TUNNEL_LOG_FILE,
-        mcpHttpLogFile: DEFAULT_MCP_HTTP_LOG_FILE,
+        managedTunnelPidFile: resolveMcpWorkspaceIdentityPath(
+            normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_PID_FILE'], DEFAULT_MANAGED_TUNNEL_PID_FILE),
+        ),
+        mcpHttpPidFile: resolveMcpWorkspaceIdentityPath(
+            normalizeStateFile(env['COPILOT_MCP_HTTP_PID_FILE'], DEFAULT_MCP_HTTP_PID_FILE),
+        ),
+        managedTunnelLogFile: resolveMcpWorkspaceIdentityPath(DEFAULT_MANAGED_TUNNEL_LOG_FILE),
+        mcpHttpLogFile: resolveMcpWorkspaceIdentityPath(DEFAULT_MCP_HTTP_LOG_FILE),
         staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),
         processStopTimeoutMs: normalizeProcessStopTimeoutMs(env['COPILOT_MCP_PROCESS_STOP_TIMEOUT_MS']),
         http2Plus: {

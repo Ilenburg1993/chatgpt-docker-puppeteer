@@ -155,7 +155,7 @@ export async function applyCloudflareMcpPassthroughPlan(options = {}) {
     const confirmApply = options.confirmApply === true;
     const [{ default: Cloudflare }, { createCloudflareEdgeBackup }] = await Promise.all([
         import('cloudflare'),
-        import('../edge/public/index.js'),
+        import('#copilot/mcp/public/cloudflare/edge'),
     ]);
     const backup = await createCloudflareEdgeBackup({
         ...(options.authority ? { authority: options.authority } : {}),

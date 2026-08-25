@@ -9,7 +9,8 @@
 
 import { DEFAULT_MODEL } from '#copilot/sdk/constants';
 import { isExperimentalEnabled } from '#copilot/sdk/feature-flags';
-import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
+import { modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
+import { listModels } from '#copilot/sdk/session';
 
 /** @type {string} */
 export const AGENT_SDK_DEFAULT_MODEL = DEFAULT_MODEL;

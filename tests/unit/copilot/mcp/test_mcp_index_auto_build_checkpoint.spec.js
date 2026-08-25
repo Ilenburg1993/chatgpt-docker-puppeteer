@@ -157,6 +157,10 @@ describe('MCP index startup checkpoint', () => {
         assert.equal(classified.hiddenScopeRows, 1);
         assert.equal(classified.invalidPathRows, 1);
         assert.equal(classified.recursiveScopeInvalidation, true);
+        assert.throws(
+            () => classifyIndexJournalReplayRows([{ filePath: '/workspace/src/copilot/a.js' }], 'src/copilot'),
+            /scopeRoot must already be absolute/,
+        );
     });
 
     it('uses journal replay as additive evidence and fails closed on replay uncertainty', () => {

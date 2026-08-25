@@ -37,7 +37,6 @@ export {
     hasVision,
     indexModelsById,
     isModelEnabled,
-    listModels,
     pickModel,
     resolveModelId,
     resolveModelIdAuto,

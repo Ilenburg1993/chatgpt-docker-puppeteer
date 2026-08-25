@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "node": "v24.15.0",
+  "platform": "linux",
+  "arch": "x64",
+  "compileCache": "disabled",
+  "samples": 2,
+  "warmups": 0,
+  "kind": "copilot-mcp-public-api-cold-import-baseline",
+  "entries": [
+    {
+      "alias": "#copilot/mcp/public/adapters/http1",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1206.401,
+        "wallMs": 1251.301,
+        "rssMiB": 373.064,
+        "rssDeltaMiB": 331.053
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/adapters/http2",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1220.871,
+        "wallMs": 1266.723,
+        "rssMiB": 401.881,
+        "rssDeltaMiB": 359.813
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/adapters/stdio",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1290.837,
+        "wallMs": 1336.943,
+        "rssMiB": 400.635,
+        "rssDeltaMiB": 358.574
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/composition/process-config",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1219.203,
+        "wallMs": 1261.91,
+        "rssMiB": 401.754,
+        "rssDeltaMiB": 359.725
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/composition/process-host",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1170.977,
+        "wallMs": 1212.22,
+        "rssMiB": 318.625,
+        "rssDeltaMiB": 276.586
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/registry",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1198.372,
+        "wallMs": 1247.345,
+        "rssMiB": 399.996,
+        "rssDeltaMiB": 357.98
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/server",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1156.241,
+        "wallMs": 1199.062,
+        "rssMiB": 346.869,
+        "rssDeltaMiB": 304.836
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/tools/catalog",
+      "costTier": "heavy",
+      "metrics": {
+        "importMs": 1186.261,
+        "wallMs": 1229.324,
+        "rssMiB": 399.514,
+        "rssDeltaMiB": 357.539
+      }
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/modern",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 92.092,
+        "wallMs": 118.411,
+        "rssMiB": 77.42,
+        "rssDeltaMiB": 35.418
+      }
+    }
+  ]
+}

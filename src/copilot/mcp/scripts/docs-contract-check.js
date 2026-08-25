@@ -9,10 +9,11 @@
  */
 
 import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const ROOT = process.cwd();
+const ROOT = MCP_WORKSPACE_ROOT;
 const docsWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: ROOT });
 const ACTIVE_DOCS = Object.freeze([
     'src/copilot/README.md',

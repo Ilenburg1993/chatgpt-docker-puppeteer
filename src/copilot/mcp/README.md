@@ -7,7 +7,7 @@ Servidor MCP canônico para conectar ChatGPT ao workspace real do projeto.
 HTTP local:
 
 ```bash
-node src/copilot/mcp/cli.js --transport http
+node src/copilot/mcp/cli/index.js --transport http
 ```
 
 Endpoint local:
@@ -19,7 +19,7 @@ http://127.0.0.1:3333/mcp
 Stdio local:
 
 ```bash
-node src/copilot/mcp/cli.js --transport stdio
+node src/copilot/mcp/cli/index.js --transport stdio
 ```
 
 ## ChatGPT
@@ -65,7 +65,9 @@ ChatGPT durante restarts sem gravar refresh token em claro. Clientes DCR publico
 `src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que um `client_id` emitido
 antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth. Replay de DPoP e
 `private_key_jwt` também sobrevive a restart no `copilot.sqlite`: somente SHA-256 da chave de replay
-é persistido, separado por namespace e com expiração/limite por namespace. Use
+é persistido, separado por namespace e com expiração/limite por namespace. A runtime do issuer é uma
+única geração explícita: request budgets, response policy e DPoP são sub-runtimes instance-owned
+criadas uma vez por `createDevOAuthRuntime()`, sem caches/`WeakMap`s mutáveis em module scope. Use
 `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave. Use
 `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o
 estado canônico local sem imprimir tokens. O perfil remoto canônico do tunnel usa
@@ -169,6 +171,41 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `mcp_tunnel_status`
 - `mcp_runtime_health`
 
+### Arquitetura e governança de surfaces
+
+A API interna do MCP é deliberadamente separada por audience. Imports de produção usam apenas
+aliases exatos `#copilot/mcp/public/...`; white-box tests usam `#copilot/testing/mcp/...`, sempre
+apontando para uma membrane física `testing/`. Não existe aggregate root público implícito e a mera
+existência de um `index.js` não cria surface de package.
+
+Snapshot arquitetural atual: **75 public aliases** e **44 testing aliases**. O valor não é uma meta
+a ser preservada: `copilot:mcp:surface-governance:check` exige, em uma única varredura, target na
+membrane correta, consumer real, owner MCP concreto, consumer operacional para public e ausência de
+testing leakage para runtime. `copilot:mcp:owner-governance:check` deriva e ratcheta ainda
+audiences, authority classes, policy hooks e o grafo direto owner→owner; ciclos e divergência do
+manifest v2 são falhas arquiteturais. Aliases sem consumer são removidos/demovidos, não mantidos por
+compatibilidade inercial.
+
+Workspace identity também é uma authority explícita, mas não é filesystem authority nem config
+ambiental. `MCP_WORKSPACE_ROOT` deriva da localização física de `workspace/contracts/root.js`;
+`resolveMcpWorkspaceIdentityPath` ancora paths configurados relativos nessa identidade. O manifest
+`config/architecture/copilot-mcp-workspace-identity.json` ratcheta os consumers desses exports e o
+baseline MCP proíbe `process.cwd()`. Factories que recebem paths já autorizados/absolutos os
+rejeitam quando relativos em vez de reinterpretá-los silenciosamente pelo diretório de lançamento.
+
+Custos de public import são governados separadamente por `copilot:mcp:public-api-cost:check`:
+closure estática, módulos, source bytes, external packages, tier e import purity transitiva.
+Cold-import wall/RSS existe como benchmark versionado, mas é um gate raro; a baseline estrutural
+barata participa do architecture barrier. Rebaseline só é aceitável quando a mudança de
+surface/custo é intencional e explicada no roadmap arquitetural.
+
+Dependencies runtime não podem ficar invisíveis ao grafo. `import(expr)` computed é proibido; lazy
+loading usa somente `import('<literal>')` e precisa constar em `copilot-mcp-dynamic-graph.json` com
+source owner, target owner/membrane quando MCP, audience, load policy e expected count. O mesmo
+manifest governa subprocessos: cada launcher declara
+executable/cwd/env/credential/signal/terminality, completion/cancellation/process-group e bound,
+sempre associado ao owner mais profundo existente.
+
 Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the
 command, args, timeout, exit code, signal and `timedOut` flag.
 
@@ -204,7 +241,7 @@ COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
 The `copilot-local` server is registered as a stdio MCP config that launches:
 
 ```bash
-node src/copilot/mcp/cli.js --transport stdio
+node src/copilot/mcp/cli/index.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
@@ -253,7 +290,7 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
   raiz real.
 - `repo_tree` e `repo_root_tree` redigem caminhos protegidos na listagem e retornam
   `blockedEntriesCount`.
-- `repo_search_text` aceita `contextLines` de 0 a 10, `cursor` retornado por `nextCursor` e separa
+- `repo_search_text` aceita `contextLines` de 0 a 48, `cursor` retornado por `nextCursor` e separa
   `returnedMatchCount`, `returnedLineCount`, `totalMatchCount` e `totalLineCount`.
 - `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com
   `expectedHash`.

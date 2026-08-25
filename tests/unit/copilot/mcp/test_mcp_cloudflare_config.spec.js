@@ -3,7 +3,9 @@
  * Cloudflare Tunnel config helpers for the Copilot MCP endpoint.
  */
 
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { describe, it } from 'vitest';
 
 import {
@@ -39,10 +41,16 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
         assert.equal(config.tunnelName, 'workspace-mcp-dev');
         assert.equal(config.zone, 'aurelin.org');
         assert.equal(config.publicMcpUrl, DEFAULT_CLOUDFLARE_PUBLIC_URL);
-        assert.equal(config.managedTunnelPidFile, 'src/copilot/.ai/cloudflare/cloudflared.pid');
-        assert.equal(config.mcpHttpPidFile, 'src/copilot/.ai/cloudflare/mcp-http.pid');
-        assert.equal(config.managedTunnelLogFile, 'src/copilot/.ai/cloudflare/cloudflared.log');
-        assert.equal(config.mcpHttpLogFile, 'src/copilot/.ai/cloudflare/mcp-http.log');
+        assert.equal(
+            config.managedTunnelPidFile,
+            path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/cloudflare/cloudflared.pid'),
+        );
+        assert.equal(config.mcpHttpPidFile, path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/cloudflare/mcp-http.pid'));
+        assert.equal(
+            config.managedTunnelLogFile,
+            path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/cloudflare/cloudflared.log'),
+        );
+        assert.equal(config.mcpHttpLogFile, path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/cloudflare/mcp-http.log'));
         assert.equal(config.metricsAddr, '127.0.0.1:60123');
         assert.equal(config.loglevel, 'info');
         assert.deepEqual(buildQuickTunnelArgs(config), [
@@ -184,10 +192,16 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
         assert.throws(() => buildTemporaryConnectorUrl('https://example.com'), /trycloudflare\.com/);
     });
 
-    it('keeps the temporary tunnel state path configurable', () => {
+    it('keeps the temporary tunnel state path configurable while process config anchors identity', () => {
         assert.equal(normalizeStateFile(undefined), 'src/copilot/.ai/cloudflare/quick-tunnel.json');
         assert.equal(normalizeStateFile('tmp/state.json'), 'tmp/state.json');
         assert.throws(() => normalizeStateFile('bad\0path'), /null bytes/);
+        const config = readCloudflareTunnelConfig({
+            COPILOT_MCP_CLOUDFLARE_STATE_FILE: 'tmp/state.json',
+            COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE: 'tmp/smoke.json',
+        });
+        assert.equal(config.stateFile, path.join(MCP_WORKSPACE_ROOT, 'tmp/state.json'));
+        assert.equal(config.smokeStateFile, path.join(MCP_WORKSPACE_ROOT, 'tmp/smoke.json'));
     });
 
     it('normalizes the temporary tunnel stale window', () => {

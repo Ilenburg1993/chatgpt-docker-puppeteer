@@ -4,6 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,7 +12,8 @@ import { afterEach, describe, it } from 'vitest';
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
-import { createRepoWriteTools, repoWriteTools } from '#copilot/testing/mcp/tools/repo-write';
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
+import { createRepoWriteTools } from '#copilot/testing/mcp/tools/repo-write';
 
 import {
     getValidatedMutableWorkspacePathStats,
@@ -22,6 +24,14 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     backgroundServices: false,
 });
 const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+const TEST_QUARANTINE_DIR = path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/quarantine/test-runs', randomUUID());
+
+/** @param {NonNullable<Parameters<typeof createRepoWriteTools>[0]>} [options] */
+function createTestRepoWriteTools(options = {}) {
+    return createRepoWriteTools({ ...options, quarantineDir: TEST_QUARANTINE_DIR });
+}
+
+const TEST_REPO_WRITE_TOOLS = createTestRepoWriteTools();
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -53,10 +63,10 @@ function createRepoWriteOperationContext(signal) {
 
 /**
  * @param {string} name
- * @param {typeof repoWriteTools} [definitions]
+ * @param {ReturnType<typeof createRepoWriteTools>} [definitions]
  * @param {typeof TOOL_OPERATION_CONTEXT} [operationContext]
  */
-function findRepoWriteTool(name, definitions = repoWriteTools, operationContext = TOOL_OPERATION_CONTEXT) {
+function findRepoWriteTool(name, definitions = TEST_REPO_WRITE_TOOLS, operationContext = TOOL_OPERATION_CONTEXT) {
     const definition = definitions.find((tool) => tool.name === name);
     assert.ok(definition, `missing repo write tool ${name}`);
     return {
@@ -79,8 +89,9 @@ const restoreQuarantinedFileTool = findRepoWriteTool('repo_restore_quarantined_f
 const removeFileTool = findRepoWriteTool('repo_remove_file');
 
 describe('copilot MCP repo write tools', () => {
-    afterEach(() => {
+    afterEach(async () => {
         resetValidatedMutableWorkspacePathStatsForTest();
+        await fs.rm(TEST_QUARANTINE_DIR, { recursive: true, force: true });
     });
 
     it('reuses the write-policy capability in MCP patch instead of revalidating inside workspace IO', async () => {
@@ -510,7 +521,7 @@ describe('copilot MCP repo write tools', () => {
         let writeCount = 0;
         /** @type {string | null} */
         let observedQuarantineId = null;
-        const isolatedTools = createRepoWriteTools({
+        const isolatedTools = createTestRepoWriteTools({
             quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
                 observedQuarantineId = metadata.quarantineId;
                 writeCount += 1;
@@ -529,7 +540,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(filePath, 'utf8'), 'still here\n');
         assert.ok(observedQuarantineId);
-        const quarantineDir = path.join(process.cwd(), 'src/copilot/.ai/quarantine');
+        const quarantineDir = TEST_QUARANTINE_DIR;
         await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.data`)), { code: 'ENOENT' });
         await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.json`)), { code: 'ENOENT' });
     });
@@ -542,7 +553,7 @@ describe('copilot MCP repo write tools', () => {
         let writeCount = 0;
         /** @type {string | null} */
         let observedQuarantineId = null;
-        const isolatedTools = createRepoWriteTools({
+        const isolatedTools = createTestRepoWriteTools({
             quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
                 observedQuarantineId = metadata.quarantineId;
                 writeCount += 1;
@@ -563,7 +574,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(controller.signal.aborted, true);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'must return to source\n');
         assert.ok(observedQuarantineId);
-        const quarantineDir = path.join(process.cwd(), 'src/copilot/.ai/quarantine');
+        const quarantineDir = TEST_QUARANTINE_DIR;
         await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.data`)), { code: 'ENOENT' });
         await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.json`)), { code: 'ENOENT' });
     });
@@ -583,7 +594,7 @@ describe('copilot MCP repo write tools', () => {
         const quarantineId = String(quarantined.structuredContent['quarantineId']);
 
         let writeCount = 0;
-        const isolatedTools = createRepoWriteTools({
+        const isolatedTools = createTestRepoWriteTools({
             quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
                 writeCount += 1;
                 if (writeCount === 2) {
@@ -612,7 +623,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);
         assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
-        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
+        const quarantineEntries = await fs.readdir(TEST_QUARANTINE_DIR);
         assert.equal(
             quarantineEntries.some((entry) => entry.includes(`${quarantineId}.restore-backup-`)),
             false,
@@ -631,7 +642,7 @@ describe('copilot MCP repo write tools', () => {
 
         const controller = new AbortController();
         let writeCount = 0;
-        const isolatedTools = createRepoWriteTools({
+        const isolatedTools = createTestRepoWriteTools({
             quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
                 writeCount += 1;
                 if (writeCount === 2) controller.abort(new Error('cancel-restore-final-metadata'));
@@ -659,7 +670,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);
         assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
-        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
+        const quarantineEntries = await fs.readdir(TEST_QUARANTINE_DIR);
         assert.equal(
             quarantineEntries.some((entry) => entry.includes(`${quarantineId}.restore-backup-`)),
             false,

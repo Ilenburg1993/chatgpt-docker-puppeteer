@@ -10,7 +10,7 @@
  */
 
 import { execWorkspaceGit } from '#copilot/mcp/public/workspace/git';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, normalize, relative } from 'node:path';
 const TABLE = 'copilot_mcp_index_startup_checkpoint';
 const GIT_TIMEOUT_MS = 5_000;
 const GIT_MAX_BUFFER = 16 * 1024 * 1024;
@@ -288,7 +288,8 @@ export function planIndexStartup(input) {
  * @param {string} scopeRoot
  */
 export function classifyIndexJournalReplayRows(rows, scopeRoot) {
-    const normalizedScopeRoot = resolve(scopeRoot);
+    if (!isAbsolute(scopeRoot)) throw new TypeError('Index journal replay scopeRoot must already be absolute.');
+    const normalizedScopeRoot = normalize(scopeRoot);
     const uniquePaths = new Set();
     let outsideScopeRows = 0;
     let hiddenScopeRows = 0;
@@ -299,7 +300,7 @@ export function classifyIndexJournalReplayRows(rows, scopeRoot) {
             invalidPathRows += 1;
             continue;
         }
-        const candidate = resolve(row.filePath);
+        const candidate = normalize(row.filePath);
         const rel = relative(normalizedScopeRoot, candidate);
         const insideScope = rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
         if (!insideScope) {

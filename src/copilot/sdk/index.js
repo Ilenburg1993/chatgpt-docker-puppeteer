@@ -67,6 +67,7 @@ export {
     listActiveClientSessions,
     listAllClientSessions,
     listAvailableModels,
+    listModels,
     pingClient,
     resumeClientSession,
     setForegroundClientSessionId,
@@ -86,7 +87,6 @@ export {
     resolveSessionCreateModel,
     resumeOrCreate,
     resumeSession,
-    setSessionAutoModelResolver,
 } from './session/lifecycle.js';
 
 export {
@@ -143,7 +143,6 @@ export {
     hasVision,
     indexModelsById,
     isModelEnabled,
-    listModels,
     pickModel,
     resolveModelId,
     resolveModelIdAuto,

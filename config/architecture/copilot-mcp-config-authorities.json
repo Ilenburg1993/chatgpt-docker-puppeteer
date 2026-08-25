@@ -115,11 +115,11 @@
     ],
     "process-entrypoint": [
       {
-        "path": "src/copilot/mcp/cli.js",
+        "path": "src/copilot/mcp/cli/index.js",
         "maxReferences": 1
       },
       {
-        "path": "src/copilot/mcp/cloudflare/cli.js",
+        "path": "src/copilot/mcp/composition/cloudflare-cli/cli.js",
         "maxReferences": 1
       },
       {

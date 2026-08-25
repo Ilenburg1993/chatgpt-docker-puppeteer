@@ -57,10 +57,10 @@ SDK/agent events
 | `conversation-hub/` | store/orquestração de sessões/turnos persistidos                                         |
 | `hooks/`            | policies e callbacks configuráveis sobre a sessão SDK                                    |
 | `tools/`            | custom tools registradas sobre a superfície do SDK                                       |
+| `mcp/`              | servidor WORKSPACE MCP, transports, OAuth, Cloudflare e tool/control plane governado     |
 | `model-gateway/`    | control plane de catálogo, BYOK, elegibilidade, roteamento e binding de modelos          |
 | `infra/`            | primitivas compartilhadas de I/O, cache, índice, locks, storage e SSE                    |
 | `config/`           | defaults, builders e configuração declarativa                                            |
-| `core/`             | erros, constantes, contratos centrais e utilitários base                                 |
 
 ## Boot Canônico
 

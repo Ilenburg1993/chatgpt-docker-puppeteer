@@ -6,6 +6,11 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import {
+    MCP_WORKSPACE_ROOT,
+    resolveMcpWorkspaceIdentityPath,
+    toMcpWorkspaceRelativePath,
+} from '#copilot/mcp/public/workspace';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR } from '../config.js';
@@ -13,7 +18,7 @@ import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
 
 const BACKUP_SCHEMA_VERSION = 1;
 const BACKUP_KIND = 'cloudflare-edge-snapshot-backup';
-const CLOUDFLARE_EDGE_BACKUP_ROOT = path.resolve(DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR);
+const CLOUDFLARE_EDGE_BACKUP_ROOT = path.resolve(MCP_WORKSPACE_ROOT, DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR);
 const CLOUDFLARE_EDGE_BACKUP_IO = createConfiguredFsIo(
     createConfiguredFsGrant({
         id: 'mcp.cloudflare.edge-backup',
@@ -69,7 +74,7 @@ export async function createCloudflareEdgeBackup(options = {}) {
  * @param {{dir:string;io:ConfiguredFsIo}} options
  */
 export function createCloudflareEdgeBackupStore(options) {
-    const absoluteDir = path.resolve(String(options.dir).trim());
+    const absoluteDir = resolveMcpWorkspaceIdentityPath(String(options.dir).trim());
     if (!String(options.dir).trim() || String(options.dir).includes('\0')) {
         throw new Error('Cloudflare edge backup directory is invalid.');
     }
@@ -314,8 +319,8 @@ function sha256(content) {
  * @returns {string}
  */
 function normalizeRelativePath(absolutePath) {
-    const relative = path.relative(process.cwd(), absolutePath);
-    return relative && !relative.startsWith('..') ? relative : absolutePath;
+    const relative = toMcpWorkspaceRelativePath(absolutePath);
+    return relative !== '.' && !relative.startsWith('..') ? relative : absolutePath;
 }
 
 /**

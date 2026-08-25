@@ -10,8 +10,9 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { signalProcessTreeDetailed } from '#copilot/mcp/public/process/supervision';
+import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
 import { spawn, spawnSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import process from 'node:process';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
@@ -173,10 +174,10 @@ function createBoundProcessPaths(key, name, pidFile, logFile) {
         metadataFile,
         logFile,
         rotatedLogFile,
-        resolvedPidFile: resolve(pidFile),
-        resolvedMetadataFile: resolve(metadataFile),
-        resolvedLogFile: resolve(logFile),
-        resolvedRotatedLogFile: resolve(rotatedLogFile),
+        resolvedPidFile: resolveMcpWorkspaceIdentityPath(pidFile),
+        resolvedMetadataFile: resolveMcpWorkspaceIdentityPath(metadataFile),
+        resolvedLogFile: resolveMcpWorkspaceIdentityPath(logFile),
+        resolvedRotatedLogFile: resolveMcpWorkspaceIdentityPath(rotatedLogFile),
     });
 }
 

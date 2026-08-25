@@ -31,13 +31,8 @@ vi.mock('@github/copilot-sdk', () => {
     };
 });
 
-vi.mock('#copilot/sdk/session', () => ({
-    getClient: mockGetClient,
-}));
-
 // ─── Imports ───────────────────────────────────────────────────────────────
 
-import { setModelListClientProvider } from '../../../../src/copilot/sdk/models/client-provider.js';
 import {
     clearModelsCacheAsync,
     filterModels,
@@ -50,7 +45,7 @@ import {
     getVisionMediaTypes,
     hasVision,
     isModelEnabled,
-    listModels,
+    listModelsWithClient,
     supportsReasoning,
 } from '../../../../src/copilot/sdk/models/helpers.js';
 import { KNOWN_MODELS } from '../../../../src/copilot/sdk/models/known-models.js';
@@ -109,7 +104,6 @@ describe('F76 - listModels / getModelById', () => {
         originalPersistentCacheEnabled = process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'];
         process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'] = 'false';
         await clearModelsCacheAsync();
-        setModelListClientProvider(mockGetClient);
         mockClient = {
             listModels: vi.fn().mockResolvedValue([makeModel(), makeReasoningModel()]),
         };
@@ -126,20 +120,20 @@ describe('F76 - listModels / getModelById', () => {
     });
 
     it('listModels retorna array de modelos via client', async () => {
-        const models = await listModels();
+        const models = await listModelsWithClient(mockGetClient);
         expect(models).toHaveLength(2);
         expect(mockClient.listModels).toHaveBeenCalledOnce();
     });
 
     it('listModels usa cache na segunda chamada', async () => {
-        await listModels();
-        await listModels();
+        await listModelsWithClient(mockGetClient);
+        await listModelsWithClient(mockGetClient);
         expect(mockClient.listModels).toHaveBeenCalledTimes(1);
     });
 
     it('listModels com forceRefresh bypassa cache', async () => {
-        await listModels();
-        await listModels({}, true);
+        await listModelsWithClient(mockGetClient);
+        await listModelsWithClient(mockGetClient, {}, true);
         expect(mockClient.listModels).toHaveBeenCalledTimes(2);
     });
 

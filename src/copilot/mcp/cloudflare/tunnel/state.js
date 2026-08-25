@@ -6,7 +6,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { resolve } from 'node:path';
+import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -153,7 +153,7 @@ function resolveConfiguredStatePath(value, label) {
     if (!raw || /[\r\n\0]/u.test(raw)) {
         throw new TypeError(`Cloudflare ${label} must be a non-empty single-line path.`);
     }
-    return resolve(raw);
+    return resolveMcpWorkspaceIdentityPath(raw);
 }
 
 /**

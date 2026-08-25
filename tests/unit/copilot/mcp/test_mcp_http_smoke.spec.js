@@ -6,11 +6,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import {
-    buildMcpHttpProtocolReport,
-    createMcpHttpProtocolState,
-    recordMcpHttpProtocolRequest,
-} from '#copilot/mcp/public/adapters/http-protocol';
 import { readMcpHttpServerTimingPolicy } from '#copilot/mcp/public/adapters/http1';
 import { readMcpHttp2ServerPolicy } from '#copilot/mcp/public/adapters/http2';
 import {
@@ -18,6 +13,11 @@ import {
     extractMcpToolNames,
     readMcpHttpSmokeRuntimeConfig,
 } from '#copilot/mcp/public/diagnostics/http-smoke';
+import {
+    buildMcpHttpProtocolReport,
+    createMcpHttpProtocolState,
+    recordMcpHttpProtocolRequest,
+} from '#copilot/testing/mcp/adapters/http';
 
 describe('copilot MCP local HTTP smoke helpers', () => {
     it('captures observable smoke config separately from bearer secrets', () => {

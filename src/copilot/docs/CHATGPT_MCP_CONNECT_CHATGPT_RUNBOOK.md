@@ -387,7 +387,7 @@ tunnel-client init \
   --sample sample_mcp_stdio_local \
   --profile repo-devcontainer-stdio \
   --tunnel-id tunnel_ \
-  "node src/copilot/mcp/cli.js --transport stdio" < preencher > --mcp-command
+  "node src/copilot/mcp/cli/index.js --transport stdio" < preencher > --mcp-command
 
 tunnel-client doctor --profile repo-devcontainer-stdio --explain
 tunnel-client run --profile repo-devcontainer-stdio

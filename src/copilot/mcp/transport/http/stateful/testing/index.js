@@ -13,12 +13,21 @@ export {
     parseMcpEventId,
 } from '../events/store.js';
 export {
+    MCP_HTTP_STATEFUL_PROCESS_CONFIG_KIND,
+    MCP_HTTP_STATEFUL_PROCESS_CONFIG_SCHEMA_VERSION,
+    readMcpHttpStatefulProcessConfig,
+    readMcpHttpStatefulRuntimePolicySnapshot,
+    readMcpHttpStatefulSessionPolicy,
+} from '../session/config.js';
+export {
     DEFAULT_MCP_HTTP_MAX_SESSIONS,
     DEFAULT_MCP_HTTP_SESSION_TTL_MS,
     MCP_HTTP_SESSION_RUNTIME_VERSION,
     createMcpHttpSessionRuntime,
     createMcpHttpSessionRuntimeForConfig,
+    hashMcpHttpSessionId,
     previewMcpHttpSessionId,
+    readMcpHttpSessionRuntimeState,
     validateRawSessionId,
 } from '../session/runtime.js';
 export { createSqliteMcpHttpSessionStoreForDb, ensureMcpHttpSessionStoreSchema } from '../session/store.js';

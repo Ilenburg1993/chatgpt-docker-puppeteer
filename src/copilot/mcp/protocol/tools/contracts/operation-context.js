@@ -73,7 +73,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
  *     audit?: ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>;
  *     authIssuerRuntime?: ReturnType<typeof import('#copilot/mcp/public/auth').createDevOAuthRuntime>;
  *     aiArtifacts?: ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>;
- *     roundTripAnalytics?: ReturnType<typeof import('#copilot/mcp/public/diagnostics/latency').createMcpRoundTripAnalyticsCapability>;
+ *     roundTripAnalytics?: ReturnType<typeof import('#copilot/mcp/public/diagnostics/latency/round-trip').createMcpRoundTripAnalyticsCapability>;
  *     modelGatewaySqliteFingerprint?: ReturnType<typeof import('#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint').createModelGatewaySqliteFingerprintCapability>;
  *     toolSurface?: Readonly<{
  *         tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];

@@ -1,5 +1,5 @@
 // @ts-check
-/** Exact Cloudflare public membrane: errors. */
+/** Testing-only membrane for Cloudflare error taxonomy. */
 
 export {
     isCloudflaredActionableOriginErrorLine,

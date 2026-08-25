@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "kind": "copilot-mcp-public-api-cost-manifest",
+  "tierLimits": {
+    "micro": {
+      "maxModules": 38,
+      "maxSourceBytes": 230400
+    },
+    "standard": {
+      "maxModules": 120,
+      "maxSourceBytes": 614400
+    },
+    "heavy": {
+      "maxModules": null,
+      "maxSourceBytes": null
+    }
+  },
+  "entries": [
+    {
+      "alias": "#copilot/mcp/public/adapters/http-config",
+      "target": "./src/copilot/mcp/adapters/public/http-config.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/adapters/http1",
+      "target": "./src/copilot/mcp/adapters/public/http1.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/adapters/http2",
+      "target": "./src/copilot/mcp/adapters/public/http2.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/adapters/stdio",
+      "target": "./src/copilot/mcp/adapters/public/stdio.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/auth",
+      "target": "./src/copilot/mcp/auth/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/config",
+      "target": "./src/copilot/mcp/cloudflare/public/config.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/edge",
+      "target": "./src/copilot/mcp/cloudflare/edge/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/environment",
+      "target": "./src/copilot/mcp/cloudflare/public/environment.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/environment-authority",
+      "target": "./src/copilot/mcp/cloudflare/public/environment-authority.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/observability",
+      "target": "./src/copilot/mcp/cloudflare/observability/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/posture",
+      "target": "./src/copilot/mcp/cloudflare/posture/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/process",
+      "target": "./src/copilot/mcp/cloudflare/process/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/remote",
+      "target": "./src/copilot/mcp/cloudflare/remote/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/transport-benchmark",
+      "target": "./src/copilot/mcp/cloudflare/transport-benchmark/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/cloudflare/tunnel",
+      "target": "./src/copilot/mcp/cloudflare/tunnel/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/company-knowledge",
+      "target": "./src/copilot/mcp/company-knowledge/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/composition/cloudflare-cli",
+      "target": "./src/copilot/mcp/composition/cloudflare-cli/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/composition/process-config",
+      "target": "./src/copilot/mcp/composition/process-config/public/index.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/composition/process-host",
+      "target": "./src/copilot/mcp/composition/process-host/public/index.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/connection",
+      "target": "./src/copilot/mcp/connection/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/connection/url",
+      "target": "./src/copilot/mcp/connection/url/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/devcontainer-network",
+      "target": "./src/copilot/mcp/diagnostics/devcontainer-network/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/http-smoke",
+      "target": "./src/copilot/mcp/diagnostics/http-smoke/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/infra-health",
+      "target": "./src/copilot/mcp/diagnostics/infra-health/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/io-cache",
+      "target": "./src/copilot/mcp/diagnostics/io-cache/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/latency",
+      "target": "./src/copilot/mcp/diagnostics/latency/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/latency/attribution",
+      "target": "./src/copilot/mcp/diagnostics/latency/attribution/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/latency/benchmark",
+      "target": "./src/copilot/mcp/diagnostics/latency/benchmark/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/latency/dashboard",
+      "target": "./src/copilot/mcp/diagnostics/latency/dashboard/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/latency/round-trip",
+      "target": "./src/copilot/mcp/diagnostics/latency/round-trip/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/oauth-smoke",
+      "target": "./src/copilot/mcp/diagnostics/oauth-smoke/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/project-doctor",
+      "target": "./src/copilot/mcp/diagnostics/project-doctor/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/runtime-health",
+      "target": "./src/copilot/mcp/diagnostics/runtime-health/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/runtime-source-drift",
+      "target": "./src/copilot/mcp/diagnostics/runtime-source-drift/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/tool-payload",
+      "target": "./src/copilot/mcp/diagnostics/tool-payload/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/diagnostics/workspace-smoke",
+      "target": "./src/copilot/mcp/diagnostics/workspace-smoke/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/indexing/auto-build",
+      "target": "./src/copilot/mcp/indexing/auto-build/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/indexing/repository",
+      "target": "./src/copilot/mcp/indexing/repository/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/integrations/http",
+      "target": "./src/copilot/mcp/integrations/http/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/integrations/model-gateway/live-runs",
+      "target": "./src/copilot/mcp/integrations/model-gateway/live-runs/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint",
+      "target": "./src/copilot/mcp/integrations/model-gateway/sqlite-fingerprint/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/maintenance",
+      "target": "./src/copilot/mcp/maintenance/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/maintenance/dependencies/native-smoke",
+      "target": "./src/copilot/mcp/maintenance/dependencies/native-smoke/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/observability",
+      "target": "./src/copilot/mcp/observability/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/process/environment",
+      "target": "./src/copilot/mcp/process/environment/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/process/host",
+      "target": "./src/copilot/mcp/process/host/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/process/supervision",
+      "target": "./src/copilot/mcp/process/supervision/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/process/terminal",
+      "target": "./src/copilot/mcp/process/terminal/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/protocol/apps-sdk",
+      "target": "./src/copilot/mcp/protocol/apps-sdk/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/protocol/catalog",
+      "target": "./src/copilot/mcp/protocol/catalog/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/protocol/tools",
+      "target": "./src/copilot/mcp/protocol/tools/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/protocol/version",
+      "target": "./src/copilot/mcp/protocol/version/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/registry",
+      "target": "./src/copilot/mcp/registry/public/index.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/runtime/reload",
+      "target": "./src/copilot/mcp/runtime/reload/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/runtime/startup-maintenance",
+      "target": "./src/copilot/mcp/runtime/startup-maintenance/public/index.js",
+      "costTier": "heavy",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/server",
+      "target": "./src/copilot/mcp/server/public/index.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/tools/catalog",
+      "target": "./src/copilot/mcp/tools/catalog/public/index.js",
+      "costTier": "heavy",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/compat/stateless",
+      "target": "./src/copilot/mcp/transport/http/compat/stateless/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/modern",
+      "target": "./src/copilot/mcp/transport/http/modern/public/index.js",
+      "costTier": "micro",
+      "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/bootstrap",
+      "target": "./src/copilot/mcp/transport/http/stateful/bootstrap/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/config",
+      "target": "./src/copilot/mcp/transport/http/stateful/public/config.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/request-contract",
+      "target": "./src/copilot/mcp/transport/http/stateful/public/request-contract.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/router",
+      "target": "./src/copilot/mcp/transport/http/stateful/public/router.js",
+      "costTier": "standard",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/runtime",
+      "target": "./src/copilot/mcp/transport/http/stateful/public/runtime.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/transport/http/stateful/streams",
+      "target": "./src/copilot/mcp/transport/http/stateful/public/streams.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/validation",
+      "target": "./src/copilot/mcp/validation/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/validation/devcontainer-shell",
+      "target": "./src/copilot/mcp/validation/devcontainer-shell/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/validation/suites",
+      "target": "./src/copilot/mcp/validation/suites/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace",
+      "target": "./src/copilot/mcp/workspace/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/git",
+      "target": "./src/copilot/mcp/workspace/git/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/patch",
+      "target": "./src/copilot/mcp/workspace/repository/patch/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/read",
+      "target": "./src/copilot/mcp/workspace/repository/read/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/read-cache",
+      "target": "./src/copilot/mcp/workspace/repository/read-cache/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/status",
+      "target": "./src/copilot/mcp/workspace/repository/status/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/write",
+      "target": "./src/copilot/mcp/workspace/repository/write/public/index.js",
+      "costTier": "standard",
+      "coldImport": false
+    }
+  ]
+}

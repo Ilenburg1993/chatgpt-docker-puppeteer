@@ -8,12 +8,12 @@
  * @module copilot/mcp/connection/profile
  */
 
+import { buildResourceFromMcpUrl, hasAsciiControlChars, normalizeMcpUrl } from '#copilot/mcp/public/connection/url';
 import {
     MCP_CONNECTION_PROFILE_DEFAULTS,
     readMcpConnectionConfig,
     resolveMcpConnectionProfileOptions,
 } from './config.js';
-import { buildResourceFromMcpUrl, hasAsciiControlChars, normalizeMcpUrl } from './url.js';
 
 const DEFAULT_LOCAL_HTTP_ORIGIN_URL = MCP_CONNECTION_PROFILE_DEFAULTS.localHttpOriginUrl;
 const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = MCP_CONNECTION_PROFILE_DEFAULTS.localHttp2OriginUrl;
@@ -263,7 +263,7 @@ export function buildSecureTunnelRunbook(options = {}, config = readMcpConnectio
         ],
         stdioTunnelCommands: [
             'export CONTROL_PLANE_API_KEY="sk-..."',
-            `tunnel-client init --sample sample_mcp_stdio_local --profile repo-devcontainer-stdio --tunnel-id ${profile.tunnelId} --mcp-command "node src/copilot/mcp/cli.js --transport stdio"`,
+            `tunnel-client init --sample sample_mcp_stdio_local --profile repo-devcontainer-stdio --tunnel-id ${profile.tunnelId} --mcp-command "node src/copilot/mcp/cli/index.js --transport stdio"`,
             'tunnel-client doctor --profile repo-devcontainer-stdio --explain',
             'tunnel-client run --profile repo-devcontainer-stdio',
         ],

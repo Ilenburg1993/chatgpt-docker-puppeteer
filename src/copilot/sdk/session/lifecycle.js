@@ -23,10 +23,7 @@ import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../
 import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
-import { setSessionAutoModelResolver } from './model-resolution-port.js';
 import { createConfiguredPermissionHandler } from './permission-controller.js';
-
-export { setSessionAutoModelResolver };
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *

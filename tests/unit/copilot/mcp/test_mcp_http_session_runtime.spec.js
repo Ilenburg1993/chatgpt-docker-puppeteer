@@ -10,17 +10,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
+    createMcpHttpSessionRuntime,
+    createMcpHttpSessionRuntimeForConfig,
+    createSqliteMcpHttpSessionStoreForDb,
     hashMcpHttpSessionId,
+    previewMcpHttpSessionId,
     readMcpHttpSessionRuntimeState,
     readMcpHttpStatefulProcessConfig,
     readMcpHttpStatefulRuntimePolicySnapshot,
     readMcpHttpStatefulSessionPolicy,
-} from '#copilot/mcp/public/transport/http/stateful';
-import {
-    createMcpHttpSessionRuntime,
-    createMcpHttpSessionRuntimeForConfig,
-    createSqliteMcpHttpSessionStoreForDb,
-    previewMcpHttpSessionId,
 } from '#copilot/testing/mcp/transport/http/stateful';
 
 describe('MCP HTTP stateful session runtime', () => {

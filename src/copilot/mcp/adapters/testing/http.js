@@ -14,4 +14,8 @@ export { classifyMcpCompatibilityContinuity, classifyMcpCompatibilityRpcClass } 
 export { readMcpHttpJsonBody } from '../http-body.js';
 export { readMcpHttpSessionRuntimeState } from '../http/runtime-state.js';
 
-export { createMcpHttpProtocolState } from '../http-protocol.js';
+export {
+    buildMcpHttpProtocolReport,
+    createMcpHttpProtocolState,
+    recordMcpHttpProtocolRequest,
+} from '../http-protocol.js';

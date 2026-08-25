@@ -681,6 +681,8 @@ describe('infra/io/fs read line ports', () => {
         const enabled = readIoRollbackPolicy({ COPILOT_IO_ROLLBACK_ENABLED: 'true' }, '/workspace');
         expect(enabled.enabled).toBe(true);
         expect(enabled.directory).toBe('/workspace/src/copilot/.ai/rollback');
+        const configured = readIoRollbackPolicy({ COPILOT_IO_ROLLBACK_DIR: 'var/rollback' }, '/workspace');
+        expect(configured.directory).toBe('/workspace/var/rollback');
     });
 
     it('aplica budget de quantidade preservando explicitamente um sidecar sem ultrapassar o limite', async () => {

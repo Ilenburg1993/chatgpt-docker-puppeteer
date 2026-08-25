@@ -38,6 +38,6 @@ export {
     readMcpPostRestartReadiness,
     summarizeMcpPostRestartReadiness,
 } from '../readiness.js';
-export { normalizeMcpUrl, validatePublicConnectorUrl } from '../url.js';
+export { normalizeMcpUrl, validatePublicConnectorUrl } from '#copilot/mcp/public/connection/url';
 
 export { refreshMcpConnectorSmoke } from '../connector-smoke.js';

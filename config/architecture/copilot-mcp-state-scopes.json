@@ -73,8 +73,8 @@
       "rationale": "Warmup is a single generation-owned timer/promise/state service with explicit stop semantics."
     },
     {
-      "path": "src/copilot/mcp/cli.js",
-      "ownerId": "mcp",
+      "path": "src/copilot/mcp/cli/index.js",
+      "ownerId": "mcp.cli",
       "scope": "process",
       "lifecycle": "singleton-runtime",
       "boundedness": "single-value",
@@ -202,7 +202,7 @@
     },
     {
       "path": "src/copilot/mcp/diagnostics/runtime-source-drift/runtime.js",
-      "ownerId": "mcp.diagnostics",
+      "ownerId": "mcp.diagnostics.runtime-source-drift",
       "scope": "process",
       "lifecycle": "bounded-cache",
       "boundedness": "single-value",
@@ -219,7 +219,7 @@
     },
     {
       "path": "src/copilot/mcp/diagnostics/workspace-smoke/state.js",
-      "ownerId": "mcp.diagnostics",
+      "ownerId": "mcp.diagnostics.workspace-smoke",
       "scope": "process",
       "lifecycle": "last-value",
       "boundedness": "single-value",
@@ -403,7 +403,7 @@
     },
     {
       "path": "src/copilot/mcp/runtime/startup-maintenance/runtime.js",
-      "ownerId": "mcp.runtime",
+      "ownerId": "mcp.runtime.startup-maintenance",
       "scope": "process-generation",
       "lifecycle": "timer-service",
       "boundedness": "single-value",

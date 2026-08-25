@@ -19,9 +19,12 @@ export {
     listMutableModuleBindings,
 } from './mutable-state.js';
 export { buildInfraPublicAuthorityReport, inspectPublicApiAuthoritySource } from './public-api-authority.js';
+export { buildPublicSurfaceCostReport } from './public-api-cost-engine.js';
 export {
     buildInfraPublicApiCostReport,
     buildStaticImportClosure,
+    createStaticImportClosureAnalyzer,
+    listStaticModuleEdges,
     listStaticModuleSpecifiers,
 } from './public-api-cost.js';
 export {

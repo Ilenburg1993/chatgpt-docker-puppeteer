@@ -29,12 +29,14 @@ import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/tunne
 import { createMcpProcessConfig } from '#copilot/mcp/public/composition/process-config';
 import { createMcpInfraHealthCapability } from '#copilot/mcp/public/diagnostics/infra-health';
 import {
-    createMcpRoundTripAnalyticsCapability,
-    scheduleMcpRoundTripAnalyticsMonitor,
     scheduleOpenAiEndpointLatencyMonitor,
-    stopMcpRoundTripAnalyticsMonitor,
     stopOpenAiEndpointLatencyMonitor,
 } from '#copilot/mcp/public/diagnostics/latency';
+import {
+    createMcpRoundTripAnalyticsCapability,
+    scheduleMcpRoundTripAnalyticsMonitor,
+    stopMcpRoundTripAnalyticsMonitor,
+} from '#copilot/mcp/public/diagnostics/latency/round-trip';
 import { maybeStartMcpIndexAutoBuild, readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
 import { createModelGatewaySqliteFingerprintCapability } from '#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint';
 import { createAiArtifactsRuntime } from '#copilot/mcp/public/maintenance';
@@ -238,11 +240,14 @@ function createComposedAiArtifactsRuntime(workspace, workspaceInfra) {
     const policy = getApplicationInfraRuntime().config.rollback;
     const rollback = workspaceInfra.rollback;
     if (!rollback) throw new Error('MCP workspace is missing its rollback maintenance capability.');
+    if (!path.isAbsolute(workspaceRoot) || !path.isAbsolute(policy.directory)) {
+        throw new Error('MCP composition requires absolute workspace and rollback identities.');
+    }
     const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
     const io = createConfiguredFsIo(
         createConfiguredFsGrant({
             id: 'mcp.ai-artifacts.runtime',
-            roots: [aiDir, path.resolve(policy.directory)],
+            roots: [aiDir, policy.directory],
             operations: ['delete', 'list', 'stat'],
             symlinkPolicy: 'deny',
             durability: ['file-and-directory'],

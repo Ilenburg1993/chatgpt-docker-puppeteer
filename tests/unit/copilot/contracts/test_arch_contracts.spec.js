@@ -672,33 +672,26 @@ describe('W4-9 — bordas não leem propriedades voláteis do agent diretamente'
 // 3E. SDK model/session: sem ciclo estático entre model helpers e client lifecycle
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('W4-9 — SDK model/session: helpers de modelo não importam client estaticamente', () => {
-    it('sdk/models/helpers.js carrega session/client.js apenas de forma lazy', () => {
-        const src = readSrc('sdk/models/helpers.js');
+describe('W4-9 — SDK model/session: dependência unidirecional session -> models', () => {
+    it('sdk/models não possui authority de aquisição do client nem reverse edge para session', () => {
+        const helpers = readSrc('sdk/models/helpers.js');
+        const client = readSrc('sdk/session/client.js');
 
-        assert.doesNotMatch(src, /import\s+\{[^}]*getClient[^}]*\}\s+from\s+['"]\.\.\/session\/client\.js['"]/);
-        assert.doesNotMatch(src, /import\(['"]\.\.\/session\/client\.js['"]\)/);
-        assert.match(src, /from ['"]\.\/client-provider\.js['"]/);
+        assert.doesNotMatch(helpers, /#copilot\/sdk\/session|session\/client|session-client-port/);
+        assert.match(helpers, /listModelsWithClient/);
+        assert.match(client, /from ['"]\.\.\/models\/helpers\.js['"]/);
+        assert.match(client, /listModelsWithClient/);
+        assert.doesNotMatch(client, /setModelListClientProvider/);
     });
 
-    it('sdk/session/lifecycle.js depende da porta model-resolution (sem barrel models/index)', () => {
-        const src = readSrc('sdk/session/lifecycle.js');
+    it('sdk/session preserva model auto nativo sem model-resolution side channel', () => {
+        const lifecycle = readSrc('sdk/session/lifecycle.js');
 
-        assert.doesNotMatch(src, /from ['"]\.\.\/models\/index\.js['"]/);
-        assert.doesNotMatch(src, /import\(['"]\.\.\/models\/index\.js['"]\)/);
-        assert.match(src, /from ['"]\.\/model-resolution-port\.js['"]/);
-        assert.match(src, /resolveSessionCreateModel/);
-        assert.match(src, /setSessionAutoModelResolver/);
-    });
-
-    it('sdk/models/session-resolution-adapter.js usa helpers injetáveis de catálogo/model metadata', () => {
-        const src = readSrc('sdk/models/session-resolution-adapter.js');
-
-        assert.match(src, /createSessionAutoModelResolver/);
-        assert.match(src, /resolveSessionAutoModelFromCatalog/);
-        assert.match(src, /listModelsFn/);
-        assert.match(src, /resolveModelIdAutoFn/);
-        assert.match(src, /from ['"]\.\/helpers\.js['"]/);
+        assert.doesNotMatch(lifecycle, /model-resolution-port/);
+        assert.match(lifecycle, /resolveSessionCreateModel/);
+        assert.equal(existsSync(copilotPath('sdk/session/model-resolution-port.js')), false);
+        assert.equal(existsSync(copilotPath('sdk/models/session-resolution-adapter.js')), false);
+        assert.equal(existsSync(copilotPath('sdk/models/session-client-port.js')), false);
     });
 });
 

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
-import { auditOpenAiSecureMcpTunnelReadiness } from '#copilot/mcp/public/openai';
+import { auditOpenAiSecureMcpTunnelReadiness } from '#copilot/testing/mcp/openai';
 
 /** @type {string[]} */
 const tempRoots = [];

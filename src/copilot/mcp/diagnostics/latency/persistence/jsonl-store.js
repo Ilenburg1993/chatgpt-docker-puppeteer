@@ -25,7 +25,11 @@ import path from 'node:path';
  * }} options
  */
 export function createBoundConfiguredJsonlStore(options) {
-    const filePath = path.resolve(String(options.filePath));
+    const configuredFilePath = String(options.filePath);
+    if (!path.isAbsolute(configuredFilePath)) {
+        throw new TypeError('Bound configured JSONL storage requires an already-resolved absolute filePath.');
+    }
+    const filePath = path.normalize(configuredFilePath);
     const io = options.io;
     const maxReadBytes = positiveInteger(options.maxReadBytes, 'maxReadBytes');
     const mode = options.mode ?? 0o600;

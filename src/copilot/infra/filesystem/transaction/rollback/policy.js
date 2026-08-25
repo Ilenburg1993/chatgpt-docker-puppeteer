@@ -50,7 +50,7 @@ export function readIoRollbackPolicy(env, cwd = process.cwd()) {
     const configuredDirectory = String(source['COPILOT_IO_ROLLBACK_DIR'] ?? '').trim();
     return Object.freeze({
         enabled: booleanValueOr(source['COPILOT_IO_ROLLBACK_ENABLED'], false),
-        directory: configuredDirectory ? path.resolve(configuredDirectory) : defaultRollbackDirectory(cwd),
+        directory: configuredDirectory ? path.resolve(cwd, configuredDirectory) : defaultRollbackDirectory(cwd),
         ttlMs: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_TTL_MS'], DEFAULT_ROLLBACK_TTL_MS),
         maxEntries: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_MAX_ENTRIES'], DEFAULT_ROLLBACK_MAX_ENTRIES),
         maxBytes: positiveIntegerOr(source['COPILOT_IO_ROLLBACK_MAX_BYTES'], DEFAULT_ROLLBACK_MAX_BYTES),

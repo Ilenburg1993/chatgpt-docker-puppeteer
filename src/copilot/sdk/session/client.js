@@ -10,7 +10,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 import { CONNECTION_STATES } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log, logSdkSwallowed } from '../logger.js';
-import { setModelListClientProvider } from '../models/client-provider.js';
+import { clearModelsCacheAsync, listModelsWithClient } from '../models/helpers.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import {
@@ -85,7 +85,6 @@ async function wait(ms) {
  */
 async function clearModelsCacheBestEffort() {
     try {
-        const { clearModelsCacheAsync } = await import('../models/helpers.js');
         await clearModelsCacheAsync();
     } catch (error) {
         logSdkSwallowed(error, 'sdk.client.clearModelsCache');
@@ -393,10 +392,13 @@ export class CopilotClientManager {
         return client.getAuthStatus();
     }
 
-    /** @returns {Promise<ModelInfo[]>} */
-    async listAvailableModels() {
-        const client = await this.getClient();
-        return client.listModels();
+    /**
+     * @param {Partial<CopilotClientOptions>} [clientOverrides]
+     * @param {boolean} [forceRefresh]
+     * @returns {Promise<ModelInfo[]>}
+     */
+    async listAvailableModels(clientOverrides = {}, forceRefresh = false) {
+        return listModelsWithClient((overrides = {}) => this.getClient(overrides), clientOverrides, forceRefresh);
     }
 
     /** @returns {Promise<string | undefined>} */
@@ -622,8 +624,6 @@ export async function getClient(overrides = {}) {
     return defaultClientManager.getClient(overrides);
 }
 
-setModelListClientProvider(getClient);
-
 export async function stopClient() {
     return defaultClientManager.stopClient();
 }
@@ -655,8 +655,20 @@ export async function getAuthStatus() {
     return defaultClientManager.getAuthStatus();
 }
 
+/**
+ * Canonical cached model-list surface. Client acquisition belongs to the session owner; cache/model metadata remain
+ * owned by `sdk/models` through an explicitly injected capability.
+ *
+ * @param {Partial<CopilotClientOptions>} [clientOverrides]
+ * @param {boolean} [forceRefresh]
+ * @returns {Promise<ModelInfo[]>}
+ */
+export async function listModels(clientOverrides = {}, forceRefresh = false) {
+    return defaultClientManager.listAvailableModels(clientOverrides, forceRefresh);
+}
+
 export async function listAvailableModels() {
-    return defaultClientManager.listAvailableModels();
+    return listModels();
 }
 
 export async function getLastClientSessionId() {

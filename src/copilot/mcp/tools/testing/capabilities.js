@@ -1,4 +1,4 @@
 // @ts-check
-/** Public capability metadata projection for the MCP wire surface. */
+/** Testing-only membrane for MCP capability metadata helpers. */
 
 export { buildMcpCapabilitiesSummary, getAdvertisedMcpToolNames, getMcpCapabilityGroups } from '../meta.js';

@@ -14,10 +14,12 @@ import { createProcessShutdownController } from './shutdown/index.js';
 
 let processSequence = 0;
 
-/** @param {{ processId?:string; env?:NodeJS.ProcessEnv; config?:ReturnType<typeof readProcessInfraConfig>; activateProcessPolicies?:boolean }} [options] */
+/** @param {{ processId?:string; env?:NodeJS.ProcessEnv; config?:ReturnType<typeof readProcessInfraConfig>; workspaceRoot?:string|null; activateProcessPolicies?:boolean }} [options] */
 export function createProcessInfra(options = {}) {
     const processId = options.processId?.trim() || `process-infra-${++processSequence}`;
-    const config = options.config ?? readProcessInfraConfig(options.env ?? process.env);
+    const config =
+        options.config ??
+        readProcessInfraConfig(options.env ?? process.env, { workspaceRoot: options.workspaceRoot ?? null });
     const lifecycle = createInfraLifecycle(`ProcessInfra(${processId})`);
     const processLocks = createProcessLockRuntime({ processId, config: config.locks });
     const scheduler = createProcessScheduler({ processId });

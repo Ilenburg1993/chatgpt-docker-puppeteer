@@ -9,6 +9,7 @@
  */
 
 import { resolveExecutable } from '#copilot/infra/public/platform/process/executable';
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 
 const TUNNEL_ID_ENV_KEYS = ['OPENAI_MCP_TUNNEL_ID', 'OPENAI_TUNNEL_ID', 'MCP_TUNNEL_ID', 'TUNNEL_ID'];
 const RUNTIME_KEY_ENV_KEYS = ['CONTROL_PLANE_API_KEY', 'OPENAI_CONTROL_PLANE_API_KEY'];
@@ -30,7 +31,7 @@ export function auditOpenAiSecureMcpTunnelReadiness(options) {
             PATH: options.pathEnv ?? env['PATH'] ?? env['Path'] ?? env['path'] ?? '',
             PATHEXT: env['PATHEXT'],
         },
-        cwd: process.cwd(),
+        cwd: MCP_WORKSPACE_ROOT,
         platform: process.platform,
     });
     const tunnelClient = executable.found

@@ -1,6 +1,148 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "computedImports": [],
+  "literalDynamicImports": [
+    {
+      "source": "src/copilot/mcp/adapters/http/handler.js",
+      "sourceOwnerId": "mcp.adapters",
+      "specifier": "#copilot/mcp/public/transport/http/stateful/request-contract",
+      "targetOwnerId": "mcp.transport",
+      "audience": "public",
+      "loadPolicy": "protocol-compatibility-lazy",
+      "expectedCount": 1,
+      "rationale": "Load stateful request classification only when the request path needs compatibility semantics."
+    },
+    {
+      "source": "src/copilot/mcp/adapters/http/handler.js",
+      "sourceOwnerId": "mcp.adapters",
+      "specifier": "#copilot/mcp/public/transport/http/stateful/router",
+      "targetOwnerId": "mcp.transport",
+      "audience": "public",
+      "loadPolicy": "protocol-compatibility-lazy",
+      "expectedCount": 1,
+      "rationale": "Keep the stateful compatibility router outside the modern HTTP handler cold closure until required."
+    },
+    {
+      "source": "src/copilot/mcp/adapters/http/handler.js",
+      "sourceOwnerId": "mcp.adapters",
+      "specifier": "#copilot/mcp/public/transport/http/compat/stateless",
+      "targetOwnerId": "mcp.transport",
+      "audience": "public",
+      "loadPolicy": "protocol-compatibility-lazy",
+      "expectedCount": 1,
+      "rationale": "Load the legacy stateless compatibility transport only for requests that require that envelope."
+    },
+    {
+      "source": "src/copilot/mcp/cli/index.js",
+      "sourceOwnerId": "mcp.cli",
+      "specifier": "#copilot/mcp/public/observability",
+      "targetOwnerId": "mcp.observability",
+      "audience": "public",
+      "loadPolicy": "startup-lazy",
+      "expectedCount": 1,
+      "rationale": "Defer the MCP logger graph until CLI execution needs to emit runtime diagnostics."
+    },
+    {
+      "source": "src/copilot/mcp/cli/index.js",
+      "sourceOwnerId": "mcp.cli",
+      "specifier": "#copilot/mcp/public/composition/process-host",
+      "targetOwnerId": "mcp.composition.process-host",
+      "audience": "public",
+      "loadPolicy": "startup-lazy",
+      "expectedCount": 2,
+      "rationale": "Construct the composed process host only after the selected CLI transport is known."
+    },
+    {
+      "source": "src/copilot/mcp/cli/index.js",
+      "sourceOwnerId": "mcp.cli",
+      "specifier": "#copilot/mcp/public/adapters/stdio",
+      "targetOwnerId": "mcp.adapters",
+      "audience": "public",
+      "loadPolicy": "startup-lazy",
+      "expectedCount": 1,
+      "rationale": "Keep stdio adapter initialization outside HTTP CLI startup and reserve stdout until needed."
+    },
+    {
+      "source": "src/copilot/mcp/cli/index.js",
+      "sourceOwnerId": "mcp.cli",
+      "specifier": "#copilot/mcp/public/adapters/http2",
+      "targetOwnerId": "mcp.adapters",
+      "audience": "public",
+      "loadPolicy": "startup-lazy",
+      "expectedCount": 1,
+      "rationale": "Load the HTTP2 adapter only when the selected CLI transport requires the secure HTTP2 server."
+    },
+    {
+      "source": "src/copilot/mcp/cli/index.js",
+      "sourceOwnerId": "mcp.cli",
+      "specifier": "#copilot/mcp/public/adapters/http1",
+      "targetOwnerId": "mcp.adapters",
+      "audience": "public",
+      "loadPolicy": "startup-lazy",
+      "expectedCount": 1,
+      "rationale": "Load the HTTP1 adapter only when the selected CLI transport requires the compatibility listener."
+    },
+    {
+      "source": "src/copilot/mcp/cloudflare/observability/connector-smoke.js",
+      "sourceOwnerId": "mcp.cloudflare.observability",
+      "specifier": "#copilot/mcp/public/diagnostics/oauth-smoke",
+      "targetOwnerId": "mcp.diagnostics.oauth-smoke",
+      "audience": "public",
+      "loadPolicy": "optional-capability",
+      "expectedCount": 1,
+      "rationale": "OAuth smoke is loaded only for the authenticated connector-smoke branch that requests it."
+    },
+    {
+      "source": "src/copilot/mcp/cloudflare/posture/mcp-passthrough-plan.js",
+      "sourceOwnerId": "mcp.cloudflare.posture",
+      "specifier": "cloudflare",
+      "targetOwnerId": null,
+      "audience": "external",
+      "loadPolicy": "operation-lazy",
+      "expectedCount": 1,
+      "rationale": "The Cloudflare SDK is needed only by the guarded mutation path, not by read-only planning."
+    },
+    {
+      "source": "src/copilot/mcp/cloudflare/posture/mcp-passthrough-plan.js",
+      "sourceOwnerId": "mcp.cloudflare.posture",
+      "specifier": "#copilot/mcp/public/cloudflare/edge",
+      "targetOwnerId": "mcp.cloudflare.edge",
+      "audience": "public",
+      "loadPolicy": "operation-lazy",
+      "expectedCount": 1,
+      "rationale": "Edge backup authority is loaded only when the guarded passthrough apply path is entered."
+    },
+    {
+      "source": "src/copilot/mcp/diagnostics/io-cache/worker.js",
+      "sourceOwnerId": "mcp.diagnostics.io-cache",
+      "specifier": "#copilot/infra/public/composition/database/sqlite",
+      "targetOwnerId": null,
+      "audience": "cross-domain-public",
+      "loadPolicy": "benchmark-lazy",
+      "expectedCount": 1,
+      "rationale": "The representative IO benchmark creates its isolated SQLite runtime only for modes that require L2 state."
+    },
+    {
+      "source": "src/copilot/mcp/maintenance/dependencies/native-smoke/runtime.js",
+      "sourceOwnerId": "mcp.maintenance.dependencies.native-smoke",
+      "specifier": "node-pty",
+      "targetOwnerId": null,
+      "audience": "external",
+      "loadPolicy": "native-probe-lazy",
+      "expectedCount": 1,
+      "rationale": "Native PTY binding is loaded only while explicitly probing the installed native dependency."
+    },
+    {
+      "source": "src/copilot/mcp/maintenance/dependencies/native-smoke/runtime.js",
+      "sourceOwnerId": "mcp.maintenance.dependencies.native-smoke",
+      "specifier": "@lancedb/lancedb",
+      "targetOwnerId": null,
+      "audience": "external",
+      "loadPolicy": "native-probe-lazy",
+      "expectedCount": 1,
+      "rationale": "LanceDB is loaded only while explicitly probing the installed native dependency and its binding."
+    }
+  ],
   "childProcessImportOwners": [
     "src/copilot/mcp/cloudflare/process/cli-process.js",
     "src/copilot/mcp/composition/cloudflare-cli/managed-stack.js",
@@ -26,6 +168,10 @@
       "launchers": [
         {
           "id": "managed-daemons",
+          "executableAuthority": "bound-process-spec",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "managed-controller",
+          "terminality": "managed-daemon",
           "completionModel": "managed-lifecycle",
           "callerCancellation": "explicit-control",
           "cwdAuthority": "process-cwd-inherited",
@@ -35,6 +181,10 @@
         },
         {
           "id": "cloudflared-version",
+          "executableAuthority": "fixed-binary",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "none",
+          "terminality": "synchronous",
           "completionModel": "sync-probe",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "process-cwd-inherited",
@@ -50,6 +200,10 @@
       "launchers": [
         {
           "id": "foreground-cloudflared",
+          "executableAuthority": "fixed-binary",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "process-cwd-inherited",
@@ -59,6 +213,10 @@
         },
         {
           "id": "managed-stack",
+          "executableAuthority": "bound-process-spec",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "managed-controller",
+          "terminality": "managed-daemon",
           "completionModel": "managed-lifecycle",
           "callerCancellation": "explicit-control",
           "cwdAuthority": "process-cwd-inherited",
@@ -74,6 +232,10 @@
       "launchers": [
         {
           "id": "detached-benchmark-launch",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "detached-acceptance-supervisor",
+          "terminality": "detached",
           "completionModel": "detached-acceptance",
           "callerCancellation": "before-acceptance",
           "cwdAuthority": "fixed-workspace",
@@ -83,6 +245,10 @@
         },
         {
           "id": "benchmark-fixed-child",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "fixed-workspace",
@@ -94,10 +260,14 @@
     },
     {
       "path": "src/copilot/mcp/diagnostics/devcontainer-network/runtime.js",
-      "ownerId": "mcp.diagnostics",
+      "ownerId": "mcp.diagnostics.devcontainer-network",
       "launchers": [
         {
           "id": "network-state-refresh",
+          "executableAuthority": "fixed-binary",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "fixed-workspace",
@@ -109,10 +279,14 @@
     },
     {
       "path": "src/copilot/mcp/diagnostics/io-cache/runner.js",
-      "ownerId": "mcp.diagnostics",
+      "ownerId": "mcp.diagnostics.io-cache",
       "launchers": [
         {
           "id": "benchmark-worker",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "fixed-workspace",
@@ -124,10 +298,14 @@
     },
     {
       "path": "src/copilot/mcp/diagnostics/io-cache/scheduler.js",
-      "ownerId": "mcp.diagnostics",
+      "ownerId": "mcp.diagnostics.io-cache",
       "launchers": [
         {
           "id": "detached-io-cache-launch",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "detached-acceptance-supervisor",
+          "terminality": "detached",
           "completionModel": "detached-acceptance",
           "callerCancellation": "before-acceptance",
           "cwdAuthority": "caller-bounded-workspace",
@@ -143,6 +321,10 @@
       "launchers": [
         {
           "id": "attached-live-command",
+          "executableAuthority": "allowlisted-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "fixed-workspace",
@@ -152,6 +334,10 @@
         },
         {
           "id": "detached-live-launch",
+          "executableAuthority": "allowlisted-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "detached-acceptance-supervisor",
+          "terminality": "detached",
           "completionModel": "detached-acceptance",
           "callerCancellation": "before-acceptance",
           "cwdAuthority": "fixed-workspace",
@@ -167,6 +353,10 @@
       "launchers": [
         {
           "id": "dependency-maintenance",
+          "executableAuthority": "allowlisted-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "fixed-workspace",
@@ -182,6 +372,10 @@
       "launchers": [
         {
           "id": "one-shot-terminal",
+          "executableAuthority": "caller-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "caller-bounded-workspace",
@@ -191,6 +385,10 @@
         },
         {
           "id": "persistent-terminal",
+          "executableAuthority": "caller-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "persistent-session-control",
+          "terminality": "persistent",
           "completionModel": "persistent-session",
           "callerCancellation": "before-acceptance-then-explicit-control",
           "cwdAuthority": "caller-bounded-workspace",
@@ -202,10 +400,14 @@
     },
     {
       "path": "src/copilot/mcp/runtime/reload/runner.js",
-      "ownerId": "mcp.runtime",
+      "ownerId": "mcp.runtime.reload",
       "launchers": [
         {
           "id": "detached-reload-launch",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "detached-acceptance-supervisor",
+          "terminality": "detached",
           "completionModel": "detached-acceptance",
           "callerCancellation": "before-acceptance",
           "cwdAuthority": "fixed-workspace",
@@ -215,6 +417,10 @@
         },
         {
           "id": "reload-fixed-child",
+          "executableAuthority": "fixed-node-script",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "fixed-workspace",
@@ -230,6 +436,10 @@
       "launchers": [
         {
           "id": "stateful-bootstrap-npm",
+          "executableAuthority": "fixed-package-manager",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "not-applicable",
           "cwdAuthority": "fixed-workspace",
@@ -245,6 +455,10 @@
       "launchers": [
         {
           "id": "shellcheck-file",
+          "executableAuthority": "allowlisted-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "fixed-workspace",
@@ -260,6 +474,10 @@
       "launchers": [
         {
           "id": "validator-job-launch",
+          "executableAuthority": "allowlisted-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "job-manager",
+          "terminality": "job",
           "completionModel": "job-lifecycle",
           "callerCancellation": "before-acceptance",
           "cwdAuthority": "caller-bounded-workspace",
@@ -269,6 +487,10 @@
         },
         {
           "id": "validator-wait",
+          "executableAuthority": "allowlisted-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "caller-bounded-workspace",
@@ -284,6 +506,10 @@
       "launchers": [
         {
           "id": "safe-suite-step",
+          "executableAuthority": "allowlisted-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "fixed-workspace",
@@ -299,6 +525,10 @@
       "launchers": [
         {
           "id": "workspace-git",
+          "executableAuthority": "fixed-binary",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
           "completionModel": "attached-close",
           "callerCancellation": "drain",
           "cwdAuthority": "caller-bounded-workspace",

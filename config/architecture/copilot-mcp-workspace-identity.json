@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "canonicalDefinition": {
+    "path": "src/copilot/mcp/workspace/contracts/root.js",
+    "publicSpecifier": "#copilot/mcp/public/workspace",
+    "rootExport": "MCP_WORKSPACE_ROOT",
+    "resolverExport": "resolveMcpWorkspaceIdentityPath",
+    "relativeExport": "toMcpWorkspaceRelativePath",
+    "derivation": "import.meta.url"
+  },
+  "ambientCwdAllowlist": [],
+  "consumers": [
+    {
+      "path": "src/copilot/mcp/cloudflare/config.js",
+      "ownerId": "mcp.cloudflare",
+      "symbols": ["resolveMcpWorkspaceIdentityPath"],
+      "rationale": "Anchors configured Cloudflare token, state, PID and log paths to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/edge/edge-backup.js",
+      "ownerId": "mcp.cloudflare.edge",
+      "symbols": ["MCP_WORKSPACE_ROOT", "resolveMcpWorkspaceIdentityPath", "toMcpWorkspaceRelativePath"],
+      "rationale": "Binds edge backup storage and reporting to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/process/cli-process.js",
+      "ownerId": "mcp.cloudflare.process",
+      "symbols": ["resolveMcpWorkspaceIdentityPath"],
+      "rationale": "Prevents managed process PID, metadata and log authority from depending on ambient cwd."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/transport-benchmark/runtime.js",
+      "ownerId": "mcp.cloudflare.transport-benchmark",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs fixed benchmark launchers and workspace IO against canonical repository identity."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/transport-benchmark/state.js",
+      "ownerId": "mcp.cloudflare.transport-benchmark",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Binds persisted transport benchmark state to the canonical repository."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/tunnel/state.js",
+      "ownerId": "mcp.cloudflare.tunnel",
+      "symbols": ["resolveMcpWorkspaceIdentityPath"],
+      "rationale": "Makes tunnel and connector-smoke state paths invariant under later cwd changes."
+    },
+    {
+      "path": "src/copilot/mcp/composition/process-host/runtime.js",
+      "ownerId": "mcp.composition.process-host",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Composes the process host around the canonical application workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/latency/client/evidence.js",
+      "ownerId": "mcp.diagnostics.latency",
+      "symbols": ["MCP_WORKSPACE_ROOT", "toMcpWorkspaceRelativePath"],
+      "rationale": "Binds sanitized client-latency evidence and reported paths to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/latency/dashboard/history.js",
+      "ownerId": "mcp.diagnostics.latency.dashboard",
+      "symbols": ["MCP_WORKSPACE_ROOT", "toMcpWorkspaceRelativePath"],
+      "rationale": "Binds dashboard history persistence and reporting to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/latency/openai/latency.js",
+      "ownerId": "mcp.diagnostics.latency",
+      "symbols": ["MCP_WORKSPACE_ROOT", "toMcpWorkspaceRelativePath"],
+      "rationale": "Binds OpenAI latency history persistence and reporting to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/observability/audit/config.js",
+      "ownerId": "mcp.observability",
+      "symbols": ["resolveMcpWorkspaceIdentityPath"],
+      "rationale": "Anchors configured MCP audit persistence to canonical workspace identity."
+    },
+    {
+      "path": "src/copilot/mcp/openai/secure-tunnel-readiness.js",
+      "ownerId": "mcp.openai",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Uses canonical workspace identity as the deterministic executable-resolution cwd."
+    },
+    {
+      "path": "src/copilot/mcp/registry/runtime.js",
+      "ownerId": "mcp.registry",
+      "symbols": ["toMcpWorkspaceRelativePath"],
+      "rationale": "Projects registry diagnostics to stable workspace-relative source identities."
+    },
+    {
+      "path": "src/copilot/mcp/runtime/reload/runner.js",
+      "ownerId": "mcp.runtime.reload",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs controlled reload launchers from the canonical repository root."
+    },
+    {
+      "path": "src/copilot/mcp/scripts/architecture-contract-check.js",
+      "ownerId": "mcp.scripts",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs architecture governance against canonical repository identity rather than invocation cwd."
+    },
+    {
+      "path": "src/copilot/mcp/scripts/dependency-native-smoke.js",
+      "ownerId": "mcp.scripts",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs native dependency smoke checks against canonical repository identity."
+    },
+    {
+      "path": "src/copilot/mcp/scripts/docs-contract-check.js",
+      "ownerId": "mcp.scripts",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs documentation governance against canonical repository identity rather than invocation cwd."
+    },
+    {
+      "path": "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
+      "ownerId": "mcp.transport",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Constrains stateful bootstrap files and child execution to canonical repository identity."
+    },
+    {
+      "path": "src/copilot/mcp/validation/devcontainer-shell/runtime.js",
+      "ownerId": "mcp.validation",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs fixed DevContainer validation from canonical repository identity."
+    },
+    {
+      "path": "src/copilot/mcp/validation/suites/runtime.js",
+      "ownerId": "mcp.validation",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Runs allowlisted validation suites from canonical repository identity."
+    },
+    {
+      "path": "src/copilot/mcp/workspace/repository/status/runtime.js",
+      "ownerId": "mcp.workspace.repository.status",
+      "symbols": ["MCP_WORKSPACE_ROOT"],
+      "rationale": "Uses canonical workspace identity as the default repository-status target."
+    }
+  ]
+}

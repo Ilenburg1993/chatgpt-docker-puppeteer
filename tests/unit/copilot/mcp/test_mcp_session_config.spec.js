@@ -17,7 +17,7 @@ describe('copilot MCP session config', () => {
             'copilot-local': {
                 type: 'stdio',
                 command: 'node',
-                args: ['src/copilot/mcp/cli.js', '--transport', 'stdio'],
+                args: ['src/copilot/mcp/cli/index.js', '--transport', 'stdio'],
                 timeout: 30_000,
             },
         });

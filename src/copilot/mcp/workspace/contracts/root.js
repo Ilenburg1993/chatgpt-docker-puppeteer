@@ -15,6 +15,21 @@ import { fileURLToPath } from 'node:url';
 export const MCP_WORKSPACE_ROOT = resolve(fileURLToPath(new URL('../../../../../', import.meta.url)));
 
 /**
+ * Resolve a configured path against the canonical MCP workspace identity without granting filesystem authority.
+ * Absolute inputs remain absolute; relative inputs are anchored to the repository root rather than ambient cwd.
+ *
+ * @param {string} configuredPath
+ * @returns {string}
+ */
+export function resolveMcpWorkspaceIdentityPath(configuredPath) {
+    const value = String(configuredPath ?? '').trim();
+    if (!value || /[\r\n\0]/u.test(value)) {
+        throw new TypeError('MCP workspace identity path must be a non-empty single-line path.');
+    }
+    return resolve(MCP_WORKSPACE_ROOT, value);
+}
+
+/**
  * Project an absolute path into the canonical MCP workspace identity without granting filesystem authority.
  *
  * @param {string} absolutePath

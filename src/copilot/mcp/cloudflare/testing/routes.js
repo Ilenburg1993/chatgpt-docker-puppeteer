@@ -1,5 +1,5 @@
 // @ts-check
-/** Exact Cloudflare public membrane: routes. */
+/** Testing-only membrane for Cloudflare route-expression builders. */
 
 export {
     buildCloudflareAnonymousMcpExpression,

@@ -56,7 +56,10 @@ const MCP_LATENCY_HISTORY_IO = createConfiguredFsIo(
  * @param {{ filePath:string; io:ConfiguredFsIo }} binding
  */
 export function createMcpLatencyHistoryRuntime(binding) {
-    const filePath = path.resolve(binding.filePath);
+    if (!path.isAbsolute(binding.filePath)) {
+        throw new TypeError('MCP latency history requires an already-resolved absolute filePath binding.');
+    }
+    const filePath = path.normalize(binding.filePath);
     const store = createBoundConfiguredJsonlStore({
         filePath,
         io: binding.io,

@@ -44,6 +44,7 @@ function buildGenerationEnv(resource, dir) {
         COPILOT_MCP_DEV_OAUTH_KEY_FILE: path.join(dir, 'oauth-key.pem'),
         COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE: path.join(dir, 'refresh-tokens.json'),
         COPILOT_MCP_DEV_OAUTH_CLIENT_FILE: path.join(dir, 'clients.json'),
+        COPILOT_MCP_DEV_OAUTH_RATE_LIMIT_REGISTER_PER_WINDOW: '1',
         COPILOT_MCP_AUDIT_FILE: path.join(dir, 'audit.jsonl'),
         COPILOT_MCP_ALLOWED_ORIGINS: 'https://chatgpt.com,http://127.0.0.1',
         COPILOT_MCP_JWKS_WARMUP_ENABLED: 'false',
@@ -52,13 +53,19 @@ function buildGenerationEnv(resource, dir) {
 }
 
 /** @param {string} url @param {string} clientName */
-async function registerClient(url, clientName) {
+async function requestClientRegistration(url, clientName) {
     const response = await fetch(`${url}/oauth/register`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ client_name: clientName, redirect_uris: ['http://127.0.0.1/callback'] }),
     });
     const payload = /** @type {Record<string, unknown>} */ (await response.json());
+    return { response, payload };
+}
+
+/** @param {string} url @param {string} clientName */
+async function registerClient(url, clientName) {
+    const { response, payload } = await requestClientRegistration(url, clientName);
     assert.equal(response.status, 201, JSON.stringify(payload));
     assert.match(String(payload['client_id'] ?? ''), /^mcp_dev_/u);
     return payload;
@@ -96,7 +103,15 @@ describe('MCP OAuth runtime generations', () => {
 
             await registerClient(resourceA, 'generation-a-client');
             assert.equal(generationA.processHost.authRuntime.issuerRuntime.readState().registeredClients, 1);
+            assert.equal(generationA.processHost.authRuntime.issuerRuntime.readState().requestBudgetEntries, 1);
             assert.equal(generationB.processHost.authRuntime.issuerRuntime.readState().registeredClients, 0);
+            assert.equal(generationB.processHost.authRuntime.issuerRuntime.readState().requestBudgetEntries, 0);
+
+            const generationAThrottled = await requestClientRegistration(resourceA, 'generation-a-throttled');
+            assert.equal(generationAThrottled.response.status, 429);
+            assert.equal(generationAThrottled.payload['error'], 'temporarily_unavailable');
+            assert.equal(generationA.processHost.authRuntime.issuerRuntime.readState().requestBudgetEntries, 1);
+            assert.equal(generationB.processHost.authRuntime.issuerRuntime.readState().requestBudgetEntries, 0);
 
             await registerClient(resourceB, 'generation-b-client');
             assert.equal(generationA.processHost.authRuntime.issuerRuntime.readState().registeredClients, 1);

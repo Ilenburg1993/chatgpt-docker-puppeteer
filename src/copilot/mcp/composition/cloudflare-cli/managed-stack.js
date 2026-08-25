@@ -50,7 +50,7 @@ export async function startManagedStack({ config, env, restart = false }) {
     const mcpHttp = await processes.mcpHttp.ensure({
         name: 'mcp-http',
         command: process.execPath,
-        args: ['src/copilot/mcp/cli.js', '--transport', originTransport],
+        args: ['src/copilot/mcp/cli/index.js', '--transport', originTransport],
         env: buildMcpHttpEnvironment(config, originTransport, env),
     });
     const originReadiness = await waitForManagedHealthReady(config.healthUrl, {

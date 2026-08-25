@@ -5,12 +5,12 @@ import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
-import { readMcpRoundTripAnalyticsSnapshot } from '#copilot/mcp/public/diagnostics/latency';
+import { readMcpRoundTripAnalyticsSnapshot } from '#copilot/mcp/public/diagnostics/latency/round-trip';
 import {
     createMcpRoundTripAnalytics,
     normalizeMcpRoundTripAuditEvent,
     summarizeMcpRoundTripRows,
-} from '#copilot/testing/mcp/diagnostics/latency';
+} from '#copilot/testing/mcp/diagnostics/latency/round-trip';
 
 /** @type {import('better-sqlite3').Database[]} */
 const databases = [];

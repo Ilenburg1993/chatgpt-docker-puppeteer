@@ -89,6 +89,20 @@ describe('ApplicationInfraHost', () => {
         expect(() => host.workspace(root)).toThrow(/disposed/iu);
     });
 
+    it('anchors relative rollback policy to the host workspace identity', async () => {
+        const root = await createTempRoot();
+        const host = createApplicationInfraHost({
+            hostId: 'rollback-identity-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+            env: { ...process.env, COPILOT_IO_ROLLBACK_DIR: 'relative-rollback' },
+        });
+        hosts.push(host);
+
+        expect(host.processInfra.config.runtimeDefaults.rollback.directory).toBe(path.join(root, 'relative-rollback'));
+        expect(host.runtime.config.rollback.directory).toBe(path.join(root, 'relative-rollback'));
+    });
+
     it('exposes async disposal as the same idempotent host-owned teardown', async () => {
         const root = await createTempRoot();
         const host = createApplicationInfraHost({

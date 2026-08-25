@@ -82,7 +82,10 @@ async function statSafe(context, filePath) {
  * @param {{ workspaceRoot:string; rollbackPolicy:AiArtifactsRollbackPolicy; rollbackMaintenance?:AiArtifactsRollbackMaintenance|null; io:AiArtifactsReadIo }} binding
  */
 export function createAiArtifactsRuntime(binding) {
-    const workspaceRoot = path.resolve(binding.workspaceRoot);
+    if (!path.isAbsolute(binding.workspaceRoot) || !path.isAbsolute(binding.rollbackPolicy.directory)) {
+        throw new TypeError('AI artifact runtime requires absolute workspace and rollback identity bindings.');
+    }
+    const workspaceRoot = path.normalize(binding.workspaceRoot);
     const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
     /** @type {AiArtifactsContext} */
     const context = Object.freeze({
@@ -91,7 +94,7 @@ export function createAiArtifactsRuntime(binding) {
         jobsDir: path.join(aiDir, 'jobs'),
         cloudflareDir: path.join(aiDir, 'cloudflare'),
         mcpDir: path.join(aiDir, 'mcp'),
-        rollbackDir: path.resolve(binding.rollbackPolicy.directory),
+        rollbackDir: path.normalize(binding.rollbackPolicy.directory),
         rollbackPolicy: binding.rollbackPolicy,
         rollbackMaintenance: binding.rollbackMaintenance ?? null,
         io: binding.io,

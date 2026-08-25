@@ -117,7 +117,7 @@ vi.mock('@github/copilot-sdk', () => {
 });
 
 import { classifySdkRateLimitScope, getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
-import { clearModelsCacheAsync, listModels } from '../../../../src/copilot/sdk/models/helpers.js';
+import { clearModelsCacheAsync } from '../../../../src/copilot/sdk/models/helpers.js';
 import {
     _injectClientForTest,
     _resetClientState,
@@ -138,6 +138,7 @@ import {
     getServerRpc,
     incrementSessionMessageCount,
     listActiveClientSessions,
+    listModels,
     resumeClientSession,
     sdkConnectionCircuitBreaker,
     setForegroundClientSessionId,

@@ -93,7 +93,6 @@ describe('F86 - Barrel complete export coverage', () => {
             'resumeOrCreate',
             'resumeSession',
             'resolveSessionCreateModel',
-            'setSessionAutoModelResolver',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });

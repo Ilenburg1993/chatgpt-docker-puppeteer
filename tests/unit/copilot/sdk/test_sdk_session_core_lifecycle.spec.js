@@ -37,7 +37,6 @@ import {
     listSessions,
     resolveSessionCreateModel,
     resumeSession,
-    setSessionAutoModelResolver,
 } from '../../../../src/copilot/sdk/session/lifecycle.js';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
@@ -63,7 +62,6 @@ describe('sdk/session/lifecycle core hardening', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         metrics = [];
-        setSessionAutoModelResolver(null);
         setSdkMetricEmitter((metric) => metrics.push(metric));
     });
 
@@ -182,12 +180,9 @@ describe('sdk/session/lifecycle core hardening', () => {
 
     it('createSession preserva model auto nativo do SDK sem resolver local', async () => {
         const client = fakeClient();
-        const resolver = vi.fn().mockResolvedValue('resolved-auto-model');
-        setSessionAutoModelResolver(resolver);
 
         await createSession(client, { model: 'auto', reasoningEffort: 'high' });
 
-        expect(resolver).not.toHaveBeenCalled();
         expect(client.createSession).toHaveBeenCalledWith(expect.objectContaining({ model: 'auto' }));
         expect(client.createSession).toHaveBeenCalledWith(
             expect.not.objectContaining({
@@ -196,20 +191,12 @@ describe('sdk/session/lifecycle core hardening', () => {
         );
     });
 
-    it('resolveSessionCreateModel retorna modelo explícito sem acionar resolver', async () => {
-        const resolver = vi.fn().mockResolvedValue('should-not-run');
-        setSessionAutoModelResolver(resolver);
-
+    it('resolveSessionCreateModel retorna modelo explícito sem resolução paralela', async () => {
         await expect(resolveSessionCreateModel('gpt-4.1')).resolves.toBe('gpt-4.1');
-        expect(resolver).not.toHaveBeenCalled();
     });
 
     it('resolveSessionCreateModel preserva auto para seleção nativa do SDK', async () => {
-        const resolver = vi.fn().mockResolvedValue('should-not-run');
-        setSessionAutoModelResolver(resolver);
-
         await expect(resolveSessionCreateModel('auto')).resolves.toBe('auto');
-        expect(resolver).not.toHaveBeenCalled();
     });
 
     it('resumeSession valida sessionId não-vazio', async () => {

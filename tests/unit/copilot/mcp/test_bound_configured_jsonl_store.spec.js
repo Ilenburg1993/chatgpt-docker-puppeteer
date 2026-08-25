@@ -33,6 +33,16 @@ async function fixture() {
 }
 
 describe('bound configured JSONL store', () => {
+    it('rejects relative paths instead of resolving them against ambient cwd', () => {
+        expect(() =>
+            createBoundConfiguredJsonlStore({
+                filePath: 'relative/history.jsonl',
+                io: /** @type {never} */ ({}),
+                maxReadBytes: 64 * 1024,
+            }),
+        ).toThrow(/already-resolved absolute filePath/);
+    });
+
     it('não perde appends concorrentes e faz trim dentro da mesma seção crítica', async () => {
         const { filePath, store } = await fixture();
         await Promise.all(Array.from({ length: 24 }, (_, index) => store.appendRecord({ index }, { maxEntries: 100 })));

@@ -87,6 +87,7 @@ export {
     listActiveClientSessions,
     listAllClientSessions,
     listAvailableModels,
+    listModels,
     pingClient,
     resumeClientSession,
     sdkConnectionCircuitBreaker,
@@ -137,10 +138,7 @@ export {
     listSessions,
     resumeOrCreate,
     resumeSession,
-    setSessionAutoModelResolver,
 } from './lifecycle.js';
-
-// model-resolution-port.js — excluído: lifecycle.js já re-exporta setSessionAutoModelResolver.
 
 export { PermissionController, createConfiguredPermissionHandler } from './permission-controller.js';
 export {

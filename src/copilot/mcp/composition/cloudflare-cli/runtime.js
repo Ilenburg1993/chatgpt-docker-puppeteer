@@ -349,7 +349,7 @@ function runCommands() {
 /** @returns {void} */
 function runHelp() {
     process.stdout.write(
-        `copilot-mcp-cloudflare ${CLOUDFLARE_CLI_VERSION}\n\nUsage: node src/copilot/mcp/cloudflare/cli.js <command> [args]\n\nCommands:\n${COMMANDS.map(([name, description]) => `  ${String(name).padEnd(28)} ${description}`).join('\n')}\n`,
+        `copilot-mcp-cloudflare ${CLOUDFLARE_CLI_VERSION}\n\nUsage: node src/copilot/mcp/composition/cloudflare-cli/cli.js <command> [args]\n\nCommands:\n${COMMANDS.map(([name, description]) => `  ${String(name).padEnd(28)} ${description}`).join('\n')}\n`,
     );
 }
 

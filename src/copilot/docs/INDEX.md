@@ -2,7 +2,7 @@
 
 > Autoridade documental para navegação, precedência e status dos documentos sob `src/copilot/docs`.
 >
-> Atualizado em: 2026-08-18.
+> Atualizado em: 2026-08-25.
 
 ## 1. Como usar este índice
 
@@ -36,24 +36,25 @@ Para trabalho amplo via WORKSPACE, comece pela menor fotografia operacional úti
 Depois navegue preferencialmente por símbolo/outline, use plan + precondition/hash em writes e
 quarantine antes de delete quando a remoção puder ser reversível.
 
-## 2. Documentos de coordenação ativos
+## 2. Status executivo e documentos de coordenação
 
-- `WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md` — roadmap
-  mestre mais recente para MCP, I/O, latência, liberdade operacional, tool surface, round-trips e
-  evolução do workspace. É a referência de coordenação geral desta onda.
-- `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md` — referência
-  especializada canônica para DevContainer, Network Control Plane, DNS,
-  GitHub/Copilot/OpenAI/ChatGPT reachability, Cloudflare/MCP, autoridade temporal, lifecycle e
-  roadmap provider-neutral. Em decisões dessa frente, prevalece sobre roadmaps de rede anteriores,
-  sempre subordinado ao código/testes validados.
-- `WORKSPACE_MCP_ROUND_TRIP_PREFLIGHT_RECOVERY_AUTONOMY_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md`
-  — autoridade especializada ativa para round-trip economics, preflight adaptativo, fail-rich
-  recovery, tool-schema convergence, compatibility envelopes, analytics incremental e composição
-  one-shot de workflows. Complementa o ILCP: o ILCP mede onde o tempo é perdido; este roadmap
-  governa como reduzir devoluções evitáveis ao host/modelo sem enfraquecer safety.
-- `WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md` — diagnóstico amplo
-  predecessor. Permanece útil para contexto e decisões ainda não superseded, mas deve ser
-  reconciliado com os documentos de 17–18 de agosto antes de orientar nova implementação.
+A arquitetura 2.4 substituiu a antiga noção de um único roadmap amplo sempre vigente. O status
+executivo atual é explícito:
+
+| Documento                                                                                                                                                                             | Classe                                 | Precedência/uso                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `WORKSPACE_ARQUITETURA_2_4_PRINCIPIOS_INVARIANTS_ESTADO_ALVO_GOVERNANCA_2026-08-23.md`                                                                                                | **CANÔNICO / ATIVO**                   | princípios, invariants e estado-alvo 2.4; governa decisões arquiteturais gerais                                               |
+| `WORKSPACE_SRC_COPILOT_MCP_ARQUITETURA_2_4_POS_CAMPANHA_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-24.md`                                                            | **CANÔNICO / ATIVO**                   | roadmap executivo MCP vigente e ledger da campanha atual; prevalece sobre roadmaps MCP anteriores                             |
+| `WORKSPACE_SRC_COPILOT_MCP_ARQUITETURA_2_4_AUDITORIA_ESTADO_ALVO_ROADMAP_2026-08-23.md`                                                                                               | **HISTÓRICO / SUPERADO PARCIALMENTE**  | auditoria de entrada da 2.4; usar como evidência temporal, reconciliada pelo pós-campanha de 24/08                            |
+| `WORKSPACE_SRC_COPILOT_CORE_EXTINCAO_ARQUITETURA_1_0_2_0_2_1_AUDITORIA_ESTADO_ALVO_ROADMAP_2026-08-22.md`                                                                             | **HISTÓRICO / CONCLUÍDO**              | registra a extinção de `core/`; não descreve uma pasta ainda existente                                                        |
+| `WORKSPACE_SRC_COPILOT_INFRA_ARQUITETURA_2_0_AUDITORIA_ESTADO_ALVO_ROADMAP_2026-08-21.md` e `WORKSPACE_SRC_COPILOT_INFRA_ARQUITETURA_2_1_AUDITORIA_ESTADO_ALVO_ROADMAP_2026-08-21.md` | **HISTÓRICO / CONCLUÍDO PARCIALMENTE** | trilha de evolução de Infra; estado live vem de `infra/README.md`, manifests e código                                         |
+| roadmaps de 14–18/08 (`WORKSPACE_SRC_COPILOT_DIAGNOSTICO...`, ILCP, round-trip, NCP)                                                                                                  | **HISTÓRICO / SUPERADO PARCIALMENTE**  | continuam úteis para causalidade, benchmarks e decisões especializadas ainda não substituídas, mas não prevalecem sobre a 2.4 |
+
+Runbooks operacionais (`CHATGPT_MCP_CONNECT_CHATGPT_RUNBOOK.md`,
+`MCP-STATEFUL-STREAMABLE-HTTP-RESTART-RUNBOOK-2026-06-13.md`, `CLAUDE_MCP_CONNECTOR_RUNBOOK.md`)
+permanecem **RUNBOOK ATIVO** enquanto seus comandos existirem no `package.json`/CLI e não
+conflitarem com o README MCP ou o roadmap 2.4. Um runbook nunca eleva uma arquitetura histórica a
+contrato vigente.
 
 ## 3. Mapas arquiteturais canônicos
 
@@ -111,7 +112,7 @@ quarantine antes de delete quando a remoção puder ser reversível.
 
 Os demais arquivos em `model-gateway/` preservam decisões, guias BYOK e ondas anteriores de
 automação/runtime. Eles são valiosos como contexto e critérios, mas não substituem a leitura do
-código atual nem do roadmap mestre de 2026-08-14.
+código atual, do `model-gateway/README.md` nem do roadmap executivo 2.4 vigente.
 
 ## 6. SDK
 

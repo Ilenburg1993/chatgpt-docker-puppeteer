@@ -196,7 +196,7 @@ export async function spawnCloudflareTransportBenchmarkWithDependencies(input, d
 async function runSmoke(parentEnv) {
     const startedAt = Date.now();
     const result = await runFixedNode(
-        ['src/copilot/mcp/cloudflare/cli.js', 'smoke'],
+        ['src/copilot/mcp/composition/cloudflare-cli/cli.js', 'smoke'],
         SMOKE_TIMEOUT_MS,
         buildTransportBenchmarkSmokeEnvironment(parentEnv),
     );

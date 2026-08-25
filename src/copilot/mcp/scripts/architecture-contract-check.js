@@ -9,11 +9,12 @@
  */
 
 import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
+import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { parse } from '@babel/parser';
 import { posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const ROOT = process.cwd();
+const ROOT = MCP_WORKSPACE_ROOT;
 const architectureWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: ROOT });
 const PRESENTATION_ROOT = 'src/copilot/presentation';
 const SOURCE_EXTENSIONS = Object.freeze(['.js', '.mjs', '.cjs', '.ts']);
@@ -78,6 +79,9 @@ function collectModuleAuthorityFacts(source, path) {
         return {
             parseError: `${path}: ${error instanceof Error ? error.message : String(error)}`,
             computedImports: /** @type {{ line: number | null; expressionType: string }[]} */ ([]),
+            literalDynamicImports: /** @type {{ line: number | null; specifier: string }[]} */ ([]),
+            workspaceIdentityImports: /** @type {string[]} */ ([]),
+            processCwdCalls: /** @type {number[]} */ ([]),
             childProcessImport: false,
             workerThreadImport: false,
             processEnvReferences: 0,
@@ -95,6 +99,11 @@ function collectModuleAuthorityFacts(source, path) {
 
     /** @type {{ line: number | null; expressionType: string }[]} */
     const computedImports = [];
+    /** @type {{ line: number | null; specifier: string }[]} */
+    const literalDynamicImports = [];
+    const workspaceIdentityImports = new Set();
+    /** @type {number[]} */
+    const processCwdCalls = [];
     let childProcessImport = false;
     let workerThreadImport = false;
     let processEnvReferences = 0;
@@ -260,6 +269,20 @@ function collectModuleAuthorityFacts(source, path) {
                 }
             }
             if (specifier === 'node:worker_threads' || specifier === 'worker_threads') workerThreadImport = true;
+            if (specifier === '#copilot/mcp/public/workspace') {
+                const trackedIdentityExports = new Set([
+                    'MCP_WORKSPACE_ROOT',
+                    'resolveMcpWorkspaceIdentityPath',
+                    'toMcpWorkspaceRelativePath',
+                ]);
+                for (const rawSpecifier of Array.isArray(node['specifiers']) ? node['specifiers'] : []) {
+                    const importSpecifier = asRecord(rawSpecifier);
+                    if (importSpecifier['type'] !== 'ImportSpecifier') continue;
+                    const imported = asRecord(importSpecifier['imported']);
+                    const importedName = String(imported['name'] ?? imported['value'] ?? '');
+                    if (trackedIdentityExports.has(importedName)) workspaceIdentityImports.add(importedName);
+                }
+            }
         }
         if (nodeType === 'SpreadElement' && isBroadEnvironmentSpread(node['argument'])) {
             broadEnvironmentSpreadLines.push(readNodeStartLine(node) ?? 0);
@@ -280,7 +303,9 @@ function collectModuleAuthorityFacts(source, path) {
         }
         if (nodeType === 'ImportExpression') {
             const sourceNode = asRecord(node['source']);
-            if (sourceNode['type'] !== 'StringLiteral') {
+            if (sourceNode['type'] === 'StringLiteral' && typeof sourceNode['value'] === 'string') {
+                literalDynamicImports.push({ line: readNodeStartLine(node), specifier: sourceNode['value'] });
+            } else {
                 computedImports.push({
                     line: readNodeStartLine(node),
                     expressionType: String(sourceNode['type'] ?? 'unknown'),
@@ -290,10 +315,21 @@ function collectModuleAuthorityFacts(source, path) {
         if (nodeType === 'CallExpression') {
             recordBroadChildEnvironment(node);
             const calleeNode = asRecord(node['callee']);
+            if (calleeNode['type'] === 'MemberExpression') {
+                const objectNode = asRecord(calleeNode['object']);
+                const propertyNode = asRecord(calleeNode['property']);
+                const propertyName =
+                    propertyNode['type'] === 'Identifier' ? propertyNode['name'] : propertyNode['value'];
+                if (objectNode['type'] === 'Identifier' && objectNode['name'] === 'process' && propertyName === 'cwd') {
+                    processCwdCalls.push(readNodeStartLine(node) ?? 0);
+                }
+            }
             const argumentNodes = Array.isArray(node['arguments']) ? node['arguments'] : [];
             if (calleeNode['type'] === 'Import') {
                 const sourceNode = asRecord(argumentNodes[0]);
-                if (sourceNode['type'] !== 'StringLiteral') {
+                if (sourceNode['type'] === 'StringLiteral' && typeof sourceNode['value'] === 'string') {
+                    literalDynamicImports.push({ line: readNodeStartLine(node), specifier: sourceNode['value'] });
+                } else {
                     computedImports.push({
                         line: readNodeStartLine(node),
                         expressionType: String(sourceNode['type'] ?? 'unknown'),
@@ -314,6 +350,9 @@ function collectModuleAuthorityFacts(source, path) {
     return {
         parseError: null,
         computedImports,
+        literalDynamicImports,
+        workspaceIdentityImports: [...workspaceIdentityImports].sort(),
+        processCwdCalls,
         childProcessImport,
         workerThreadImport,
         processEnvReferences,
@@ -408,6 +447,26 @@ function validateMcpOwnerManifest(manifest, mcpSourceFiles) {
             .filter((owner) => owner['protectedBoundary'] === true && typeof owner['path'] === 'string')
             .map((owner) => /** @type {string} */ (owner['path'])),
     };
+}
+
+/** @param {ReturnType<typeof validateMcpOwnerManifest>} ownerManifestReport @param {string} targetPath */
+function resolveMcpOwnerForPath(ownerManifestReport, targetPath) {
+    return (
+        ownerManifestReport.owners
+            .filter((owner) => {
+                const ownerPath = owner['path'];
+                return (
+                    typeof ownerPath === 'string' &&
+                    (targetPath === ownerPath || targetPath.startsWith(`${ownerPath}/`))
+                );
+            })
+            .sort((left, right) => String(right['path'] ?? '').length - String(left['path'] ?? '').length)[0] ?? null
+    );
+}
+
+/** @param {unknown} target */
+function normalizePackageImportTarget(target) {
+    return typeof target === 'string' ? target.replace(/^\.\//u, '') : null;
 }
 
 /**
@@ -546,6 +605,33 @@ const MCP_PROCESS_CWD_AUTHORITIES = Object.freeze([
     'caller-bounded-workspace',
     'process-cwd-inherited',
 ]);
+const MCP_PROCESS_EXECUTABLE_AUTHORITIES = Object.freeze([
+    'fixed-binary',
+    'fixed-node-script',
+    'fixed-package-manager',
+    'allowlisted-node-script',
+    'allowlisted-command',
+    'caller-command',
+    'bound-process-spec',
+]);
+/** @type {Readonly<Record<string, string>>} */
+const MCP_PROCESS_SIGNAL_POLICY_BY_COMPLETION = Object.freeze({
+    'sync-probe': 'none',
+    'attached-close': 'attached-supervisor',
+    'detached-acceptance': 'detached-acceptance-supervisor',
+    'managed-lifecycle': 'managed-controller',
+    'persistent-session': 'persistent-session-control',
+    'job-lifecycle': 'job-manager',
+});
+/** @type {Readonly<Record<string, string>>} */
+const MCP_PROCESS_TERMINALITY_BY_COMPLETION = Object.freeze({
+    'sync-probe': 'synchronous',
+    'attached-close': 'attached',
+    'detached-acceptance': 'detached',
+    'managed-lifecycle': 'managed-daemon',
+    'persistent-session': 'persistent',
+    'job-lifecycle': 'job',
+});
 
 /**
  * @param {Record<string, unknown>} manifest
@@ -582,6 +668,12 @@ function validateMcpChildProcessAuthorityManifest(
             if (!(path === ownerPath || path.startsWith(`${ownerPath}/`))) {
                 violations.push(`${path}: outside owner=${String(ownerId)}`);
             }
+            const deepestOwner = resolveMcpOwnerForPath(ownerManifestReport, path);
+            if (!deepestOwner || deepestOwner['ownerId'] !== ownerId) {
+                violations.push(
+                    `${path}: ownerId must be deepest owner actual=${String(deepestOwner?.['ownerId'] ?? 'missing')} declared=${String(ownerId)}`,
+                );
+            }
         }
         const launchers = Array.isArray(row['launchers']) ? row['launchers'].map(asRecord) : [];
         if (launchers.length === 0) violations.push(`${path}: no launcher contracts`);
@@ -591,8 +683,12 @@ function validateMcpChildProcessAuthorityManifest(
             const id = launcher['id'];
             const completionModel = String(launcher['completionModel'] ?? '');
             const callerCancellation = String(launcher['callerCancellation'] ?? '');
+            const executableAuthority = String(launcher['executableAuthority'] ?? '');
             const cwdAuthority = String(launcher['cwdAuthority'] ?? '');
             const environmentAuthority = String(launcher['environmentAuthority'] ?? '');
+            const credentialAuthority = String(launcher['credentialAuthority'] ?? '');
+            const signalPolicy = String(launcher['signalPolicy'] ?? '');
+            const terminality = String(launcher['terminality'] ?? '');
             const processGroup = String(launcher['processGroup'] ?? '');
             const bound = launcher['bound'];
             if (typeof id !== 'string' || !id) violations.push(`${path}: launcher missing id`);
@@ -602,10 +698,28 @@ function validateMcpChildProcessAuthorityManifest(
                 violations.push(`${path}:${String(id)} invalid completionModel=${completionModel}`);
             if (!MCP_PROCESS_CANCELLATION_MODES.includes(callerCancellation))
                 violations.push(`${path}:${String(id)} invalid callerCancellation=${callerCancellation}`);
+            if (!MCP_PROCESS_EXECUTABLE_AUTHORITIES.includes(executableAuthority)) {
+                violations.push(`${path}:${String(id)} invalid executableAuthority=${executableAuthority}`);
+            }
             if (!MCP_PROCESS_CWD_AUTHORITIES.includes(cwdAuthority))
                 violations.push(`${path}:${String(id)} invalid cwdAuthority=${cwdAuthority}`);
             if (environmentAuthority !== 'explicit-projection')
                 violations.push(`${path}:${String(id)} invalid environmentAuthority=${environmentAuthority}`);
+            if (credentialAuthority !== 'projected-only') {
+                violations.push(`${path}:${String(id)} invalid credentialAuthority=${credentialAuthority}`);
+            }
+            const expectedSignalPolicy = MCP_PROCESS_SIGNAL_POLICY_BY_COMPLETION[completionModel];
+            if (signalPolicy !== expectedSignalPolicy) {
+                violations.push(
+                    `${path}:${String(id)} signalPolicy=${signalPolicy} expected=${String(expectedSignalPolicy ?? 'unknown')}`,
+                );
+            }
+            const expectedTerminality = MCP_PROCESS_TERMINALITY_BY_COMPLETION[completionModel];
+            if (terminality !== expectedTerminality) {
+                violations.push(
+                    `${path}:${String(id)} terminality=${terminality} expected=${String(expectedTerminality ?? 'unknown')}`,
+                );
+            }
             if (!['yes', 'no'].includes(processGroup))
                 violations.push(`${path}:${String(id)} invalid processGroup=${processGroup}`);
             if (typeof bound !== 'string' || bound.trim().length < 12)
@@ -896,6 +1010,111 @@ function validateMcpConfigAuthorityManifest(manifest, moduleAuthorityFacts, owne
 }
 
 /**
+ * @param {Record<string, unknown>} manifest
+ * @param {Map<string, ReturnType<typeof collectModuleAuthorityFacts>>} moduleAuthorityFacts
+ * @param {ReturnType<typeof validateMcpOwnerManifest>} ownerManifestReport
+ * @param {string} canonicalSource
+ */
+function validateMcpWorkspaceIdentityManifest(manifest, moduleAuthorityFacts, ownerManifestReport, canonicalSource) {
+    const violations = [];
+    const expectedDefinition = Object.freeze({
+        path: 'src/copilot/mcp/workspace/contracts/root.js',
+        publicSpecifier: '#copilot/mcp/public/workspace',
+        rootExport: 'MCP_WORKSPACE_ROOT',
+        resolverExport: 'resolveMcpWorkspaceIdentityPath',
+        relativeExport: 'toMcpWorkspaceRelativePath',
+        derivation: 'import.meta.url',
+    });
+    const definition = asRecord(manifest['canonicalDefinition']);
+    for (const [key, expected] of Object.entries(expectedDefinition)) {
+        if (definition[key] !== expected) {
+            violations.push(`canonicalDefinition.${key}=${String(definition[key])}, expected=${expected}`);
+        }
+    }
+    if (
+        !canonicalSource.includes("new URL('../../../../../', import.meta.url)") ||
+        !canonicalSource.includes('resolve(MCP_WORKSPACE_ROOT, value)')
+    ) {
+        violations.push('canonical workspace identity is no longer derived only from module location');
+    }
+
+    const allowlistRows = Array.isArray(manifest['ambientCwdAllowlist']) ? manifest['ambientCwdAllowlist'] : [];
+    const ambientCwdAllowlist = new Set(allowlistRows.filter((value) => typeof value === 'string'));
+    if (ambientCwdAllowlist.size !== allowlistRows.length)
+        violations.push('ambientCwdAllowlist contains invalid/duplicate rows');
+
+    const consumers = Array.isArray(manifest['consumers']) ? manifest['consumers'].map(asRecord) : [];
+    const declaredByPath = new Map();
+    for (const consumer of consumers) {
+        const path = consumer['path'];
+        const ownerId = consumer['ownerId'];
+        const symbols = Array.isArray(consumer['symbols'])
+            ? [...new Set(consumer['symbols'].filter((value) => typeof value === 'string'))].sort()
+            : [];
+        const rationale = consumer['rationale'];
+        if (typeof path !== 'string' || !path) {
+            violations.push('workspace identity consumer missing path');
+            continue;
+        }
+        if (declaredByPath.has(path)) violations.push(`${path}: duplicate workspace identity consumer`);
+        declaredByPath.set(path, { ownerId, symbols });
+        const owner = resolveMcpOwnerForPath(ownerManifestReport, path);
+        if (!owner || owner['ownerId'] !== ownerId) {
+            violations.push(
+                `${path}: workspace identity owner actual=${String(owner?.['ownerId'] ?? 'missing')} declared=${String(ownerId)}`,
+            );
+        }
+        if (symbols.length === 0) violations.push(`${path}: workspace identity consumer has no tracked symbols`);
+        if (typeof rationale !== 'string' || rationale.trim().length < 12) {
+            violations.push(`${path}: workspace identity consumer missing rationale`);
+        }
+    }
+
+    let actualConsumerFiles = 0;
+    let actualSymbolImports = 0;
+    let ambientCwdCalls = 0;
+    for (const [path, facts] of moduleAuthorityFacts.entries()) {
+        const actualSymbols = [...facts.workspaceIdentityImports].sort();
+        if (actualSymbols.length > 0) {
+            actualConsumerFiles += 1;
+            actualSymbolImports += actualSymbols.length;
+            const declared = declaredByPath.get(path);
+            if (!declared) {
+                violations.push(`${path}: undeclared workspace identity consumer symbols=${actualSymbols.join('|')}`);
+            } else if (JSON.stringify(declared.symbols) !== JSON.stringify(actualSymbols)) {
+                violations.push(
+                    `${path}: workspace identity symbols actual=${actualSymbols.join('|')} declared=${declared.symbols.join('|')}`,
+                );
+            }
+        }
+        if (facts.processCwdCalls.length > 0) {
+            ambientCwdCalls += facts.processCwdCalls.length;
+            if (!ambientCwdAllowlist.has(path)) {
+                violations.push(`${path}: ambient process.cwd() at lines=${facts.processCwdCalls.join('|')}`);
+            }
+        }
+    }
+    for (const path of declaredByPath.keys()) {
+        const facts = moduleAuthorityFacts.get(path);
+        if (!facts) violations.push(`${path}: stale workspace identity consumer path`);
+        else if (facts.workspaceIdentityImports.length === 0)
+            violations.push(`${path}: stale workspace identity consumer`);
+    }
+    for (const path of ambientCwdAllowlist) {
+        const facts = moduleAuthorityFacts.get(path);
+        if (!facts || facts.processCwdCalls.length === 0) violations.push(`${path}: stale ambient cwd allowlist entry`);
+    }
+
+    return {
+        violations,
+        declaredConsumerFiles: declaredByPath.size,
+        actualConsumerFiles,
+        actualSymbolImports,
+        ambientCwdCalls,
+    };
+}
+
+/**
  * @returns {Promise<{ success: boolean; checks: { name: string; passed: boolean; detail: string }[] }>}
  */
 export async function runArchitectureContractCheck() {
@@ -938,6 +1157,9 @@ export async function runArchitectureContractCheck() {
     const configAuthorityManifest = asRecord(
         JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-config-authorities.json')),
     );
+    const workspaceIdentityManifest = asRecord(
+        JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-workspace-identity.json')),
+    );
     const stateScopeManifest = asRecord(
         JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-state-scopes.json')),
     );
@@ -965,6 +1187,21 @@ export async function runArchitectureContractCheck() {
             moduleFactParseErrors.length === 0
                 ? `parsed=${mcpSourceFiles.length}`
                 : `errors=${moduleFactParseErrors.join(',')}`,
+    });
+
+    const workspaceIdentityReport = validateMcpWorkspaceIdentityManifest(
+        workspaceIdentityManifest,
+        moduleAuthorityFacts,
+        ownerManifestReport,
+        await readWorkspaceText('src/copilot/mcp/workspace/contracts/root.js'),
+    );
+    checks.push({
+        name: 'mcp-workspace-identity-authority-is-canonical-and-ratcheted',
+        passed: workspaceIdentityReport.violations.length === 0,
+        detail:
+            workspaceIdentityReport.violations.length === 0
+                ? `consumers=${workspaceIdentityReport.actualConsumerFiles} symbolImports=${workspaceIdentityReport.actualSymbolImports} ambientCwdCalls=${workspaceIdentityReport.ambientCwdCalls}`
+                : `violations=${workspaceIdentityReport.violations.join(',')}`,
     });
 
     const stateScopeReport = validateMcpStateScopeManifest(
@@ -1008,39 +1245,171 @@ export async function runArchitectureContractCheck() {
     const declaredComputedImports = Array.isArray(dynamicGraphManifest['computedImports'])
         ? dynamicGraphManifest['computedImports'].map(asRecord)
         : [];
-    const declaredComputedBySource = new Map(
-        declaredComputedImports
-            .filter((entry) => typeof entry['source'] === 'string')
-            .map((entry) => [entry['source'], Number(entry['expectedCount'] ?? 0)]),
-    );
+    const actualComputedImports = [...moduleAuthorityFacts.entries()].flatMap(([path, facts]) => {
+        const imports = /** @type {{ line: number | null; expressionType: string }[]} */ (facts.computedImports);
+        return imports.map((entry) => ({ path, ...entry }));
+    });
     const computedImportViolations = [];
-    for (const [path, facts] of moduleAuthorityFacts.entries()) {
-        const actualCount = facts.computedImports.length;
-        const declaredCount = declaredComputedBySource.get(path) ?? 0;
-        if (actualCount !== declaredCount) {
-            computedImportViolations.push(`${path}: actual=${actualCount} declared=${declaredCount}`);
-        }
+    if (declaredComputedImports.length > 0) {
+        computedImportViolations.push('computedImports manifest must remain empty; use a literal dynamic import');
     }
-    for (const source of declaredComputedBySource.keys()) {
-        if (!moduleAuthorityFacts.has(source))
-            computedImportViolations.push(`${source}: stale computed-import manifest entry`);
+    for (const entry of actualComputedImports) {
+        computedImportViolations.push(
+            `${entry.path}:${String(entry.line ?? 'unknown-line')} computed import expressionType=${entry.expressionType}`,
+        );
     }
     checks.push({
-        name: 'mcp-computed-dynamic-imports-are-explicit-and-ratcheted',
+        name: 'mcp-computed-dynamic-imports-are-prohibited',
         passed: computedImportViolations.length === 0,
         detail:
             computedImportViolations.length === 0
-                ? `declared=${declaredComputedImports.length} actual=${[...moduleAuthorityFacts.values()].reduce((sum, facts) => sum + facts.computedImports.length, 0)}`
+                ? 'computedImports=0; lazy loading requires an exact literal module specifier'
                 : `violations=${computedImportViolations.join(',')}`,
+    });
+
+    const dynamicPackageJson = asRecord(JSON.parse(await readWorkspaceText('package.json')));
+    const dynamicPackageImports = asRecord(dynamicPackageJson['imports']);
+    const declaredLiteralDynamicImports = Array.isArray(dynamicGraphManifest['literalDynamicImports'])
+        ? dynamicGraphManifest['literalDynamicImports'].map(asRecord)
+        : [];
+    const actualLiteralDynamicImports = new Map();
+    for (const [source, facts] of moduleAuthorityFacts.entries()) {
+        for (const entry of facts.literalDynamicImports) {
+            const key = `${source}\u0000${entry.specifier}`;
+            actualLiteralDynamicImports.set(key, Number(actualLiteralDynamicImports.get(key) ?? 0) + 1);
+        }
+    }
+    const declaredDependencyPackages = new Set([
+        ...Object.keys(asRecord(dynamicPackageJson['dependencies'])),
+        ...Object.keys(asRecord(dynamicPackageJson['devDependencies'])),
+        ...Object.keys(asRecord(dynamicPackageJson['optionalDependencies'])),
+    ]);
+    const literalDynamicImportViolations = [];
+    const declaredLiteralDynamicKeys = new Set();
+    for (const entry of declaredLiteralDynamicImports) {
+        const source = entry['source'];
+        const specifier = entry['specifier'];
+        const sourceOwnerId = entry['sourceOwnerId'];
+        const targetOwnerId = entry['targetOwnerId'];
+        const audience = entry['audience'];
+        const loadPolicy = entry['loadPolicy'];
+        const rationale = entry['rationale'];
+        const expectedCount = Number(entry['expectedCount'] ?? 1);
+        if (typeof source !== 'string' || typeof specifier !== 'string') {
+            literalDynamicImportViolations.push('literal dynamic import entry missing source/specifier');
+            continue;
+        }
+        const key = `${source}\u0000${specifier}`;
+        if (declaredLiteralDynamicKeys.has(key)) {
+            literalDynamicImportViolations.push(`${source}:${specifier} duplicate literal dynamic import declaration`);
+            continue;
+        }
+        declaredLiteralDynamicKeys.add(key);
+        const actualCount = Number(actualLiteralDynamicImports.get(key) ?? 0);
+        if (!Number.isInteger(expectedCount) || expectedCount < 1 || actualCount !== expectedCount) {
+            literalDynamicImportViolations.push(
+                `${source}:${specifier} actual=${actualCount} declared=${String(expectedCount)}`,
+            );
+        }
+        const sourceOwner = resolveMcpOwnerForPath(ownerManifestReport, source);
+        if (!sourceOwner || sourceOwner['ownerId'] !== sourceOwnerId) {
+            literalDynamicImportViolations.push(
+                `${source}:${specifier} sourceOwner actual=${String(sourceOwner?.['ownerId'] ?? 'missing')} declared=${String(sourceOwnerId)}`,
+            );
+        }
+        const packageTarget = normalizePackageImportTarget(dynamicPackageImports[specifier]);
+        if (specifier.startsWith('#copilot/mcp/public/')) {
+            if (!packageTarget) {
+                literalDynamicImportViolations.push(`${source}:${specifier} missing exact MCP public package target`);
+                continue;
+            }
+            const targetOwner = resolveMcpOwnerForPath(ownerManifestReport, packageTarget);
+            if (!targetOwner || targetOwner['ownerId'] !== targetOwnerId) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} targetOwner actual=${String(targetOwner?.['ownerId'] ?? 'missing')} declared=${String(targetOwnerId)}`,
+                );
+            }
+            if (audience !== 'public')
+                literalDynamicImportViolations.push(`${source}:${specifier} audience must be public`);
+        } else if (specifier.startsWith('#copilot/')) {
+            if (!packageTarget || !specifier.includes('/public/')) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} cross-domain lazy import must use an exact public package membrane`,
+                );
+            }
+            if (audience !== 'cross-domain-public') {
+                literalDynamicImportViolations.push(`${source}:${specifier} audience must be cross-domain-public`);
+            }
+            if (targetOwnerId !== null && targetOwnerId !== undefined) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} cross-domain targetOwnerId must be null/omitted`,
+                );
+            }
+        } else {
+            if (specifier.startsWith('.') || specifier.startsWith('/')) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} relative/absolute lazy imports are forbidden across governance boundaries`,
+                );
+            }
+            const packageName = specifier.startsWith('@')
+                ? specifier.split('/').slice(0, 2).join('/')
+                : specifier.split('/')[0];
+            if (!packageName || !declaredDependencyPackages.has(packageName)) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} external package is not declared in package.json`,
+                );
+            }
+            if (audience !== 'external')
+                literalDynamicImportViolations.push(`${source}:${specifier} audience must be external`);
+            if (targetOwnerId !== null && targetOwnerId !== undefined) {
+                literalDynamicImportViolations.push(
+                    `${source}:${specifier} external targetOwnerId must be null/omitted`,
+                );
+            }
+        }
+        if (
+            ![
+                'protocol-compatibility-lazy',
+                'startup-lazy',
+                'operation-lazy',
+                'benchmark-lazy',
+                'native-probe-lazy',
+                'optional-capability',
+            ].includes(String(loadPolicy))
+        ) {
+            literalDynamicImportViolations.push(`${source}:${specifier} invalid loadPolicy=${String(loadPolicy)}`);
+        }
+        if (typeof rationale !== 'string' || rationale.trim().length < 12) {
+            literalDynamicImportViolations.push(`${source}:${specifier} missing rationale`);
+        }
+    }
+    for (const key of actualLiteralDynamicImports.keys()) {
+        if (!declaredLiteralDynamicKeys.has(key)) {
+            const [source, specifier] = key.split('\u0000');
+            literalDynamicImportViolations.push(
+                `${String(source)}:${String(specifier)} undeclared literal dynamic import`,
+            );
+        }
+    }
+    checks.push({
+        name: 'mcp-literal-dynamic-imports-have-owned-public-surfaces',
+        passed: literalDynamicImportViolations.length === 0,
+        detail:
+            literalDynamicImportViolations.length === 0
+                ? `declared=${declaredLiteralDynamicImports.length} actual=${actualLiteralDynamicImports.size}`
+                : `violations=${literalDynamicImportViolations.join(',')}`,
     });
 
     const httpHandlerSource = await readWorkspaceText('src/copilot/mcp/adapters/http/handler.js');
     const httpBodyReaderSource = await readWorkspaceText('src/copilot/mcp/adapters/http-body.js');
-    const lazyCompatibilitySpecifiers = [
-        '#copilot/mcp/public/transport/http/stateful/request-contract',
-        '#copilot/mcp/public/transport/http/stateful/router',
-        '#copilot/mcp/public/transport/http/compat/stateless',
-    ];
+    const lazyCompatibilitySpecifiers = declaredLiteralDynamicImports
+        .filter(
+            (entry) =>
+                entry['source'] === 'src/copilot/mcp/adapters/http/handler.js' &&
+                entry['loadPolicy'] === 'protocol-compatibility-lazy' &&
+                typeof entry['specifier'] === 'string',
+        )
+        .map((entry) => String(entry['specifier']));
     const httpCompatibilityClosureViolations = [];
     for (const specifier of lazyCompatibilitySpecifiers) {
         const hasStaticImport =
@@ -1051,6 +1420,8 @@ export async function runArchitectureContractCheck() {
         if (hasStaticImport) httpCompatibilityClosureViolations.push(`eager=${specifier}`);
         if (!hasLiteralDynamicImport) httpCompatibilityClosureViolations.push(`missing-lazy=${specifier}`);
     }
+    if (lazyCompatibilitySpecifiers.length === 0)
+        httpCompatibilityClosureViolations.push('missing-compatibility-lazy-manifest');
     if (httpHandlerSource.includes('NodeStreamableHTTPServerTransport')) {
         httpCompatibilityClosureViolations.push('adapter-owns-NodeStreamableHTTPServerTransport');
     }

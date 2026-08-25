@@ -16,6 +16,7 @@ import {
 } from '#copilot/infra/public/platform/node';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { parseTransport } from './transport.js';
 
 enableCopilotNodeCompileCache(readCopilotNodeCompileCacheConfig(process.env));
 
@@ -32,7 +33,6 @@ async function getLogMcp() {
     return logger;
 }
 
-const VALID_TRANSPORTS = /** @type {const} */ (['http', 'http2', 'stdio']);
 const SHUTDOWN_GRACE_MS = 5000;
 
 /**
@@ -46,48 +46,6 @@ const SHUTDOWN_GRACE_MS = 5000;
  * @typedef {{ server: ClosableMcpServer; processHost: CliMcpProcessHost }} McpHttpRuntime
  * @typedef {Awaited<ReturnType<typeof import('#copilot/mcp/public/adapters/stdio').startStdioMcpServer>>} McpStdioRuntime
  */
-
-/**
- * @param {string[]} argv
- * @returns {McpCliTransport}
- */
-export function parseTransport(argv) {
-    const explicitTransport = readTransportArgument(argv);
-    if (explicitTransport) return normalizeTransport(explicitTransport);
-    if (argv.includes('--stdio')) return 'stdio';
-    if (argv.includes('--http2') || argv.includes('--h2')) return 'http2';
-    if (argv.includes('--http')) return 'http';
-    return 'http2';
-}
-
-/**
- * @param {string[]} argv
- * @returns {string | null}
- */
-function readTransportArgument(argv) {
-    const equalsArg = argv.find((arg) => arg.startsWith('--transport='));
-    if (equalsArg) return equalsArg.slice('--transport='.length);
-    const idx = argv.indexOf('--transport');
-    if (idx < 0) return null;
-    const value = argv[idx + 1];
-    if (!value || value.startsWith('-')) {
-        throw new Error('Missing value for --transport. Use http, http2, h2, or stdio.');
-    }
-    return value;
-}
-
-/**
- * @param {string} value
- * @returns {McpCliTransport}
- */
-function normalizeTransport(value) {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'h2') return 'http2';
-    if (VALID_TRANSPORTS.includes(/** @type {McpCliTransport} */ (normalized))) {
-        return /** @type {McpCliTransport} */ (normalized);
-    }
-    throw new Error(`Invalid MCP transport "${value}". Use http, http2, h2, or stdio.`);
-}
 
 /**
  * @returns {Promise<void>}

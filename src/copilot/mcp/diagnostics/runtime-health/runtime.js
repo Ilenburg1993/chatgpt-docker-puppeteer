@@ -17,7 +17,7 @@ import {
     summarizeQuickTunnelState,
 } from '#copilot/mcp/public/cloudflare/tunnel';
 import { readIoCacheBenchmarkState } from '#copilot/mcp/public/diagnostics/io-cache';
-import { readMcpRoundTripAnalyticsMonitorState } from '#copilot/mcp/public/diagnostics/latency';
+import { readMcpRoundTripAnalyticsMonitorState } from '#copilot/mcp/public/diagnostics/latency/round-trip';
 import { readMcpRuntimeSourceDrift } from '#copilot/mcp/public/diagnostics/runtime-source-drift';
 import { readMcpWorkspaceSmokeSummary } from '#copilot/mcp/public/diagnostics/workspace-smoke';
 import { readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';

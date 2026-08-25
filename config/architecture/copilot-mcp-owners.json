@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "rootOwnerId": "mcp",
   "owners": [
     {
@@ -8,7 +8,11 @@
       "parentOwnerId": null,
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP application boundary"
+      "role": "MCP application boundary",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.adapters",
@@ -16,7 +20,20 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Node transport host adapters"
+      "role": "Node transport host adapters",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.connection",
+        "mcp.indexing.auto-build",
+        "mcp.observability",
+        "mcp.protocol",
+        "mcp.runtime.startup-maintenance",
+        "mcp.server",
+        "mcp.transport"
+      ]
     },
     {
       "ownerId": "mcp.auth",
@@ -24,7 +41,23 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "OAuth resource-server and issuer domain"
+      "role": "OAuth resource-server and issuer domain",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": ["mcp.observability"]
+    },
+    {
+      "ownerId": "mcp.cli",
+      "path": "src/copilot/mcp/cli",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "MCP executable CLI parsing and testing membrane",
+      "audiences": ["testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "testing-surface"],
+      "policyHooks": ["config", "state", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.cloudflare",
@@ -32,7 +65,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare remote/edge/tunnel authority"
+      "role": "Cloudflare remote/edge/tunnel authority",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": ["mcp.connection.url", "mcp.process", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.cloudflare.remote",
@@ -40,7 +77,11 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare remote API and ruleset snapshot authority"
+      "role": "Cloudflare remote API and ruleset snapshot authority",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": ["mcp.cloudflare"]
     },
     {
       "ownerId": "mcp.cloudflare.edge",
@@ -48,7 +89,11 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare edge audit, policy, backup and snapshot workflows"
+      "role": "Cloudflare edge audit, policy, backup and snapshot workflows",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.cloudflare", "mcp.cloudflare.remote", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.cloudflare.posture",
@@ -56,7 +101,17 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare config, passthrough and capability posture workflows"
+      "role": "Cloudflare config, passthrough and capability posture workflows",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": [
+        "mcp.cloudflare",
+        "mcp.cloudflare.edge",
+        "mcp.cloudflare.observability",
+        "mcp.cloudflare.remote",
+        "mcp.cloudflare.tunnel"
+      ]
     },
     {
       "ownerId": "mcp.cloudflare.tunnel",
@@ -64,7 +119,11 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare tunnel state and origin-plan workflows"
+      "role": "Cloudflare tunnel state and origin-plan workflows",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.cloudflare", "mcp.cloudflare.process", "mcp.cloudflare.remote", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.cloudflare.observability",
@@ -72,7 +131,18 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare probes, connector smoke, metrics and latency observability"
+      "role": "Cloudflare probes, connector smoke, metrics and latency observability",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare",
+        "mcp.cloudflare.remote",
+        "mcp.cloudflare.tunnel",
+        "mcp.integrations.http",
+        "mcp.protocol"
+      ]
     },
     {
       "ownerId": "mcp.cloudflare.process",
@@ -80,7 +150,11 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare managed process supervision"
+      "role": "Cloudflare managed process supervision",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "process", "surface"],
+      "allowedDependencies": ["mcp.cloudflare", "mcp.process", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.cloudflare.transport-benchmark",
@@ -88,7 +162,11 @@
       "parentOwnerId": "mcp.cloudflare",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare transport benchmark runtime and state"
+      "role": "Cloudflare transport benchmark runtime and state",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "process", "surface"],
+      "allowedDependencies": ["mcp.cloudflare", "mcp.cloudflare.observability", "mcp.process", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.company-knowledge",
@@ -96,7 +174,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Company Knowledge corpus and feature configuration"
+      "role": "Company Knowledge corpus and feature configuration",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.composition",
@@ -104,7 +186,11 @@
       "parentOwnerId": "mcp",
       "kind": "taxonomy",
       "protectedBoundary": false,
-      "role": "MCP composition roots"
+      "role": "MCP composition roots",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.composition.cloudflare-cli",
@@ -112,7 +198,24 @@
       "parentOwnerId": "mcp.composition",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Cloudflare CLI application and managed-process composition"
+      "role": "Cloudflare CLI application and managed-process composition",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "process", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare",
+        "mcp.cloudflare.edge",
+        "mcp.cloudflare.observability",
+        "mcp.cloudflare.posture",
+        "mcp.cloudflare.process",
+        "mcp.cloudflare.remote",
+        "mcp.cloudflare.tunnel",
+        "mcp.connection",
+        "mcp.integrations.model-gateway.live-runs",
+        "mcp.process",
+        "mcp.registry"
+      ]
     },
     {
       "ownerId": "mcp.composition.process-config",
@@ -120,7 +223,33 @@
       "parentOwnerId": "mcp.composition",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Immutable MCP process configuration composition"
+      "role": "Immutable MCP process configuration composition",
+      "audiences": ["public"],
+      "authorityClasses": ["config-authority", "public-surface"],
+      "policyHooks": ["config", "cost", "surface"],
+      "allowedDependencies": [
+        "mcp.adapters",
+        "mcp.auth",
+        "mcp.cloudflare",
+        "mcp.company-knowledge",
+        "mcp.connection",
+        "mcp.diagnostics.devcontainer-network",
+        "mcp.diagnostics.io-cache",
+        "mcp.diagnostics.latency",
+        "mcp.diagnostics.tool-payload",
+        "mcp.indexing.auto-build",
+        "mcp.integrations.model-gateway.live-runs",
+        "mcp.observability",
+        "mcp.process",
+        "mcp.registry",
+        "mcp.runtime.reload",
+        "mcp.runtime.startup-maintenance",
+        "mcp.server",
+        "mcp.transport",
+        "mcp.validation",
+        "mcp.workspace.git",
+        "mcp.workspace.repository.read-cache"
+      ]
     },
     {
       "ownerId": "mcp.composition.process-host",
@@ -128,7 +257,26 @@
       "parentOwnerId": "mcp.composition",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Concrete MCP process composition"
+      "role": "Concrete MCP process composition",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare.tunnel",
+        "mcp.composition.process-config",
+        "mcp.diagnostics.infra-health",
+        "mcp.diagnostics.latency",
+        "mcp.diagnostics.latency.round-trip",
+        "mcp.indexing.auto-build",
+        "mcp.integrations.model-gateway.sqlite-fingerprint",
+        "mcp.maintenance",
+        "mcp.observability",
+        "mcp.process",
+        "mcp.runtime.startup-maintenance",
+        "mcp.workspace",
+        "mcp.workspace.repository.read-cache"
+      ]
     },
     {
       "ownerId": "mcp.connection",
@@ -136,7 +284,33 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Connector profile and URL contracts"
+      "role": "Connector profile, readiness and client-facing integration",
+      "audiences": ["public"],
+      "authorityClasses": ["config-authority", "public-surface"],
+      "policyHooks": ["config", "cost", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare",
+        "mcp.cloudflare.observability",
+        "mcp.cloudflare.process",
+        "mcp.cloudflare.tunnel",
+        "mcp.connection.url",
+        "mcp.integrations.http",
+        "mcp.runtime.reload",
+        "mcp.transport"
+      ]
+    },
+    {
+      "ownerId": "mcp.connection.url",
+      "path": "src/copilot/mcp/connection/url",
+      "parentOwnerId": "mcp.connection",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Side-effect-free connector URL contract shared by lower-level transport/config owners",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.diagnostics",
@@ -144,7 +318,23 @@
       "parentOwnerId": "mcp",
       "kind": "taxonomy",
       "protectedBoundary": false,
-      "role": "Diagnostic owners"
+      "role": "Diagnostic owners",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
+    },
+    {
+      "ownerId": "mcp.diagnostics.devcontainer-network",
+      "path": "src/copilot/mcp/diagnostics/devcontainer-network",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Dev-container network posture and resilience diagnostics",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "process", "surface"],
+      "allowedDependencies": ["mcp.process"]
     },
     {
       "ownerId": "mcp.diagnostics.http-smoke",
@@ -152,15 +342,47 @@
       "parentOwnerId": "mcp.diagnostics",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "HTTP smoke runtime"
+      "role": "HTTP smoke runtime",
+      "audiences": ["public"],
+      "authorityClasses": ["config-authority", "public-surface"],
+      "policyHooks": ["config", "cost", "surface"],
+      "allowedDependencies": ["mcp.auth", "mcp.connection", "mcp.registry"]
+    },
+    {
+      "ownerId": "mcp.diagnostics.infra-health",
+      "path": "src/copilot/mcp/diagnostics/infra-health",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Infra health projection for MCP runtime diagnostics",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
+    },
+    {
+      "ownerId": "mcp.diagnostics.io-cache",
+      "path": "src/copilot/mcp/diagnostics/io-cache",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository IO-cache benchmark and scheduler diagnostics",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "process", "surface"],
+      "allowedDependencies": ["mcp.process"]
     },
     {
       "ownerId": "mcp.diagnostics.latency",
       "path": "src/copilot/mcp/diagnostics/latency",
       "parentOwnerId": "mcp.diagnostics",
-      "kind": "taxonomy",
-      "protectedBoundary": false,
-      "role": "Latency diagnostic owners"
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Latency diagnostics runtime, evidence, persistence and child owners",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": ["mcp.observability", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.diagnostics.latency.attribution",
@@ -168,7 +390,11 @@
       "parentOwnerId": "mcp.diagnostics.latency",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Latency attribution"
+      "role": "Latency attribution",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.cloudflare.observability", "mcp.diagnostics.latency", "mcp.observability"]
     },
     {
       "ownerId": "mcp.diagnostics.latency.benchmark",
@@ -176,7 +402,11 @@
       "parentOwnerId": "mcp.diagnostics.latency",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Latency benchmark execution"
+      "role": "Latency benchmark execution",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.connection"]
     },
     {
       "ownerId": "mcp.diagnostics.latency.dashboard",
@@ -184,7 +414,16 @@
       "parentOwnerId": "mcp.diagnostics.latency",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Latency SLO dashboard assessment and history"
+      "role": "Latency SLO dashboard assessment and history",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": [
+        "mcp.diagnostics.latency",
+        "mcp.diagnostics.latency.round-trip",
+        "mcp.observability",
+        "mcp.workspace"
+      ]
     },
     {
       "ownerId": "mcp.diagnostics.latency.round-trip",
@@ -192,7 +431,11 @@
       "parentOwnerId": "mcp.diagnostics.latency",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Incremental round-trip audit analytics, causal workflow evidence and monitor lifecycle"
+      "role": "Incremental round-trip audit analytics, causal workflow evidence and monitor lifecycle",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": ["mcp.diagnostics.latency", "mcp.observability"]
     },
     {
       "ownerId": "mcp.diagnostics.oauth-smoke",
@@ -200,7 +443,23 @@
       "parentOwnerId": "mcp.diagnostics",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "OAuth smoke diagnostics"
+      "role": "OAuth smoke diagnostics",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.auth", "mcp.protocol"]
+    },
+    {
+      "ownerId": "mcp.diagnostics.project-doctor",
+      "path": "src/copilot/mcp/diagnostics/project-doctor",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Project doctor diagnostics and bounded health checks",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.workspace.git"]
     },
     {
       "ownerId": "mcp.diagnostics.runtime-health",
@@ -208,7 +467,37 @@
       "parentOwnerId": "mcp.diagnostics",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "MCP runtime health projection"
+      "role": "MCP runtime health projection",
+      "audiences": ["public"],
+      "authorityClasses": ["mutable-state", "public-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare.tunnel",
+        "mcp.diagnostics.io-cache",
+        "mcp.diagnostics.latency.round-trip",
+        "mcp.diagnostics.runtime-source-drift",
+        "mcp.diagnostics.workspace-smoke",
+        "mcp.indexing.auto-build",
+        "mcp.observability",
+        "mcp.protocol",
+        "mcp.runtime.startup-maintenance",
+        "mcp.transport",
+        "mcp.workspace.repository.read-cache",
+        "mcp.workspace.repository.status"
+      ]
+    },
+    {
+      "ownerId": "mcp.diagnostics.runtime-source-drift",
+      "path": "src/copilot/mcp/diagnostics/runtime-source-drift",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Runtime/source drift measurement and testing support",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.diagnostics.tool-payload",
@@ -216,7 +505,28 @@
       "parentOwnerId": "mcp.diagnostics",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Tool payload diagnostics"
+      "role": "Tool payload diagnostics",
+      "audiences": ["public"],
+      "authorityClasses": ["config-authority", "public-surface"],
+      "policyHooks": ["config", "cost", "surface"],
+      "allowedDependencies": ["mcp.protocol"]
+    },
+    {
+      "ownerId": "mcp.diagnostics.workspace-smoke",
+      "path": "src/copilot/mcp/diagnostics/workspace-smoke",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Workspace smoke execution, state and testing support",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": [
+        "mcp.cloudflare.tunnel",
+        "mcp.diagnostics.project-doctor",
+        "mcp.observability",
+        "mcp.workspace.repository.status"
+      ]
     },
     {
       "ownerId": "mcp.indexing",
@@ -224,7 +534,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP indexing orchestration"
+      "role": "MCP indexing orchestration",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.indexing.auto-build",
@@ -232,7 +546,11 @@
       "parentOwnerId": "mcp.indexing",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Index startup checkpoint, evidence, bounded verification and background build lifecycle"
+      "role": "Index startup checkpoint, evidence, bounded verification and background build lifecycle",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": ["mcp.workspace.git"]
     },
     {
       "ownerId": "mcp.indexing.repository",
@@ -240,7 +558,11 @@
       "parentOwnerId": "mcp.indexing",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository indexing/query adapter"
+      "role": "Repository indexing/query adapter",
+      "audiences": ["public"],
+      "authorityClasses": ["mutable-state", "public-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": ["mcp.indexing.auto-build"]
     },
     {
       "ownerId": "mcp.integrations",
@@ -248,7 +570,23 @@
       "parentOwnerId": "mcp",
       "kind": "taxonomy",
       "protectedBoundary": false,
-      "role": "External/domain integrations"
+      "role": "External/domain integrations",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
+    },
+    {
+      "ownerId": "mcp.integrations.http",
+      "path": "src/copilot/mcp/integrations/http",
+      "parentOwnerId": "mcp.integrations",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Bounded outbound HTTP integration for MCP probes",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.integrations.model-gateway",
@@ -256,7 +594,11 @@
       "parentOwnerId": "mcp.integrations",
       "kind": "taxonomy",
       "protectedBoundary": false,
-      "role": "Model Gateway MCP integration"
+      "role": "Model Gateway MCP integration",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.integrations.model-gateway.live-runs",
@@ -264,7 +606,17 @@
       "parentOwnerId": "mcp.integrations.model-gateway",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Governed Model Gateway live process integration"
+      "role": "Governed Model Gateway live process integration",
+      "audiences": ["public", "testing"],
+      "authorityClasses": [
+        "config-authority",
+        "mutable-state",
+        "process-launcher",
+        "public-surface",
+        "testing-surface"
+      ],
+      "policyHooks": ["config", "cost", "process", "state", "surface"],
+      "allowedDependencies": ["mcp.process"]
     },
     {
       "ownerId": "mcp.integrations.model-gateway.sqlite-fingerprint",
@@ -272,7 +624,11 @@
       "parentOwnerId": "mcp.integrations.model-gateway",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Model Gateway SQLite fingerprint projection"
+      "role": "Model Gateway SQLite fingerprint projection",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.maintenance",
@@ -280,7 +636,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP maintenance operations"
+      "role": "MCP maintenance operations",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.maintenance.dependencies"]
     },
     {
       "ownerId": "mcp.maintenance.dependencies",
@@ -288,7 +648,11 @@
       "parentOwnerId": "mcp.maintenance",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Dependency maintenance"
+      "role": "Dependency maintenance",
+      "audiences": [],
+      "authorityClasses": ["process-launcher"],
+      "policyHooks": ["process"],
+      "allowedDependencies": ["mcp.process"]
     },
     {
       "ownerId": "mcp.maintenance.dependencies.native-smoke",
@@ -296,7 +660,11 @@
       "parentOwnerId": "mcp.maintenance.dependencies",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Native dependency smoke"
+      "role": "Native dependency smoke",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.observability",
@@ -304,7 +672,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP audit/metrics/logging"
+      "role": "MCP audit/metrics/logging",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": ["mcp.workspace"]
     },
     {
       "ownerId": "mcp.openai",
@@ -312,7 +684,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "OpenAI/ChatGPT connector integration"
+      "role": "OpenAI/ChatGPT connector integration",
+      "audiences": ["testing"],
+      "authorityClasses": ["config-authority", "testing-surface"],
+      "policyHooks": ["config", "surface"],
+      "allowedDependencies": ["mcp.workspace"]
     },
     {
       "ownerId": "mcp.process",
@@ -320,7 +696,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Process host/environment/supervision/terminal primitives"
+      "role": "Process host/environment/supervision/terminal primitives",
+      "audiences": ["public"],
+      "authorityClasses": ["config-authority", "mutable-state", "process-launcher", "public-surface"],
+      "policyHooks": ["config", "cost", "process", "state", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.protocol",
@@ -328,7 +708,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP protocol contracts"
+      "role": "MCP protocol contracts",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.auth"]
     },
     {
       "ownerId": "mcp.protocol.apps-sdk",
@@ -336,7 +720,11 @@
       "parentOwnerId": "mcp.protocol",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Apps SDK protocol projection"
+      "role": "Apps SDK protocol projection",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.company-knowledge"]
     },
     {
       "ownerId": "mcp.registry",
@@ -344,7 +732,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Tool registry runtime"
+      "role": "Tool registry runtime",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": ["mcp.auth", "mcp.observability", "mcp.protocol", "mcp.tools", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.runtime",
@@ -352,7 +744,39 @@
       "parentOwnerId": "mcp",
       "kind": "taxonomy",
       "protectedBoundary": false,
-      "role": "Process runtime operations"
+      "role": "Process runtime operations",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
+    },
+    {
+      "ownerId": "mcp.runtime.reload",
+      "path": "src/copilot/mcp/runtime/reload",
+      "parentOwnerId": "mcp.runtime",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Controlled MCP reload planning, state and execution",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "process", "surface"],
+      "allowedDependencies": ["mcp.process", "mcp.workspace"]
+    },
+    {
+      "ownerId": "mcp.runtime.startup-maintenance",
+      "path": "src/copilot/mcp/runtime/startup-maintenance",
+      "parentOwnerId": "mcp.runtime",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Startup maintenance scheduling and lifecycle",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": [
+        "mcp.diagnostics.workspace-smoke",
+        "mcp.integrations.model-gateway.live-runs",
+        "mcp.observability"
+      ]
     },
     {
       "ownerId": "mcp.scripts",
@@ -360,7 +784,28 @@
       "parentOwnerId": "mcp",
       "kind": "entrypoint-space",
       "protectedBoundary": false,
-      "role": "MCP launchers and architecture gates"
+      "role": "MCP launchers and architecture gates",
+      "audiences": [],
+      "authorityClasses": ["config-authority"],
+      "policyHooks": ["config"],
+      "allowedDependencies": [
+        "mcp.cloudflare.transport-benchmark",
+        "mcp.composition.process-config",
+        "mcp.composition.process-host",
+        "mcp.diagnostics.http-smoke",
+        "mcp.diagnostics.io-cache",
+        "mcp.diagnostics.latency.benchmark",
+        "mcp.diagnostics.oauth-smoke",
+        "mcp.diagnostics.tool-payload",
+        "mcp.maintenance",
+        "mcp.maintenance.dependencies.native-smoke",
+        "mcp.process",
+        "mcp.registry",
+        "mcp.runtime.reload",
+        "mcp.transport",
+        "mcp.validation",
+        "mcp.workspace"
+      ]
     },
     {
       "ownerId": "mcp.server",
@@ -368,7 +813,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "MCP server composition/runtime"
+      "role": "MCP server composition/runtime",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["config-authority", "mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["config", "cost", "state", "surface"],
+      "allowedDependencies": ["mcp.observability", "mcp.protocol", "mcp.protocol.apps-sdk", "mcp.registry"]
     },
     {
       "ownerId": "mcp.tools",
@@ -376,7 +825,44 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Wire exposure plane"
+      "role": "Wire exposure plane",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.cloudflare.edge",
+        "mcp.cloudflare.observability",
+        "mcp.cloudflare.posture",
+        "mcp.cloudflare.remote",
+        "mcp.cloudflare.transport-benchmark",
+        "mcp.cloudflare.tunnel",
+        "mcp.company-knowledge",
+        "mcp.connection",
+        "mcp.diagnostics.devcontainer-network",
+        "mcp.diagnostics.io-cache",
+        "mcp.diagnostics.latency",
+        "mcp.diagnostics.latency.attribution",
+        "mcp.diagnostics.latency.dashboard",
+        "mcp.diagnostics.project-doctor",
+        "mcp.diagnostics.runtime-health",
+        "mcp.diagnostics.tool-payload",
+        "mcp.diagnostics.workspace-smoke",
+        "mcp.indexing.repository",
+        "mcp.integrations.model-gateway.live-runs",
+        "mcp.maintenance",
+        "mcp.observability",
+        "mcp.process",
+        "mcp.protocol",
+        "mcp.protocol.apps-sdk",
+        "mcp.runtime.reload",
+        "mcp.validation",
+        "mcp.workspace.git",
+        "mcp.workspace.repository.patch",
+        "mcp.workspace.repository.read",
+        "mcp.workspace.repository.status",
+        "mcp.workspace.repository.write"
+      ]
     },
     {
       "ownerId": "mcp.transport",
@@ -384,7 +870,17 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "MCP transport owners"
+      "role": "MCP transport owners",
+      "audiences": ["public", "testing"],
+      "authorityClasses": [
+        "config-authority",
+        "mutable-state",
+        "process-launcher",
+        "public-surface",
+        "testing-surface"
+      ],
+      "policyHooks": ["config", "cost", "process", "state", "surface"],
+      "allowedDependencies": ["mcp.auth", "mcp.observability", "mcp.process", "mcp.protocol", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.validation",
@@ -392,7 +888,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Validation jobs/suites"
+      "role": "Validation jobs/suites",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "process-launcher", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "process", "state", "surface"],
+      "allowedDependencies": ["mcp.process", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.workspace",
@@ -400,7 +900,11 @@
       "parentOwnerId": "mcp",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Workspace capability and repository operations"
+      "role": "Workspace capability and repository operations",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.workspace.git",
@@ -408,7 +912,11 @@
       "parentOwnerId": "mcp.workspace",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Workspace Git primitive"
+      "role": "Workspace Git primitive",
+      "audiences": ["public"],
+      "authorityClasses": ["process-launcher", "public-surface"],
+      "policyHooks": ["cost", "process", "surface"],
+      "allowedDependencies": ["mcp.process"]
     },
     {
       "ownerId": "mcp.workspace.repository",
@@ -416,7 +924,11 @@
       "parentOwnerId": "mcp.workspace",
       "kind": "owner",
       "protectedBoundary": false,
-      "role": "Repository operation owners"
+      "role": "Repository operation owners",
+      "audiences": [],
+      "authorityClasses": [],
+      "policyHooks": [],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.workspace.repository.patch",
@@ -424,7 +936,11 @@
       "parentOwnerId": "mcp.workspace.repository",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository patch semantics"
+      "role": "Repository patch semantics",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.workspace.repository.read-cache"]
     },
     {
       "ownerId": "mcp.workspace.repository.read",
@@ -432,7 +948,11 @@
       "parentOwnerId": "mcp.workspace.repository",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository read operations"
+      "role": "Repository read operations",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.workspace.repository.read-cache"]
     },
     {
       "ownerId": "mcp.workspace.repository.read-cache",
@@ -440,7 +960,11 @@
       "parentOwnerId": "mcp.workspace.repository",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository read response cache"
+      "role": "Repository read response cache",
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["mutable-state", "public-surface", "testing-surface"],
+      "policyHooks": ["cost", "state", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.workspace.repository.status",
@@ -448,7 +972,11 @@
       "parentOwnerId": "mcp.workspace.repository",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository status projection"
+      "role": "Repository status projection",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.workspace", "mcp.workspace.git"]
     },
     {
       "ownerId": "mcp.workspace.repository.write",
@@ -456,7 +984,18 @@
       "parentOwnerId": "mcp.workspace.repository",
       "kind": "owner",
       "protectedBoundary": true,
-      "role": "Repository write, quarantine and batch-operation semantics"
+      "role": "Repository write, quarantine and batch-operation semantics",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.validation", "mcp.workspace.repository.patch", "mcp.workspace.repository.read-cache"]
     }
-  ]
+  ],
+  "policy": {
+    "derivedFields": ["audiences", "authorityClasses", "policyHooks", "allowedDependencies"],
+    "audiences": "derived from exact #copilot/mcp/public/* and #copilot/testing/mcp/* package surfaces",
+    "authorities": "derived from config/state/process manifests and public-surface audience",
+    "dependencies": "exact direct static ESM import/re-export owner graph; cycles are rejected",
+    "dynamicEdges": "governed separately by copilot-mcp-dynamic-graph.json"
+  }
 }

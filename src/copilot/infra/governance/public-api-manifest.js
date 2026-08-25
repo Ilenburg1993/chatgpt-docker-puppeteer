@@ -315,7 +315,11 @@ export const INFRA_PUBLIC_API_MANIFEST = Object.freeze([
             'buildInfraMutableStateReport',
             'buildInfraPublicApiCostReport',
             'buildInfraPublicAuthorityReport',
+            'buildPublicSurfaceCostReport',
             'buildStaticImportClosure',
+            'createStaticImportClosureAnalyzer',
+            'listStaticModuleEdges',
+            'listStaticModuleSpecifiers',
         ],
     }),
     definePublicApi({
