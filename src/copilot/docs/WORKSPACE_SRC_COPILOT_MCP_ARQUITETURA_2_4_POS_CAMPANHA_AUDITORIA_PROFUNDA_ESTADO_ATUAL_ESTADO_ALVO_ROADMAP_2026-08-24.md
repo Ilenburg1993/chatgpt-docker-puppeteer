@@ -3195,12 +3195,26 @@ store persistente contém **100/100 clients** com nome exato `Copilot MCP OAuth 
 confirmando que o teto era dívida causada pelo próprio smoke, não demanda externa. A limpeza desse
 estado deve ocorrer junto da promoção para não competir com a geração antiga em memória.
 
-**Gate de promoção deste incidente:** [ ] commit/push source; [ ] reload MCP/Cloudflare; [ ]
-metadata live anuncia `offline_access`; [ ] diagnostics live `ready=true`; [ ] canonical connector
-smoke `ok=true` sem criar novo DCR; [ ] remover somente os 100 clients/refresh records pertencentes
-ao smoke histórico, com backup; [ ] nova criação do app/conector no ChatGPT usando
-`https://mcp.aurelin.org/mcp`; [ ] nenhuma nova ocorrência `unknown_client` para
-`https://chatgpt.com/oauth/client.json`.
+**Gate de promoção deste incidente:** [x] commit/push source (`5b651dc8e`); [x] reload
+MCP/Cloudflare `current -> quic`; [x] metadata live anuncia `offline_access`; [x] diagnostics live
+`ready=true`; [x] canonical connector smoke `ok=true` sem criar novo DCR; [x] remover somente os 100
+clients/refresh records pertencentes ao smoke histórico, com backup mode 0600; [ ] nova criação do
+app/conector no ChatGPT usando `https://mcp.aurelin.org/mcp`; [x] authorization stage live para
+`https://chatgpt.com/oauth/client.json` não produz mais `unknown_client`.
+
+**Prova host-real pós-promoção — 2026-08-25:** runtime `main@5b651dc8e`, worktree limpa e
+`runtimeSourceDrift=false`; OAuth metadata live lista `offline_access` e diagnostics retorna
+`ready=true`, `offlineAccessSupported=true`, CIMD + `private_key_jwt` + PKCE S256. O cleanup removeu
+100 clients diagnósticos, 38 refresh records ativos e 99 consumed records associados, preservando 45
+refresh records não ligados ao smoke. Após restart o issuer carregou `dynamicClientCount=0`; o
+canonical connector smoke terminou `ok=true` em ~2,0 s, com `tools/list` 131/131 e SSE reconnect
+verde, e a contagem DCR permaneceu **0**. Uma reprodução pública do authorization request que havia
+falhado — client ID platform-wide, callback platform-wide, seis scopes incluindo `offline_access`,
+resource `/mcp` e PKCE S256 — retornou **302**, callback correto, authorization code presente, state
+preservado e nenhum OAuth error. O log novo registra `Using trusted ChatGPT CIMD fast-path` para
+`/oauth/client.json`; as ocorrências `unknown_client` permanecem apenas como evidência histórica
+anterior à promoção. O único gate restante exige a chave privada real do ChatGPT e, portanto, é a
+criação do novo app pela UI para provar o token exchange `private_key_jwt` end-to-end.
 
 - [x] diff review;
 - [x] runtime/artifact dirs limpos conforme policy;
