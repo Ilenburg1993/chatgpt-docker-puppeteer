@@ -2908,10 +2908,21 @@ governada.
 
 - [x] diff review;
 - [x] runtime/artifact dirs limpos conforme policy;
-- [ ] commit coeso por barrier;
-- [ ] push;
-- [ ] `main == origin/main`;
-- [ ] ledger atualizado com commit/evidência.
+- [x] commit coeso por barrier;
+- [x] push;
+- [x] `main == origin/main`;
+- [x] ledger atualizado com commit/evidência.
+
+**Checkpoint N.4 publicado — 2026-08-25:** a campanha auditada foi consolidada no commit
+`0dec61ca63c1fc3800c9738659d4d6375b87665d`
+(`refactor(mcp): complete architecture 2.4 post-campaign hardening`), com **410 arquivos**, **35.114
+inserções** e **17.190 deleções**. O push foi executado exclusivamente para o upstream existente
+`origin/main`, sem force, após dry-run verde; o resultado observado foi `ahead=0`, `behind=0`. A
+limpeza governada removeu **2.868** artifacts UUID antigos além da retenção de 240, com **0
+candidatos restantes**, sem alcançar OAuth stores, tunnel tokens/state, pid files, quarantine ou
+rollback fora do schema permitido. O release permaneceu Prettier-clean, `git diff --check` verde,
+TS7 strict/lint verdes e registry/schema 30/30 após a correção Prettier-stable final de
+`registry/runtime.js`.
 
 **Handoff de promoção após publicação:** este checkpoint não reinicia o processo MCP que hospeda a
 própria sessão. Depois de commit/push e upstream sincronizado, a sequência causal é:
@@ -2981,7 +2992,7 @@ A Arquitetura 2.4 pode ser considerada encerrada em seu ideal quando:
 - [ ] historical docs estão claramente históricos;
 - [x] global validation barrier está verde;
 - [ ] connector real foi revalidado depois das transformações;
-- [ ] `main == origin/main` após publicação;
+- [x] `main == origin/main` após publicação;
 - [ ] cada faixa encerrada possui evidência e commit rastreável.
 
 ---
