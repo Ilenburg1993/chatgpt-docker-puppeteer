@@ -2,7 +2,7 @@
 /**
  * Canonical OAuth smoke test for the ChatGPT MCP endpoint.
  *
- * Version 1.2.0 focuses on MCP 2025-11-25 / OpenAI Apps SDK compatibility:
+ * Version 1.4.0 focuses on MCP 2026-07-28 / OpenAI Apps SDK compatibility:
  *
  * - RFC 9728 Protected Resource Metadata discovery, path-specific and root.
  * - OAuth Authorization Server Metadata / OIDC discovery.
@@ -23,7 +23,7 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 export const OAUTH_SMOKE_IMPLEMENTATION_NAME = 'copilot-mcp-oauth-smoke';
-export const OAUTH_SMOKE_IMPLEMENTATION_VERSION = '1.3.0';
+export const OAUTH_SMOKE_IMPLEMENTATION_VERSION = '1.4.0';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_ATTEMPTS = 5;
@@ -34,7 +34,7 @@ const MAX_SUMMARY_TEXT_LENGTH = 500;
 const MAX_URL_LENGTH = 2048;
 const MAX_TOKEN_LENGTH = 64 * 1024;
 const FULL_REPO_SCOPE = 'repo:read repo:write repo:validate repo:admin';
-const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email`;
+const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email offline_access`;
 const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
 /**
@@ -61,6 +61,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     retryBaseDelayMs?: number;
  *     retryMaxDelayMs?: number;
  *     strict?: boolean;
+ *     runDcrCompatibility?: boolean;
  *     runPrivateKeyJwt?: boolean;
  *     runNegativeResourceChecks?: boolean;
  *     verboseTools?: boolean;
@@ -75,6 +76,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     retryBaseDelayMs: number;
  *     retryMaxDelayMs: number;
  *     strict: boolean;
+ *     runDcrCompatibility: boolean;
  *     runPrivateKeyJwt: boolean;
  *     runNegativeResourceChecks: boolean;
  *     verboseTools: boolean;
@@ -167,16 +169,27 @@ export async function runMcpOAuthSmoke(options) {
         runtime,
     });
 
-    const registration = await registerPublicClient(metadata, authorizationServer, runtime);
+    const dcrEnabled = runtime.runDcrCompatibility;
+    const registration = dcrEnabled
+        ? await registerPublicClient(metadata, authorizationServer, runtime)
+        : skippedProbe('DCR compatibility smoke disabled; canonical remote smoke uses CIMD.');
     finishPhase('registration');
-    // The canonical authorization-code and PAR flows use independent authorization transactions for the same public
-    // client. Validate them concurrently so PAR coverage does not double the login/token critical path.
-    const [dcrToken, parToken] = registration.ok
-        ? await Promise.all([
-              authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE, runtime),
-              authorizeAndExchangeRegisteredClientViaPar(metadata, registration, resource, FULL_REPO_SCOPE, runtime),
-          ])
-        : [failure('registration failed'), failure('registration failed')];
+    // DCR remains an explicit compatibility probe, but it is no longer required to establish the canonical runtime
+    // identity. This prevents our own remote smoke from manufacturing persistent DCR demand and polluting retirement
+    // evidence while preserving a deliberate compatibility mode for release investigations.
+    const [dcrToken, parToken] =
+        dcrEnabled && registration.ok
+            ? await Promise.all([
+                  authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE, runtime),
+                  authorizeAndExchangeRegisteredClientViaPar(
+                      metadata,
+                      registration,
+                      resource,
+                      FULL_REPO_SCOPE,
+                      runtime,
+                  ),
+              ])
+            : [skippedProbe('DCR compatibility smoke disabled.'), skippedProbe('DCR compatibility smoke disabled.')];
     finishPhase('authorizationFlows');
     const registrationBody = asRecord(registration.body);
     const dcrTokenBody = asRecord(dcrToken.body);
@@ -196,33 +209,30 @@ export async function runMcpOAuthSmoke(options) {
     });
     const initialDcrAccessToken =
         typeof dcrTokenBody?.['access_token'] === 'string' ? dcrTokenBody['access_token'] : null;
-    // Runtime MCP checks validate the original DCR access token and do not depend on introspection or refresh results.
-    // Start them now so token-lifecycle verification overlaps the authenticated MCP transport checks.
-    const runtimeChecksPromise = initialDcrAccessToken
-        ? runMcpToolRuntimeChecks(mcpUrl, initialDcrAccessToken, runtime)
-        : null;
-    // Introspection reads the issued access token while refresh rotates/renews from the independent refresh token.
-    // Neither result is an input to the other, so wait for both together.
-    const [dcrIntrospection, dcrRefreshToken] = await Promise.all([
-        typeof dcrTokenBody?.['access_token'] === 'string'
-            ? introspectToken(
-                  metadata,
-                  resource,
-                  String(registrationBody?.['client_id'] ?? ''),
-                  dcrTokenBody['access_token'],
-                  runtime,
-              )
-            : Promise.resolve(failure('access_token missing')),
-        typeof dcrTokenBody?.['refresh_token'] === 'string'
-            ? refreshToken(
-                  metadata,
-                  resource,
-                  String(registrationBody?.['client_id'] ?? ''),
-                  dcrTokenBody['refresh_token'],
-                  runtime,
-              )
-            : Promise.resolve(failure('refresh_token missing')),
-    ]);
+    const dcrRuntimeChecksPromise =
+        dcrEnabled && initialDcrAccessToken ? runMcpToolRuntimeChecks(mcpUrl, initialDcrAccessToken, runtime) : null;
+    const [dcrIntrospection, dcrRefreshToken] = dcrEnabled
+        ? await Promise.all([
+              typeof dcrTokenBody?.['access_token'] === 'string'
+                  ? introspectToken(
+                        metadata,
+                        resource,
+                        String(registrationBody?.['client_id'] ?? ''),
+                        dcrTokenBody['access_token'],
+                        runtime,
+                    )
+                  : Promise.resolve(failure('access_token missing')),
+              typeof dcrTokenBody?.['refresh_token'] === 'string'
+                  ? refreshToken(
+                        metadata,
+                        resource,
+                        String(registrationBody?.['client_id'] ?? ''),
+                        dcrTokenBody['refresh_token'],
+                        runtime,
+                    )
+                  : Promise.resolve(failure('refresh_token missing')),
+          ])
+        : [skippedProbe('DCR compatibility smoke disabled.'), skippedProbe('DCR compatibility smoke disabled.')];
     finishPhase('tokenLifecycle');
     const dcrRefreshTokenBody = asRecord(dcrRefreshToken.body);
     const dcrRefreshTokenValidation = validateAccessTokenClaims(dcrRefreshTokenBody?.['access_token'], {
@@ -234,45 +244,43 @@ export async function runMcpOAuthSmoke(options) {
     const dcrRuntimeAccessToken =
         initialDcrAccessToken ??
         (typeof dcrRefreshTokenBody?.['access_token'] === 'string' ? dcrRefreshTokenBody['access_token'] : null);
-    const runtimeHealthUnusedRuntimeChecks = runtimeChecksPromise
-        ? await runtimeChecksPromise
-        : typeof dcrRuntimeAccessToken === 'string'
-          ? await runMcpToolRuntimeChecks(mcpUrl, dcrRuntimeAccessToken, runtime)
+
+    const cimdRun = await cimdFlowPromise;
+    const cimdFlow = cimdRun.report;
+    const primaryRuntimeIdentity = dcrEnabled ? 'dcr' : 'cimd';
+    const primaryRuntimeAccessToken = dcrEnabled ? dcrRuntimeAccessToken : cimdRun.accessToken;
+    const runtimeChecks = dcrRuntimeChecksPromise
+        ? await dcrRuntimeChecksPromise
+        : typeof primaryRuntimeAccessToken === 'string'
+          ? await runMcpToolRuntimeChecks(mcpUrl, primaryRuntimeAccessToken, runtime)
           : {
-                runtimeHealth: failure('token missing'),
-                authenticatedToolsList: failure('token missing'),
-                authenticatedSse: failure('token missing'),
+                runtimeHealth: failure(`${primaryRuntimeIdentity} token missing`),
+                authenticatedToolsList: failure(`${primaryRuntimeIdentity} token missing`),
+                authenticatedSse: failure(`${primaryRuntimeIdentity} token missing`),
             };
     finishPhase('runtimeChecks');
-    const runtimeHealth =
-        typeof dcrRuntimeAccessToken === 'string'
-            ? runtimeHealthUnusedRuntimeChecks.runtimeHealth
-            : failure('token missing');
-    const authenticatedToolsList =
-        typeof dcrRuntimeAccessToken === 'string'
-            ? await Promise.resolve(runtimeHealthUnusedRuntimeChecks.authenticatedToolsList)
-            : failure('token missing');
+    const runtimeHealth = runtimeChecks.runtimeHealth;
+    const authenticatedToolsList = await Promise.resolve(runtimeChecks.authenticatedToolsList);
     const authenticatedToolsSummary = summarizeAuthenticatedToolsList(authenticatedToolsList, runtime);
-    const authenticatedSse =
-        typeof dcrRuntimeAccessToken === 'string'
-            ? await Promise.resolve(runtimeHealthUnusedRuntimeChecks.authenticatedSse)
-            : failure('token missing');
+    const authenticatedSse = await Promise.resolve(runtimeChecks.authenticatedSse);
 
-    const cimdFlow = await cimdFlowPromise;
+    const privateKeyJwtFlow = dcrEnabled
+        ? await runPrivateKeyJwtSmoke({
+              metadata,
+              authorizationServer,
+              resource,
+              runtime,
+          })
+        : { ok: true, required: false, skipped: true, reason: 'DCR compatibility smoke disabled.' };
 
-    const privateKeyJwtFlow = await runPrivateKeyJwtSmoke({
-        metadata,
-        authorizationServer,
-        resource,
-        runtime,
-    });
-
-    const negativeResourceChecks = await runNegativeResourceChecks({
-        metadata,
-        registration,
-        resource,
-        runtime,
-    });
+    const negativeResourceChecks = dcrEnabled
+        ? await runNegativeResourceChecks({
+              metadata,
+              registration,
+              resource,
+              runtime,
+          })
+        : { ok: true, skipped: true, reason: 'DCR compatibility smoke disabled.' };
     finishPhase('optionalChecks');
 
     const checks = {
@@ -284,19 +292,19 @@ export async function runMcpOAuthSmoke(options) {
         oauthMetadataCors: oauthMetadataCors.ok,
         jwks: jwks.ok,
         profile: profile.ok,
-        registration: registration.ok,
-        dcrToken: dcrToken.ok,
-        dcrTokenClaims: dcrTokenValidation.ok,
-        par: parToken.skipped === true || (parToken.ok && parTokenValidation.ok),
-        dcrIntrospection: dcrIntrospection.ok,
-        dcrRefreshToken: dcrRefreshToken.ok,
-        dcrRefreshTokenClaims: dcrRefreshTokenValidation.ok,
+        registration: !dcrEnabled || registration.ok,
+        dcrToken: !dcrEnabled || dcrToken.ok,
+        dcrTokenClaims: !dcrEnabled || dcrTokenValidation.ok,
+        par: !dcrEnabled || parToken.skipped === true || (parToken.ok && parTokenValidation.ok),
+        dcrIntrospection: !dcrEnabled || dcrIntrospection.ok,
+        dcrRefreshToken: !dcrEnabled || dcrRefreshToken.ok,
+        dcrRefreshTokenClaims: !dcrEnabled || dcrRefreshTokenValidation.ok,
         runtimeHealth: runtimeHealth.ok,
         authenticatedToolsList: authenticatedToolsSummary.ok,
         authenticatedSse: authenticatedSse.ok,
-        cimd: !cimdAdvertised || Boolean(cimdFlow.ok),
-        privateKeyJwt: !privateKeyJwtFlow.required || privateKeyJwtFlow.ok,
-        negativeResourceChecks: !runtime.runNegativeResourceChecks || negativeResourceChecks.ok,
+        cimd: dcrEnabled ? !cimdAdvertised || Boolean(cimdFlow.ok) : cimdAdvertised && Boolean(cimdFlow.ok),
+        privateKeyJwt: !dcrEnabled || !privateKeyJwtFlow.required || privateKeyJwtFlow.ok,
+        negativeResourceChecks: !dcrEnabled || !runtime.runNegativeResourceChecks || negativeResourceChecks.ok,
     };
     const failedChecks = Object.entries(checks)
         .filter(([, ok]) => !ok)
@@ -329,6 +337,7 @@ export async function runMcpOAuthSmoke(options) {
         compliance: profile,
         registration: summarizeRegistration(registration),
         dcrFlow: {
+            enabled: dcrEnabled,
             token: summarizeToken(dcrToken),
             tokenClaims: dcrTokenClaims,
             tokenValidation: dcrTokenValidation,
@@ -337,6 +346,9 @@ export async function runMcpOAuthSmoke(options) {
             introspection: summarizeIntrospection(dcrIntrospection),
             refreshToken: summarizeToken(dcrRefreshToken),
             refreshTokenValidation: dcrRefreshTokenValidation,
+        },
+        runtimeFlow: {
+            identity: primaryRuntimeIdentity,
             runtimeHealth: {
                 ok: runtimeHealth.ok,
                 status: runtimeHealth.status ?? null,
@@ -383,6 +395,12 @@ function readSmokeRuntimeOptions(options, env) {
             0,
         ),
         strict: readBooleanOption(options.strict, env, 'COPILOT_MCP_OAUTH_SMOKE_STRICT', true),
+        runDcrCompatibility: readBooleanOption(
+            options.runDcrCompatibility,
+            env,
+            'COPILOT_MCP_OAUTH_SMOKE_DCR_COMPATIBILITY',
+            false,
+        ),
         runPrivateKeyJwt: readBooleanOption(
             options.runPrivateKeyJwt,
             env,
@@ -700,7 +718,12 @@ function buildComplianceProfile(input) {
     }
     if (metadata?.['client_id_metadata_document_supported'] !== true) {
         warnings.push(
-            'authorization server metadata does not advertise CIMD; MCP 2025-11-25 clients prefer CIMD when available.',
+            'authorization server metadata does not advertise CIMD; MCP 2026-07-28 clients prefer CIMD when available.',
+        );
+    }
+    if (!scopesSupported.includes('offline_access')) {
+        errors.push(
+            'authorization server metadata must advertise offline_access when refresh-token connectivity is supported.',
         );
     }
     if (typeof metadata?.['registration_endpoint'] !== 'string') {
@@ -1181,16 +1204,19 @@ async function authorizeAndExchangeClient(metadata, client, runtime) {
  *     resource: string;
  *     runtime: OAuthSmokeRuntimeOptions;
  * }} input
- * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ * @returns {Promise<{ report: Record<string, unknown> & { ok: boolean }; accessToken: string | null }>}
  */
 async function runCimdSmoke(input) {
     if (!input.advertised) {
         return {
-            ok: true,
-            advertised: false,
-            canonicalForThisIssuer: 'dcr',
-            skipped: true,
-            reason: 'client_id_metadata_document_supported not advertised',
+            report: {
+                ok: true,
+                advertised: false,
+                canonicalForThisIssuer: 'dcr',
+                skipped: true,
+                reason: 'client_id_metadata_document_supported not advertised',
+            },
+            accessToken: null,
         };
     }
     const cimdClientMetadataUrl = `${input.authorizationServer}/.well-known/oauth-client/codex-smoke.json`;
@@ -1245,23 +1271,26 @@ async function runCimdSmoke(input) {
               )
             : failure('userinfo unavailable');
     return {
-        ok:
-            cimdClientMetadata.ok &&
-            clientMetadataValidation.ok &&
-            token.ok &&
-            tokenValidation.ok &&
-            refresh.ok &&
-            refreshValidation.ok &&
-            userinfo.ok,
-        advertised: true,
-        canonicalForThisIssuer: 'cimd',
-        clientMetadata: summarizeClientMetadata(cimdClientMetadata),
-        clientMetadataValidation,
-        token: summarizeToken(token),
-        tokenValidation,
-        refreshToken: summarizeToken(refresh),
-        refreshTokenValidation: refreshValidation,
-        userinfo: summarizeUserinfo(userinfo),
+        report: {
+            ok:
+                cimdClientMetadata.ok &&
+                clientMetadataValidation.ok &&
+                token.ok &&
+                tokenValidation.ok &&
+                refresh.ok &&
+                refreshValidation.ok &&
+                userinfo.ok,
+            advertised: true,
+            canonicalForThisIssuer: 'cimd',
+            clientMetadata: summarizeClientMetadata(cimdClientMetadata),
+            clientMetadataValidation,
+            token: summarizeToken(token),
+            tokenValidation,
+            refreshToken: summarizeToken(refresh),
+            refreshTokenValidation: refreshValidation,
+            userinfo: summarizeUserinfo(userinfo),
+        },
+        accessToken: typeof tokenBody?.['access_token'] === 'string' ? tokenBody['access_token'] : null,
     };
 }
 
@@ -2395,6 +2424,11 @@ function base64Url(buffer) {
  */
 function failure(error, status) {
     return { ok: false, ...(status !== undefined ? { status } : {}), error };
+}
+
+/** @param {string} reason @returns {ProbeResult} */
+function skippedProbe(reason) {
+    return { ok: true, skipped: true, error: reason };
 }
 
 /**

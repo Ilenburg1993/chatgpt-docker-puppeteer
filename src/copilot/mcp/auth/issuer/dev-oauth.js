@@ -5,7 +5,7 @@
  * This is intentionally scoped to local/dev MCP usage. It gives ChatGPT a real OAuth flow for the permanent Cloudflare
  * endpoint without introducing an external IdP dependency before the project chooses a production issuer.
  *
- * Version: 1.7.0
+ * Version: 1.8.0
  *
  * @module copilot/mcp/auth/issuer/dev-oauth
  */
@@ -39,7 +39,7 @@ import { firstHeaderValue, normalizeHostname } from './http-values.js';
 import { createDevOAuthRequestBudgetRuntime } from './request-budget/runtime.js';
 import { createDevOAuthResponseRuntime } from './response/runtime.js';
 
-export const DEV_OAUTH_IMPLEMENTATION_VERSION = '1.7.0';
+export const DEV_OAUTH_IMPLEMENTATION_VERSION = '1.8.0';
 export const DEV_OAUTH_IMPLEMENTATION_NAME = 'copilot-mcp-dev-oauth';
 
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
@@ -84,9 +84,11 @@ const JSON_CONTENT_TYPE = 'application/json';
 const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
 const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
 const CHATGPT_CIMD_ORIGIN = 'https://chatgpt.com';
+const CHATGPT_PLATFORM_CIMD_CLIENT_PATH = '/oauth/client.json';
+const CHATGPT_PLATFORM_JWKS_URI = 'https://chatgpt.com/oauth/jwks.json';
 const CHATGPT_CIMD_CLIENT_PATH_PATTERN = /^\/oauth\/([A-Za-z0-9_-]{6,128})\/client\.json$/u;
 const CHATGPT_CONNECTOR_REDIRECT_PATH_PREFIX = '/connector/oauth/';
-const CHATGPT_LEGACY_REDIRECT_URI = 'https://chatgpt.com/connector_platform_oauth_redirect';
+const CHATGPT_PLATFORM_REDIRECT_URI = 'https://chatgpt.com/connector_platform_oauth_redirect';
 const CLAUDE_CIMD_ORIGIN = 'https://claude.ai';
 const CLAUDE_CIMD_CLIENT_PATH = '/oauth/mcp-oauth-client-metadata';
 const CLAUDE_CONNECTOR_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback';
@@ -94,6 +96,7 @@ const PRIVATE_KEY_JWT_MAX_TTL_SECONDS = 5 * 60;
 const PRIVATE_KEY_JWT_CLOCK_TOLERANCE_SECONDS = 30;
 const PRIVATE_KEY_JWT_REPLAY_CACHE_MAX_ENTRIES = 2000;
 const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
+const OFFLINE_ACCESS_SCOPE = 'offline_access';
 const REFRESH_TOKEN_GRANT = 'refresh_token';
 const REFRESH_TOKEN_PREFIX = 'rt_';
 const REFRESH_TOKEN_FAMILY_PREFIX = 'rtf_';
@@ -337,7 +340,7 @@ export function createDevOAuthRuntime(options = {}) {
      */
     function buildBuiltInDevOAuthMetadata(config, processConfig = boundProcessConfig) {
         const issuerConfig = resolveDevOAuthProcessConfig(processConfig);
-        const scopesSupported = [...new Set([...config.scopesSupported, ...OIDC_SCOPES])];
+        const scopesSupported = [...new Set([...config.scopesSupported, ...OIDC_SCOPES, OFFLINE_ACCESS_SCOPE])];
         const cimdEnabled = isDevOAuthCimdEnabled(issuerConfig);
         return {
             issuer: config.resource,
@@ -935,7 +938,7 @@ export function createDevOAuthRuntime(options = {}) {
                 resourceParameterPresent: Boolean(resourceParam),
             });
             writeJson(res, 400, {
-                error: errors.some((item) => item.startsWith('resource_')) ? 'invalid_target' : 'invalid_request',
+                error: selectAuthorizationRequestErrorCode(errors),
                 error_description: 'Pushed authorization request parameters are invalid.',
             });
             return;
@@ -1032,6 +1035,20 @@ export function createDevOAuthRuntime(options = {}) {
     }
 
     /**
+     * Preserve standard OAuth authorization error semantics instead of collapsing every malformed PAR request into
+     * invalid_request. Resource Indicator failures take precedence because they identify a different target authority.
+     *
+     * @param {string[]} errors
+     * @returns {'invalid_target' | 'invalid_scope' | 'unsupported_response_type' | 'invalid_request'}
+     */
+    function selectAuthorizationRequestErrorCode(errors) {
+        if (errors.some((item) => item.startsWith('resource_'))) return 'invalid_target';
+        if (errors.includes('invalid_scope')) return 'invalid_scope';
+        if (errors.includes('unsupported_response_type')) return 'unsupported_response_type';
+        return 'invalid_request';
+    }
+
+    /**
      * @param {URLSearchParams} params
      * @param {string} name
      * @param {number} maxLength
@@ -1114,9 +1131,7 @@ export function createDevOAuthRuntime(options = {}) {
                 dpopJktPresent: Boolean(dpopJkt),
                 requestedScopeCount: scopeResult.ok ? scopeResult.scope.split(/\s+/u).filter(Boolean).length : null,
             });
-            const authorizationError = authorizationRequestErrors.some((item) => item.startsWith('resource_'))
-                ? 'invalid_target'
-                : 'invalid_request';
+            const authorizationError = selectAuthorizationRequestErrorCode(authorizationRequestErrors);
             rejectOrRedirectAuthorizeError(res, config, client, redirectUri, stateResult.value, authorizationError);
             return;
         }
@@ -3026,6 +3041,19 @@ export function createDevOAuthRuntime(options = {}) {
             ) {
                 return undefined;
             }
+            if (url.pathname === CHATGPT_PLATFORM_CIMD_CLIENT_PATH) {
+                return {
+                    clientId,
+                    clientName: 'ChatGPT',
+                    redirectUris: [CHATGPT_PLATFORM_REDIRECT_URI],
+                    createdAt: Date.now(),
+                    source: 'cimd',
+                    tokenEndpointAuthMethod: 'private_key_jwt',
+                    jwksUri: CHATGPT_PLATFORM_JWKS_URI,
+                    trustedFallback: true,
+                    trustedFallbackReason: 'chatgpt-platform-cimd',
+                };
+            }
             const match = CHATGPT_CIMD_CLIENT_PATH_PATTERN.exec(url.pathname);
             const handle = match?.[1] ?? '';
             if (!handle) return undefined;
@@ -3034,13 +3062,13 @@ export function createDevOAuthRuntime(options = {}) {
                 clientName: 'ChatGPT Connector CIMD client',
                 redirectUris: [
                     `${CHATGPT_CIMD_ORIGIN}${CHATGPT_CONNECTOR_REDIRECT_PATH_PREFIX}${handle}`,
-                    CHATGPT_LEGACY_REDIRECT_URI,
+                    CHATGPT_PLATFORM_REDIRECT_URI,
                 ],
                 createdAt: Date.now(),
                 source: 'cimd',
                 tokenEndpointAuthMethod: 'none',
                 trustedFallback: true,
-                trustedFallbackReason: 'chatgpt-cimd-fetch-unavailable',
+                trustedFallbackReason: 'chatgpt-handle-cimd',
             };
         } catch {
             return undefined;
@@ -3152,6 +3180,9 @@ export function createDevOAuthRuntime(options = {}) {
                     });
                     return cacheClientMetadataDocument(clientId, trustedChatGptFallback);
                 }
+                logDevOAuthEvent('WARN', 'OAuth CIMD metadata fetch failed.', {
+                    clientId: summarizeClientIdForLog(clientId),
+                });
                 return undefined;
             }
             const metadata = parseClientMetadata(parsed, clientId);
@@ -3167,6 +3198,9 @@ export function createDevOAuthRuntime(options = {}) {
                     );
                     return cacheClientMetadataDocument(clientId, trustedChatGptFallback);
                 }
+                logDevOAuthEvent('WARN', 'OAuth CIMD metadata document validation failed.', {
+                    clientId: summarizeClientIdForLog(clientId),
+                });
                 return undefined;
             }
             return cacheClientMetadataDocument(clientId, metadata, fetched?.cacheTtlMs);
@@ -3178,6 +3212,10 @@ export function createDevOAuthRuntime(options = {}) {
                 });
                 return cacheClientMetadataDocument(clientId, trustedChatGptFallback);
             }
+            logDevOAuthEvent('WARN', 'OAuth CIMD metadata resolution threw.', {
+                clientId: summarizeClientIdForLog(clientId),
+                error: error instanceof Error ? error.message : String(error),
+            });
             return undefined;
         }
     }
@@ -3354,28 +3392,16 @@ export function createDevOAuthRuntime(options = {}) {
     function publicOnlyLookup(hostname, options, callback) {
         void lookupDns(hostname, { all: true, verbatim: true })
             .then((addresses) => {
-                const publicAddresses = addresses.filter((entry) => !isPrivateIpAddress(entry.address));
-                if (publicAddresses.length === 0) {
-                    callback(
-                        Object.assign(new Error('Resolved client metadata host is not public.'), { code: 'ENOTFOUND' }),
-                    );
+                const result = selectPublicLookupResult(addresses, options);
+                if (result.kind === 'error') {
+                    callback(result.error);
                     return;
                 }
-                const requestedFamily =
-                    typeof options === 'object' && options && typeof options.family === 'number' ? options.family : 0;
-                const preferred =
-                    (requestedFamily ? publicAddresses.find((entry) => entry.family === requestedFamily) : undefined) ??
-                    publicAddresses.find((entry) => entry.family === 4) ??
-                    publicAddresses[0];
-                if (!preferred) {
-                    callback(
-                        Object.assign(new Error('Resolved client metadata host has no usable address.'), {
-                            code: 'ENOTFOUND',
-                        }),
-                    );
+                if (result.kind === 'all') {
+                    callback(null, result.addresses);
                     return;
                 }
-                callback(null, preferred.address, preferred.family);
+                callback(null, result.address, result.family);
             })
             .catch((error) =>
                 callback(
@@ -3384,6 +3410,44 @@ export function createDevOAuthRuntime(options = {}) {
                         : Object.assign(new Error(String(error)), { code: 'ELOOKUP' }),
                 ),
             );
+    }
+
+    /**
+     * Node 24 may call a custom lookup with `all: true`; in that mode the callback contract requires an array of
+     * LookupAddress objects. Filter every resolved address through the SSRF policy before honoring either callback form.
+     *
+     * @param {import('node:dns').LookupAddress[]} addresses
+     * @param {import('node:dns').LookupOptions} options
+     * @returns {
+     *     | { kind: 'error'; error: NodeJS.ErrnoException }
+     *     | { kind: 'all'; addresses: import('node:dns').LookupAddress[] }
+     *     | { kind: 'single'; address: string; family: number }
+     * }
+     */
+    function selectPublicLookupResult(addresses, options) {
+        const publicAddresses = addresses.filter((entry) => !isPrivateIpAddress(entry.address));
+        if (publicAddresses.length === 0) {
+            return {
+                kind: 'error',
+                error: Object.assign(new Error('Resolved client metadata host is not public.'), { code: 'ENOTFOUND' }),
+            };
+        }
+        if (options?.all === true) return { kind: 'all', addresses: publicAddresses };
+
+        const requestedFamily = typeof options?.family === 'number' ? options.family : 0;
+        const preferred =
+            (requestedFamily ? publicAddresses.find((entry) => entry.family === requestedFamily) : undefined) ??
+            publicAddresses.find((entry) => entry.family === 4) ??
+            publicAddresses[0];
+        if (!preferred) {
+            return {
+                kind: 'error',
+                error: Object.assign(new Error('Resolved client metadata host has no usable address.'), {
+                    code: 'ENOTFOUND',
+                }),
+            };
+        }
+        return { kind: 'single', address: preferred.address, family: preferred.family };
     }
 
     /**
@@ -3431,7 +3495,7 @@ export function createDevOAuthRuntime(options = {}) {
     function normalizeScope(scope, config) {
         const defaultScope = config.scopesSupported.join(' ');
         if (!scope || !scope.trim()) return { ok: true, scope: defaultScope };
-        const allowed = new Set([...config.scopesSupported, ...OIDC_SCOPES].map(String));
+        const allowed = new Set([...config.scopesSupported, ...OIDC_SCOPES, OFFLINE_ACCESS_SCOPE].map(String));
         const requested = uniqueStrings(
             scope
                 .split(/\s+/u)
@@ -3713,6 +3777,7 @@ export function createDevOAuthRuntime(options = {}) {
     const devOAuthTestHarness = Object.freeze({
         isAllowedClientMetadataUrl,
         isPrivateIpAddress,
+        selectPublicLookupResult,
     });
 
     /**
@@ -3788,7 +3853,11 @@ export function createDevOAuthRuntime(options = {}) {
         if (clientId.startsWith('mcp_dev_')) return { clientSource: 'dcr', hostClass: 'unknown' };
         try {
             const url = new URL(clientId);
-            if (url.origin === CHATGPT_CIMD_ORIGIN && CHATGPT_CIMD_CLIENT_PATH_PATTERN.test(url.pathname)) {
+            if (
+                url.origin === CHATGPT_CIMD_ORIGIN &&
+                (url.pathname === CHATGPT_PLATFORM_CIMD_CLIENT_PATH ||
+                    CHATGPT_CIMD_CLIENT_PATH_PATTERN.test(url.pathname))
+            ) {
                 return { clientSource: 'cimd', hostClass: 'chatgpt' };
             }
             if (url.origin === CLAUDE_CIMD_ORIGIN && url.pathname === CLAUDE_CIMD_CLIENT_PATH) {

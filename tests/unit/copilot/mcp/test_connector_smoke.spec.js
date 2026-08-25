@@ -41,7 +41,8 @@ function healthyOauthSmoke() {
         ok: true,
         durationMs: 30,
         failedChecks: [],
-        dcrFlow: {
+        runtimeFlow: {
+            identity: 'cimd',
             runtimeHealth: { ok: true, status: 200 },
             authenticatedToolsList: {
                 ok: true,
@@ -109,7 +110,8 @@ describe('canonical connector smoke', () => {
                     ok: false,
                     durationMs: 25,
                     failedChecks: ['authenticated-tools-list'],
-                    dcrFlow: {
+                    runtimeFlow: {
+                        identity: 'cimd',
                         authenticatedToolsList: { ok: false, status: 500, tools: 0 },
                         authenticatedSse: { ok: false, status: 500 },
                     },
@@ -161,7 +163,7 @@ describe('canonical connector smoke', () => {
         });
     });
 
-    it('passes the exact same bounded environment snapshot to public and OAuth/DCR branches', async () => {
+    it('passes one bounded environment snapshot to public/CIMD branches and disables DCR compatibility traffic', async () => {
         const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
             PATH: '/usr/bin',
             COPILOT_MCP_PROTOCOL_VERSION: '2026-07-28',
@@ -190,6 +192,9 @@ describe('canonical connector smoke', () => {
                 },
                 runOauthSmoke: async (options) => {
                     oauthEnv = /** @type {NodeJS.ProcessEnv | null} */ (options['env'] ?? null);
+                    assert.equal(options.runDcrCompatibility, false);
+                    assert.equal(options.runPrivateKeyJwt, false);
+                    assert.equal(options.runNegativeResourceChecks, false);
                     return healthyOauthSmoke();
                 },
             },

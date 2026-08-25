@@ -3156,6 +3156,52 @@ adicional foi executado porque a prova causal era suficiente.
 
 ### N.4 Git
 
+**Incidente ChatGPT OAuth/CIMD pós-publicação — 2026-08-25:** após restart manual do MCP/Cloudflare
+às ~19:48 BRT, duas tentativas de criar um novo app/conector no `chatgpt.com` falharam com
+`invalid_request`. A correlação com `mcp-http.log` fechou a causa às **19:50:15** e **19:50:32
+BRT**: o authorization endpoint rejeitou `client_id=https://chatgpt.com/oauth/client.json` com
+`errors=["unknown_client"]`, `clientResolved=false`, callback
+`https://chatgpt.com/connector_platform_oauth_redirect` e resource `/mcp`. O ChatGPT havia migrado o
+novo fluxo para um **CIMD platform-wide fixo**, enquanto o issuer reconhecia no fast-path somente a
+forma histórica `https://chatgpt.com/oauth/<handle>/client.json`.
+
+Correções source desta barreira:
+
+- o issuer 1.8.0 reconhece as duas formas ChatGPT CIMD; a forma platform-wide usa callback único,
+  `private_key_jwt` e `jwks_uri=https://chatgpt.com/oauth/jwks.json`, preservando o formato com
+  handle apenas como compatibilidade;
+- `offline_access` passou a ser anunciado em `scopes_supported` e aceito pelo authorization server;
+  isso acompanha o requisito atual do ChatGPT para conectividade via refresh token;
+- o classificador de compatibility evidence reconhece o CIMD fixo como `cimd/chatgpt`;
+- falhas genéricas de fetch/validation de CIMD agora geram diagnóstico sanitizado em vez de cair em
+  `unknown_client` sem causa observável;
+- PAR preserva códigos OAuth específicos (`invalid_target`, `invalid_scope`,
+  `unsupported_response_type`) em vez de colapsar tudo em `invalid_request`;
+- o custom DNS lookup SSRF-safe suporta o contrato Node 24 `lookup({all:true})`, filtrando **todas**
+  as respostas antes de devolver `LookupAddress[]`; isso é necessário tanto para CIMD quanto para o
+  JWKS usado por `private_key_jwt`;
+- `mcp_oauth_issuer_diagnostics` passa a bloquear readiness quando `refresh_token` é anunciado sem
+  `offline_access`, eliminando o falso-verde observado antes do incidente;
+- o canonical connector smoke deixa de criar DCR por padrão: CIMD é a identidade moderna e DCR só é
+  exercitado por opt-in explícito `COPILOT_MCP_OAUTH_SMOKE_DCR_COMPATIBILITY=true`. Isso impede que
+  nosso próprio diagnóstico fabrique demanda de compatibilidade ou mantenha o store de clients no
+  teto.
+
+Evidência local: `https://chatgpt.com/oauth/client.json` respondeu 200 com `client_id` exato,
+callback platform-wide, `private_key_jwt` e JWKS oficial; um probe com a mesma política
+public-only/SNI obteve **200** também em `/oauth/jwks.json`, com **1 chave**. A matriz focal
+`oauth-smoke + connector-smoke + SSRF` fechou **26/26** em ~2,9 s e TS7 strict em ~3,0 s. O antigo
+store persistente contém **100/100 clients** com nome exato `Copilot MCP OAuth smoke public client`,
+confirmando que o teto era dívida causada pelo próprio smoke, não demanda externa. A limpeza desse
+estado deve ocorrer junto da promoção para não competir com a geração antiga em memória.
+
+**Gate de promoção deste incidente:** [ ] commit/push source; [ ] reload MCP/Cloudflare; [ ]
+metadata live anuncia `offline_access`; [ ] diagnostics live `ready=true`; [ ] canonical connector
+smoke `ok=true` sem criar novo DCR; [ ] remover somente os 100 clients/refresh records pertencentes
+ao smoke histórico, com backup; [ ] nova criação do app/conector no ChatGPT usando
+`https://mcp.aurelin.org/mcp`; [ ] nenhuma nova ocorrência `unknown_client` para
+`https://chatgpt.com/oauth/client.json`.
+
 - [x] diff review;
 - [x] runtime/artifact dirs limpos conforme policy;
 - [x] commit coeso por barrier;

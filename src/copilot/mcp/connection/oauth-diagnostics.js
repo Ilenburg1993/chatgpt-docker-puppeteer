@@ -418,7 +418,13 @@ function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer, allowL
         warnings.push('grant_types_supported does not include authorization_code.');
     if (metadata['client_id_metadata_document_supported'] !== true) {
         warnings.push(
-            'client_id_metadata_document_supported is not true; Dynamic Client Registration must be available and is the canonical path for this dev issuer.',
+            'client_id_metadata_document_supported is not true; MCP 2026-07-28 prefers Client ID Metadata Documents and DCR should be treated only as compatibility fallback.',
+        );
+    }
+    if (grantTypes.includes('refresh_token') && !scopesSupported.includes('offline_access')) {
+        blockers.push('offline-access-not-advertised');
+        warnings.push(
+            'Refresh tokens are advertised but scopes_supported does not include offline_access; current ChatGPT OAuth setup may reject or fail to preserve connector refresh connectivity.',
         );
     }
     if (metadata['resource_parameter_supported'] !== true) {
@@ -473,6 +479,7 @@ function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer, allowL
             responseTypesSupported: responseTypes,
             grantTypesSupported: grantTypes,
             oidcScopesSupported: OIDC_SCOPES.filter((scope) => scopesSupported.includes(scope)),
+            offlineAccessSupported: scopesSupported.includes('offline_access'),
             scopesSupported,
             missingRequiredScopes: missingScopes,
             missingRecommendedFields,

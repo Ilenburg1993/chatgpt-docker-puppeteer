@@ -2,9 +2,10 @@
 /**
  * Canonical full connector smoke shared by the CLI and MCP tool surface.
  *
- * The unauthenticated edge/OAuth-challenge smoke and the authenticated OAuth/DCR smoke are independent and therefore
+ * The unauthenticated edge/OAuth-challenge smoke and the authenticated OAuth/CIMD smoke are independent and therefore
  * execute concurrently. Only their combined result is persisted as connector readiness, so a healthy public challenge
- * can no longer mask a broken authenticated connector path.
+ * can no longer mask a broken authenticated connector path. DCR is deliberately excluded from this canonical remote
+ * smoke so internal diagnostics do not manufacture compatibility demand or persistent client registrations.
  *
  * @module copilot/mcp/cloudflare/connector-smoke
  */
@@ -109,6 +110,7 @@ export async function runCanonicalConnectorSmoke({
         retryAttempts: 2,
         retryBaseDelayMs: 250,
         retryMaxDelayMs: 1_000,
+        runDcrCompatibility: false,
         runPrivateKeyJwt: false,
         runNegativeResourceChecks: false,
         localToolNames,
@@ -118,10 +120,10 @@ export async function runCanonicalConnectorSmoke({
         runOauthSmoke(oauthOptions),
     ]);
     const oauthRecord = asRecord(oauth);
-    const dcrFlow = asRecord(oauthRecord['dcrFlow']);
-    const authenticatedToolsList = asRecord(dcrFlow['authenticatedToolsList']);
-    const authenticatedSse = asRecord(dcrFlow['authenticatedSse']);
-    const runtimeHealth = asRecord(dcrFlow['runtimeHealth']);
+    const runtimeFlow = asRecord(oauthRecord['runtimeFlow']);
+    const authenticatedToolsList = asRecord(runtimeFlow['authenticatedToolsList']);
+    const authenticatedSse = asRecord(runtimeFlow['authenticatedSse']);
+    const runtimeHealth = asRecord(runtimeFlow['runtimeHealth']);
     /** @type {AuthenticatedToolsListProjection | null} */
     const authenticatedToolsListProjection =
         Object.keys(authenticatedToolsList).length > 0

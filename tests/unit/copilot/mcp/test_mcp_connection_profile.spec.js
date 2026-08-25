@@ -155,6 +155,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(/** @type {string[]} */ (metadata['grant_types_supported']).includes('refresh_token'));
         assert.deepEqual(metadata['token_endpoint_auth_methods_supported'], ['none', 'private_key_jwt']);
         assert.ok(/** @type {string[]} */ (metadata['scopes_supported']).includes('openid'));
+        assert.ok(/** @type {string[]} */ (metadata['scopes_supported']).includes('offline_access'));
         assert.ok(/** @type {string[]} */ (metadata['claims_supported']).includes('email'));
         assert.deepEqual(buildProtectedResourceMetadata(config)['scopes_supported'], [
             'repo:read',
@@ -491,17 +492,39 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.ok(chatGptLocation);
             assert.equal(new URL(chatGptLocation).origin, 'https://chatgpt.com');
 
+            // ChatGPT's current platform-wide CIMD identity no longer carries a per-connector handle. Keep this exact
+            // production shape protected independently from the older /oauth/<handle>/client.json compatibility path.
+            const platformVerifier = base64Url(randomBytes(32));
+            const platformChallenge = base64Url(createHash('sha256').update(platformVerifier).digest());
+            const platformAuthorize = new URL(`${resource}/oauth/authorize`);
+            platformAuthorize.searchParams.set('response_type', 'code');
+            platformAuthorize.searchParams.set('client_id', 'https://chatgpt.com/oauth/client.json');
+            platformAuthorize.searchParams.set('redirect_uri', 'https://chatgpt.com/connector_platform_oauth_redirect');
+            platformAuthorize.searchParams.set('scope', 'repo:read offline_access');
+            platformAuthorize.searchParams.set('resource', resource);
+            platformAuthorize.searchParams.set('code_challenge', platformChallenge);
+            platformAuthorize.searchParams.set('code_challenge_method', 'S256');
+            const platformAuthorizationResponse = await fetch(platformAuthorize, { redirect: 'manual' });
+            assert.equal(platformAuthorizationResponse.status, 302);
+            const platformLocation = platformAuthorizationResponse.headers.get('location');
+            assert.ok(platformLocation);
+            const platformCallback = new URL(platformLocation);
+            assert.equal(platformCallback.origin, 'https://chatgpt.com');
+            assert.equal(platformCallback.pathname, '/connector_platform_oauth_redirect');
+            assert.ok(platformCallback.searchParams.get('code'));
+
             const compatibility = await processHost.toolCapabilities.audit.readCompatibilitySummary({
                 tailBytes: 256 * 1024,
                 maxEvents: 2000,
             });
-            assert.ok(compatibility.oauth.clientActivity.bySource.cimd >= 2);
+            assert.ok(compatibility.oauth.clientActivity.bySource.cimd >= 3);
             assert.ok(compatibility.oauth.clientActivity.byHostClass.claude > 0);
-            assert.ok(compatibility.oauth.clientActivity.byHostClass.chatgpt > 0);
-            assert.ok(compatibility.oauth.clientActivity.byResolution['trusted-fallback'] >= 2);
+            assert.ok(compatibility.oauth.clientActivity.byHostClass.chatgpt >= 2);
+            assert.ok(compatibility.oauth.clientActivity.byResolution['trusted-fallback'] >= 3);
             const auditText = await readFile(process.env['COPILOT_MCP_AUDIT_FILE'], 'utf8');
             assert.equal(auditText.includes('https://claude.ai/oauth/mcp-oauth-client-metadata'), false);
             assert.equal(auditText.includes('https://chatgpt.com/oauth/unit_test/client.json'), false);
+            assert.equal(auditText.includes('https://chatgpt.com/oauth/client.json'), false);
         } finally {
             if (server) await closeHttpMcpServer(server);
             await processHost?.dispose();

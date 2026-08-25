@@ -82,6 +82,7 @@ describe('MCP OAuth smoke hardening', () => {
             retryAttempts: 1,
             retryBaseDelayMs: 0,
             retryMaxDelayMs: 0,
+            runDcrCompatibility: true,
             runPrivateKeyJwt: false,
             runNegativeResourceChecks: false,
         });
@@ -155,6 +156,7 @@ describe('MCP OAuth smoke hardening', () => {
             retryAttempts: 1,
             retryBaseDelayMs: 0,
             retryMaxDelayMs: 0,
+            runDcrCompatibility: true,
             runPrivateKeyJwt: false,
             runNegativeResourceChecks: false,
         });
