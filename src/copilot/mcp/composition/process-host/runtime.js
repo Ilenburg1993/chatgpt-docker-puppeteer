@@ -299,7 +299,10 @@ async function prepareApplicationInfra(processConfig, audit) {
     /** @type {{ capability: string; dispose: () => void | Promise<void> }[]} */
     const disposers = [{ capability: 'audit-runtime', dispose: () => audit.flush() }];
 
-    await processConfig.toolCapabilities.cloudflare.prepare();
+    await Promise.all([
+        processConfig.toolCapabilities.cloudflare.prepare(),
+        processConfig.toolCapabilities.modelGatewayLiveRuns.prepare(),
+    ]);
 
     try {
         await bootstrapApplicationInfraSqliteProvider();

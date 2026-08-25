@@ -2677,7 +2677,7 @@ como TTFT.
       `registry wire projection ==     official SDK tools/list`, mudança de fingerprint quando
       `minLength` muda sem renomear campo, limite de 64 caracteres na identidade e legacy wire sem
       `ttlMs/cacheScope`;
-- [ ] host real confirma refresh após descriptor change/reload da nova geração.
+- [x] host real confirma refresh após descriptor change/reload da nova geração.
 
 **Checkpoint de auditoria K.4 — 2026-08-25:** SDK `@modelcontextprotocol/{server,client,node}`
 **2.0.0** foi inspecionado nos bundles/declarations efetivos. `ServerOptions.cacheHints` é público;
@@ -2712,6 +2712,14 @@ permanece **57/37**; state **25/52/0**; config/env **38 arquivos / 61 refs obser
 0 migration targets**. **O processo MCP/conector que hospeda esta própria sessão ainda não foi
 recarregado**, portanto a ativação no host real continua sendo o único gate restante de K.4 e deve
 ser tratada junto da barreira N.3 para não confundir worktree certificado com runtime vivo.
+
+**Checkpoint K.4 host-real promovido — 2026-08-25:** após publicação, o reload controlado promoveu
+MCP + OAuth + Cloudflare permanente e o host voltou a observar a geração nova. `tools/list` remoto
+retornou **131/131**, sem missing/unexpected tools, sob protocolo **2026-07-28**; schema convergence
+registrou `toolsListObservedCount >= 3`, `listChangedSentCount=1`, zero `listChangedError`, e o
+fingerprint wire permaneceu `98aad6e8205ea09cb3b993385a97f5c6e4d0b37c2cac7f9fe88766069e78307e`. O
+runtime vivo reportou `runtimeSourceDrift=false`, workspace limpo e HEAD publicado. Assim, a
+freshness proof de K.4 está fechada também no host real, não apenas localmente.
 
 **Gate K:** ganho de performance é demonstrado end-to-end sem sacrificar freshness/correctness.
 
@@ -2757,7 +2765,7 @@ não criar nova mutable process state.
 ### L.2 Decision gates
 
 - [x] janela mínima de observação;
-- [ ] ChatGPT real;
+- [x] ChatGPT real;
 - [ ] Claude real se continuar consumer suportado;
 - [x] consumer/exit condition documentados;
 - [ ] zero-use evidence.
@@ -2784,6 +2792,14 @@ config/env **38 arquivos / 61 refs / 0 migration targets**, owners/boundaries **
 que hospeda esta conversa ainda não coleta essa telemetria nova. Portanto ChatGPT real, Claude real
 (se mantido) e zero-use evidence permanecem gates de N.3; L.3 continua integralmente bloqueada até
 essa evidência existir.
+
+**Checkpoint L.2 host-real — 2026-08-25:** depois do reload e da reconexão real do ChatGPT, o
+aggregate persistido observou **2 resoluções CIMD ChatGPT bem-sucedidas**, grant
+`authorization_code` associado a ChatGPT e requests modernos 2026. O shared gate de retirement,
+contudo, ainda é insuficiente: janela observada ~**1h44m** versus 7 dias e **76 requests MCP**
+versus mínimo 100. Além disso, o aggregate contém uso 2025 e DCR (incluindo tráfego dos próprios
+smokes de compatibilidade), portanto nenhum zero-use pode ser inferido. ChatGPT real está fechado;
+Claude continua opcional/aberto se permanecer consumer suportado; L.3 permanece bloqueada.
 
 ### L.3 Retirement
 
@@ -2891,18 +2907,80 @@ governada.
 
 ### N.3 Runtime/host
 
-- [ ] reload/promote controlado;
-- [ ] runtime generation == source `HEAD`;
-- [ ] Scan Tools/tools-list parity;
-- [ ] read-only call;
-- [ ] bounded write plan/apply;
-- [ ] cancellation real;
-- [ ] OAuth/CIMD reconnect/reauth;
-- [ ] Cloudflare readiness;
-- [ ] modern/compat telemetry;
-- [ ] LLM-B readiness;
-- [ ] ChatGPT real;
+- [x] reload/promote controlado;
+- [x] runtime generation == source `HEAD`;
+- [x] Scan Tools/tools-list parity;
+- [x] read-only call;
+- [x] bounded write plan/apply;
+- [x] cancellation real;
+- [x] OAuth/CIMD reconnect/reauth — fatos brutos `authorization_code`/CIMD/reconnect; não inferir UI
+      de reauth;
+- [x] Cloudflare readiness;
+- [x] modern/compat telemetry;
+- [ ] LLM-B readiness — control plane íntegro, mas runtime selector permanece sem env/runtime proof
+      selecionável;
+- [x] ChatGPT real;
 - [ ] Claude real se suportado.
+
+**Checkpoint N.3 pós-reconnect — 2026-08-25:** reload allowlisted `current -> quic` completou com
+exit code 0; MCP PID `99572` e cloudflared PID `99630` ficaram vivos, health local/público 200,
+origin HTTP/2 e edge QUIC. O connector smoke autenticado provou OAuth metadata/challenge, SSE
+initial/reconnect e `tools/list` **131/131**. `mcp_runtime_health` confirmou `main@20fb7d0ee`,
+`dirty=false` e `runtimeSourceDrift=false`. Uma sonda ignorada pelo Git executou
+`create plan -> create -> patch plan -> apply -> read -> delete` com hash precondition. Uma unit
+suite real foi iniciada como child do runtime e cancelada por `job_cancel` via SIGTERM no mesmo
+runtime epoch, sem orphaning.
+
+A compatibility telemetry viva observou 2026 moderno, stateful, CIMD ChatGPT e grants OAuth. Os
+gates Cloudflare pós-change ficaram verdes: 4 conexões HA, QUIC presente, RTT ~22 ms e RPC client
+p95 ~1,17 s. A primeira geração promovida mostrou `llmb_live_readiness` com control plane íntegro,
+mas `ok=false`: runtime selector 0/7 e terminal selector 0/3 por `runtime_env_not_ready`.
+
+**Correção LLM-B readiness/environment authority — 2026-08-25:** a auditoria causal provou que o
+blocker era um falso negativo arquitetural. O domain readiness já aceitava `options.env`, mas o
+adapter MCP não passava a `ModelGatewayLiveRunEnvironmentAuthority`; ao mesmo tempo, o caminho
+`make -> stateful-env -> Cloudflare CLI -> MCP child` não carrega `.env.local`, portanto o runtime
+MCP não possuía as credenciais provider-specific que o terminal/Model Gateway pode usar. A
+`ModelGatewayLiveRunEnvironmentAuthority` foi promovida para schema v2: capability opaca,
+`prepare()` generation-bound, snapshot único de `.env.local` por grant exato/read-only, allowlist
+somente de configuração BYOK/Model Gateway e secrets provider reconhecidos, precedence
+`process env > file`, nenhuma serialização de secret e nenhuma leitura de arquivo dentro da handler.
+`process-host.prepare` prepara a authority antes de aceitar operações; `llmb_live_readiness` agora
+exige essa mesma authority e avalia em memória a mesma projeção provider-capable que um live run
+usaria. GITHUB/Copilot-model/MCP credentials e secrets arbitrários continuam fora da projeção de
+arquivo. A auditoria final também eliminou dois parsers `.env` duplicados: a sintaxe pura
+`parseMcpEnvironmentFile` passou ao owner genérico `process/environment` (policy 1.1.0), enquanto
+Cloudflare e Model Gateway mantêm exclusivamente seus grants/allowlists/authorities; a antiga
+reexportação `Cloudflare remote -> parseEnvFile` foi removida em vez de virar shim.
+
+Prova local da correção: teste de authority verifica allowlist, single-read concorrente,
+process-over-file precedence, separação provider/model/read-only e zero secret serialization;
+focused boundaries/tools **71/71** antes da centralização e **17/17** focais após a centralização;
+TS7 strict, lint e architecture verdes sem rebaseline (owners/boundaries 57/37, state 25/52/0, env
+38/61/0, ciclos 0). Um `ProcessHost` composto com a nova authority preparada executou o readiness
+real com `success=true` e **`ok=true`**. A barreira canônica final `mcp-fast`, executada por terminal
+persistente/cursor sobre o source definitivo, fechou **97/97 test files e 563/563 tests**, além do
+strict, em ~50,8 s, com exit 0 e zero dropped output. O checkbox LLM-B permanece aberto somente até
+reload da geração publicada e prova pela tool real.
+
+**Incidente de transporte da sessão:** inicialmente apareceu logo após uma prova de cancellation,
+mas a mesma sequência
+(`run_unit_copilot -> job_cancel -> git_status -> terminal_exec -> LLM-B read`) foi reproduzida após
+reconexão sem falha. Mais tarde o `ExceptionGroup: unhandled errors in a TaskGroup` reapareceu **sem
+cancellation**, durante um `terminal_exec` one-shot longo que executava readiness/workers. O MCP
+permaneceu vivo, chamadas curtas continuaram funcionando e não houve `ExceptionGroup`/`TaskGroup`,
+crash ou erro correlato no runtime Node. A mesma carga executada por `terminal_session_control` +
+leitura cursor-based concluiu corretamente. Classificação atual: **fragilidade host/session
+transport associada a one-shot longo, não evidência de bug causal em cancellation ou handler Node**.
+Para trabalho longo, preferir jobs/sessões persistentes + cursor; não introduzir workaround de
+transport/cancellation no servidor sem nova evidência. Se reincidir, capturar timestamp + continuity
+telemetry e correlacionar origin/Cloudflare.
+
+**Checkpoint de promoção LLM-B pendente — 2026-08-25:** o delta de environment authority está
+localmente certificado e pronto para publicação. Ordem obrigatória: commit/push -> confirmar
+`main == origin/main` -> reload controlado -> `mcp_connector_smoke_refresh` ->
+`llmb_live_readiness` pela geração nova. Somente um `ok=true` da tool real autoriza fechar o item
+LLM-B acima; não usar o probe composto local como substituto da prova host-real.
 
 ### N.4 Git
 
@@ -2983,15 +3061,14 @@ A Arquitetura 2.4 pode ser considerada encerrada em seu ideal quando:
 - [ ] import purity é avaliada transitivamente;
 - [ ] index readiness não depende de full safety scan foreground desnecessário;
 - [ ] round-trip/recovery é medido end-to-end;
-- [x] cache hints modernos possuem freshness proof local completa; promoção no host real permanece
-      em N.3;
+- [x] cache hints modernos possuem freshness proof local e host-real completas;
 - [ ] compat 2025/DCR têm consumer + telemetry + exit condition ou foram removidos;
 - [x] modern 2026 permanece primário;
 - [x] `max-autonomy` permanece decisão explícita enquanto for a política adotada;
 - [ ] docs live descrevem o `HEAD`;
 - [ ] historical docs estão claramente históricos;
 - [x] global validation barrier está verde;
-- [ ] connector real foi revalidado depois das transformações;
+- [x] connector real foi revalidado depois das transformações;
 - [x] `main == origin/main` após publicação;
 - [ ] cada faixa encerrada possui evidência e commit rastreável.
 

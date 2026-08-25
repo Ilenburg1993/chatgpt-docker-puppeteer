@@ -1,4 +1,5 @@
-import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/public/cloudflare/remote';
+import { compareRemoteConfig } from '#copilot/mcp/public/cloudflare/remote';
+import { parseMcpEnvironmentFile } from '#copilot/mcp/public/process/environment';
 import { getCloudflareClient } from '#copilot/testing/mcp/cloudflare/remote';
 import { describe, expect, it } from 'vitest';
 import { compactCloudflareRemoteAudit } from '../../../../src/copilot/mcp/tools/cloudflare-remote.js';
@@ -34,7 +35,7 @@ describe('mcp/cloudflare/remote-api', () => {
 
     it('parses local env files without exposing comments', () => {
         expect(
-            parseEnvFile(`
+            parseMcpEnvironmentFile(`
 # comment
 CLOUDFLARE_API_TOKEN="cfat_test"
 CLOUDFLARE_ACCOUNT_ID='account'

@@ -9,6 +9,8 @@ import {
     buildModelGatewayLiveRunPlan,
     buildModelGatewayReadOnlyChildEnvironment,
     createModelGatewayLiveRunEnvironmentAuthority,
+    createModelGatewayLiveRunEnvironmentAuthorityWithDependencies,
+    projectModelGatewayAuthorityFileEnvironment,
     spawnDetachedLiveRunWithDependencies,
 } from '#copilot/testing/mcp/integrations/model-gateway/live-runs';
 
@@ -67,6 +69,78 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
             true,
         );
     });
+    it('projects only recognized Model Gateway file keys and prepares one sealed provider generation', async () => {
+        const projected = projectModelGatewayAuthorityFileEnvironment({
+            ZAI_API_KEY: 'zai-file-secret',
+            CHUTES_API_KEY: 'chutes-file-secret',
+            OPENROUTER_API_KEY: 'openrouter-file-secret',
+            COPILOT_BYOK_PROFILES_JSON: '[{"id":"unit"}]',
+            COPILOT_BYOK_API_KEY_ENV: 'CUSTOM_BYOK_SECRET',
+            CUSTOM_BYOK_SECRET: 'custom-byok-file-secret',
+            GITHUB_TOKEN: 'must-not-enter-file-projection',
+            COPILOT_CONNECTION_TOKEN: 'must-not-enter-file-projection',
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'must-not-enter-file-projection',
+            AURELIN_UNRELATED_SECRET: 'must-not-enter-file-projection',
+        });
+        assert.equal(projected['ZAI_API_KEY'], 'zai-file-secret');
+        assert.equal(projected['CHUTES_API_KEY'], 'chutes-file-secret');
+        assert.equal(projected['OPENROUTER_API_KEY'], 'openrouter-file-secret');
+        assert.equal(projected['CUSTOM_BYOK_SECRET'], 'custom-byok-file-secret');
+        assert.equal(projected['GITHUB_TOKEN'], undefined);
+        assert.equal(projected['COPILOT_CONNECTION_TOKEN'], undefined);
+        assert.equal(projected['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
+        assert.equal(projected['AURELIN_UNRELATED_SECRET'], undefined);
+
+        let reads = 0;
+        const authority = createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(
+            {
+                PATH: '/usr/bin',
+                ZAI_API_KEY: 'zai-process-wins',
+                COPILOT_CONNECTION_TOKEN: 'copilot-process-only',
+            },
+            {
+                readEnvironmentFile: async () => {
+                    reads += 1;
+                    return [
+                        'ZAI_API_KEY=zai-file-loses',
+                        'CHUTES_API_KEY=chutes-file-secret',
+                        'OPENROUTER_API_KEY=openrouter-file-secret',
+                        'GITHUB_TOKEN=must-not-enter',
+                        'COPILOT_MCP_STATIC_BEARER_TOKEN=must-not-enter',
+                    ].join('\n');
+                },
+            },
+        );
+
+        assert.equal(authority.liveRunEnvironment({ invokesRealProvider: true })['CHUTES_API_KEY'], undefined);
+        await Promise.all([authority.prepare(), authority.prepare()]);
+        await authority.prepare();
+        assert.equal(reads, 1);
+
+        const provider = authority.liveRunEnvironment({ invokesModel: false, invokesRealProvider: true });
+        assert.equal(provider['ZAI_API_KEY'], 'zai-process-wins');
+        assert.equal(provider['CHUTES_API_KEY'], 'chutes-file-secret');
+        assert.equal(provider['OPENROUTER_API_KEY'], 'openrouter-file-secret');
+        assert.equal(provider['COPILOT_CONNECTION_TOKEN'], undefined);
+        assert.equal(provider['GITHUB_TOKEN'], undefined);
+        assert.equal(provider['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
+
+        const modelOnly = authority.liveRunEnvironment({ invokesModel: true, invokesRealProvider: false });
+        assert.equal(modelOnly['COPILOT_CONNECTION_TOKEN'], 'copilot-process-only');
+        assert.equal(modelOnly['ZAI_API_KEY'], undefined);
+        assert.equal(modelOnly['CHUTES_API_KEY'], undefined);
+
+        const readOnly = authority.readOnlyEnvironment();
+        assert.equal(readOnly['ZAI_API_KEY'], undefined);
+        assert.equal(readOnly['CHUTES_API_KEY'], undefined);
+        assert.equal(readOnly['COPILOT_CONNECTION_TOKEN'], undefined);
+
+        const serialized = JSON.stringify(authority);
+        assert.equal(serialized.includes('zai-process-wins'), false);
+        assert.equal(serialized.includes('chutes-file-secret'), false);
+        assert.match(serialized, /"prepared":true/u);
+    });
+
     it('keeps read-only and control-only children free of all ambient credential classes', () => {
         const readOnly = buildModelGatewayReadOnlyChildEnvironment(PARENT_ENV);
         const control = buildModelGatewayLiveRunEnvironment(

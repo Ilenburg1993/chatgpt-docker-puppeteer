@@ -1,8 +1,19 @@
 // @ts-check
 /** Environment authority for MCP-launched Model Gateway / LLM-B live operations. */
 
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
+import { buildMcpChildEnvironment, parseMcpEnvironmentFile } from '#copilot/mcp/public/process/environment';
 import { DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS } from '#copilot/model-gateway';
+
+const DEFAULT_ENV_FILE = '.env.local';
+const MODEL_GATEWAY_ENVIRONMENT_AUTHORITY_IO = createConfiguredFsIo(
+    createConfiguredFsGrant({
+        id: 'mcp.model-gateway.live-environment-authority',
+        exactPaths: [DEFAULT_ENV_FILE],
+        operations: ['read'],
+        symlinkPolicy: 'deny',
+    }),
+);
 
 const READ_ONLY_CONFIG_KEYS = Object.freeze([
     'MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS',
@@ -88,7 +99,7 @@ const COPILOT_MODEL_CREDENTIAL_KEYS = Object.freeze([
     'GITHUB_TOKEN',
 ]);
 
-/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null>} target @param {readonly string[]} keys */
+/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null | undefined>} target @param {readonly string[]} keys */
 function copyConfigured(source, target, keys) {
     for (const key of keys) {
         const value = source[key];
@@ -102,7 +113,7 @@ function validEnvironmentKey(value) {
     return /^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) ? key : null;
 }
 
-/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null>} target @param {string} pointerKey */
+/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null | undefined>} target @param {string} pointerKey */
 function copyExplicitSecretReference(source, target, pointerKey) {
     const referencedKey = validEnvironmentKey(source[pointerKey]);
     if (!referencedKey) return;
@@ -111,7 +122,7 @@ function copyExplicitSecretReference(source, target, pointerKey) {
     if (value !== undefined) target[referencedKey] = value;
 }
 
-/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null>} target */
+/** @param {NodeJS.ProcessEnv} source @param {Record<string, string | null | undefined>} target */
 function copyKnownProviderSecrets(source, target) {
     copyConfigured(source, target, DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS);
     const knownRefs = new Set(DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS);
@@ -122,6 +133,41 @@ function copyKnownProviderSecrets(source, target) {
     }
     copyExplicitSecretReference(source, target, 'COPILOT_BYOK_API_KEY_ENV');
     copyExplicitSecretReference(source, target, 'COPILOT_BYOK_BEARER_TOKEN_ENV');
+}
+
+/**
+ * Project only Model Gateway/BYOK configuration and recognized provider secrets from `.env.local`.
+ * Copilot model credentials, MCP credentials and unrelated future secrets are deliberately excluded.
+ * Exported only through the testing membrane.
+ *
+ * @param {Record<string, string>} fileEnv
+ * @returns {Readonly<NodeJS.ProcessEnv>}
+ */
+export function projectModelGatewayAuthorityFileEnvironment(fileEnv) {
+    /** @type {Record<string, string | null | undefined>} */
+    const projected = {};
+    copyConfigured(fileEnv, projected, [
+        ...READ_ONLY_CONFIG_KEYS,
+        ...LIVE_COMMON_CONFIG_KEYS,
+        ...REAL_PROVIDER_CONFIG_KEYS,
+    ]);
+    copyKnownProviderSecrets(fileEnv, projected);
+    return freezeDefinedEnvironment(projected);
+}
+
+/** @param {NodeJS.ProcessEnv} parentEnv @returns {Readonly<NodeJS.ProcessEnv>} */
+function captureModelGatewayAuthoritySource(parentEnv) {
+    const operational = buildMcpChildEnvironment({ parentEnv }).env;
+    /** @type {Record<string, string | null | undefined>} */
+    const captured = { ...operational };
+    copyConfigured(parentEnv, captured, [
+        ...READ_ONLY_CONFIG_KEYS,
+        ...LIVE_COMMON_CONFIG_KEYS,
+        ...REAL_PROVIDER_CONFIG_KEYS,
+    ]);
+    copyConfigured(parentEnv, captured, COPILOT_MODEL_CREDENTIAL_KEYS);
+    copyKnownProviderSecrets(parentEnv, captured);
+    return freezeDefinedEnvironment(captured);
 }
 
 /** @param {NodeJS.ProcessEnv} parentEnv */
@@ -156,43 +202,72 @@ export function buildModelGatewayLiveRunEnvironment(plan, parentEnv) {
     return buildMcpChildEnvironment({ parentEnv, overrides }).env;
 }
 
-export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 1;
+export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 2;
 export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND = 'copilot-mcp-model-gateway-live-environment-authority';
 
 /**
- * Secret-bearing process capability for Model Gateway live subprocesses.
+ * Secret-bearing process capability for Model Gateway live subprocesses and in-process readiness evaluation.
  *
- * Raw process.env is never retained. The authority closes only over bounded, already-projected child environments and
- * exposes methods rather than secret/config fields, so JSON/string inspection of the capability cannot reveal tokens.
+ * Raw process.env is never retained. The authority captures only bounded Model Gateway/Copilot-model inputs, then may
+ * enrich that generation once from the allowlisted `.env.local` projection during process-host prepare. Process values
+ * override file values. Methods expose fresh frozen copies and serialization exposes metadata only.
  *
  * @typedef {Readonly<{
- *     schemaVersion: 1;
+ *     schemaVersion: 2;
  *     kind: 'copilot-mcp-model-gateway-live-environment-authority';
+ *     prepare: () => Promise<void>;
  *     readOnlyEnvironment: () => Readonly<NodeJS.ProcessEnv>;
  *     liveRunEnvironment: (plan: { invokesModel?: boolean; invokesRealProvider?: boolean }) => Readonly<NodeJS.ProcessEnv>;
+ *     toJSON: () => Record<string, unknown>;
  * }>} ModelGatewayLiveRunEnvironmentAuthority
  */
 
 /** @param {NodeJS.ProcessEnv} [parentEnv] @returns {ModelGatewayLiveRunEnvironmentAuthority} */
 export function createModelGatewayLiveRunEnvironmentAuthority(parentEnv = process.env) {
-    const templates = Object.freeze({
-        readOnly: freezeEnvironment(buildModelGatewayReadOnlyChildEnvironment(parentEnv)),
-        control: freezeEnvironment(
-            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: false }, parentEnv),
-        ),
-        model: freezeEnvironment(
-            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: false }, parentEnv),
-        ),
-        provider: freezeEnvironment(
-            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: true }, parentEnv),
-        ),
-        modelAndProvider: freezeEnvironment(
-            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: true }, parentEnv),
-        ),
-    });
-    return Object.freeze({
+    return createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(parentEnv, {});
+}
+
+/**
+ * White-box construction seam for authority lifecycle tests. Production callers use the public factory above.
+ *
+ * @param {NodeJS.ProcessEnv} parentEnv
+ * @param {{ readEnvironmentFile?: () => Promise<string> }} dependencies
+ * @returns {ModelGatewayLiveRunEnvironmentAuthority}
+ */
+export function createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(parentEnv, dependencies) {
+    const capturedSource = captureModelGatewayAuthoritySource(parentEnv);
+    let templates = buildAuthorityTemplates(capturedSource);
+    let prepared = false;
+    /** @type {Promise<void> | null} */
+    let preparePromise = null;
+
+    /** @type {ModelGatewayLiveRunEnvironmentAuthority} */
+    const authority = Object.freeze({
         schemaVersion: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION,
         kind: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND,
+        async prepare() {
+            if (prepared) return;
+            if (!preparePromise) {
+                preparePromise = (async () => {
+                    /** @type {Record<string, string>} */
+                    let fileEnv;
+                    try {
+                        const content = dependencies.readEnvironmentFile
+                            ? await dependencies.readEnvironmentFile()
+                            : (await MODEL_GATEWAY_ENVIRONMENT_AUTHORITY_IO.readTextFresh(DEFAULT_ENV_FILE)).content;
+                        fileEnv = parseMcpEnvironmentFile(content);
+                    } catch {
+                        fileEnv = {};
+                    }
+                    const fileProjection = projectModelGatewayAuthorityFileEnvironment(fileEnv);
+                    templates = buildAuthorityTemplates(Object.freeze({ ...fileProjection, ...capturedSource }));
+                    prepared = true;
+                })().finally(() => {
+                    preparePromise = null;
+                });
+            }
+            await preparePromise;
+        },
         readOnlyEnvironment: () => freezeEnvironment(templates.readOnly),
         liveRunEnvironment(plan) {
             const template =
@@ -205,10 +280,51 @@ export function createModelGatewayLiveRunEnvironmentAuthority(parentEnv = proces
                       : templates.control;
             return freezeEnvironment(template);
         },
+        toJSON() {
+            return {
+                schemaVersion: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION,
+                kind: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND,
+                prepared,
+                credentialsExposed: false,
+            };
+        },
+    });
+    return authority;
+}
+
+/** @param {Readonly<NodeJS.ProcessEnv>} source */
+function buildAuthorityTemplates(source) {
+    return Object.freeze({
+        readOnly: freezeEnvironment(buildModelGatewayReadOnlyChildEnvironment(source)),
+        control: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: false }, source),
+        ),
+        model: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: false }, source),
+        ),
+        provider: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: true }, source),
+        ),
+        modelAndProvider: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: true }, source),
+        ),
     });
 }
 
 /** @param {Readonly<NodeJS.ProcessEnv>} projectedEnvironment @returns {Readonly<NodeJS.ProcessEnv>} */
 function freezeEnvironment(projectedEnvironment) {
     return Object.freeze({ ...projectedEnvironment });
+}
+
+/**
+ * @param {Record<string, string | null | undefined>} source
+ * @returns {Readonly<NodeJS.ProcessEnv>}
+ */
+function freezeDefinedEnvironment(source) {
+    /** @type {NodeJS.ProcessEnv} */
+    const normalized = {};
+    for (const [key, value] of Object.entries(source)) {
+        if (typeof value === 'string') normalized[key] = value;
+    }
+    return Object.freeze(normalized);
 }

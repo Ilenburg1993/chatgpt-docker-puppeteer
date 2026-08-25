@@ -9,7 +9,7 @@ import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import Cloudflare from 'cloudflare';
 import { createHash } from 'node:crypto';
 import { readCloudflareTunnelConfig } from '../config.js';
-import { parseEnvFile, resolveCloudflareRemoteApiEnvironment } from '../environment-authority.js';
+import { resolveCloudflareRemoteApiEnvironment } from '../environment-authority.js';
 import {
     auditOriginRequestProfile as auditOriginRequestProfileBase,
     buildDesiredOriginRequestProfile,
@@ -239,8 +239,6 @@ export function getCloudflareClient(apiToken) {
 function createClientCacheKey(value) {
     return createHash('sha256').update(value).digest('hex');
 }
-
-export { parseEnvFile };
 
 /** @param {NodeJS.ProcessEnv} env @returns {string[]} */
 function buildCredentialSources(env) {

@@ -68,10 +68,17 @@ function pruneLiveReadinessCache() {
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {boolean} includeSqliteRuntimeHealth
- * @param {{ signal?: AbortSignal; sqliteFingerprint?: Readonly<{ read: () => string }> }} [options]
+ * @param {{
+ *     signal?: AbortSignal;
+ *     sqliteFingerprint?: Readonly<{ read: () => string }>;
+ *     environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority;
+ * }} options
  * @returns {Promise<ModelGatewayLiveReadinessExecution>}
  */
-export async function executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth, options = {}) {
+export async function executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth, options) {
+    if (!options?.environmentAuthority) {
+        throw new TypeError('Model Gateway readiness requires an explicit live-run environment authority.');
+    }
     const fingerprint = await buildLiveReadinessFingerprint(
         workspace,
         includeSqliteRuntimeHealth,
@@ -120,6 +127,10 @@ export async function executeModelGatewayLiveReadiness(workspace, includeSqliteR
                 ),
                 includeSqliteRuntimeHealth,
                 reuseRedactionWorkers: true,
+                env: options.environmentAuthority.liveRunEnvironment({
+                    invokesModel: false,
+                    invokesRealProvider: true,
+                }),
             });
         } catch (builderError) {
             error = builderError instanceof Error ? builderError.message : String(builderError);

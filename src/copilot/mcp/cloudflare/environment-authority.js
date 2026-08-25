@@ -8,7 +8,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { buildMcpChildEnvironment, parseMcpEnvironmentFile } from '#copilot/mcp/public/process/environment';
 import { CLOUDFLARE_CONNECTOR_SMOKE_ENV_KEYS } from './environment.js';
 
 export const CLOUDFLARE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 1;
@@ -118,7 +118,7 @@ async function prepareCloudflareAuthority(authority) {
             /** @type {Record<string, string>} */
             let fileEnv;
             try {
-                fileEnv = parseEnvFile((await AUTHORITY_ENV_IO.readTextFresh(DEFAULT_ENV_FILE)).content);
+                fileEnv = parseMcpEnvironmentFile((await AUTHORITY_ENV_IO.readTextFresh(DEFAULT_ENV_FILE)).content);
             } catch {
                 fileEnv = {};
             }
@@ -184,24 +184,4 @@ function isAuthority(value) {
         typeof value === 'object' &&
         authorityStates.has(/** @type {CloudflareEnvironmentAuthority} */ (value)),
     );
-}
-
-/** @param {string} text @returns {Record<string, string>} */
-export function parseEnvFile(text) {
-    /** @type {Record<string, string>} */
-    const result = {};
-    for (const rawLine of String(text).split(/\r?\n/u)) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith('#')) continue;
-        const separator = line.indexOf('=');
-        if (separator <= 0) continue;
-        const key = line.slice(0, separator).trim();
-        if (!/^[A-Z_][A-Z0-9_]*$/iu.test(key)) continue;
-        let value = line.slice(separator + 1).trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-        result[key] = value;
-    }
-    return result;
 }

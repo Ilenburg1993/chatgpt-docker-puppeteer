@@ -5,6 +5,8 @@ export {
     buildModelGatewayLiveRunEnvironment,
     buildModelGatewayReadOnlyChildEnvironment,
     createModelGatewayLiveRunEnvironmentAuthority,
+    createModelGatewayLiveRunEnvironmentAuthorityWithDependencies,
+    projectModelGatewayAuthorityFileEnvironment,
 } from '../environment.js';
 export { buildModelGatewayLiveRunPlan } from '../plan.js';
 export { resetModelGatewayLiveReadinessCacheForTests } from '../readiness.js';

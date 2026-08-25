@@ -9,6 +9,7 @@ export {
     MCP_CHILD_ENVIRONMENT_POLICY_VERSION,
     buildMcpChildEnvironment,
     isOperationalEnvironmentKey,
+    parseMcpEnvironmentFile,
 } from '../contracts/child-environment.js';
 
 /** @typedef {import('../contracts/child-environment.js').McpChildEnvironmentProjection} McpChildEnvironmentProjection */

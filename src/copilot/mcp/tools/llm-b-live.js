@@ -81,7 +81,9 @@ export const llmBLiveTools = [
 
         handler: async ({ includeSqliteRuntimeHealth }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
             const execution = await executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth === true, {
+                environmentAuthority,
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 sqliteFingerprint: requireMcpToolModelGatewaySqliteFingerprintCapability(operationContext),
             });

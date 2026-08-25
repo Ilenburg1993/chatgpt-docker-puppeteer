@@ -13,7 +13,33 @@
  * @module copilot/mcp/process/environment/contracts/child-environment
  */
 
-export const MCP_CHILD_ENVIRONMENT_POLICY_VERSION = '1.0.0';
+export const MCP_CHILD_ENVIRONMENT_POLICY_VERSION = '1.1.0';
+
+/**
+ * Parse simple KEY=VALUE environment-file syntax without reading files or deciding authority.
+ * Callers remain responsible for filesystem capability, allowlisting and secret ownership.
+ *
+ * @param {string} text
+ * @returns {Record<string, string>}
+ */
+export function parseMcpEnvironmentFile(text) {
+    /** @type {Record<string, string>} */
+    const result = {};
+    for (const rawLine of String(text).split(/\r?\n/u)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) continue;
+        const separator = line.indexOf('=');
+        if (separator <= 0) continue;
+        const key = line.slice(0, separator).trim();
+        if (!/^[A-Z_][A-Z0-9_]*$/iu.test(key)) continue;
+        let value = line.slice(separator + 1).trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+        result[key] = value;
+    }
+    return result;
+}
 
 const OPERATIONAL_ENVIRONMENT_KEYS = Object.freeze(
     new Set([
