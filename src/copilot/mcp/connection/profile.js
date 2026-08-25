@@ -8,21 +8,15 @@
  * @module copilot/mcp/connection/profile
  */
 
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
 import {
-    DEFAULT_PUBLIC_MCP_URL,
-    MCP_PATH,
-    buildResourceFromMcpUrl,
-    hasAsciiControlChars,
-    normalizeMcpUrl,
-} from './url.js';
+    MCP_CONNECTION_PROFILE_DEFAULTS,
+    readMcpConnectionConfig,
+    resolveMcpConnectionProfileOptions,
+} from './config.js';
+import { buildResourceFromMcpUrl, hasAsciiControlChars, normalizeMcpUrl } from './url.js';
 
-const DEFAULT_LOCAL_HTTP_ORIGIN_URL = 'http://127.0.0.1:3333';
-const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = 'https://127.0.0.1:3333';
-const DEFAULT_LOCAL_MCP_URL = `${DEFAULT_LOCAL_HTTP_ORIGIN_URL}/mcp`;
-const DEFAULT_CLOUDFLARE_ORIGIN_URL = DEFAULT_LOCAL_HTTP_ORIGIN_URL;
-const DEFAULT_CLOUDFLARE_HTTP2_ORIGIN_URL = DEFAULT_LOCAL_HTTP2_ORIGIN_URL;
-const DEFAULT_TUNNEL_ID_PLACEHOLDER = 'tunnel_<preencher>';
+const DEFAULT_LOCAL_HTTP_ORIGIN_URL = MCP_CONNECTION_PROFILE_DEFAULTS.localHttpOriginUrl;
+const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = MCP_CONNECTION_PROFILE_DEFAULTS.localHttp2OriginUrl;
 const MAX_URL_LENGTH = 2048;
 
 export const CHATGPT_CONNECTOR_NAME = 'Repo DevContainer MCP';
@@ -97,7 +91,7 @@ export const CLAUDE_CONNECTOR_DESCRIPTION =
  * @param {{ mode: string }} [authConfig]
  * @returns {string}
  */
-export function formatChatGptConnectorAuthentication(authConfig = readMcpAuthConfig()) {
+export function formatChatGptConnectorAuthentication(authConfig = readMcpConnectionConfig().auth) {
     if (authConfig.mode === 'oauth') return 'OAuth';
     if (authConfig.mode === 'mixed-auth') return 'Mixed Authentication';
     if (authConfig.mode === 'secure-mcp-tunnel') return 'Secure MCP Tunnel';
@@ -106,6 +100,7 @@ export function formatChatGptConnectorAuthentication(authConfig = readMcpAuthCon
 
 /**
  * @param {ConnectorProfileOptions} [options]
+ * @param {import('./config.js').McpConnectionConfig} [config]
  * @returns {{
  *     name: string;
  *     description: string;
@@ -130,14 +125,17 @@ export function formatChatGptConnectorAuthentication(authConfig = readMcpAuthCon
  *     notes: string[];
  * }}
  */
-export function buildClaudeConnectorProfile(options = {}) {
-    const publicMcpUrl = readPublicMcpUrl(options.publicMcpUrl);
-    const connectorUrl = normalizeMcpUrl(publicMcpUrl);
-    const authConfig = readMcpAuthConfig();
-    const http2Plus = buildHttp2PlusProfile({
-        publicMcpUrl: connectorUrl,
-        ...(options.localMcpUrl === undefined ? {} : { localMcpUrl: options.localMcpUrl }),
-    });
+export function buildClaudeConnectorProfile(options = {}, config = readMcpConnectionConfig()) {
+    const resolved = resolveMcpConnectionProfileOptions(options, config);
+    const connectorUrl = resolved.publicMcpUrl;
+    const authConfig = config.auth;
+    const http2Plus = buildHttp2PlusProfile(
+        {
+            publicMcpUrl: connectorUrl,
+            ...(options.localMcpUrl === undefined ? {} : { localMcpUrl: options.localMcpUrl }),
+        },
+        config,
+    );
     return {
         name: CLAUDE_CONNECTOR_NAME,
         description: CLAUDE_CONNECTOR_DESCRIPTION,
@@ -180,20 +178,18 @@ export function buildClaudeConnectorProfile(options = {}) {
 
 /**
  * @param {ConnectorProfileOptions} [options]
+ * @param {import('./config.js').McpConnectionConfig} [config]
  * @returns {ConnectorProfile}
  */
-export function buildChatGptConnectorProfile(options = {}) {
-    const publicMcpUrl = readPublicMcpUrl(options.publicMcpUrl);
-    const localMcpUrl = readLocalMcpUrl(options.localMcpUrl);
-    const authMode = normalizeAuthMode(
-        options.authMode ?? /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'oauth'),
-    );
-    const tunnelId = normalizeTunnelId(options.tunnelId ?? process.env['OPENAI_MCP_TUNNEL_ID']);
-    const connectorUrl = normalizeMcpUrl(publicMcpUrl);
-    const localUrl = normalizeMcpUrl(localMcpUrl);
-    const authConfig = { ...readMcpAuthConfig(), mode: authMode };
+export function buildChatGptConnectorProfile(options = {}, config = readMcpConnectionConfig()) {
+    const resolved = resolveMcpConnectionProfileOptions(options, config);
+    const connectorUrl = resolved.publicMcpUrl;
+    const localUrl = resolved.localMcpUrl;
+    const authMode = resolved.authMode;
+    const tunnelId = resolved.tunnelId;
+    const authConfig = { ...config.auth, mode: authMode };
     const authentication = formatChatGptConnectorAuthentication(authConfig);
-    const http2Plus = buildHttp2PlusProfile({ publicMcpUrl: connectorUrl, localMcpUrl: localUrl });
+    const http2Plus = buildHttp2PlusProfile({ publicMcpUrl: connectorUrl, localMcpUrl: localUrl }, config);
     return {
         name: CHATGPT_CONNECTOR_NAME,
         description: CHATGPT_CONNECTOR_DESCRIPTION,
@@ -239,6 +235,7 @@ export function buildChatGptConnectorProfile(options = {}) {
 
 /**
  * @param {ConnectorProfileOptions} [options]
+ * @param {import('./config.js').McpConnectionConfig} [config]
  * @returns {{
  *     prerequisites: string[];
  *     httpTunnelCommands: string[];
@@ -247,8 +244,8 @@ export function buildChatGptConnectorProfile(options = {}) {
  *     notes: string[];
  * }}
  */
-export function buildSecureTunnelRunbook(options = {}) {
-    const profile = buildChatGptConnectorProfile(options);
+export function buildSecureTunnelRunbook(options = {}, config = readMcpConnectionConfig()) {
+    const profile = buildChatGptConnectorProfile(options, config);
     return {
         prerequisites: [
             'Developer mode habilitado no ChatGPT.',
@@ -283,6 +280,7 @@ export function buildSecureTunnelRunbook(options = {}) {
 
 /**
  * @param {ConnectorProfileOptions & { originUrl?: string }} [options]
+ * @param {import('./config.js').McpConnectionConfig} [config]
  * @returns {{
  *     prerequisites: string[];
  *     originUrl: string;
@@ -294,13 +292,13 @@ export function buildSecureTunnelRunbook(options = {}) {
  *     notes: string[];
  * }}
  */
-export function buildCloudflareTunnelRunbook(options = {}) {
-    const profile = buildChatGptConnectorProfile(options);
-    const http2Plus = buildHttp2PlusProfile({ publicMcpUrl: profile.connectorUrl, localMcpUrl: profile.localMcpUrl });
-    const originUrl = normalizeOriginUrl(
-        options.originUrl ?? process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'],
-        http2Plus.originUrl,
+export function buildCloudflareTunnelRunbook(options = {}, config = readMcpConnectionConfig()) {
+    const profile = buildChatGptConnectorProfile(options, config);
+    const http2Plus = buildHttp2PlusProfile(
+        { publicMcpUrl: profile.connectorUrl, localMcpUrl: profile.localMcpUrl },
+        config,
     );
+    const originUrl = normalizeOriginUrl(options.originUrl ?? config.profile.cloudflareOriginUrl, http2Plus.originUrl);
     return {
         prerequisites: [
             'cloudflared instalado no mesmo ambiente que alcança o MCP HTTP local.',
@@ -358,21 +356,20 @@ export function buildCloudflareTunnelRunbook(options = {}) {
 
 /**
  * @param {{ publicMcpUrl?: string; localMcpUrl?: string }} [options]
+ * @param {import('./config.js').McpConnectionConfig} [config]
  * @returns {Http2PlusProfile}
  */
-export function buildHttp2PlusProfile(options = {}) {
-    const originTransport = resolveOriginTransport();
-    const cloudflareTunnelTransport = resolveCloudflareTunnelTransport();
-    const cloudflareHttp2OriginRequested = readBooleanEnv(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false);
-    const publicMcpUrl = normalizeMcpUrl(options.publicMcpUrl ?? readPublicMcpUrl());
+export function buildHttp2PlusProfile(options = {}, config = readMcpConnectionConfig()) {
+    const originTransport = config.profile.originTransport;
+    const cloudflareTunnelTransport = config.profile.cloudflareTunnelTransport;
+    const cloudflareHttp2OriginRequested = config.profile.cloudflareHttp2OriginRequested;
+    const publicMcpUrl = normalizeMcpUrl(options.publicMcpUrl ?? config.profile.publicMcpUrl);
     const defaultOriginUrl =
         originTransport === 'http2' || cloudflareHttp2OriginRequested
-            ? DEFAULT_CLOUDFLARE_HTTP2_ORIGIN_URL
-            : DEFAULT_CLOUDFLARE_ORIGIN_URL;
-    const originUrl = normalizeOriginUrl(process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'], defaultOriginUrl);
-    const localMcpUrl = normalizeMcpUrl(
-        options.localMcpUrl ?? process.env['COPILOT_MCP_LOCAL_URL'] ?? `${originUrl}${MCP_PATH}`,
-    );
+            ? DEFAULT_LOCAL_HTTP2_ORIGIN_URL
+            : DEFAULT_LOCAL_HTTP_ORIGIN_URL;
+    const originUrl = normalizeOriginUrl(config.profile.cloudflareOriginUrl, defaultOriginUrl);
+    const localMcpUrl = normalizeMcpUrl(options.localMcpUrl ?? config.profile.localMcpUrl);
     return {
         defaultPolicy: 'HTTP/2+',
         originTransport,
@@ -409,7 +406,7 @@ export function buildHttp2PlusProfile(options = {}) {
 }
 
 /**
- * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {ConnectorAuthReadiness}
  */
 function buildConnectorAuthReadiness(config) {
@@ -449,7 +446,7 @@ function buildConnectorAuthReadiness(config) {
 }
 
 /**
- * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {string[]}
  */
 function buildProtectedResourceMetadataUrls(config) {
@@ -462,7 +459,7 @@ function buildProtectedResourceMetadataUrls(config) {
 /**
  * @param {string} connectorUrl
  * @param {string} localMcpUrl
- * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {Record<string, Record<string, string>>}
  */
 function buildProfileEnvironmentTemplates(connectorUrl, localMcpUrl, config) {
@@ -479,7 +476,7 @@ function buildProfileEnvironmentTemplates(connectorUrl, localMcpUrl, config) {
             TUNNEL_TRANSPORT_PROTOCOL: 'http2',
             COPILOT_MCP_ORIGIN_TRANSPORT: 'http2',
             COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
-            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: DEFAULT_CLOUDFLARE_HTTP2_ORIGIN_URL,
+            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: DEFAULT_LOCAL_HTTP2_ORIGIN_URL,
             COPILOT_MCP_OAUTH_ISSUER: resource,
             COPILOT_MCP_OAUTH_EXPECTED_ISSUER: resource,
             COPILOT_MCP_OAUTH_AUDIENCE: resource,
@@ -502,7 +499,7 @@ function buildProfileEnvironmentTemplates(connectorUrl, localMcpUrl, config) {
             TUNNEL_TRANSPORT_PROTOCOL: 'http2',
             COPILOT_MCP_ORIGIN_TRANSPORT: 'http',
             COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'false',
-            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: DEFAULT_CLOUDFLARE_ORIGIN_URL,
+            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: DEFAULT_LOCAL_HTTP_ORIGIN_URL,
             COPILOT_MCP_OAUTH_ISSUER: resource,
             COPILOT_MCP_OAUTH_EXPECTED_ISSUER: resource,
             COPILOT_MCP_OAUTH_AUDIENCE: resource,
@@ -585,80 +582,6 @@ function buildClaudeSmokePrompts() {
 
 /**
  * @param {string | undefined} value
- * @returns {string}
- */
-function readPublicMcpUrl(
-    value = process.env['COPILOT_MCP_PUBLIC_URL'] ?? process.env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'],
-) {
-    return normalizeMcpUrl(value ?? DEFAULT_PUBLIC_MCP_URL);
-}
-
-/**
- * @param {string | undefined} value
- * @returns {string}
- */
-function readLocalMcpUrl(value = process.env['COPILOT_MCP_LOCAL_URL']) {
-    const originTransport = resolveOriginTransport();
-    const fallback =
-        originTransport === 'http2' ? `${DEFAULT_LOCAL_HTTP2_ORIGIN_URL}${MCP_PATH}` : DEFAULT_LOCAL_MCP_URL;
-    return normalizeMcpUrl(value ?? fallback);
-}
-
-/**
- * @returns {'http' | 'http2'}
- */
-function resolveOriginTransport() {
-    const explicit = String(process.env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '')
-        .trim()
-        .toLowerCase();
-    if (explicit === 'http' || explicit === 'http2') return explicit;
-    if (readBooleanEnv(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false)) return 'http2';
-    const originUrl = String(process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ?? '')
-        .trim()
-        .toLowerCase();
-    return originUrl.startsWith('https://') ? 'http2' : 'http';
-}
-
-/**
- * @returns {'auto' | 'http2' | 'quic'}
- */
-function resolveCloudflareTunnelTransport() {
-    const raw = String(
-        process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? process.env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto',
-    )
-        .trim()
-        .toLowerCase();
-    if (raw === 'auto' || raw === 'http2' || raw === 'quic') return raw;
-    return 'http2';
-}
-
-/**
- * @param {string | undefined} value
- * @returns {ChatGptAuthMode}
- */
-function normalizeAuthMode(value) {
-    const raw = String(value ?? 'oauth')
-        .trim()
-        .toLowerCase();
-    if (raw === 'oauth' || raw === 'team-oauth') return 'oauth';
-    if (raw === 'mixed' || raw === 'mixed-auth' || raw === 'dev-mixed-auth') return 'mixed-auth';
-    if (raw === 'secure-mcp-tunnel') return 'secure-mcp-tunnel';
-    if (raw === 'none' || raw === 'noauth' || raw === 'none-dev' || raw === 'dev-noauth') return 'none-dev';
-    return 'oauth';
-}
-
-/**
- * @param {string | undefined} value
- * @returns {string}
- */
-function normalizeTunnelId(value) {
-    const trimmed = String(value ?? '').trim();
-    if (!trimmed || hasAsciiControlChars(trimmed) || trimmed.length > 160) return DEFAULT_TUNNEL_ID_PLACEHOLDER;
-    return trimmed;
-}
-
-/**
- * @param {string | undefined} value
  * @param {string} fallback
  * @returns {string}
  */
@@ -676,21 +599,6 @@ function normalizeOriginUrl(value, fallback) {
     } catch {
         return fallback;
     }
-}
-
-/**
- * @param {string | undefined} value
- * @param {boolean} fallback
- * @returns {boolean}
- */
-function readBooleanEnv(value, fallback) {
-    const raw = String(value ?? '')
-        .trim()
-        .toLowerCase();
-    if (!raw) return fallback;
-    if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
-    if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
-    return fallback;
 }
 
 /**

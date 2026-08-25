@@ -43,20 +43,20 @@ export function normalizeRepositoryIndexPath(value, fallback) {
     return text === '' ? fallback : text;
 }
 
-/** @param {RepositoryIndexWorkspace} workspace @returns {RepositoryIndexOperationResult} */
-export function readRepositoryIndexStatus(workspace) {
+/** @param {RepositoryIndexWorkspace} workspace @param {import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig} autoBuildConfig @returns {RepositoryIndexOperationResult} */
+export function readRepositoryIndexStatus(workspace, autoBuildConfig) {
     return success({
         success: true,
         workspaceRoot: workspace.workspaceRoot,
         defaultPath: DEFAULT_REPOSITORY_INDEX_PATH,
         stats: workspace.indexRegistry.status(),
-        autoBuild: readMcpIndexAutoBuildState(),
+        autoBuild: readMcpIndexAutoBuildState(autoBuildConfig),
     });
 }
 
 /**
  * @param {RepositoryIndexWorkspace} workspace
- * @param {{ path?: string | undefined; recursive?: boolean | undefined; depth?: number | undefined; respectGitignore?: boolean | undefined; include?: string[] | undefined; exclude?: string[] | undefined; extensions?: string[] | undefined; concurrency?: number | undefined; maxFiles?: number | undefined; pruneMissing?: boolean | undefined }} input
+ * @param {{ path?: string | undefined; recursive?: boolean | undefined; depth?: number | undefined; respectGitignore?: boolean | undefined; include?: string[] | undefined; exclude?: string[] | undefined; extensions?: string[] | undefined; concurrency?: number | undefined; maxFiles?: number | undefined; pruneMissing?: boolean | undefined; signal?: AbortSignal }} input
  * @returns {Promise<RepositoryIndexOperationResult>}
  */
 export async function buildRepositoryIndex(workspace, input) {
@@ -75,6 +75,7 @@ export async function buildRepositoryIndex(workspace, input) {
         ...(input.concurrency !== undefined ? { concurrency: input.concurrency } : {}),
         ...(input.maxFiles !== undefined ? { maxFiles: input.maxFiles } : {}),
         ...(input.pruneMissing !== undefined ? { pruneMissing: input.pruneMissing } : {}),
+        ...(input.signal ? { signal: input.signal } : {}),
     });
     return success({
         success: result.available !== false,

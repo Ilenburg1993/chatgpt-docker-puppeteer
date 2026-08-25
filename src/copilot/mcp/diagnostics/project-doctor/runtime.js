@@ -13,10 +13,11 @@ import { join } from 'node:path';
 
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
- * @param {{ includeScripts?: boolean }} [options]
+ * @param {{ includeScripts?: boolean; gitConfig: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig; signal?: AbortSignal }} options
  */
-export async function readMcpProjectDoctor(workspace, options = {}) {
+export async function readMcpProjectDoctor(workspace, options) {
     if (!workspace) throw new TypeError('Project doctor requires a workspace capability.');
+    if (!options?.gitConfig) throw new TypeError('Project doctor requires an explicit Git process config.');
     const workspaceRoot = workspace.workspaceRoot;
     const packageJsonPath = join(workspaceRoot, 'package.json');
     const packageJson = /** @type {{ scripts?: Record<string, string> }} */ (
@@ -34,7 +35,11 @@ export async function readMcpProjectDoctor(workspace, options = {}) {
             );
         }),
     );
-    const branch = await execWorkspaceGit(['branch', '--show-current'], { cwd: workspaceRoot });
+    const branch = await execWorkspaceGit(['branch', '--show-current'], {
+        cwd: workspaceRoot,
+        config: options.gitConfig,
+        ...(options.signal ? { signal: options.signal } : {}),
+    });
     return {
         success: true,
         node: process.version,

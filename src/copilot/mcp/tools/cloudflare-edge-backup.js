@@ -5,15 +5,16 @@
  * @module copilot/mcp/tools/cloudflare-edge-backup
  */
 
-import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/public/cloudflare/edge-backup';
+import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/public/cloudflare/edge';
 
-import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareEdgeBackupCreateTool = {
+export const mcpCloudflareEdgeBackupCreateTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_backup_create',
     title: 'Cloudflare edge backup create',
     description:
@@ -25,26 +26,27 @@ export const mcpCloudflareEdgeBackupCreateTool = {
             .optional()
             ['describe']('Whether to include the full snapshot in the tool response. Default: false.'),
     },
-    annotations: boundedWriteAnnotations(),
-    handler: async ({ label, includeSnapshot }) =>
+
+    handler: async ({ label, includeSnapshot }, operationContext) =>
         okResult(
             await createCloudflareEdgeBackup({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
                 ...(typeof label === 'string' ? { label } : {}),
                 ...(includeSnapshot === true ? { includeSnapshot: true } : {}),
             }),
         ),
-};
+});
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareEdgeBackupsListTool = {
+export const mcpCloudflareEdgeBackupsListTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_backups_list',
     title: 'Cloudflare edge backups list',
     description: 'List local Cloudflare edge snapshot backups created before Cloudflare edge changes.',
     inputSchema: {
         limit: z.number().int().min(1).max(200).optional()['describe']('Maximum backups to return. Default: 20.'),
     },
-    annotations: readOnlyAnnotations(),
-    handler: async ({ limit }) => okResult(await listCloudflareEdgeBackups({ limit })),
-};
+
+    handler: async ({ limit }) => okResult(await listCloudflareEdgeBackups(limit === undefined ? {} : { limit })),
+});

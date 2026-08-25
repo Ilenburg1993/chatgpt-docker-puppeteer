@@ -5,19 +5,23 @@ import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
 import {
+    createMcpAuthResourceServerRuntime,
+    readMcpAuthConfig,
     readMcpAuthJwksWarmupState,
     scheduleMcpAuthJwksWarmup,
     stopMcpAuthJwksWarmup,
-    warmMcpRemoteJwks,
 } from '#copilot/mcp/public/auth';
-import { resetMcpAuthJwksWarmupForTests, resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
+import { resetMcpAuthJwksWarmupForTests } from '#copilot/testing/mcp/auth';
 
 /** @type {http.Server[]} */
 const servers = [];
+const TEST_REPLAY = Object.freeze({
+    remember: () => ({ replay: false, stored: true, available: true, pruned: 0, evicted: 0 }),
+    status: () => ({ available: true, entries: 0, maxEntriesPerNamespace: 1000, error: null }),
+});
 
 afterEach(async () => {
     resetMcpAuthJwksWarmupForTests();
-    resetMcpAuthRuntimeForTests();
     await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
 });
 
@@ -43,14 +47,21 @@ describe('MCP auth JWKS warmup', () => {
             COPILOT_MCP_OAUTH_JWKS_URI: `${issuer}/jwks.json`,
         };
 
-        const first = await warmMcpRemoteJwks({ env });
-        const second = await warmMcpRemoteJwks({ env });
+        const runtime = createMcpAuthResourceServerRuntime(TEST_REPLAY);
+        const config = readMcpAuthConfig(env);
+        const first = await runtime.warmRemoteJwks({ config });
+        const second = await runtime.warmRemoteJwks({ config });
 
         assert.equal(first.ok, true);
         assert.equal(first.source, 'remote');
         assert.equal(first.keyCount, 0);
         assert.equal(second.source, 'cache');
         assert.equal(requests, 1);
+
+        const nextGeneration = createMcpAuthResourceServerRuntime(TEST_REPLAY);
+        const third = await nextGeneration.warmRemoteJwks({ config });
+        assert.equal(third.source, 'remote');
+        assert.equal(requests, 2);
     });
 
     it('schedules once and records a successful non-blocking warmup', async () => {
@@ -102,7 +113,7 @@ describe('MCP auth JWKS warmup', () => {
     it('stops an in-flight warmup generation without publishing stale completion state', async () => {
         /** @type {{ value: (() => void) | undefined }} */
         const callback = { value: undefined };
-        /** @type {(value: Awaited<ReturnType<typeof warmMcpRemoteJwks>>) => void} */
+        /** @type {(value: Awaited<ReturnType<ReturnType<typeof createMcpAuthResourceServerRuntime>['warmRemoteJwks']>>) => void} */
         let releaseWarmup = () => {
             throw new Error('warmup resolver was not installed');
         };

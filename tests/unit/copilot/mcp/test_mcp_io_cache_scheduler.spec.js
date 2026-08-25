@@ -6,6 +6,7 @@ import { describe, it } from 'vitest';
 
 import {
     IO_CACHE_BENCHMARK_LAUNCHER,
+    readMcpIoCacheProcessConfig,
     scheduleIoCacheBenchmarkWithDependencies,
 } from '#copilot/testing/mcp/diagnostics/io-cache';
 
@@ -13,9 +14,12 @@ import {
 function createFakeChild(pid) {
     const emitter = new EventEmitter();
     let unrefCalled = false;
+    let killCalls = 0;
     const child = Object.assign(emitter, {
         pid,
-        kill() {
+        kill(signal) {
+            killCalls += 1;
+            queueMicrotask(() => emitter.emit('close', null, signal));
             return true;
         },
         unref() {
@@ -25,6 +29,7 @@ function createFakeChild(pid) {
     return {
         child: /** @type {import('node:child_process').ChildProcess} */ (/** @type {unknown} */ (child)),
         wasUnrefCalled: () => unrefCalled,
+        killCalls: () => killCalls,
     };
 }
 
@@ -47,15 +52,15 @@ describe('MCP IO-cache benchmark scheduler boundary', () => {
             /** @type {unknown} */ (spawnChildImpl)
         );
 
+        const config = readMcpIoCacheProcessConfig({
+            PATH: '/usr/bin:/bin',
+            LANG: 'C.UTF-8',
+            AURELIN_TEST_AMBIENT_SECRET: 'must-not-cross',
+        });
         const scheduled = await scheduleIoCacheBenchmarkWithDependencies(
-            { workspaceRoot: '/workspace' },
+            { workspaceRoot: '/workspace', runnerEnvironment: config.runnerEnvironment },
             {
                 createRequestId: () => 'mcp-io-cache-benchmark-12345678',
-                parentEnv: {
-                    PATH: '/usr/bin:/bin',
-                    LANG: 'C.UTF-8',
-                    AURELIN_TEST_AMBIENT_SECRET: 'must-not-cross',
-                },
                 spawnChild,
             },
         );
@@ -70,6 +75,8 @@ describe('MCP IO-cache benchmark scheduler boundary', () => {
         assert.equal(env['PATH'], '/usr/bin:/bin');
         assert.equal(env['LANG'], 'C.UTF-8');
         assert.equal(env['AURELIN_TEST_AMBIENT_SECRET'], undefined);
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.runnerEnvironment), true);
     });
 
     it('rejects a launcher spawn error instead of reporting a detached task as accepted', async () => {
@@ -85,15 +92,47 @@ describe('MCP IO-cache benchmark scheduler boundary', () => {
 
         await assert.rejects(
             scheduleIoCacheBenchmarkWithDependencies(
-                { workspaceRoot: '/workspace' },
+                {
+                    workspaceRoot: '/workspace',
+                    runnerEnvironment: readMcpIoCacheProcessConfig({ PATH: '/usr/bin:/bin' }).runnerEnvironment,
+                },
                 {
                     createRequestId: () => 'mcp-io-cache-benchmark-87654321',
-                    parentEnv: { PATH: '/usr/bin:/bin' },
                     spawnChild,
                 },
             ),
             /injected-spawn-failure/u,
         );
+        assert.equal(fake.wasUnrefCalled(), false);
+    });
+
+    it('terminates and drains a launcher when cancellation wins before acceptance', async () => {
+        const fake = createFakeChild(424244);
+        const controller = new AbortController();
+        const spawnChild = /** @type {typeof import('node:child_process').spawn} */ (
+            /** @type {unknown} */ (
+                () => {
+                    queueMicrotask(() => {
+                        controller.abort(new Error('abort-before-io-cache-acceptance'));
+                        fake.child.emit('spawn');
+                    });
+                    return fake.child;
+                }
+            )
+        );
+
+        await assert.rejects(
+            scheduleIoCacheBenchmarkWithDependencies(
+                {
+                    workspaceRoot: '/workspace',
+                    runnerEnvironment: readMcpIoCacheProcessConfig({ PATH: '/usr/bin:/bin' }).runnerEnvironment,
+                    signal: controller.signal,
+                },
+                { createRequestId: () => 'mcp-io-cache-benchmark-cancel123', spawnChild },
+            ),
+            /abort-before-io-cache-acceptance/u,
+        );
+        assert.ok(fake.killCalls() >= 1);
         assert.equal(fake.wasUnrefCalled(), false);
     });
 
@@ -112,7 +151,11 @@ describe('MCP IO-cache benchmark scheduler boundary', () => {
 
         await assert.rejects(
             scheduleIoCacheBenchmarkWithDependencies(
-                { workspaceRoot: '/workspace', signal: controller.signal },
+                {
+                    workspaceRoot: '/workspace',
+                    runnerEnvironment: readMcpIoCacheProcessConfig({ PATH: '/usr/bin:/bin' }).runnerEnvironment,
+                    signal: controller.signal,
+                },
                 { createRequestId: () => 'mcp-io-cache-benchmark-abcdefgh', spawnChild },
             ),
             /caller-aborted/u,

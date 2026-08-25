@@ -1,7 +1,7 @@
 // @ts-check
 /** Test-only membrane for latency diagnostic factories, normalizers and resets. */
 
-export { createMcpLatencyHistoryRuntime } from '../dashboard/history.js';
+export { createMcpLatencyHistoryRuntime } from '../dashboard/testing/index.js';
 export {
     buildOpenAiEndpointLatencySnapshot,
     probeFixedOpenAiHttpsTarget,
@@ -12,6 +12,6 @@ export { createBoundConfiguredJsonlStore } from '../persistence/index.js';
 export {
     createMcpRoundTripAnalytics,
     normalizeMcpRoundTripAuditEvent,
+    resetMcpRoundTripAnalyticsMonitorForTests,
     summarizeMcpRoundTripRows,
-} from '../round-trip/analytics.js';
-export { resetMcpRoundTripAnalyticsMonitorForTests } from '../round-trip/monitor.js';
+} from '../round-trip/testing/index.js';

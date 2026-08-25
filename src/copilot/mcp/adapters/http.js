@@ -14,16 +14,12 @@
 import { logMcp } from '#copilot/mcp/public/observability';
 import { createServer } from 'node:http';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
-import {
-    MCP_PATH,
-    configureHttp1ServerTiming,
-    createMcpHttpRequestHandler,
-    readMcpHttpServerTimingPolicy,
-    readMcpHttpSessionPolicy,
-    readMcpHttpSessionRuntimeState,
-} from './http-shared.js';
+import { readMcpHttpServerTimingPolicy, readMcpHttpSessionPolicy } from './http/config.js';
+import { createMcpHttpRequestHandler } from './http/handler.js';
+import { MCP_PATH } from './http/route-policy.js';
+import { applyHttp1ServerTimingPolicy } from './http/server-timing.js';
 
-export { readMcpHttpServerTimingPolicy, readMcpHttpSessionPolicy, readMcpHttpSessionRuntimeState };
+export { readMcpHttpServerTimingPolicy, readMcpHttpSessionPolicy };
 
 export const MCP_HTTP1_ADAPTER_NAME = 'copilot-mcp-http1-adapter';
 export const MCP_HTTP1_ADAPTER_VERSION = '1.0.0';
@@ -137,12 +133,36 @@ export function readMcpHttp1ServerPolicy(env = process.env, opts = {}) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{
+ *     policy: McpHttp1ServerPolicy;
+ *     originPosture: { originTransport: string; cloudflareHttp2Origin: string };
+ * }}
+ */
+export function readMcpHttp1ListenerConfig(env = process.env) {
+    return {
+        policy: readMcpHttp1ServerPolicy(env),
+        originPosture: {
+            originTransport: String(env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '')
+                .trim()
+                .toLowerCase(),
+            cloudflareHttp2Origin: String(env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'] ?? '')
+                .trim()
+                .toLowerCase(),
+        },
+    };
+}
+
+/**
  * @typedef {{
  *     host?: string;
  *     port?: number;
- *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>;
+ *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost> & { toolCapabilities?: import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection; authRuntime?: ReturnType<typeof import('#copilot/mcp/public/composition/process-host').createComposedMcpProcessHost>['authRuntime'] };
  *     database?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
  *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     processConfig?: NonNullable<Parameters<typeof createMcpHttpRequestHandler>[0]>['processConfig'];
+ *     policy?: McpHttp1ServerPolicy;
+ *     originPosture?: ReturnType<typeof readMcpHttp1ListenerConfig>['originPosture'];
  * }} McpHttp1StartOptions
  */
 
@@ -167,16 +187,31 @@ function requireHttpWorkspaceCapability(opts, transportName) {
     return workspace;
 }
 
+/** @param {McpHttp1StartOptions} opts @returns {McpHttp1ServerPolicy} */
+function resolveHttp1StartPolicy(opts) {
+    const base = opts.policy ?? readMcpHttp1ServerPolicy(process.env, opts);
+    if (opts.host === undefined && opts.port === undefined) return base;
+    return {
+        ...base,
+        ...(opts.host === undefined ? {} : { host: normalizeHost(opts.host) }),
+        ...(opts.port === undefined ? {} : { port: normalizePort(opts.port, base.port) }),
+    };
+}
+
 /**
  * @param {McpHttp1StartOptions} [opts]
  * @returns {Promise<import('node:http').Server>}
  */
 export async function startHttpMcpServer(opts = {}) {
     const workspace = requireHttpWorkspaceCapability(opts, 'HTTP/1.1');
-    const policy = readMcpHttp1ServerPolicy(process.env, opts);
+    const policy = resolveHttp1StartPolicy(opts);
+    const timingPolicy = opts.processConfig?.transport.http.request.timing ?? readMcpHttpServerTimingPolicy();
     await opts.processHost?.prepare();
     assertHttp1Policy(policy);
-    warnIfHttp1ConflictsWithHttp2ProjectDefault(policy);
+    warnIfHttp1ConflictsWithHttp2ProjectDefault(
+        policy,
+        opts.originPosture ?? readMcpHttp1ListenerConfig().originPosture,
+    );
 
     const protocolState = createMcpHttpProtocolState('http1');
     const requestHandler = createMcpHttpRequestHandler({
@@ -185,20 +220,23 @@ export async function startHttpMcpServer(opts = {}) {
         protocolState,
         publicScheme: 'http',
         workspace,
+        ...(opts.processConfig ? { processConfig: opts.processConfig } : {}),
+        ...(opts.processHost?.toolCapabilities ? { toolCapabilities: opts.processHost.toolCapabilities } : {}),
+        ...(opts.processHost?.authRuntime ? { authRuntime: opts.processHost.authRuntime } : {}),
         ...(opts.database ? { database: opts.database } : {}),
     });
 
     const httpServer = createServer(
         {
             connectionsCheckingInterval: policy.connectionsCheckingIntervalMs,
-            headersTimeout: readMcpHttpServerTimingPolicy().headersTimeoutMs,
+            headersTimeout: timingPolicy.headersTimeoutMs,
             insecureHTTPParser: policy.insecureHTTPParser,
             joinDuplicateHeaders: policy.joinDuplicateHeaders,
             keepAlive: policy.keepAlive,
             keepAliveInitialDelay: policy.keepAliveInitialDelayMs,
             maxHeaderSize: policy.maxHeaderSizeBytes,
             noDelay: policy.noDelay,
-            requestTimeout: readMcpHttpServerTimingPolicy().requestTimeoutMs,
+            requestTimeout: timingPolicy.requestTimeoutMs,
             requireHostHeader: policy.requireHostHeader,
         },
         async (req, res) => {
@@ -217,7 +255,7 @@ export async function startHttpMcpServer(opts = {}) {
     const processHostLease = { value: null };
     installHttp1GracefulClose(httpServer, policy, requestHandler, () => processHostLease.value);
 
-    const timingPolicy = configureHttp1ServerTiming(httpServer);
+    applyHttp1ServerTimingPolicy(httpServer, timingPolicy);
     await listenHttpServer(httpServer, policy.host, policy.port);
     try {
         processHostLease.value = opts.processHost ? await opts.processHost.acquire({ reason: 'http1-listener' }) : null;
@@ -229,7 +267,7 @@ export async function startHttpMcpServer(opts = {}) {
         adapter: { name: MCP_HTTP1_ADAPTER_NAME, version: MCP_HTTP1_ADAPTER_VERSION },
         url: `http://${formatHostForUrl(policy.host)}:${policy.port}${MCP_PATH}`,
         timingPolicy,
-        sessionRuntime: readMcpHttpSessionRuntimeState(),
+        sessionRuntime: requestHandler.readSessionRuntimeState(),
         policy: sanitizeHttp1PolicyForLog(policy),
         standardTransport: 'https-http2-plus',
     });
@@ -251,15 +289,11 @@ function assertHttp1Policy(policy) {
 
 /**
  * @param {McpHttp1ServerPolicy} policy
+ * @param {ReturnType<typeof readMcpHttp1ListenerConfig>['originPosture']} originPosture
  * @returns {void}
  */
-function warnIfHttp1ConflictsWithHttp2ProjectDefault(policy) {
-    const originTransport = String(process.env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '')
-        .trim()
-        .toLowerCase();
-    const cloudflareHttp2Origin = String(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'] ?? '')
-        .trim()
-        .toLowerCase();
+function warnIfHttp1ConflictsWithHttp2ProjectDefault(policy, originPosture) {
+    const { originTransport, cloudflareHttp2Origin } = originPosture;
     if (originTransport === 'http2' || cloudflareHttp2Origin === 'true' || cloudflareHttp2Origin === '1') {
         logMcp('WARN', 'Starting HTTP/1.1 MCP fallback while the environment advertises HTTP/2+ origin settings.', {
             adapter: { name: MCP_HTTP1_ADAPTER_NAME, version: MCP_HTTP1_ADAPTER_VERSION },

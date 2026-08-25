@@ -3,4 +3,4 @@
 
 import { runCloudflareTransportBenchmarkCli } from '#copilot/mcp/public/cloudflare/transport-benchmark';
 
-process.exitCode = await runCloudflareTransportBenchmarkCli(process.argv.slice(2));
+process.exitCode = await runCloudflareTransportBenchmarkCli(process.argv.slice(2), process.env);

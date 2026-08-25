@@ -4,11 +4,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { evaluateGates } from '#copilot/testing/mcp/tools/cloudflare-post-change-gates';
+import { evaluateCloudflarePostChangeGates } from '#copilot/testing/mcp/cloudflare/posture';
 
 describe('Cloudflare post-change gates', () => {
     it('requires QUIC metrics when strict QUIC transport is active', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -36,7 +36,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('passes QUIC metrics gate when strict QUIC metrics are present', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -65,7 +65,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('warns when QUIC or RPC latency budgets are exceeded without failing HA gates', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -93,7 +93,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('downgrades aggregate request error rate when fresh smoke and HA origin signals prove recovery', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -121,7 +121,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('does not fail gates for recovered QUIC transport errors when smoke and HA metrics are healthy', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -153,7 +153,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('does not fail origin gates for abrupt stream/client closes after latest smoke', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -184,7 +184,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('does not fail origin gates for context-canceled stream/client closes after latest smoke', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {
@@ -215,7 +215,7 @@ describe('Cloudflare post-change gates', () => {
     });
 
     it('still fails gates for origin TLS/proxy errors after latest smoke', () => {
-        const result = evaluateGates({
+        const result = evaluateCloudflarePostChangeGates({
             tunnelStatus: {
                 success: true,
                 permanentTunnel: {

@@ -18,3 +18,5 @@ export {
     validateConfiguredPublicUrl,
 } from '../config.js';
 /** @typedef {import('../config.js').CloudflareTunnelConfig} CloudflareTunnelConfig */
+/** @typedef {import('../config.js').CloudflareTunnelTransportProtocol} CloudflareTunnelTransportProtocol */
+/** @typedef {import('../config.js').McpOriginTransport} McpOriginTransport */

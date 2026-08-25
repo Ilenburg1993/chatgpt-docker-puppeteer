@@ -9,9 +9,10 @@
  */
 
 import { readBoundedResponseText } from '#copilot/infra/public/platform/http-response';
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
-import { readCloudflareHttpLatencyAnalytics } from '#copilot/mcp/public/cloudflare/http-latency';
-import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
+import {
+    readCloudflaredMetricsSnapshot,
+    readCloudflareHttpLatencyAnalytics,
+} from '#copilot/mcp/public/cloudflare/observability';
 import {
     compareOpenAiEndpointLatencyToBaseline,
     measureOpenAiEndpointLatency,
@@ -21,8 +22,7 @@ import {
     summarizeClientLatencyEvidence,
     summarizeOpenAiEndpointLatencyHistory,
 } from '#copilot/mcp/public/diagnostics/latency';
-import { readMcpAuditEventTail, readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
-import { readMcpHttpSessionRuntimeState } from '#copilot/mcp/public/transport/http/stateful';
+import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_STATUS_BODY_BYTES = 512 * 1024;
@@ -65,17 +65,34 @@ const AUDIT_HISTORY_WINDOWS_MINUTES = Object.freeze([15, 60, 360, 1_440]);
 /**
  * Run the full latency attribution diagnostic without MCP wire framing.
  *
- * @param {{ reportedSlow?: boolean; clientSchemaProjectionStale?: boolean; timeoutMs?: number; includeDetails?: boolean }} [input]
+ * @param {{ reportedSlow?: boolean; clientSchemaProjectionStale?: boolean; timeoutMs?: number; includeDetails?: boolean }} input
+ * @param {import('#copilot/mcp/public/cloudflare/environment-authority').CloudflareEnvironmentAuthority} cloudflareAuthority
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} cloudflareConfig
+ * @param {Record<string, unknown> | undefined} sessionRuntimeState
+ * @param {Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'readTail'>} audit
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runMcpLatencyAttributionDiagnostic(input = {}) {
+export async function runMcpLatencyAttributionDiagnostic(
+    input,
+    cloudflareAuthority,
+    cloudflareConfig,
+    sessionRuntimeState,
+    audit,
+) {
+    if (!cloudflareAuthority) throw new TypeError('Latency attribution requires a Cloudflare environment authority.');
+    if (!cloudflareConfig) throw new TypeError('Latency attribution requires a Cloudflare config projection.');
+    if (!audit || typeof audit.readTail !== 'function')
+        throw new TypeError('Latency attribution requires an audit capability.');
     const options = /** @type {Record<string, unknown>} */ (input);
     const timeoutMs = boundedInteger(options['timeoutMs'], DEFAULT_TIMEOUT_MS, 500, 5000);
     const reportedSlow = options['reportedSlow'] === true;
     const clientSchemaProjectionStale = options['clientSchemaProjectionStale'] === true;
     const includeDetails = options['includeDetails'] === true;
     const localMetrics = readMcpMetricsSnapshot();
-    const sessionRuntime = readMcpHttpSessionRuntimeState();
+    const sessionRuntime = sessionRuntimeState ?? {
+        available: false,
+        reason: 'http-session-runtime-not-owned-by-current-transport',
+    };
     const endpointLatencyMonitor = readOpenAiEndpointLatencyMonitorState();
 
     const [
@@ -88,14 +105,18 @@ export async function runMcpLatencyAttributionDiagnostic(input = {}) {
         externalStatus,
         auditTail,
     ] = await Promise.all([
-        readCloudflaredMetricsSnapshot({ timeoutMs, includeMetricNames: false }),
-        readCloudflareHttpLatencyAnalytics({ windowMinutes: 30, timeoutMs: Math.max(timeoutMs, 3000) }),
-        measurePublicMcpLoopback(timeoutMs),
+        readCloudflaredMetricsSnapshot({ timeoutMs, includeMetricNames: false }, cloudflareConfig),
+        readCloudflareHttpLatencyAnalytics({
+            windowMinutes: 30,
+            timeoutMs: Math.max(timeoutMs, 3000),
+            authority: cloudflareAuthority,
+        }),
+        measurePublicMcpLoopback(timeoutMs, cloudflareConfig),
         measureOpenAiEndpointLatency({ sampleCount: 3, timeoutMs }),
         readOpenAiEndpointLatencyHistory({ limit: 500 }),
         readClientLatencyEvidence({ limit: 1000 }),
         collectOfficialOpenAiAggregateStatus(timeoutMs),
-        readMcpAuditEventTail({ tailBytes: AUDIT_HISTORY_TAIL_BYTES, maxEvents: AUDIT_HISTORY_MAX_EVENTS }),
+        audit.readTail({ tailBytes: AUDIT_HISTORY_TAIL_BYTES, maxEvents: AUDIT_HISTORY_MAX_EVENTS }),
     ]);
 
     const local = summarizeLocalMcpMetrics(localMetrics);
@@ -724,9 +745,9 @@ export function summarizeEndpointLatencyReachability(snapshot) {
  * transport reference, not a model/session probe.
  *
  * @param {number} timeoutMs
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} config
  */
-async function measurePublicMcpLoopback(timeoutMs) {
-    const config = readCloudflareTunnelConfig();
+async function measurePublicMcpLoopback(timeoutMs, config) {
     if (!config.publicMcpUrl) {
         return {
             status: 'unavailable',

@@ -11,20 +11,32 @@
 
 import { auditCloudflareRemoteTunnel } from '#copilot/mcp/public/cloudflare/remote';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareRemoteAuditTool = {
+
+/**
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ */
+export const mcpCloudflareRemoteAuditTool = defineMcpRawTool({
     name: 'mcp_cloudflare_remote_audit',
     title: 'Cloudflare remote tunnel audit',
     description:
         'Read the remotely-managed Cloudflare tunnel configuration and return compact sanitized drift/readiness evidence.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => okResult(compactCloudflareRemoteAudit(await auditCloudflareRemoteTunnel())),
-};
+
+    handler: async (_input, operationContext) =>
+        okResult(
+            compactCloudflareRemoteAudit(
+                await auditCloudflareRemoteTunnel({
+                    authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+                }),
+            ),
+        ),
+});
 
 /**
  * @param {Record<string, unknown> & { ok: boolean }} audit

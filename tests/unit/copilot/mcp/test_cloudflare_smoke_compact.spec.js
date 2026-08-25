@@ -3,24 +3,26 @@ import {
     isCloudflaredBenignClientOrStreamCancellationLine,
 } from '#copilot/mcp/public/cloudflare/errors';
 import {
-    isCloudflaredOriginErrorLine,
-    isCloudflaredTunnelTransportErrorLine,
     parseConnectorSmokeJsonOutput,
     summarizeConnectorSmokeReport,
-} from '#copilot/testing/mcp/tools/cloudflare-smoke';
+} from '#copilot/testing/mcp/cloudflare/observability';
+import {
+    isCloudflaredOriginErrorLine,
+    isCloudflaredTunnelTransportErrorLine,
+} from '#copilot/testing/mcp/cloudflare/process';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('cloudflare connector smoke compact mode', () => {
     it('runs the canonical connector smoke in-process instead of paying child-process lifetime overhead', async () => {
-        const source = await readFile('src/copilot/mcp/tools/tunnel-status.js', 'utf8');
+        const source = await readFile('src/copilot/mcp/connection/connector-smoke.js', 'utf8');
 
         expect(source).toContain('runCanonicalConnectorSmoke({');
         expect(source).not.toContain("spawn(process.execPath, ['src/copilot/mcp/cloudflare/cli.js', 'smoke']");
     });
 
     it('suppresses remote tool names from both legacy and authenticated tool-list projections', async () => {
-        const source = await readFile('src/copilot/mcp/tools/tunnel-status.js', 'utf8');
+        const source = await readFile('src/copilot/mcp/cloudflare/observability/smoke-report.js', 'utf8');
 
         expect(source).toContain("delete toolsListRecord['remoteToolNames'];");
         expect(source).toContain("delete authenticatedToolsList['remoteToolNames'];");

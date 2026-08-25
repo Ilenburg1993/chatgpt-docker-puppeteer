@@ -17,11 +17,11 @@ import {
     readRepositoryIndexStatus,
     searchRepositoryIndex,
 } from '#copilot/mcp/public/indexing/repository';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
     errorResult,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolIndexAutoBuildConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
@@ -36,18 +36,23 @@ function frameRepositoryIndexOperation(operation) {
         : errorResult(operation.message, operation.details);
 }
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const repoIndexTools = [
-    {
+    defineMcpRawTool({
         name: 'repo_index_status',
         title: 'Repository index status',
         description: 'Return availability and freshness metadata for the shared local IO/FTS/symbol index.',
         inputSchema: {},
-        annotations: readOnlyAnnotations(),
+
         handler: async (_input, operationContext) =>
-            frameRepositoryIndexOperation(readRepositoryIndexStatus(requireMcpToolWorkspace(operationContext))),
-    },
-    {
+            frameRepositoryIndexOperation(
+                readRepositoryIndexStatus(
+                    requireMcpToolWorkspace(operationContext),
+                    requireMcpToolIndexAutoBuildConfig(operationContext),
+                ),
+            ),
+    }),
+    defineMcpRawTool({
         name: 'repo_index_build',
         title: 'Build repository index',
         description:
@@ -76,7 +81,7 @@ export const repoIndexTools = [
                 .optional()
                 ['describe']('Remove missing files from the indexed slice. Default: safe auto-prune.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async (
             {
                 path,
@@ -104,10 +109,11 @@ export const repoIndexTools = [
                     concurrency,
                     maxFiles,
                     pruneMissing,
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_index_search',
         title: 'Search repository index',
         description:
@@ -129,7 +135,7 @@ export const repoIndexTools = [
             includePattern: z.string().optional()['describe']('Include glob filter, for example *.ts.'),
             excludePattern: z.string().optional()['describe']('Exclude glob filter, for example node_modules.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ query, path, maxResults, cursor, includePattern, excludePattern }, operationContext) =>
             frameRepositoryIndexOperation(
                 await searchRepositoryIndex(requireMcpToolWorkspace(operationContext), {
@@ -141,8 +147,8 @@ export const repoIndexTools = [
                     excludePattern,
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_index_find_symbol',
         title: 'Find repository symbol in index',
         description:
@@ -159,7 +165,7 @@ export const repoIndexTools = [
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_find_symbol call.'),
             exactMatch: z.boolean().optional()['describe']('Require exact symbol name. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ symbol, maxResults, cursor, exactMatch }, operationContext) =>
             frameRepositoryIndexOperation(
                 findRepositoryIndexSymbol(requireMcpToolWorkspace(operationContext), {
@@ -169,8 +175,8 @@ export const repoIndexTools = [
                     exactMatch,
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_find_imports',
         title: 'Find repository imports',
         description: 'Find imports or dynamic imports by module source in the shared local index.',
@@ -189,7 +195,7 @@ export const repoIndexTools = [
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_imports call.'),
             exactSource: z.boolean().optional()['describe']('Require exact import source. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ source, maxResults, cursor, exactSource }, operationContext) =>
             frameRepositoryIndexOperation(
                 findRepositoryImports(requireMcpToolWorkspace(operationContext), {
@@ -199,8 +205,8 @@ export const repoIndexTools = [
                     exactSource,
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_find_orphan_imports',
         title: 'Find orphan repository imports',
         description:
@@ -238,7 +244,7 @@ export const repoIndexTools = [
                 ['describe']('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }, operationContext) =>
             frameRepositoryIndexOperation(
                 await auditRepositoryOrphanImports(requireMcpToolWorkspace(operationContext), {
@@ -251,18 +257,18 @@ export const repoIndexTools = [
                     cursor,
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_index_invalidate',
         title: 'Invalidate repository index path',
         description: 'Invalidate a workspace file or directory in the shared local IO index after edits.',
         inputSchema: {
             path: z.string().min(1)['describe']('Workspace-relative file or directory path to invalidate.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ path }, operationContext) =>
             frameRepositoryIndexOperation(
                 await invalidateRepositoryIndex(requireMcpToolWorkspace(operationContext), path),
             ),
-    },
+    }),
 ];

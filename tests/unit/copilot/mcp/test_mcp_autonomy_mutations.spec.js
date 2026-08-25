@@ -5,15 +5,17 @@ import { describe, it } from 'vitest';
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 import { reapCompletedDetachedLiveRuns } from '#copilot/testing/mcp/integrations/model-gateway/live-runs';
 import { gitWriteTools, isAccidentalExecutableModeDrift } from '../../../../src/copilot/mcp/tools/git-write.js';
 import { llmBLiveTools } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
 import { mcpReloadTools } from '../../../../src/copilot/mcp/tools/restart-control.js';
 
-const AUTONOMY_WORKSPACE = createComposedMcpProcessHost({
+const AUTONOMY_PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'autonomy-mutations-test-host',
     backgroundServices: false,
-}).workspace;
+});
+const AUTONOMY_WORKSPACE = AUTONOMY_PROCESS_HOST.workspace;
 
 function createAutonomyOperationContext() {
     return createMcpToolOperationContext(
@@ -25,7 +27,11 @@ function createAutonomyOperationContext() {
                 _meta: { caller: 'unit-test' },
             },
         },
-        { workspace: AUTONOMY_WORKSPACE },
+        {
+            workspace: AUTONOMY_WORKSPACE,
+            config: AUTONOMY_PROCESS_HOST.processConfig.toolConfig,
+            capabilities: AUTONOMY_PROCESS_HOST.toolCapabilities,
+        },
     );
 }
 
@@ -38,6 +44,15 @@ function createAutonomyOperationContext() {
 function tool(definitions, name) {
     const definition = definitions.find((entry) => entry.name === name);
     assert.ok(definition, `missing tool ${name}`);
+    return definition;
+}
+
+/**
+ * @param {string} name
+ */
+function canonicalTool(name) {
+    const definition = getCanonicalMcpTools().find((entry) => entry.name === name);
+    assert.ok(definition, `missing canonical tool ${name}`);
     return definition;
 }
 
@@ -83,14 +98,20 @@ describe('MCP governed autonomy mutations', () => {
         assert.equal('remote' in push.inputSchema, false);
         assert.equal('refspec' in push.inputSchema, false);
         assert.equal('force' in push.inputSchema, false);
-        assert.equal(push.annotations?.destructiveHint, true);
-        assert.equal(push.annotations?.openWorldHint, true);
+        const canonicalPush = canonicalTool('git_push');
+        assert.equal(canonicalPush.annotations.destructiveHint, true);
+        assert.equal(canonicalPush.annotations.openWorldHint, true);
+        assert.equal(canonicalPush.contract.effects.mutation, 'destructive');
+        assert.equal(canonicalPush.contract.authority.network, 'open-world');
     });
 
     it('plans reload through a fixed allowlisted runner without arbitrary command/path inputs', async () => {
         const planTool = tool(mcpReloadTools, 'mcp_reload_plan');
         const scheduleTool = tool(mcpReloadTools, 'mcp_reload_schedule');
-        const result = await planTool.handler({ profile: 'current', delayMs: 2500, reason: 'unit-test' });
+        const result = await planTool.handler(
+            { profile: 'current', delayMs: 2500, reason: 'unit-test' },
+            createAutonomyOperationContext(),
+        );
         const plan = result.structuredContent;
 
         assert.equal(result.isError, undefined);
@@ -140,8 +161,11 @@ describe('MCP governed autonomy mutations', () => {
         assert.deepEqual(Object.keys(cancelTool.inputSchema).sort(), ['runId']);
         assert.equal('pid' in cancelTool.inputSchema, false);
         assert.equal('signal' in cancelTool.inputSchema, false);
-        assert.equal(cancelTool.annotations?.destructiveHint, true);
-        assert.equal(cancelTool.annotations?.openWorldHint, false);
+        const canonicalCancel = canonicalTool('llmb_live_test_cancel');
+        assert.equal(canonicalCancel.annotations.destructiveHint, true);
+        assert.equal(canonicalCancel.annotations.openWorldHint, false);
+        assert.equal(canonicalCancel.contract.effects.mutation, 'destructive');
+        assert.equal(canonicalCancel.contract.authority.network, 'local');
         const missing = await cancelTool.handler(
             { runId: 'mcp-00000000-0000-0000-0000-000000000000' },
             createAutonomyOperationContext(),

@@ -40,7 +40,7 @@ export const MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES = Object.freeze([
     'sharp',
     'vue-demi',
 ]);
-const TRUSTED_INSTALL_SCRIPT_PACKAGE_SET = new Set(MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES);
+const TRUSTED_INSTALL_SCRIPT_PACKAGES = Object.freeze([...MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES]);
 
 /**
  * @typedef {Readonly<{
@@ -424,8 +424,8 @@ export function summarizeInstallScriptPolicy(payload) {
         pending.push(name);
     }
     const uniquePending = [...new Set(pending)].sort();
-    const trustedPending = uniquePending.filter((name) => TRUSTED_INSTALL_SCRIPT_PACKAGE_SET.has(name));
-    const untrustedPending = uniquePending.filter((name) => !TRUSTED_INSTALL_SCRIPT_PACKAGE_SET.has(name));
+    const trustedPending = uniquePending.filter((name) => TRUSTED_INSTALL_SCRIPT_PACKAGES.includes(name));
+    const untrustedPending = uniquePending.filter((name) => !TRUSTED_INSTALL_SCRIPT_PACKAGES.includes(name));
     return {
         pending: uniquePending,
         pendingCount: uniquePending.length,

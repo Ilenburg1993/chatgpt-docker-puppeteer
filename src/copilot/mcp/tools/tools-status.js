@@ -5,44 +5,40 @@
  * @module copilot/mcp/tools/tools-status
  */
 
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
 import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
-import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
+import {
+    classifyMcpToolContractRisk,
+    defineMcpRawTool,
+    readMcpSchemaConvergenceState,
+} from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolAuthConfig,
+    requireMcpToolPayloadAuditConfig,
+    requireMcpToolSurface,
 } from '#copilot/mcp/public/protocol/tools';
 
-/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
-let toolsProvider = () => [];
+const NEVER_REMEMBER_APPROVAL_TOOLS = Object.freeze(['job_cancel']);
 
-/**
- * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
- * @returns {void}
- */
-export function bindMcpToolsStatusProvider(provider) {
-    toolsProvider = provider;
-    wirePayloadSummaryPromise = null;
-}
-
-const NEVER_REMEMBER_APPROVAL_TOOLS = new Set(['job_cancel']);
-
-/** @type {Promise<Record<string, unknown>> | null} */
-let wirePayloadSummaryPromise = null;
+/** @type {WeakMap<object, Promise<Record<string, unknown>>>} */
+const wirePayloadSummaryByConfig = new WeakMap();
 
 /**
  * tools/list metadata is immutable for the lifetime of one MCP process. Cache the compact summary so frequent status
  * calls do not rebuild an in-memory SDK client/server pair or transport descriptor detail that belongs in the dedicated
  * mcp_tool_payload_audit tool.
  *
+ * @param {import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig} config
+ * @param {readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
  * @returns {Promise<Record<string, unknown>>}
  */
-async function readCompactWirePayloadSummary() {
-    if (!wirePayloadSummaryPromise) {
-        wirePayloadSummaryPromise = (async () => {
-            const audit = await buildToolPayloadAudit({ tools: toolsProvider(), top: 3 });
+async function readCompactWirePayloadSummary(config, tools) {
+    let promise = wirePayloadSummaryByConfig.get(config);
+    if (!promise) {
+        promise = (async () => {
+            const audit = await buildToolPayloadAudit({ tools: [...tools], config, top: 3 });
             const fieldTotals = /** @type {Record<string, number>} */ (audit['fieldTotals'] ?? {});
             const largestField = Object.entries(fieldTotals)
                 .filter(([name]) => name !== 'totalBytes')
@@ -66,23 +62,24 @@ async function readCompactWirePayloadSummary() {
                 detailsTool: 'mcp_tool_payload_audit',
             };
         })().catch((error) => {
-            wirePayloadSummaryPromise = null;
+            wirePayloadSummaryByConfig.delete(config);
             throw error;
         });
+        wirePayloadSummaryByConfig.set(config, promise);
     }
-    return wirePayloadSummaryPromise;
+    return promise;
 }
 
 /**
- * @param {{ name: string; riskClass: string }} tool
+ * @param {{ name: string; destructive: boolean }} tool
  * @returns {boolean}
  */
 function requiresManualApproval(tool) {
-    return tool.riskClass === 'destructive' || NEVER_REMEMBER_APPROVAL_TOOLS.has(tool.name);
+    return tool.destructive || NEVER_REMEMBER_APPROVAL_TOOLS.includes(tool.name);
 }
 
 /**
- * @param {{ name: string; riskClass: string; rememberApprovalCandidate: boolean }[]} summaries
+ * @param {{ name: string; destructive: boolean; rememberApprovalCandidate: boolean }[]} summaries
  */
 function buildApprovalFrictionProfile(summaries) {
     const manual = summaries
@@ -120,64 +117,69 @@ function buildApprovalFrictionProfile(summaries) {
     };
 }
 
-function summarizeTool(tool = /** @type {any} */ ({})) {
-    const annotations = tool.annotations;
-    const readOnly = annotations.readOnlyHint === true;
-    const destructive = annotations.destructiveHint === true;
-    const openWorld = annotations.openWorldHint === true;
-    const idempotent = annotations.idempotentHint === true;
-    const riskClass = readOnly
-        ? idempotent
-            ? 'read-idempotent'
-            : 'read'
-        : destructive
-          ? 'destructive'
-          : openWorld
-            ? 'open-world'
-            : 'bounded-write';
+/**
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} tool
+ */
+function summarizeTool(tool) {
+    const contract = tool.contract;
+    const risk = classifyMcpToolContractRisk(contract);
+    const readOnly = contract.effects.mutation === 'none';
+    const destructive = contract.effects.mutation === 'destructive';
+    const openWorld = contract.authority.network === 'open-world';
     return {
         name: tool.name,
         title: tool.title,
-        riskClass,
-        annotations: {
-            readOnlyHint: readOnly,
-            destructiveHint: destructive,
-            openWorldHint: openWorld,
-            idempotentHint: idempotent,
+        riskClass: risk.category,
+        readOnly,
+        destructive,
+        openWorld,
+        contract: {
+            mutation: contract.effects.mutation,
+            externalSideEffects: contract.effects.externalSideEffects,
+            callerScope: contract.authority.callerScope,
+            networkAuthority: contract.authority.network,
+            credentials: [...contract.credentials],
+            idempotency: contract.idempotency,
+            retry: contract.retry,
+            cancellation: contract.execution.cancellation,
+            outputClass: contract.output.class,
         },
-        hasOutputSchema: Boolean(tool.outputSchema),
+        hasOutputSchema: contract.output.class === 'specific',
         securitySchemes: tool.securitySchemes ?? tool._meta?.['securitySchemes'] ?? [],
-        rememberApprovalCandidate: !readOnly && !destructive && !openWorld,
+        rememberApprovalCandidate: contract.effects.mutation === 'bounded-write' && !openWorld,
     };
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpToolsStatusTool = {
+export const mcpToolsStatusTool = defineMcpRawTool({
     name: 'mcp_tools_status',
     title: 'MCP tools status',
     description:
         'Return compact MCP tool counts, risk classes and approval strategy without repeating the full tools/list registry.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => {
-        const tools = toolsProvider();
+
+    handler: async (_args, operationContext) => {
+        const auth = requireMcpToolAuthConfig(operationContext);
+        const toolPayloadConfig = requireMcpToolPayloadAuditConfig(operationContext);
+        const tools = requireMcpToolSurface(operationContext).tools;
         const summaries = tools.map(summarizeTool).sort((left, right) => left.name.localeCompare(right.name));
-        const readOnly = summaries.filter((tool) => tool.annotations.readOnlyHint);
-        const boundedWrite = summaries.filter((tool) => tool.riskClass === 'bounded-write');
-        const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
-        const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
-        const auth = readMcpAuthConfig();
+        const readOnly = summaries.filter((tool) => tool.readOnly);
+        const boundedWrite = summaries.filter((tool) => tool.contract.mutation === 'bounded-write');
+        const destructive = summaries.filter((tool) => tool.destructive);
+        const openWorld = summaries.filter((tool) => tool.openWorld);
         const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
-        const specificOutputSchemaCount = tools.filter((tool) => tool.outputSchema !== undefined).length;
-        const missingSpecificOutputSchemaCount = Math.max(0, summaries.length - specificOutputSchemaCount);
+        const specificOutputSchemaCount = summaries.filter((tool) => tool.contract.outputClass === 'specific').length;
+        const intentionalUntypedOutputCount = summaries.filter(
+            (tool) => tool.contract.outputClass === 'intentional-untyped',
+        ).length;
         const securityMetadataCount = summaries.filter(
             (tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0,
         ).length;
         let wirePayloadAudit;
         try {
-            wirePayloadAudit = await readCompactWirePayloadSummary();
+            wirePayloadAudit = await readCompactWirePayloadSummary(toolPayloadConfig, tools);
         } catch (error) {
             wirePayloadAudit = {
                 error: error instanceof Error ? error.message : String(error),
@@ -191,12 +193,13 @@ export const mcpToolsStatusTool = {
             boundedWriteCount: boundedWrite.length,
             destructiveCount: destructive.length,
             openWorldCount: openWorld.length,
-            idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
+            idempotentReadCount: readOnly.filter((tool) => tool.contract.idempotency === 'idempotent').length,
             metadataCoverage: {
-                outputSchemaPolicy: 'explicit-specific-only',
+                outputSchemaPolicy: 'semantic-specific-or-intentional-untyped',
                 specificOutputSchemaCount,
-                missingSpecificOutputSchemaCount,
-                outputSchemaComplete: specificOutputSchemaCount === summaries.length,
+                intentionalUntypedOutputCount,
+                outputContractCoverageCount: specificOutputSchemaCount + intentionalUntypedOutputCount,
+                outputContractComplete: specificOutputSchemaCount + intentionalUntypedOutputCount === summaries.length,
                 securityMetadataCount,
                 securityComplete: securityMetadataCount === summaries.length,
             },
@@ -242,7 +245,7 @@ export const mcpToolsStatusTool = {
             detailsTool: 'mcp_capabilities_summary',
         });
     },
-};
+});
 
 /**
  * @param {number} value
@@ -254,22 +257,23 @@ function clampScore(value, max) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpAutonomyPowerScoreTool = {
+export const mcpAutonomyPowerScoreTool = defineMcpRawTool({
     name: 'mcp_autonomy_power_score',
     title: 'MCP autonomy power score',
     description:
         'Return a deterministic autonomy score for the ChatGPT connector based on tool coverage, annotations, metadata, auth posture and validation readiness.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => {
-        const tools = toolsProvider();
+
+    handler: async (_args, operationContext) => {
+        const auth = requireMcpToolAuthConfig(operationContext);
+        const tools = requireMcpToolSurface(operationContext).tools;
         const summaries = tools.map(summarizeTool);
-        const readOnly = summaries.filter((tool) => tool.annotations.readOnlyHint);
-        const boundedWrite = summaries.filter((tool) => tool.riskClass === 'bounded-write');
-        const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
-        const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
+        const readOnly = summaries.filter((tool) => tool.readOnly);
+        const boundedWrite = summaries.filter((tool) => tool.contract.mutation === 'bounded-write');
+        const destructive = summaries.filter((tool) => tool.destructive);
+        const openWorld = summaries.filter((tool) => tool.openWorld);
         const planOnly = summaries.filter((tool) => tool.name.endsWith('_plan') || tool.name.includes('_plan_'));
         const specificOutputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
         const securityMetadataCoverage =
@@ -277,7 +281,6 @@ export const mcpAutonomyPowerScoreTool = {
                 ? 0
                 : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0)
                       .length / summaries.length;
-        const auth = readMcpAuthConfig();
         const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
         const scoreParts = {
             toolSurface: clampScore((summaries.length / 66) * 18, 18),
@@ -359,4 +362,4 @@ export const mcpAutonomyPowerScoreTool = {
                     : blockers,
         });
     },
-};
+});

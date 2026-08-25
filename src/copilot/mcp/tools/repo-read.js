@@ -8,12 +8,13 @@
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import { truncateUtf8String } from '#copilot/infra/public/platform/buffer';
 
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     errorResult,
     estimateStructuredTextResultBytes,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolRepositoryReadCacheConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
     withResultSizeHint,
@@ -252,9 +253,9 @@ function frameRepositoryReadOperation(operation, sizeHintSource) {
     });
 }
 
-/** @param {RepoReadWorkspaceCapability} workspace @param {{ path?: string | undefined; startLine?: number | undefined; endLine?: number | undefined; hashMode?: 'full' | 'returned' | 'none' | undefined }} input */
-async function runRepoReadFileCall(workspace, input) {
-    return frameRepositoryReadOperation(await readRepositoryFile(workspace, input), 'repo_read_file');
+/** @param {RepoReadWorkspaceCapability} workspace @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig @param {{ path?: string | undefined; startLine?: number | undefined; endLine?: number | undefined; hashMode?: 'full' | 'returned' | 'none' | undefined }} input */
+async function runRepoReadFileCall(workspace, cacheConfig, input) {
+    return frameRepositoryReadOperation(await readRepositoryFile(workspace, input, cacheConfig), 'repo_read_file');
 }
 
 /** @param {RepoReadWorkspaceCapability} workspace @param {{ pattern?: string | undefined; query?: string | undefined; path?: string | undefined; isRegex?: boolean | undefined; caseSensitive?: boolean | undefined; includePattern?: string | undefined; excludePattern?: string | undefined; contextLines?: number | undefined; maxResults?: number | undefined; cursor?: string | undefined }} input */
@@ -268,19 +269,19 @@ async function runRepoFileStatsCall(workspace, input) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const repoReadTools = [
-    {
+    defineMcpRawTool({
         name: 'repo_status',
         title: 'Repository status',
         description: 'Return workspace root, current branch, HEAD and short Git status.',
         inputSchema: {},
         outputSchema: repoStatusOutputSchema,
-        annotations: readOnlyAnnotations(),
+
         handler: repoStatusHandler,
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_tree',
         title: 'Repository tree',
         description: 'List files and directories inside the workspace with depth and entry limits.',
@@ -296,19 +297,19 @@ export const repoReadTools = [
             maxEntries: z.number().int().min(1).max(2000).optional()['describe']('Maximum entries returned.'),
             showHidden: z.boolean().optional()['describe']('Include dotfiles. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, recursive, depth, maxEntries, showHidden }, operationContext) =>
             frameRepositoryReadOperation(
                 await readRepositoryTree(requireMcpToolWorkspace(operationContext), {
-                    path,
-                    recursive,
-                    depth,
-                    maxEntries,
-                    showHidden,
+                    ...(path === undefined ? {} : { path }),
+                    ...(recursive === undefined ? {} : { recursive }),
+                    ...(depth === undefined ? {} : { depth }),
+                    ...(maxEntries === undefined ? {} : { maxEntries }),
+                    ...(showHidden === undefined ? {} : { showHidden }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_root_tree',
         title: 'Repository root tree',
         description: 'List files and directories at the real workspace root. Equivalent to repo_tree with path=".".',
@@ -318,29 +319,29 @@ export const repoReadTools = [
             maxEntries: z.number().int().min(1).max(2000).optional()['describe']('Maximum entries returned.'),
             showHidden: z.boolean().optional()['describe']('Include dotfiles. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ recursive, depth, maxEntries, showHidden }, operationContext) =>
             frameRepositoryReadOperation(
                 await readRepositoryTree(requireMcpToolWorkspace(operationContext), {
                     path: '.',
-                    recursive,
-                    depth,
-                    maxEntries,
-                    showHidden,
+                    ...(recursive === undefined ? {} : { recursive }),
+                    ...(depth === undefined ? {} : { depth }),
+                    ...(maxEntries === undefined ? {} : { maxEntries }),
+                    ...(showHidden === undefined ? {} : { showHidden }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_root_redaction_status',
         title: 'Repository root redaction status',
         description:
             'Return root listing redaction and hidden/protected-path aggregate counts without exposing hidden or protected entry names.',
         inputSchema: {},
-        annotations: readOnlyAnnotations(),
+
         handler: async (_input, operationContext) =>
             frameRepositoryReadOperation(await auditRepositoryRootRedaction(requireMcpToolWorkspace(operationContext))),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_read_file',
         title: 'Read repository file',
         description:
@@ -384,12 +385,13 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             { path, startLine, endLine, hashMode, batch, batchFailureMode, batchConcurrency, batchResultBudgetBytes },
             operationContext,
         ) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const repositoryReadCacheConfig = requireMcpToolRepositoryReadCacheConfig(operationContext);
             if (batch !== undefined) {
                 if (path !== undefined || startLine !== undefined || endLine !== undefined || hashMode !== undefined) {
                     return errorResult('Do not mix repo_read_file batch and single-request fields.', {
@@ -406,7 +408,7 @@ export const repoReadTools = [
                                 index,
                             });
                         }
-                        return runRepoReadFileCall(workspace, parsed.data);
+                        return runRepoReadFileCall(workspace, repositoryReadCacheConfig, parsed.data);
                     },
                     {
                         concurrency: batchConcurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
@@ -463,10 +465,10 @@ export const repoReadTools = [
                     code: 'ERR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
-            return runRepoReadFileCall(workspace, { path, startLine, endLine, hashMode });
+            return runRepoReadFileCall(workspace, repositoryReadCacheConfig, { path, startLine, endLine, hashMode });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_file_stats',
         title: 'Repository file stats',
         description:
@@ -485,11 +487,15 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Maximum file size eligible for hashing. Default: 5 MiB.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, includeHash, maxHashBytes }, operationContext) =>
-            runRepoFileStatsCall(requireMcpToolWorkspace(operationContext), { path, includeHash, maxHashBytes }),
-    },
-    {
+            runRepoFileStatsCall(requireMcpToolWorkspace(operationContext), {
+                path,
+                ...(includeHash === undefined ? {} : { includeHash }),
+                ...(maxHashBytes === undefined ? {} : { maxHashBytes }),
+            }),
+    }),
+    defineMcpRawTool({
         name: 'repo_bulk_inspect',
         title: 'Bulk repository inspect',
         description:
@@ -516,9 +522,10 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ operations, failureMode, concurrency, resultBudgetBytes }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const repositoryReadCacheConfig = requireMcpToolRepositoryReadCacheConfig(operationContext);
             const execution = await runBoundedOperationBatch(
                 /** @type {Record<string, unknown>[]} */ (operations),
                 async (raw, index) => {
@@ -533,7 +540,7 @@ export const repoReadTools = [
                     if (op === 'read') {
                         const parsed = repoReadBatchItemSchema.safeParse(args);
                         return parsed.success
-                            ? runRepoReadFileCall(workspace, parsed.data)
+                            ? runRepoReadFileCall(workspace, repositoryReadCacheConfig, parsed.data)
                             : errorResult(`Invalid read args at repo_bulk_inspect index ${index}.`, {
                                   code: 'ERR_BULK_INSPECT_INVALID_READ',
                                   index,
@@ -616,8 +623,8 @@ export const repoReadTools = [
                 mode: `bulk-inspect:${execution.failureMode}`,
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_read_file_chunks',
         title: 'Read repository file chunks',
         description:
@@ -636,21 +643,25 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Optional stream highWaterMark in bytes.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, startLine, endLine, chunkLines, cursor, highWaterMark }, operationContext) =>
             frameRepositoryReadOperation(
-                await readRepositoryFileChunks(requireMcpToolWorkspace(operationContext), {
-                    path,
-                    startLine,
-                    endLine,
-                    chunkLines,
-                    cursor,
-                    highWaterMark,
-                }),
+                await readRepositoryFileChunks(
+                    requireMcpToolWorkspace(operationContext),
+                    {
+                        path,
+                        ...(startLine === undefined ? {} : { startLine }),
+                        ...(endLine === undefined ? {} : { endLine }),
+                        ...(chunkLines === undefined ? {} : { chunkLines }),
+                        ...(cursor === undefined ? {} : { cursor }),
+                        ...(highWaterMark === undefined ? {} : { highWaterMark }),
+                    },
+                    requireMcpToolRepositoryReadCacheConfig(operationContext),
+                ),
                 'repo_read_file_chunks',
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_diff_files',
         title: 'Diff repository files',
         description: 'Return a unified diff between two workspace files using the canonical IO diff engine.',
@@ -663,18 +674,18 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Include textual diff in the tool result. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ pathA, pathB, contextLines, includeDiffPreview }, operationContext) =>
             frameRepositoryReadOperation(
                 await diffRepositoryFiles(requireMcpToolWorkspace(operationContext), {
                     pathA,
                     pathB,
-                    contextLines,
-                    includeDiffPreview,
+                    ...(contextLines === undefined ? {} : { contextLines }),
+                    ...(includeDiffPreview === undefined ? {} : { includeDiffPreview }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_search_text',
         title: 'Search repository text',
         description: 'Search text or regex inside the workspace and return matching lines.',
@@ -726,7 +737,7 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             {
                 pattern,
@@ -844,8 +855,8 @@ export const repoReadTools = [
                 cursor,
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_find_symbol_usages',
         title: 'Find repository symbol usages',
         description:
@@ -860,7 +871,7 @@ export const repoReadTools = [
             maxResults: z.number().int().min(1).max(500).optional()['describe']('Maximum matches returned.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_symbol_usages call.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             { symbol, path, includePattern, excludePattern, wholeWord, caseSensitive, maxResults, cursor },
             operationContext,
@@ -868,17 +879,17 @@ export const repoReadTools = [
             frameRepositoryReadOperation(
                 await findRepositorySymbolUsages(requireMcpToolWorkspace(operationContext), {
                     symbol,
-                    path,
-                    includePattern,
-                    excludePattern,
-                    wholeWord,
-                    caseSensitive,
-                    maxResults,
-                    cursor,
+                    ...(path === undefined ? {} : { path }),
+                    ...(includePattern === undefined ? {} : { includePattern }),
+                    ...(excludePattern === undefined ? {} : { excludePattern }),
+                    ...(wholeWord === undefined ? {} : { wholeWord }),
+                    ...(caseSensitive === undefined ? {} : { caseSensitive }),
+                    ...(maxResults === undefined ? {} : { maxResults }),
+                    ...(cursor === undefined ? {} : { cursor }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_symbol_search',
         title: 'Search repository symbols',
         description:
@@ -896,7 +907,7 @@ export const repoReadTools = [
             maxResults: z.number().int().min(1).max(500).optional()['describe']('Maximum matches returned.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_symbol_search call.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             { name, kind, path, includePattern, caseSensitive, exactMatch, maxResults, cursor },
             operationContext,
@@ -904,17 +915,17 @@ export const repoReadTools = [
             frameRepositoryReadOperation(
                 await searchRepositorySymbols(requireMcpToolWorkspace(operationContext), {
                     name,
-                    kind,
-                    path,
-                    includePattern,
-                    caseSensitive,
-                    exactMatch,
-                    maxResults,
-                    cursor,
+                    ...(kind === undefined ? {} : { kind }),
+                    ...(path === undefined ? {} : { path }),
+                    ...(includePattern === undefined ? {} : { includePattern }),
+                    ...(caseSensitive === undefined ? {} : { caseSensitive }),
+                    ...(exactMatch === undefined ? {} : { exactMatch }),
+                    ...(maxResults === undefined ? {} : { maxResults }),
+                    ...(cursor === undefined ? {} : { cursor }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_file_outline',
         title: 'Repository file outline',
         description:
@@ -940,7 +951,7 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Total UTF-8 budget for returned collections. Default: 524288.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             { path, includeImports, includeExports, includeOutline, includeTopComments, maxItems, maxBytes },
             operationContext,
@@ -948,13 +959,13 @@ export const repoReadTools = [
             frameRepositoryReadOperation(
                 await readRepositoryFileOutline(requireMcpToolWorkspace(operationContext), {
                     path,
-                    includeImports,
-                    includeExports,
-                    includeOutline,
-                    includeTopComments,
-                    maxItems,
-                    maxBytes,
+                    ...(includeImports === undefined ? {} : { includeImports }),
+                    ...(includeExports === undefined ? {} : { includeExports }),
+                    ...(includeOutline === undefined ? {} : { includeOutline }),
+                    ...(includeTopComments === undefined ? {} : { includeTopComments }),
+                    ...(maxItems === undefined ? {} : { maxItems }),
+                    ...(maxBytes === undefined ? {} : { maxBytes }),
                 }),
             ),
-    },
+    }),
 ];

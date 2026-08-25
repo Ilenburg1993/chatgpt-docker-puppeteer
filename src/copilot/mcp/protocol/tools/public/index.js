@@ -5,14 +5,6 @@
  * @module copilot/mcp/protocol/tools/public
  */
 
-export {
-    boundedWriteAnnotations,
-    destructiveAnnotations,
-    openWorldBoundedWriteAnnotations,
-    openWorldDestructiveAnnotations,
-    openWorldReadOnlyAnnotations,
-    readOnlyAnnotations,
-} from '../contracts/annotations.js';
 export { MCP_TOOL_EXECUTION_LIMITS, MCP_TOOL_EXECUTION_LIMITS_VERSION } from '../contracts/execution-limits.js';
 export {
     asRecord,
@@ -28,8 +20,33 @@ export {
 export {
     MCP_TOOL_OPERATION_CONTEXT_VERSION,
     createMcpToolOperationContext,
+    requireMcpToolAuthConfig,
+    requireMcpToolAiArtifactsCapability,
+    requireMcpToolAuditCapability,
+    requireMcpToolAuthIssuerConfig,
+    requireMcpToolAuthIssuerRuntime,
+    requireMcpToolCloudflareConfig,
+    requireMcpToolCloudflareEnvironmentAuthority,
+    requireMcpToolCompanyKnowledgeConfig,
+    requireMcpToolDevcontainerNetworkConfig,
+    requireMcpToolGitConfig,
+    requireMcpToolIoCacheConfig,
+    requireMcpToolIndexAutoBuildConfig,
+    requireMcpToolInfraHealthCapability,
+    requireMcpToolModelGatewayLiveRunEnvironmentAuthority,
+    requireMcpToolModelGatewaySqliteFingerprintCapability,
+    requireMcpToolLatencyDashboardConfig,
+    requireMcpToolReloadConfig,
+    requireMcpToolRepositoryReadCacheConfig,
+    requireMcpToolRoundTripAnalyticsCapability,
+    requireMcpToolSurface,
+    requireMcpToolTerminalConfig,
+    requireMcpToolPayloadAuditConfig,
+    requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
 } from '../contracts/operation-context.js';
 
 /** @typedef {import('../contracts/operation-context.js').McpToolOperationContext} McpToolOperationContext */
+/** @typedef {import('../contracts/operation-context.js').McpToolConfigProjection} McpToolConfigProjection */
+/** @typedef {import('../contracts/operation-context.js').McpToolCapabilityProjection} McpToolCapabilityProjection */
 /** @typedef {import('../contracts/result.js').StructuredCallToolResult} StructuredCallToolResult */

@@ -447,53 +447,6 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
     };
 }
 
-/** @type {ReturnType<typeof createAiArtifactsRuntime> | null} */
-let defaultAiArtifactsRuntime = null;
-
-/** @param {ReturnType<typeof createAiArtifactsRuntime>} runtime */
-export function configureAiArtifactsRuntime(runtime) {
-    if (
-        !runtime ||
-        typeof runtime.readPressure !== 'function' ||
-        typeof runtime.buildReport !== 'function' ||
-        typeof runtime.cleanup !== 'function'
-    ) {
-        throw new TypeError('configureAiArtifactsRuntime requires an AI-artifacts runtime capability.');
-    }
-    defaultAiArtifactsRuntime = runtime;
-    return () => {
-        if (defaultAiArtifactsRuntime === runtime) defaultAiArtifactsRuntime = null;
-    };
-}
-
-function requireAiArtifactsRuntime() {
-    if (!defaultAiArtifactsRuntime) {
-        throw new Error('AI-artifacts runtime has not been configured by MCP process composition.');
-    }
-    return defaultAiArtifactsRuntime;
-}
-
-/** @param {AiArtifactsReportOptions} [options] */
-export function readAiArtifactsPressure(options = {}) {
-    return requireAiArtifactsRuntime().readPressure(options);
-}
-
-/** @param {AiArtifactsReportOptions} [options] */
-export function buildAiArtifactsReport(options = {}) {
-    return requireAiArtifactsRuntime().buildReport(options);
-}
-
-export function clearAiArtifactsReportCache() {
-    requireAiArtifactsRuntime().clearCache();
-}
-
-/**
- * @param {AiArtifactsReportOptions & {dryRun?:boolean;maxDeleteCount?:number;purgeDisabledRollback?:boolean}} [options]
- */
-export function cleanupAiArtifacts(options = {}) {
-    return requireAiArtifactsRuntime().cleanup(options);
-}
-
 /**
  * @param {unknown} value
  * @param {number} fallback

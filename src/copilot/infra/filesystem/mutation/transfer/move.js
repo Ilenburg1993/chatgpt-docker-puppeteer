@@ -19,7 +19,7 @@ import { assertDestinationWritable, readMutationSnapshot, readOptionalMutationSn
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>; capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>; capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity; signal?: AbortSignal }} [options]
  * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
 export async function moveFileLocked(source, destination, options = {}, invalidationBus = undefined) {
@@ -31,6 +31,7 @@ export async function moveFileLocked(source, destination, options = {}, invalida
         options.overwrite === true && (options.captureRollback ?? options.rollbackPolicy?.enabled ?? false);
     try {
         const lease = await acquireIoResourceLocks([source, destination], {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             operation: 'move',
             target: destination,
             riskClass: 'high',
@@ -58,8 +59,10 @@ export async function moveFileLocked(source, destination, options = {}, invalida
                         await assertDestinationWritable(destination, options.overwrite);
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
+                    options.signal?.throwIfAborted();
                     assertExpectedSha256Digest(sourceSnapshot.contentHash, options.expectedSourceHash);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
+                    options.signal?.throwIfAborted();
                     const moveResult = await moveFileUnlocked(source, destination, {
                         overwrite: Boolean(options.overwrite),
                         expectedSourceHash: sourceSnapshot.contentHash,

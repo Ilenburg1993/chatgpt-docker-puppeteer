@@ -6,7 +6,7 @@
  */
 
 export const IO_CACHE_BENCHMARK_LAUNCHER = 'src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js';
-export const IO_CACHE_BENCHMARK_WORKER = 'src/copilot/mcp/diagnostics/io-cache/worker.js';
+export const IO_CACHE_BENCHMARK_WORKER = 'src/copilot/mcp/scripts/io-cache-benchmark-worker.js';
 export const IO_CACHE_BENCHMARK_REQUEST_ID_RE = /^mcp-io-cache-benchmark-[a-z0-9-]{8,80}$/u;
 export const IO_CACHE_BENCHMARK_WORKER_MODES = Object.freeze(['cold', 'l1', 'l2-prime', 'l2']);
 

@@ -13,11 +13,12 @@ import {
     readOpenAiEndpointLatencyMonitorState,
     summarizeOpenAiEndpointLatencyHistory,
 } from '#copilot/mcp/public/diagnostics/latency';
-import { okResult, openWorldBoundedWriteAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpOpenAiEndpointLatencyTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpOpenAiEndpointLatencyTool = defineMcpRawTool({
     name: 'mcp_openai_endpoint_latency',
     title: 'OpenAI endpoint latency observer',
     description:
@@ -48,22 +49,23 @@ export const mcpOpenAiEndpointLatencyTool = {
             ['describe']('Maximum persisted snapshots retained. Default: 1000.'),
         includeSamples: z.boolean().optional()['describe']('Include individual sanitized samples. Default: false.'),
     },
-    annotations: openWorldBoundedWriteAnnotations(),
-    handler: async ({
-        sampleCount,
-        timeoutMs,
-        persistSnapshot,
-        historyLimit,
-        maxHistorySnapshots,
-        includeSamples,
-    } = {}) => {
-        const history = await readOpenAiEndpointLatencyHistory({ limit: historyLimit });
+
+    handler: async ({ sampleCount, timeoutMs, persistSnapshot, historyLimit, maxHistorySnapshots, includeSamples }) => {
+        const history = await readOpenAiEndpointLatencyHistory(
+            historyLimit === undefined ? {} : { limit: historyLimit },
+        );
         const baseline = summarizeOpenAiEndpointLatencyHistory(history.entries);
-        const measurement = await measureOpenAiEndpointLatency({ sampleCount, timeoutMs });
+        const measurement = await measureOpenAiEndpointLatency({
+            ...(sampleCount === undefined ? {} : { sampleCount }),
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        });
         const comparison = compareOpenAiEndpointLatencyToBaseline(measurement.snapshot, baseline);
         const shouldPersist = persistSnapshot !== false;
         const persistence = shouldPersist
-            ? await appendOpenAiEndpointLatencySnapshot(measurement.snapshot, { maxSnapshots: maxHistorySnapshots })
+            ? await appendOpenAiEndpointLatencySnapshot(
+                  measurement.snapshot,
+                  maxHistorySnapshots === undefined ? {} : { maxSnapshots: maxHistorySnapshots },
+              )
             : { persisted: false, reason: 'disabled-by-caller', path: history.path };
         const failedTargets = measurement.snapshot.targets
             .filter((target) => target.successRate < 1)
@@ -92,4 +94,4 @@ export const mcpOpenAiEndpointLatencyTool = {
             ...(includeSamples === true ? { samples: measurement.samples } : {}),
         });
     },
-};
+});

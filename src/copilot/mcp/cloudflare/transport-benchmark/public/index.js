@@ -7,3 +7,5 @@ export {
     readTransportBenchmarkState,
 } from '../state.js';
 export { runCloudflareTransportBenchmarkCli, spawnCloudflareTransportBenchmark } from '../runtime.js';
+
+export { buildCloudflareTransportBenchmarkPlan } from '../plan.js';

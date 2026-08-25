@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "canonicalSnapshotOwner": "mcp.composition.process-config",
+    "canonicalSnapshotPath": "src/copilot/mcp/composition/process-config/runtime.js",
+    "rule": "Ambient process.env access is fail-closed to declared authorities; migration-target entries must monotonically shrink.",
+    "secretRule": "Secret-bearing environment values are projected into explicit secret capabilities and must not be retained in observable config fingerprints."
+  },
+  "authorities": {
+    "canonical-snapshot": [
+      {
+        "path": "src/copilot/mcp/composition/process-config/runtime.js",
+        "maxReferences": 1
+      }
+    ],
+    "config-parser-default": [
+      {
+        "path": "src/copilot/mcp/adapters/http/config.js",
+        "maxReferences": 12
+      },
+      {
+        "path": "src/copilot/mcp/adapters/http.js",
+        "maxReferences": 3
+      },
+      {
+        "path": "src/copilot/mcp/adapters/http2.js",
+        "maxReferences": 4
+      },
+      {
+        "path": "src/copilot/mcp/auth/issuer/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/auth/persistence/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/auth/resource-server/decision-cache.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/auth/resource-server/service.js",
+        "maxReferences": 9
+      },
+      {
+        "path": "src/copilot/mcp/auth/runtime/jwks-warmup.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/observability/audit/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/company-knowledge/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/connection/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/diagnostics/latency/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/diagnostics/devcontainer-network/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/diagnostics/http-smoke/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/diagnostics/io-cache/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/diagnostics/tool-payload/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/transport/http/stateful/session/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/registry/runtime.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/registry/surface-policy.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/runtime/reload/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/runtime/startup-maintenance/config.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/server/runtime.js",
+        "maxReferences": 2
+      }
+    ],
+    "environment-projector": [
+      {
+        "path": "src/copilot/mcp/integrations/model-gateway/live-runs/environment.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/process/environment/contracts/child-environment.js",
+        "maxReferences": 1
+      }
+    ],
+    "process-entrypoint": [
+      {
+        "path": "src/copilot/mcp/cli.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/cloudflare/cli.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/scheduled-restart-runner.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/io-cache-benchmark-worker.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/run-safe-validation-suite.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/dependency-native-smoke.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/oauth-smoke-cli.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/validate-devcontainer-shell.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/openai/secure-tunnel-cli.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js",
+        "maxReferences": 1
+      },
+      {
+        "path": "src/copilot/mcp/scripts/latency-benchmark.js",
+        "maxReferences": 1
+      }
+    ],
+    "migration-target": []
+  }
+}

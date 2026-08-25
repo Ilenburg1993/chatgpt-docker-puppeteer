@@ -65,7 +65,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     runNegativeResourceChecks?: boolean;
  *     verboseTools?: boolean;
  *     localToolNames?: string[];
- *     env?: NodeJS.ProcessEnv;
+ *     env: NodeJS.ProcessEnv;
  * }} OAuthSmokeOptions
  *
  *
@@ -95,10 +95,11 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  */
 
 /**
- * @param {OAuthSmokeOptions} [options]
+ * @param {OAuthSmokeOptions} options
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runMcpOAuthSmoke(options = {}) {
+export async function runMcpOAuthSmoke(options) {
+    if (!options?.env) throw new TypeError('MCP OAuth smoke requires an explicit process environment.');
     const startedAtMs = Date.now();
     /** @type {Record<string, number>} */
     const phaseTimings = {};
@@ -109,7 +110,7 @@ export async function runMcpOAuthSmoke(options = {}) {
         phaseTimings[name] = nowMs - phaseStartedAtMs;
         phaseStartedAtMs = nowMs;
     };
-    const env = options.env ?? process.env;
+    const env = options.env;
     const runtime = readSmokeRuntimeOptions(options, env);
     const config = readMcpAuthConfig(env);
     const resource = normalizeResource(options.resource ?? env['COPILOT_MCP_OAUTH_SMOKE_RESOURCE'] ?? config.resource);

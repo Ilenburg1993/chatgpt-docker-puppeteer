@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { devOAuthTestHarness } from '#copilot/testing/mcp/auth';
+import { createDevOAuthRuntime } from '#copilot/testing/mcp/auth';
+
+const devOAuthTestHarness = createDevOAuthRuntime().testHarness;
 
 describe('dev OAuth SSRF protection', () => {
     it.each([

@@ -25,7 +25,7 @@ export const DEFAULT_MAX_SESSIONS = '256';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const secretKey = 'COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET';
-const RUN_TARGETS = new Set([
+const RUN_TARGETS = Object.freeze([
     'copilot:mcp:quic:up',
     'copilot:mcp:quic:restart',
     'copilot:mcp:quic:status',
@@ -99,12 +99,12 @@ function isMissingPathError(error) {
 }
 
 /**
- * @param {string} [relativePath]
- * @param {{ parentEnv?: NodeJS.ProcessEnv }} [options]
+ * @param {string | undefined} relativePath
+ * @param {{ parentEnv: NodeJS.ProcessEnv }} options
  * @returns {Promise<EnsureResult>}
  */
-export async function ensureStatefulEnvFile(relativePath = undefined, options = {}) {
-    const parentEnv = options.parentEnv ?? process.env;
+export async function ensureStatefulEnvFile(relativePath, options) {
+    const parentEnv = requireBootstrapParentEnv(options.parentEnv);
     const store = createStatefulEnvStore(relativePath, parentEnv);
     await store.parentIo.mkdirPath(store.parentDir, { recursive: true, mode: 0o700 });
     const warnings = [];
@@ -153,12 +153,12 @@ export async function ensureStatefulEnvFile(relativePath = undefined, options = 
  * Build the exact child environment for a stateful transport target. The persisted env file cannot inject arbitrary
  * process variables: only the session hash secret, TTL and max-session policy are projected.
  *
- * @param {string} [relativePath]
- * @param {{ parentEnv?: NodeJS.ProcessEnv }} [options]
+ * @param {string | undefined} relativePath
+ * @param {{ parentEnv: NodeJS.ProcessEnv }} options
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-export async function buildStatefulProcessEnv(relativePath = undefined, options = {}) {
-    const parentEnv = options.parentEnv ?? process.env;
+export async function buildStatefulProcessEnv(relativePath, options) {
+    const parentEnv = requireBootstrapParentEnv(options.parentEnv);
     const store = createStatefulEnvStore(relativePath, parentEnv);
     const fileEnv = parseEnvFile((await store.fileIo.readTextFresh(store.absolutePath)).content);
     const secret = normalizeSecret(fileEnv[secretKey]);
@@ -189,8 +189,8 @@ export async function buildStatefulProcessEnv(relativePath = undefined, options 
  * @returns {Promise<number>}
  */
 export async function runWithStatefulEnv(scriptName, options = {}) {
-    if (!RUN_TARGETS.has(scriptName)) throw new Error(`Unsupported stateful run target: ${scriptName}`);
-    const parentEnv = options.parentEnv ?? process.env;
+    if (!RUN_TARGETS.includes(scriptName)) throw new Error(`Unsupported stateful run target: ${scriptName}`);
+    const parentEnv = resolveBootstrapParentEnv(options.parentEnv);
     const ensured = await ensureStatefulEnvFile(undefined, { parentEnv });
     const env = await buildStatefulProcessEnv(ensured.envFile, { parentEnv });
     console.error(`[mcp-stateful-env] env=${ensured.envFile} secret=${ensured.secretPreview} target=${scriptName}`);
@@ -317,6 +317,19 @@ function printUsage() {
   node src/copilot/mcp/scripts/stateful-env.js run <allowlisted-npm-script>`);
 }
 
+/** @param {NodeJS.ProcessEnv | undefined} parentEnv @returns {NodeJS.ProcessEnv} */
+function resolveBootstrapParentEnv(parentEnv) {
+    return parentEnv ?? process.env;
+}
+
+/** @param {NodeJS.ProcessEnv | undefined} parentEnv @returns {NodeJS.ProcessEnv} */
+function requireBootstrapParentEnv(parentEnv) {
+    if (!parentEnv) {
+        throw new TypeError('Stateful MCP bootstrap internals require an explicit parent environment projection.');
+    }
+    return parentEnv;
+}
+
 /**
  * @param {string[]} argv
  * @param {{ parentEnv?: NodeJS.ProcessEnv }} [options]
@@ -329,7 +342,7 @@ export async function runStatefulHttpBootstrapCli(argv, options = {}) {
             printUsage();
             return 0;
         }
-        const parentEnv = options.parentEnv ?? process.env;
+        const parentEnv = resolveBootstrapParentEnv(options.parentEnv);
         if (command === 'ensure' || command === 'status') {
             const result = await ensureStatefulEnvFile(undefined, { parentEnv });
             console.log(JSON.stringify({ success: true, ...result }, null, 2));

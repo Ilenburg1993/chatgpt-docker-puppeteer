@@ -2,10 +2,11 @@
 import { createTtlCache } from '#copilot/infra/public/cache/ttl';
 import { calculateJwkThumbprint, createRemoteJWKSet, importJWK, jwtVerify } from 'jose';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { OAUTH_REPLAY_NAMESPACES, rememberPersistentOAuthReplay } from '../persistence/replay-store.js';
+import { OAUTH_REPLAY_NAMESPACES } from '../persistence/replay-store.js';
 import {
     getMcpAuthDecisionCacheStats,
     readCachedMcpAuthorizationDecision,
+    readMcpAuthDecisionCachePolicy,
     rememberMcpAuthorizationDecision,
     resetMcpAuthDecisionCache,
 } from './decision-cache.js';
@@ -57,6 +58,14 @@ import {
  * @property {boolean} staticBearerEnabled
  * @property {boolean} requireResourceClaim
  * @property {boolean} publicOauthDiagnosticsEnabled
+ *
+ * @typedef {Readonly<{ staticBearerToken?: string }>} McpAuthRuntimeSecrets
+ *
+ * @typedef {Readonly<{
+ *     config: McpAuthConfig;
+ *     secrets: McpAuthRuntimeSecrets;
+ *     decisionCache: import('./decision-cache.js').McpAuthDecisionCachePolicy;
+ * }>} McpAuthRuntimeConfig
  *
  * @typedef {object} McpAuthContext
  * @property {string | null | undefined} bearerToken
@@ -129,61 +138,7 @@ const DPOP_MAX_TTL_SECONDS = 5 * 60;
 const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
 const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
 const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
-/** @type {import('#copilot/infra/public/cache/ttl').TtlCache<ReturnType<typeof createRemoteJWKSet>>} */
-const REMOTE_JWKS_CACHE = createTtlCache({
-    name: 'oauth-remote-jwks',
-    ttlMs: JWKS_CACHE_MAX_AGE_MS,
-    maxEntries: MAX_JWKS_CACHE_ENTRIES,
-});
-
-/** @type {Map<string, number>} */
-const DPOP_REPLAY_CACHE = new Map();
-
-const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics']);
-
-const AUTH_CONFIG_ENV_KEYS = /** @type {const} */ ([
-    'COPILOT_MCP_AUTH_MODE',
-    'COPILOT_MCP_CHATGPT_AUTH_MODE',
-    'COPILOT_MCP_PUBLIC_URL',
-    'COPILOT_MCP_CLOUDFLARE_PUBLIC_URL',
-    'COPILOT_MCP_OAUTH_AUTHORIZATION_SERVERS',
-    'COPILOT_MCP_OAUTH_ISSUER',
-    'COPILOT_MCP_OAUTH_EXPECTED_ISSUER',
-    'COPILOT_MCP_OAUTH_AUDIENCE',
-    'COPILOT_MCP_OAUTH_ACCEPTED_AUDIENCES',
-    'COPILOT_MCP_OAUTH_JWKS_URI',
-    'COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED',
-    'COPILOT_MCP_STATIC_BEARER_TOKEN',
-    'COPILOT_MCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED',
-    'COPILOT_MCP_OAUTH_INITIAL_SCOPE_PROFILE',
-    'COPILOT_MCP_OAUTH_INITIAL_SCOPES',
-    'COPILOT_MCP_RESOURCE_DOCUMENTATION',
-    'COPILOT_MCP_RESOURCE_NAME',
-    'COPILOT_MCP_RESOURCE_POLICY_URI',
-    'COPILOT_MCP_RESOURCE_TOS_URI',
-    'COPILOT_MCP_AUTH_ENFORCEMENT',
-    'COPILOT_MCP_OAUTH_JWT_ALGORITHMS',
-    'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM',
-    'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS',
-]);
-
-/** @type {{ fingerprint: string; config: McpAuthConfig } | null} */
-let _mcpAuthConfigCache = null;
-const _mcpAuthConfigCacheStats = {
-    hits: 0,
-    misses: 0,
-    sets: 0,
-    bypasses: 0,
-    clears: 0,
-};
-
-const ADMIN_TOOL_NAMES = new Set([
-    'job_cancel',
-    'repo_remove_file',
-    'repo_restore_quarantined_file',
-    'mcp_cloudflare_edge_policy_apply',
-    'mcp_cloudflare_mcp_passthrough_apply',
-]);
+const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = Object.freeze(['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics']);
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
@@ -194,20 +149,20 @@ function publicOauthDiagnosticsEnabled(env = process.env) {
 }
 
 /**
- * @param {NodeJS.ProcessEnv} env
- * @returns {string}
- */
-function buildMcpAuthConfigEnvFingerprint(env) {
-    return AUTH_CONFIG_ENV_KEYS.map((key) => `${key}\u0000${String(env[key] ?? '')}`).join('\u0001');
-}
-
-/**
  * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} tool
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {boolean}
  */
 export function isPublicOauthDiagnosticTool(tool, env = process.env) {
-    return publicOauthDiagnosticsEnabled(env) && PUBLIC_OAUTH_DIAGNOSTIC_TOOLS.has(String(tool.name ?? ''));
+    return isPublicOauthDiagnosticToolEnabled(tool, publicOauthDiagnosticsEnabled(env));
+}
+
+/**
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} tool
+ * @param {boolean} enabled
+ */
+function isPublicOauthDiagnosticToolEnabled(tool, enabled) {
+    return enabled && PUBLIC_OAUTH_DIAGNOSTIC_TOOLS.includes(String(tool.name ?? ''));
 }
 
 /**
@@ -250,15 +205,6 @@ export function normalizeMcpAuthEnforcement(value, mode) {
  * @returns {McpAuthConfig}
  */
 export function readMcpAuthConfig(env = process.env) {
-    const cacheable = env === process.env;
-    if (!cacheable) _mcpAuthConfigCacheStats.bypasses += 1;
-    const fingerprint = cacheable ? buildMcpAuthConfigEnvFingerprint(env) : '';
-    if (cacheable && _mcpAuthConfigCache?.fingerprint === fingerprint) {
-        _mcpAuthConfigCacheStats.hits += 1;
-        return _mcpAuthConfigCache.config;
-    }
-    if (cacheable) _mcpAuthConfigCacheStats.misses += 1;
-
     const mode = normalizeMcpAuthMode(env['COPILOT_MCP_AUTH_MODE'] ?? env['COPILOT_MCP_CHATGPT_AUTH_MODE']);
     const resource = normalizeResourceBaseUrl(
         env['COPILOT_MCP_PUBLIC_URL'] ?? env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'],
@@ -335,21 +281,33 @@ export function readMcpAuthConfig(env = process.env) {
         requireResourceClaim: readBooleanEnv(env, 'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM', true),
         publicOauthDiagnosticsEnabled: publicOauthDiagnosticsEnabled(env),
     };
-    if (cacheable) {
-        _mcpAuthConfigCache = { fingerprint, config };
-        _mcpAuthConfigCacheStats.sets += 1;
-    }
     return config;
 }
 
 /**
- * @returns {Record<string, unknown>}
+ * Capture the auth resource-server projection used by one process generation without retaining the ambient environment.
+ * The public/diagnostic config and secret authority are intentionally separate.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {McpAuthRuntimeConfig}
  */
+export function readMcpAuthRuntimeConfig(env = process.env) {
+    return Object.freeze({
+        config: readMcpAuthConfig(env),
+        secrets: readMcpAuthRuntimeSecrets(env),
+        decisionCache: readMcpAuthDecisionCachePolicy(env),
+    });
+}
+
+/** @param {NodeJS.ProcessEnv} env @returns {McpAuthRuntimeSecrets} */
+function readMcpAuthRuntimeSecrets(env) {
+    const staticBearerToken = readStaticBearerToken(env);
+    return Object.freeze(staticBearerToken === undefined ? {} : { staticBearerToken });
+}
+
+/** @returns {Record<string, unknown>} */
 export function readMcpAuthConfigCacheStats() {
-    return {
-        ..._mcpAuthConfigCacheStats,
-        size: _mcpAuthConfigCache ? 1 : 0,
-    };
+    return { enabled: false, reason: 'process-config-snapshot-is-authoritative', size: 0 };
 }
 
 /**
@@ -597,20 +555,20 @@ function buildAcceptedAudiences(expectedAudience, resource, env = process.env) {
  * @returns {McpAuthScope[]}
  */
 export function scopesForMcpTool(tool) {
-    const name = String(tool.name ?? '');
-    if (ADMIN_TOOL_NAMES.has(name)) return [MCP_AUTH_SCOPES.admin];
-    if (tool.annotations?.destructiveHint === true) return [MCP_AUTH_SCOPES.admin];
-    if (
-        name.startsWith('mcp_cloudflare_') &&
-        (name.includes('_apply') || name.includes('backup_create') || name.includes('policy_apply'))
-    ) {
-        return [MCP_AUTH_SCOPES.admin];
+    const callerScope = tool.contract?.authority.callerScope;
+    if (!callerScope) throw new Error(`MCP tool ${tool.name} has no semantic caller-scope contract.`);
+    switch (callerScope) {
+        case 'read':
+            return [MCP_AUTH_SCOPES.read];
+        case 'write':
+            return [MCP_AUTH_SCOPES.write];
+        case 'validate':
+            return [MCP_AUTH_SCOPES.validate];
+        case 'admin':
+            return [MCP_AUTH_SCOPES.admin];
+        default:
+            throw new Error(`MCP tool ${tool.name} has unsupported caller scope=${String(callerScope)}.`);
     }
-    if (name.startsWith('run_') || name.includes('validation') || name.includes('validator')) {
-        return [MCP_AUTH_SCOPES.validate];
-    }
-    if (tool.annotations?.readOnlyHint === true) return [MCP_AUTH_SCOPES.read];
-    return [MCP_AUTH_SCOPES.write];
 }
 
 /**
@@ -651,7 +609,8 @@ export function parseBearerToken(header) {
  */
 export function securitySchemesForMcpTool(tool, config = readMcpAuthConfig()) {
     const oauth = { type: /** @type {const} */ ('oauth2'), scopes: scopesForMcpTool(tool) };
-    if (config.mode === 'oauth' && isPublicOauthDiagnosticTool(tool)) return [{ type: 'noauth' }, oauth];
+    if (config.mode === 'oauth' && isPublicOauthDiagnosticToolEnabled(tool, config.publicOauthDiagnosticsEnabled))
+        return [{ type: 'noauth' }, oauth];
     if (config.mode === 'oauth') return [oauth];
     if (config.mode === 'mixed-auth') return [{ type: 'noauth' }, oauth];
     return [{ type: 'noauth' }];
@@ -885,6 +844,8 @@ export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, option
  * @param {string} resourceUrl
  * @param {McpAuthConfig} [config]
  * @param {NodeJS.ProcessEnv} [env]
+ * @param {McpAuthRuntimeSecrets} [runtimeSecrets]
+ * @param {McpAuthResourceServerState} [runtime]
  * @returns {Promise<McpSessionAuthBindingResolution>}
  */
 export async function resolveMcpSessionAuthBinding(
@@ -892,6 +853,8 @@ export async function resolveMcpSessionAuthBinding(
     resourceUrl,
     config = readMcpAuthConfig(),
     env = process.env,
+    runtimeSecrets = readMcpAuthRuntimeSecrets(env),
+    runtime = createEphemeralMcpAuthResourceServerState(),
 ) {
     const bearerToken = context.bearerToken;
     if (!bearerToken) {
@@ -925,7 +888,7 @@ export async function resolveMcpSessionAuthBinding(
         };
     }
 
-    const staticBearerToken = readStaticBearerToken(env);
+    const staticBearerToken = runtimeSecrets.staticBearerToken;
     if (config.staticBearerEnabled && staticBearerToken && safeEqualString(bearerToken, staticBearerToken)) {
         return {
             ok: true,
@@ -964,7 +927,7 @@ export async function resolveMcpSessionAuthBinding(
     }
 
     try {
-        const jwks = getRemoteJwks(config.jwksUri);
+        const jwks = getRemoteJwks(runtime, config.jwksUri);
         const verified = await jwtVerify(bearerToken, jwks, {
             issuer: config.expectedIssuer,
             audience: config.acceptedAudiences,
@@ -973,7 +936,7 @@ export async function resolveMcpSessionAuthBinding(
             maxTokenAge: `${MAX_TOKEN_AGE_SECONDS}s`,
         });
         const payload = verified.payload;
-        const dpopDecision = await validateDpopConfirmationForResource(payload, context, [], config);
+        const dpopDecision = await validateDpopConfirmationForResource(runtime, payload, context, [], config);
         if (dpopDecision) {
             return {
                 ok: false,
@@ -1176,13 +1139,100 @@ function safeEqualString(left, right) {
 }
 
 /**
+ * @typedef {Readonly<{
+ *   remoteJwksCache: import('#copilot/infra/public/cache/ttl').TtlCache<ReturnType<typeof createRemoteJWKSet>>;
+ *   dpopReplayCache: Map<string, number>;
+ *   replay: Pick<ReturnType<typeof import('../persistence/replay-store.js').createOAuthReplayCapability>, 'remember' | 'status'>;
+ * }>} McpAuthResourceServerState
+ */
+
+/**
+ * @param {Pick<ReturnType<typeof import('../persistence/replay-store.js').createOAuthReplayCapability>, 'remember' | 'status'>} replay
+ */
+export function createMcpAuthResourceServerRuntime(replay) {
+    if (!replay || typeof replay.remember !== 'function' || typeof replay.status !== 'function') {
+        throw new TypeError('MCP auth resource-server runtime requires an OAuth replay capability.');
+    }
+    /** @type {McpAuthResourceServerState} */
+    const state = Object.freeze({
+        remoteJwksCache: createTtlCache({
+            name: `oauth-remote-jwks-${Math.random().toString(36).slice(2, 10)}`,
+            ttlMs: JWKS_CACHE_MAX_AGE_MS,
+            maxEntries: MAX_JWKS_CACHE_ENTRIES,
+        }),
+        dpopReplayCache: new Map(),
+        replay,
+    });
+    return Object.freeze({
+        authorize: (
+            /** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */ tool,
+            /** @type {McpAuthContext | undefined} */ context,
+            /** @type {McpAuthConfig} */ config,
+            /** @type {McpAuthRuntimeSecrets} */ secrets,
+            /** @type {import('./decision-cache.js').McpAuthDecisionCachePolicy} */ decisionCache,
+        ) => authorizeMcpToolCall(tool, context, config, {}, secrets, decisionCache, state),
+        resolveSessionBinding: (
+            /** @type {McpAuthContext} */ context,
+            /** @type {string} */ resourceUrl,
+            /** @type {McpAuthConfig} */ config,
+            /** @type {McpAuthRuntimeSecrets} */ secrets,
+        ) => resolveMcpSessionAuthBinding(context, resourceUrl, config, {}, secrets, state),
+        warmRemoteJwks: (/** @type {{ env?: NodeJS.ProcessEnv; config?: McpAuthConfig }} */ options = {}) =>
+            warmMcpRemoteJwks({ ...options, runtime: state }),
+        resetForTests() {
+            state.remoteJwksCache.clear();
+            state.dpopReplayCache.clear();
+            resetMcpAuthDecisionCache();
+        },
+        readState: () => ({
+            remoteJwks: state.remoteJwksCache.stats(),
+            dpopReplayEntries: state.dpopReplayCache.size,
+            replay: state.replay.status(),
+        }),
+    });
+}
+
+function createUnavailableReplayCapability() {
+    return Object.freeze({
+        remember: () => ({
+            replay: false,
+            stored: false,
+            available: false,
+            pruned: 0,
+            evicted: 0,
+            error: 'OAuth replay capability unavailable.',
+        }),
+        status: () => ({
+            available: false,
+            entries: null,
+            maxEntriesPerNamespace: 0,
+            error: 'OAuth replay capability unavailable.',
+        }),
+    });
+}
+
+/** @returns {McpAuthResourceServerState} */
+function createEphemeralMcpAuthResourceServerState() {
+    return Object.freeze({
+        remoteJwksCache: createTtlCache({
+            name: `oauth-remote-jwks-ephemeral-${Math.random().toString(36).slice(2, 10)}`,
+            ttlMs: JWKS_CACHE_MAX_AGE_MS,
+            maxEntries: MAX_JWKS_CACHE_ENTRIES,
+        }),
+        dpopReplayCache: new Map(),
+        replay: createUnavailableReplayCapability(),
+    });
+}
+
+/**
+ * @param {McpAuthResourceServerState} runtime
  * @param {string} jwksUri
  * @returns {ReturnType<typeof createRemoteJWKSet>}
  */
-function getRemoteJwks(jwksUri) {
-    const cached = REMOTE_JWKS_CACHE.get(jwksUri);
+function getRemoteJwks(runtime, jwksUri) {
+    const cached = runtime.remoteJwksCache.get(jwksUri);
     if (cached) return cached;
-    return REMOTE_JWKS_CACHE.set(
+    return runtime.remoteJwksCache.set(
         jwksUri,
         createRemoteJWKSet(new URL(jwksUri), {
             timeoutDuration: JWKS_TIMEOUT_MS,
@@ -1198,7 +1248,7 @@ function getRemoteJwks(jwksUri) {
  * `jose` de-duplicates concurrent reloads internally, while `REMOTE_JWKS_CACHE` keeps a single resolver per URI for
  * subsequent authorization calls.
  *
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; config?: McpAuthConfig; runtime?: McpAuthResourceServerState }} [options]
  * @returns {Promise<{
  *     ok: true;
  *     skipped: boolean;
@@ -1209,9 +1259,10 @@ function getRemoteJwks(jwksUri) {
  *     durationMs: number;
  * }>}
  */
-export async function warmMcpRemoteJwks({ env = process.env } = {}) {
+export async function warmMcpRemoteJwks(options = {}) {
     const startedAt = performance.now();
-    const config = readMcpAuthConfig(env);
+    const runtime = options.runtime ?? createEphemeralMcpAuthResourceServerState();
+    const config = options.config ?? readMcpAuthConfig(options.env);
     if (config.mode === 'none-dev' || config.enforcement === 'off') {
         return {
             ok: true,
@@ -1235,7 +1286,7 @@ export async function warmMcpRemoteJwks({ env = process.env } = {}) {
         };
     }
 
-    const jwks = getRemoteJwks(config.jwksUri);
+    const jwks = getRemoteJwks(runtime, config.jwksUri);
     const alreadyFresh = jwks.fresh;
     if (!alreadyFresh) await jwks.reload();
     const keyCount = jwks.jwks()?.keys.length ?? null;
@@ -1256,10 +1307,6 @@ export async function warmMcpRemoteJwks({ env = process.env } = {}) {
  * @returns {void}
  */
 export function resetMcpAuthRuntimeForTests() {
-    REMOTE_JWKS_CACHE.clear();
-    DPOP_REPLAY_CACHE.clear();
-    _mcpAuthConfigCache = null;
-    _mcpAuthConfigCacheStats.clears += 1;
     resetMcpAuthDecisionCache();
 }
 
@@ -1271,13 +1318,14 @@ export function readMcpAuthDecisionCacheStats() {
 }
 
 /**
+ * @param {McpAuthResourceServerState} runtime
  * @param {import('jose').JWTPayload} payload
  * @param {McpAuthContext} context
  * @param {McpAuthScope[]} requiredScopes
  * @param {McpAuthConfig} config
  * @returns {Promise<McpAuthorizationDecision | undefined>}
  */
-async function validateDpopConfirmationForResource(payload, context, requiredScopes, config) {
+async function validateDpopConfirmationForResource(runtime, payload, context, requiredScopes, config) {
     const cnf = payload['cnf'];
     const expectedJkt =
         cnf && typeof cnf === 'object' && !Array.isArray(cnf)
@@ -1293,18 +1341,19 @@ async function validateDpopConfirmationForResource(payload, context, requiredSco
             'MCP_AUTH_DPOP_REQUIRED',
         );
     }
-    const verified = await verifyResourceDpopProof(proof, expectedJkt, context);
+    const verified = await verifyResourceDpopProof(runtime, proof, expectedJkt, context);
     if (verified.ok) return undefined;
     return authInvalidTokenDecision(requiredScopes, config, verified.error, 'MCP_AUTH_DPOP_INVALID');
 }
 
 /**
+ * @param {McpAuthResourceServerState} runtime
  * @param {string | undefined} proof
  * @param {string} expectedJkt
  * @param {McpAuthContext} context
  * @returns {Promise<{ ok: true } | { ok: false; error: string }>}
  */
-async function verifyResourceDpopProof(proof, expectedJkt, context) {
+async function verifyResourceDpopProof(runtime, proof, expectedJkt, context) {
     if (!proof || proof.length > MAX_DPOP_PROOF_LENGTH || hasAsciiControlChars(proof)) {
         return { ok: false, error: 'DPoP proof is missing or too large.' };
     }
@@ -1342,19 +1391,19 @@ async function verifyResourceDpopProof(proof, expectedJkt, context) {
         if (htu !== url) return { ok: false, error: 'DPoP proof htu does not match the MCP request URL.' };
         if (!jti || jti.length > 256 || hasAsciiControlChars(jti))
             return { ok: false, error: 'DPoP proof jti is missing or invalid.' };
-        pruneDpopReplayCache();
+        pruneDpopReplayCache(runtime);
         const replayKey = `${jkt}:${jti}`;
-        if (DPOP_REPLAY_CACHE.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
+        if (runtime.dpopReplayCache.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
         const expMs = Number(verified.payload.exp)
             ? Number(verified.payload.exp) * 1000
             : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
-        const persistentReplay = rememberPersistentOAuthReplay(OAUTH_REPLAY_NAMESPACES.resourceDpop, replayKey, expMs);
+        const persistentReplay = runtime.replay.remember(OAUTH_REPLAY_NAMESPACES.resourceDpop, replayKey, expMs);
         if (!persistentReplay.available) {
             return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
         }
         if (persistentReplay.replay) return { ok: false, error: 'DPoP proof replay detected.' };
-        DPOP_REPLAY_CACHE.set(replayKey, expMs);
-        trimDpopReplayCache(DPOP_REPLAY_CACHE_MAX_ENTRIES);
+        runtime.dpopReplayCache.set(replayKey, expMs);
+        trimDpopReplayCache(runtime, DPOP_REPLAY_CACHE_MAX_ENTRIES);
         return { ok: true };
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : 'DPoP proof could not be verified.' };
@@ -1405,14 +1454,15 @@ function normalizeDpopHtu(value) {
 }
 
 /**
+ * @param {McpAuthResourceServerState} runtime
  * @param {number} [nowMs]
  * @returns {number}
  */
-function pruneDpopReplayCache(nowMs = Date.now()) {
+function pruneDpopReplayCache(runtime, nowMs = Date.now()) {
     let removed = 0;
-    for (const [key, expiresAt] of DPOP_REPLAY_CACHE) {
+    for (const [key, expiresAt] of runtime.dpopReplayCache) {
         if (expiresAt <= nowMs) {
-            DPOP_REPLAY_CACHE.delete(key);
+            runtime.dpopReplayCache.delete(key);
             removed += 1;
         }
     }
@@ -1420,15 +1470,16 @@ function pruneDpopReplayCache(nowMs = Date.now()) {
 }
 
 /**
+ * @param {McpAuthResourceServerState} runtime
  * @param {number} maxSize
  * @returns {void}
  */
-function trimDpopReplayCache(maxSize) {
-    if (DPOP_REPLAY_CACHE.size <= maxSize) return;
-    const oldest = [...DPOP_REPLAY_CACHE.entries()].sort((left, right) => left[1] - right[1]);
+function trimDpopReplayCache(runtime, maxSize) {
+    if (runtime.dpopReplayCache.size <= maxSize) return;
+    const oldest = [...runtime.dpopReplayCache.entries()].sort((left, right) => left[1] - right[1]);
     for (const [key] of oldest) {
-        if (DPOP_REPLAY_CACHE.size <= maxSize) break;
-        DPOP_REPLAY_CACHE.delete(key);
+        if (runtime.dpopReplayCache.size <= maxSize) break;
+        runtime.dpopReplayCache.delete(key);
     }
 }
 
@@ -1436,15 +1487,24 @@ function trimDpopReplayCache(maxSize) {
  * @param {string} token
  * @param {McpAuthScope[]} requiredScopes
  * @param {McpAuthConfig} config
- * @param {NodeJS.ProcessEnv} env
+ * @param {string | undefined} staticBearerToken
  * @param {McpAuthContext} [context]
+ * @param {import('./decision-cache.js').McpAuthDecisionCachePolicy} [decisionCachePolicy]
+ * @param {McpAuthResourceServerState} [runtime]
  * @returns {Promise<McpAuthorizationDecision>}
  */
-async function verifyBearerToken(token, requiredScopes, config, env, context = { bearerToken: undefined }) {
+async function verifyBearerToken(
+    token,
+    requiredScopes,
+    config,
+    staticBearerToken,
+    context = { bearerToken: undefined },
+    decisionCachePolicy = readMcpAuthDecisionCachePolicy(),
+    runtime = createEphemeralMcpAuthResourceServerState(),
+) {
     if (!token || token.length > MAX_BEARER_TOKEN_LENGTH) {
         return authInvalidTokenDecision(requiredScopes, config, 'Bearer token is malformed or too large.');
     }
-    const staticBearerToken = readStaticBearerToken(env);
     if (config.staticBearerEnabled && staticBearerToken && safeEqualString(token, staticBearerToken)) {
         return {
             allowed: true,
@@ -1454,7 +1514,13 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
             method: 'static-bearer',
         };
     }
-    const cachedDecision = readCachedMcpAuthorizationDecision(token, requiredScopes, config, context);
+    const cachedDecision = readCachedMcpAuthorizationDecision(
+        token,
+        requiredScopes,
+        config,
+        context,
+        decisionCachePolicy,
+    );
     if (cachedDecision) return cachedDecision;
     if (
         !config.jwksUri ||
@@ -1477,7 +1543,7 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
         };
     }
     try {
-        const jwks = getRemoteJwks(config.jwksUri);
+        const jwks = getRemoteJwks(runtime, config.jwksUri);
         const verified = await jwtVerify(token, jwks, {
             issuer: config.expectedIssuer,
             audience: config.acceptedAudiences,
@@ -1486,7 +1552,13 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
             maxTokenAge: `${MAX_TOKEN_AGE_SECONDS}s`,
         });
         const payload = verified.payload;
-        const dpopDecision = await validateDpopConfirmationForResource(payload, context, requiredScopes, config);
+        const dpopDecision = await validateDpopConfirmationForResource(
+            runtime,
+            payload,
+            context,
+            requiredScopes,
+            config,
+        );
         if (dpopDecision) return dpopDecision;
         const audienceValues = normalizeAudienceClaim(payload.aud);
         const tokenResource = typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : '';
@@ -1538,7 +1610,15 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
             requiredScopes,
             method: 'oauth-jwks',
         };
-        rememberMcpAuthorizationDecision(token, requiredScopes, config, context, payload, decision);
+        rememberMcpAuthorizationDecision(
+            token,
+            requiredScopes,
+            config,
+            context,
+            payload,
+            decision,
+            decisionCachePolicy,
+        );
         return decision;
     } catch (error) {
         const classification = classifyBearerVerificationError(error);
@@ -1611,6 +1691,9 @@ function readBooleanEnv(env, name, fallback) {
  * @param {McpAuthContext} [context]
  * @param {McpAuthConfig} [config]
  * @param {NodeJS.ProcessEnv} [env]
+ * @param {McpAuthRuntimeSecrets} [runtimeSecrets]
+ * @param {import('./decision-cache.js').McpAuthDecisionCachePolicy} [decisionCachePolicy]
+ * @param {McpAuthResourceServerState} [runtime]
  * @returns {Promise<McpAuthorizationDecision>}
  */
 export async function authorizeMcpToolCall(
@@ -1618,6 +1701,9 @@ export async function authorizeMcpToolCall(
     context = { bearerToken: undefined },
     config = readMcpAuthConfig(),
     env = process.env,
+    runtimeSecrets = readMcpAuthRuntimeSecrets(env),
+    decisionCachePolicy = readMcpAuthDecisionCachePolicy(env),
+    runtime = createEphemeralMcpAuthResourceServerState(),
 ) {
     const requiredScopes = scopesForMcpTool(tool);
     const required = scopesRequireAuth(requiredScopes, config.enforcement);
@@ -1630,7 +1716,7 @@ export async function authorizeMcpToolCall(
             method: 'not-required',
         };
     }
-    if (config.mode === 'oauth' && isPublicOauthDiagnosticTool(tool, env)) {
+    if (config.mode === 'oauth' && isPublicOauthDiagnosticToolEnabled(tool, config.publicOauthDiagnosticsEnabled)) {
         return {
             allowed: true,
             required: false,
@@ -1654,5 +1740,13 @@ export async function authorizeMcpToolCall(
             }),
         };
     }
-    return verifyBearerToken(context.bearerToken, requiredScopes, config, env, context);
+    return verifyBearerToken(
+        context.bearerToken,
+        requiredScopes,
+        config,
+        runtimeSecrets.staticBearerToken,
+        context,
+        decisionCachePolicy,
+        runtime,
+    );
 }

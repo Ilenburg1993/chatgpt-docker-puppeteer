@@ -6,9 +6,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/platform/node';
 import { readProcessResourceSnapshot } from '#copilot/infra/public/platform/process/introspection';
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -25,7 +23,6 @@ const MAX_JOB_OUTPUT_TAIL_BYTES = 1024 * 1024;
 const MAX_FOCUSED_UNIT_TEST_FILES = 12;
 const MAX_ACTIVE_VALIDATOR_PROCESSES = 1;
 const MAX_PERSISTED_JOB_READ_CONCURRENCY = 32;
-const DEFAULT_VALIDATOR_VITEST_MAX_WORKERS = 2;
 const JOB_TERMINATION_GRACE_MS = 1_500;
 const VALIDATOR_RUNTIME_EPOCH = randomUUID();
 
@@ -357,13 +354,24 @@ export function resolveJobTimeoutMs(timeoutMs) {
  * @param {CopilotValidatorName} validator
  * @param {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     config: import('../config.js').McpValidationProcessConfig;
  *     timeoutMs?: number;
  *     testFiles?: string[];
+ *     signal?: AbortSignal;
  * }} options
  * @returns {Promise<PublicJobRecord>}
  */
 export async function spawnValidatorJob(validator, options) {
     if (!options?.workspace) throw new TypeError('Validator execution requires a workspace capability.');
+    if (!options.config) throw new TypeError('Validator execution requires a validation process config generation.');
+    if (options.signal?.aborted) {
+        throw (
+            options.signal.reason ??
+            Object.assign(new Error('Validator job launch cancelled before acceptance.'), {
+                code: 'ERR_VALIDATOR_JOB_CANCELLED',
+            })
+        );
+    }
     const id = randomUUID();
     const focusedTestFiles =
         validator === 'unit-focused' ? normalizeFocusedUnitTestFiles(options.testFiles) : undefined;
@@ -373,7 +381,7 @@ export async function spawnValidatorJob(validator, options) {
     const artifacts = resolveJobArtifactPaths(id);
     if (!artifacts) throw new Error('Generated validator job id is invalid.');
     const { logFile, manifestFile } = artifacts;
-    if (!canRunCopilotValidatorInline()) {
+    if (!canRunCopilotValidatorInline(options.config)) {
         throw Object.assign(
             new Error(
                 'Validator subprocess fan-out is disabled inside test runners; run the integration check from the normal MCP runtime instead.',
@@ -408,85 +416,152 @@ export async function spawnValidatorJob(validator, options) {
         );
 
         const resourceBefore = await readValidatorResourceSnapshot();
+        if (options.signal?.aborted) {
+            throw (
+                options.signal.reason ??
+                Object.assign(new Error('Validator job launch cancelled before spawn.'), {
+                    code: 'ERR_VALIDATOR_JOB_CANCELLED',
+                })
+            );
+        }
         const child = spawn(command.command, command.args, {
             cwd: options.workspace.workspaceRoot,
-            env: buildValidatorChildEnv(),
+            env: { ...options.config.childEnvironment },
             detached: process.platform !== 'win32',
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         const supervisor = createAttachedChildProcessSupervisor(child);
-
-        /** @type {JobRecord} */
-        const record = {
-            id,
-            validator,
-            status: 'running',
-            startedAt: Date.now(),
-            endedAt: null,
-            exitCode: null,
-            signal: null,
-            command: command.command,
-            args: command.args,
-            timeoutMs,
-            timedOut: false,
-            terminationRequested: null,
-            terminationRequestedAt: null,
-            logFile,
-            manifestFile,
-            ownerRuntimeEpoch: VALIDATOR_RUNTIME_EPOCH,
-            ownerPid: process.pid,
-            childPid: child.pid ?? null,
-            resourceBefore,
-            resourceAfter: null,
-            process: child,
-            supervisor,
-            completion: null,
+        let accepted = false;
+        const terminateBeforeAcceptance = () => {
+            if (accepted) return;
+            supervisor.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
         };
-        JOBS.set(id, record);
-        pruneCompletedJobRecords(JOBS);
-        await persistJobRecord(record);
-
-        const timeout = setTimeout(() => {
-            if (record.status !== 'running' || !record.process || record.terminationRequested) return;
-            record.timedOut = true;
-            record.terminationRequested = 'timeout';
-            record.terminationRequestedAt = Date.now();
-            void enqueueJobIo(record, 'persist timeout request', async () => {
-                await appendJobLog(record.logFile, `\n[job:timeout-requested] timeoutMs=${timeoutMs}\n`);
-                await persistJobRecord(record);
-            });
-            record.supervisor?.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
-        }, timeoutMs);
-        timeout.unref();
-
-        attachJobOutputStream(record, child.stdout, 'stdout', logFile);
-        attachJobOutputStream(record, child.stderr, 'stderr', logFile);
-        record.completion = supervisor.closed.then(async ({ exitCode, signal }) => {
-            clearTimeout(timeout);
-            const terminationRequested = record.terminationRequested;
-            record.endedAt = Date.now();
-            record.exitCode = exitCode;
-            record.signal = signal;
-            record.process = null;
-            if (terminationRequested === 'cancel') record.status = 'cancelled';
-            else if (terminationRequested === 'timeout') record.status = 'failed';
-            else record.status = exitCode === 0 ? 'completed' : 'failed';
-            await enqueueJobIo(record, terminationRequested ? 'finalize interrupted job' : 'finalize job', async () => {
-                record.resourceAfter = await readValidatorResourceSnapshot();
-                const terminalLabel = terminationRequested === 'timeout' ? 'timed-out' : record.status;
-                await appendJobLog(
-                    logFile,
-                    `\n[job:${terminalLabel}] exitCode=${String(exitCode)} signal=${String(signal)}\n`,
+        options.signal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
+        try {
+            await waitForValidatorChildSpawn(child);
+            if (options.signal?.aborted) {
+                terminateBeforeAcceptance();
+                await supervisor.closed;
+                throw (
+                    options.signal.reason ??
+                    Object.assign(new Error('Validator job launch cancelled before acceptance.'), {
+                        code: 'ERR_VALIDATOR_JOB_CANCELLED',
+                    })
                 );
-                await persistJobRecord(record);
-                pruneCompletedJobRecords(JOBS);
-            });
-        });
+            }
 
-        return publicJobRecord(record);
+            /** @type {JobRecord} */
+            const record = {
+                id,
+                validator,
+                status: 'running',
+                startedAt: Date.now(),
+                endedAt: null,
+                exitCode: null,
+                signal: null,
+                command: command.command,
+                args: command.args,
+                timeoutMs,
+                timedOut: false,
+                terminationRequested: null,
+                terminationRequestedAt: null,
+                logFile,
+                manifestFile,
+                ownerRuntimeEpoch: VALIDATOR_RUNTIME_EPOCH,
+                ownerPid: process.pid,
+                childPid: child.pid ?? null,
+                resourceBefore,
+                resourceAfter: null,
+                process: child,
+                supervisor,
+                completion: null,
+            };
+            JOBS.set(id, record);
+            pruneCompletedJobRecords(JOBS);
+            await persistJobRecord(record);
+
+            const timeout = setTimeout(() => {
+                if (record.status !== 'running' || !record.process || record.terminationRequested) return;
+                record.timedOut = true;
+                record.terminationRequested = 'timeout';
+                record.terminationRequestedAt = Date.now();
+                void enqueueJobIo(record, 'persist timeout request', async () => {
+                    await appendJobLog(record.logFile, `\n[job:timeout-requested] timeoutMs=${timeoutMs}\n`);
+                    await persistJobRecord(record);
+                });
+                record.supervisor?.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
+            }, timeoutMs);
+            timeout.unref();
+
+            attachJobOutputStream(record, child.stdout, 'stdout', logFile);
+            attachJobOutputStream(record, child.stderr, 'stderr', logFile);
+            record.completion = supervisor.closed.then(async ({ exitCode, signal }) => {
+                clearTimeout(timeout);
+                const terminationRequested = record.terminationRequested;
+                record.endedAt = Date.now();
+                record.exitCode = exitCode;
+                record.signal = signal;
+                record.process = null;
+                if (terminationRequested === 'cancel') record.status = 'cancelled';
+                else if (terminationRequested === 'timeout') record.status = 'failed';
+                else record.status = exitCode === 0 ? 'completed' : 'failed';
+                await enqueueJobIo(
+                    record,
+                    terminationRequested ? 'finalize interrupted job' : 'finalize job',
+                    async () => {
+                        record.resourceAfter = await readValidatorResourceSnapshot();
+                        const terminalLabel = terminationRequested === 'timeout' ? 'timed-out' : record.status;
+                        await appendJobLog(
+                            logFile,
+                            `\n[job:${terminalLabel}] exitCode=${String(exitCode)} signal=${String(signal)}\n`,
+                        );
+                        await persistJobRecord(record);
+                        pruneCompletedJobRecords(JOBS);
+                    },
+                );
+            });
+
+            if (options.signal?.aborted) {
+                record.terminationRequested = 'cancel';
+                record.terminationRequestedAt = Date.now();
+                supervisor.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
+                await record.completion;
+                throw (
+                    options.signal.reason ??
+                    Object.assign(new Error('Validator job launch cancelled before acceptance.'), {
+                        code: 'ERR_VALIDATOR_JOB_CANCELLED',
+                    })
+                );
+            }
+            accepted = true;
+            return publicJobRecord(record);
+        } finally {
+            options.signal?.removeEventListener('abort', terminateBeforeAcceptance);
+            if (!accepted && supervisor.snapshot().state !== 'closed') {
+                supervisor.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
+                await supervisor.closed;
+            }
+        }
     } finally {
         validatorSpawnReserved = false;
     }
+}
+
+/** @param {import('node:child_process').ChildProcess} child */
+function waitForValidatorChildSpawn(child) {
+    return new Promise((resolvePromise, rejectPromise) => {
+        /** @param {Error} error */
+        const onError = (error) => {
+            child.off('spawn', onSpawn);
+            rejectPromise(error);
+        };
+        const onSpawn = () => {
+            child.off('error', onError);
+            resolvePromise(undefined);
+        };
+        child.once('error', onError);
+        child.once('spawn', onSpawn);
+    });
 }
 
 /**
@@ -494,9 +569,10 @@ export async function spawnValidatorJob(validator, options) {
  *
  * @param {string} id
  * @param {number} [waitMs]
+ * @param {AbortSignal} [signal]
  * @returns {Promise<PublicJobRecord | null>}
  */
-export async function waitForJobCompletion(id, waitMs = 30_000) {
+export async function waitForJobCompletion(id, waitMs = 30_000, signal) {
     const boundedWaitMs = Math.max(0, Math.min(120_000, Math.floor(Number(waitMs) || 0)));
     const attached = JOBS.get(id);
     if (!attached) {
@@ -506,15 +582,48 @@ export async function waitForJobCompletion(id, waitMs = 30_000) {
     if (attached.status !== 'running' || boundedWaitMs === 0) return publicJobRecord(attached);
 
     if (!attached.completion) return publicJobRecord(attached);
+    if (signal?.aborted) {
+        await cancelJobAndDrain(attached);
+        return publicJobRecord(attached);
+    }
     /** @type {NodeJS.Timeout | null} */
     let waitTimer = null;
     const boundedWait = new Promise((resolve) => {
-        waitTimer = setTimeout(resolve, boundedWaitMs);
+        waitTimer = setTimeout(() => resolve('timeout'), boundedWaitMs);
         waitTimer.unref();
     });
-    await Promise.race([attached.completion, boundedWait]);
+    /** @type {(() => void) | null} */
+    let resolveAbort = null;
+    const aborted = signal
+        ? new Promise((resolve) => {
+              resolveAbort = () => resolve('aborted');
+              signal.addEventListener('abort', resolveAbort, { once: true });
+          })
+        : null;
+    const winner = await Promise.race([
+        attached.completion.then(() => 'completed'),
+        boundedWait,
+        ...(aborted ? [aborted] : []),
+    ]);
     if (waitTimer) clearTimeout(waitTimer);
+    if (signal && resolveAbort) signal.removeEventListener('abort', resolveAbort);
+    if (winner === 'aborted') await cancelJobAndDrain(attached);
     return publicJobRecord(attached);
+}
+
+/** @param {JobRecord} record */
+async function cancelJobAndDrain(record) {
+    if (record.status !== 'running' || !record.process || !record.completion) return;
+    if (!record.terminationRequested) {
+        record.terminationRequested = 'cancel';
+        record.terminationRequestedAt = Date.now();
+        record.supervisor?.requestTermination({ graceMs: JOB_TERMINATION_GRACE_MS });
+        await enqueueJobIo(record, 'persist cancellation request', async () => {
+            await appendJobLog(record.logFile, '\n[job:cancellation-requested]\n');
+            await persistJobRecord(record);
+        });
+    }
+    await record.completion;
 }
 
 /**
@@ -531,27 +640,13 @@ export async function readJobOutput(id, tailBytes = 24_000) {
 }
 
 /**
- * Prevent validator subprocess fan-out from inside Vitest/test runners.
+ * Prevent validator subprocess fan-out from inside Vitest/test runners using the captured process generation.
  *
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {import('../config.js').McpValidationProcessConfig} config
  */
-export function canRunCopilotValidatorInline(env = process.env) {
-    return !env['VITEST'] && env['NODE_ENV'] !== 'test';
-}
-
-export function resolveValidatorVitestMaxWorkers(env = process.env) {
-    const candidate = Number(env['COPILOT_VALIDATOR_VITEST_MAX_WORKERS'] ?? env['VITEST_MAX_WORKERS']);
-    if (Number.isInteger(candidate) && candidate >= 1 && candidate <= 4) return candidate;
-    return DEFAULT_VALIDATOR_VITEST_MAX_WORKERS;
-}
-
-function buildValidatorChildEnv() {
-    const { env } = buildMcpChildEnvironment();
-    return withCopilotNodeCompileCacheEnv({
-        ...env,
-        NO_COLOR: '',
-        VITEST_MAX_WORKERS: String(resolveValidatorVitestMaxWorkers()),
-    });
+export function canRunCopilotValidatorInline(config) {
+    if (!config) throw new TypeError('Validator recursion guard requires a validation process config generation.');
+    return config.inlineAllowed;
 }
 
 /** @returns {Promise<ValidatorResourceSnapshot>} */
@@ -574,7 +669,9 @@ export async function readValidatorResourceSnapshot() {
     };
 }
 
-export function readCopilotValidatorCapacityState() {
+/** @param {import('../config.js').McpValidationProcessConfig} config */
+export function readCopilotValidatorCapacityState(config) {
+    if (!config) throw new TypeError('Validator capacity state requires a validation process config generation.');
     const active = [...JOBS.values()]
         .filter((record) => record.status === 'running' && record.process !== null)
         .map((record) => ({ id: record.id, validator: record.validator, startedAt: record.startedAt }));
@@ -582,7 +679,7 @@ export function readCopilotValidatorCapacityState() {
         runtimeEpoch: VALIDATOR_RUNTIME_EPOCH,
         ownerPid: process.pid,
         maxActive: MAX_ACTIVE_VALIDATOR_PROCESSES,
-        vitestMaxWorkers: resolveValidatorVitestMaxWorkers(),
+        vitestMaxWorkers: config.vitestMaxWorkers,
         spawnReserved: validatorSpawnReserved,
         activeCount: active.length,
         active,
@@ -596,15 +693,19 @@ export function readCopilotValidatorCapacityState() {
  * @param {CopilotValidatorName} validator
  * @param {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     config: import('../config.js').McpValidationProcessConfig;
  *     timeoutMs?: number;
  *     waitMs?: number;
  *     failureTailBytes?: number;
  *     testFiles?: string[];
+ *     signal?: AbortSignal;
  * }} options
  */
 export async function runCopilotValidatorInline(validator, options) {
     if (!options?.workspace) throw new TypeError('Inline validator execution requires a workspace capability.');
-    if (!canRunCopilotValidatorInline()) {
+    if (!options.config)
+        throw new TypeError('Inline validator execution requires a validation process config generation.');
+    if (!canRunCopilotValidatorInline(options.config)) {
         throw new Error(
             'Inline validator fan-out is disabled inside test runners to prevent recursive Node/Vitest process trees.',
         );
@@ -615,11 +716,13 @@ export async function runCopilotValidatorInline(validator, options) {
     if (!focused && options.testFiles) throw new Error('testFiles are valid only for unit-focused.');
     const job = await spawnValidatorJob(validator, {
         workspace: options.workspace,
+        config: options.config,
         ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
         ...(focused ? { testFiles: options.testFiles } : {}),
+        ...(options.signal ? { signal: options.signal } : {}),
     });
     const waitMs = Math.max(0, Math.min(120_000, Math.floor(Number(options.waitMs ?? 30_000))));
-    const waited = await waitForJobCompletion(job.id, waitMs);
+    const waited = await waitForJobCompletion(job.id, waitMs, options.signal);
     if (!waited) throw new Error(`Validator job ${job.id} disappeared while waiting.`);
     const completedWithinWait = waited.status !== 'running';
     const passed = waited.status === 'completed' && waited.exitCode === 0;

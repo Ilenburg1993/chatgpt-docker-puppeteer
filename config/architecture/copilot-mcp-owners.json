@@ -1,0 +1,462 @@
+{
+  "schemaVersion": 1,
+  "rootOwnerId": "mcp",
+  "owners": [
+    {
+      "ownerId": "mcp",
+      "path": "src/copilot/mcp",
+      "parentOwnerId": null,
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP application boundary"
+    },
+    {
+      "ownerId": "mcp.adapters",
+      "path": "src/copilot/mcp/adapters",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Node transport host adapters"
+    },
+    {
+      "ownerId": "mcp.auth",
+      "path": "src/copilot/mcp/auth",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "OAuth resource-server and issuer domain"
+    },
+    {
+      "ownerId": "mcp.cloudflare",
+      "path": "src/copilot/mcp/cloudflare",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare remote/edge/tunnel authority"
+    },
+    {
+      "ownerId": "mcp.cloudflare.remote",
+      "path": "src/copilot/mcp/cloudflare/remote",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare remote API and ruleset snapshot authority"
+    },
+    {
+      "ownerId": "mcp.cloudflare.edge",
+      "path": "src/copilot/mcp/cloudflare/edge",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare edge audit, policy, backup and snapshot workflows"
+    },
+    {
+      "ownerId": "mcp.cloudflare.posture",
+      "path": "src/copilot/mcp/cloudflare/posture",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare config, passthrough and capability posture workflows"
+    },
+    {
+      "ownerId": "mcp.cloudflare.tunnel",
+      "path": "src/copilot/mcp/cloudflare/tunnel",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare tunnel state and origin-plan workflows"
+    },
+    {
+      "ownerId": "mcp.cloudflare.observability",
+      "path": "src/copilot/mcp/cloudflare/observability",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare probes, connector smoke, metrics and latency observability"
+    },
+    {
+      "ownerId": "mcp.cloudflare.process",
+      "path": "src/copilot/mcp/cloudflare/process",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare managed process supervision"
+    },
+    {
+      "ownerId": "mcp.cloudflare.transport-benchmark",
+      "path": "src/copilot/mcp/cloudflare/transport-benchmark",
+      "parentOwnerId": "mcp.cloudflare",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare transport benchmark runtime and state"
+    },
+    {
+      "ownerId": "mcp.company-knowledge",
+      "path": "src/copilot/mcp/company-knowledge",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Company Knowledge corpus and feature configuration"
+    },
+    {
+      "ownerId": "mcp.composition",
+      "path": "src/copilot/mcp/composition",
+      "parentOwnerId": "mcp",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "MCP composition roots"
+    },
+    {
+      "ownerId": "mcp.composition.cloudflare-cli",
+      "path": "src/copilot/mcp/composition/cloudflare-cli",
+      "parentOwnerId": "mcp.composition",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Cloudflare CLI application and managed-process composition"
+    },
+    {
+      "ownerId": "mcp.composition.process-config",
+      "path": "src/copilot/mcp/composition/process-config",
+      "parentOwnerId": "mcp.composition",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Immutable MCP process configuration composition"
+    },
+    {
+      "ownerId": "mcp.composition.process-host",
+      "path": "src/copilot/mcp/composition/process-host",
+      "parentOwnerId": "mcp.composition",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Concrete MCP process composition"
+    },
+    {
+      "ownerId": "mcp.connection",
+      "path": "src/copilot/mcp/connection",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Connector profile and URL contracts"
+    },
+    {
+      "ownerId": "mcp.diagnostics",
+      "path": "src/copilot/mcp/diagnostics",
+      "parentOwnerId": "mcp",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "Diagnostic owners"
+    },
+    {
+      "ownerId": "mcp.diagnostics.http-smoke",
+      "path": "src/copilot/mcp/diagnostics/http-smoke",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "HTTP smoke runtime"
+    },
+    {
+      "ownerId": "mcp.diagnostics.latency",
+      "path": "src/copilot/mcp/diagnostics/latency",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "Latency diagnostic owners"
+    },
+    {
+      "ownerId": "mcp.diagnostics.latency.attribution",
+      "path": "src/copilot/mcp/diagnostics/latency/attribution",
+      "parentOwnerId": "mcp.diagnostics.latency",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Latency attribution"
+    },
+    {
+      "ownerId": "mcp.diagnostics.latency.benchmark",
+      "path": "src/copilot/mcp/diagnostics/latency/benchmark",
+      "parentOwnerId": "mcp.diagnostics.latency",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Latency benchmark execution"
+    },
+    {
+      "ownerId": "mcp.diagnostics.latency.dashboard",
+      "path": "src/copilot/mcp/diagnostics/latency/dashboard",
+      "parentOwnerId": "mcp.diagnostics.latency",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Latency SLO dashboard assessment and history"
+    },
+    {
+      "ownerId": "mcp.diagnostics.latency.round-trip",
+      "path": "src/copilot/mcp/diagnostics/latency/round-trip",
+      "parentOwnerId": "mcp.diagnostics.latency",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Incremental round-trip audit analytics, causal workflow evidence and monitor lifecycle"
+    },
+    {
+      "ownerId": "mcp.diagnostics.oauth-smoke",
+      "path": "src/copilot/mcp/diagnostics/oauth-smoke",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "OAuth smoke diagnostics"
+    },
+    {
+      "ownerId": "mcp.diagnostics.runtime-health",
+      "path": "src/copilot/mcp/diagnostics/runtime-health",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "MCP runtime health projection"
+    },
+    {
+      "ownerId": "mcp.diagnostics.tool-payload",
+      "path": "src/copilot/mcp/diagnostics/tool-payload",
+      "parentOwnerId": "mcp.diagnostics",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Tool payload diagnostics"
+    },
+    {
+      "ownerId": "mcp.indexing",
+      "path": "src/copilot/mcp/indexing",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP indexing orchestration"
+    },
+    {
+      "ownerId": "mcp.indexing.auto-build",
+      "path": "src/copilot/mcp/indexing/auto-build",
+      "parentOwnerId": "mcp.indexing",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Index startup checkpoint, evidence, bounded verification and background build lifecycle"
+    },
+    {
+      "ownerId": "mcp.indexing.repository",
+      "path": "src/copilot/mcp/indexing/repository",
+      "parentOwnerId": "mcp.indexing",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository indexing/query adapter"
+    },
+    {
+      "ownerId": "mcp.integrations",
+      "path": "src/copilot/mcp/integrations",
+      "parentOwnerId": "mcp",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "External/domain integrations"
+    },
+    {
+      "ownerId": "mcp.integrations.model-gateway",
+      "path": "src/copilot/mcp/integrations/model-gateway",
+      "parentOwnerId": "mcp.integrations",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "Model Gateway MCP integration"
+    },
+    {
+      "ownerId": "mcp.integrations.model-gateway.live-runs",
+      "path": "src/copilot/mcp/integrations/model-gateway/live-runs",
+      "parentOwnerId": "mcp.integrations.model-gateway",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Governed Model Gateway live process integration"
+    },
+    {
+      "ownerId": "mcp.integrations.model-gateway.sqlite-fingerprint",
+      "path": "src/copilot/mcp/integrations/model-gateway/sqlite-fingerprint",
+      "parentOwnerId": "mcp.integrations.model-gateway",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Model Gateway SQLite fingerprint projection"
+    },
+    {
+      "ownerId": "mcp.maintenance",
+      "path": "src/copilot/mcp/maintenance",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP maintenance operations"
+    },
+    {
+      "ownerId": "mcp.maintenance.dependencies",
+      "path": "src/copilot/mcp/maintenance/dependencies",
+      "parentOwnerId": "mcp.maintenance",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Dependency maintenance"
+    },
+    {
+      "ownerId": "mcp.maintenance.dependencies.native-smoke",
+      "path": "src/copilot/mcp/maintenance/dependencies/native-smoke",
+      "parentOwnerId": "mcp.maintenance.dependencies",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Native dependency smoke"
+    },
+    {
+      "ownerId": "mcp.observability",
+      "path": "src/copilot/mcp/observability",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP audit/metrics/logging"
+    },
+    {
+      "ownerId": "mcp.openai",
+      "path": "src/copilot/mcp/openai",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "OpenAI/ChatGPT connector integration"
+    },
+    {
+      "ownerId": "mcp.process",
+      "path": "src/copilot/mcp/process",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Process host/environment/supervision/terminal primitives"
+    },
+    {
+      "ownerId": "mcp.protocol",
+      "path": "src/copilot/mcp/protocol",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP protocol contracts"
+    },
+    {
+      "ownerId": "mcp.protocol.apps-sdk",
+      "path": "src/copilot/mcp/protocol/apps-sdk",
+      "parentOwnerId": "mcp.protocol",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Apps SDK protocol projection"
+    },
+    {
+      "ownerId": "mcp.registry",
+      "path": "src/copilot/mcp/registry",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Tool registry runtime"
+    },
+    {
+      "ownerId": "mcp.runtime",
+      "path": "src/copilot/mcp/runtime",
+      "parentOwnerId": "mcp",
+      "kind": "taxonomy",
+      "protectedBoundary": false,
+      "role": "Process runtime operations"
+    },
+    {
+      "ownerId": "mcp.scripts",
+      "path": "src/copilot/mcp/scripts",
+      "parentOwnerId": "mcp",
+      "kind": "entrypoint-space",
+      "protectedBoundary": false,
+      "role": "MCP launchers and architecture gates"
+    },
+    {
+      "ownerId": "mcp.server",
+      "path": "src/copilot/mcp/server",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "MCP server composition/runtime"
+    },
+    {
+      "ownerId": "mcp.tools",
+      "path": "src/copilot/mcp/tools",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Wire exposure plane"
+    },
+    {
+      "ownerId": "mcp.transport",
+      "path": "src/copilot/mcp/transport",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "MCP transport owners"
+    },
+    {
+      "ownerId": "mcp.validation",
+      "path": "src/copilot/mcp/validation",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Validation jobs/suites"
+    },
+    {
+      "ownerId": "mcp.workspace",
+      "path": "src/copilot/mcp/workspace",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Workspace capability and repository operations"
+    },
+    {
+      "ownerId": "mcp.workspace.git",
+      "path": "src/copilot/mcp/workspace/git",
+      "parentOwnerId": "mcp.workspace",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Workspace Git primitive"
+    },
+    {
+      "ownerId": "mcp.workspace.repository",
+      "path": "src/copilot/mcp/workspace/repository",
+      "parentOwnerId": "mcp.workspace",
+      "kind": "owner",
+      "protectedBoundary": false,
+      "role": "Repository operation owners"
+    },
+    {
+      "ownerId": "mcp.workspace.repository.patch",
+      "path": "src/copilot/mcp/workspace/repository/patch",
+      "parentOwnerId": "mcp.workspace.repository",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository patch semantics"
+    },
+    {
+      "ownerId": "mcp.workspace.repository.read",
+      "path": "src/copilot/mcp/workspace/repository/read",
+      "parentOwnerId": "mcp.workspace.repository",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository read operations"
+    },
+    {
+      "ownerId": "mcp.workspace.repository.read-cache",
+      "path": "src/copilot/mcp/workspace/repository/read-cache",
+      "parentOwnerId": "mcp.workspace.repository",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository read response cache"
+    },
+    {
+      "ownerId": "mcp.workspace.repository.status",
+      "path": "src/copilot/mcp/workspace/repository/status",
+      "parentOwnerId": "mcp.workspace.repository",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository status projection"
+    },
+    {
+      "ownerId": "mcp.workspace.repository.write",
+      "path": "src/copilot/mcp/workspace/repository/write",
+      "parentOwnerId": "mcp.workspace.repository",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Repository write, quarantine and batch-operation semantics"
+    }
+  ]
+}

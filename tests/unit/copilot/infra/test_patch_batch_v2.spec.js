@@ -109,6 +109,29 @@ describe('Patch Batch V2 low-level contract', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe(initial);
     });
 
+    it('aborts after virtual validation but before publish without changing file bytes', async () => {
+        const initial = 'alpha beta gamma';
+        const file = await createTempFile('cancel-before-publish.txt', initial);
+        const controller = new AbortController();
+
+        await expect(
+            patchTextBatchLocked(file, {
+                signal: controller.signal,
+                operations: [
+                    { oldString: 'alpha', newString: 'ALPHA' },
+                    { oldString: 'beta', newString: 'BETA' },
+                ],
+                validateUpdatedContent: (content) => {
+                    expect(content).toBe('ALPHA BETA gamma');
+                    controller.abort(new Error('cancel-patch-before-publish'));
+                },
+            }),
+        ).rejects.toThrow(/cancel-patch-before-publish/u);
+
+        expect(controller.signal.aborted).toBe(true);
+        await expect(readFile(file, 'utf8')).resolves.toBe(initial);
+    });
+
     it('preserves distinct per-operation virtual hash preconditions', async () => {
         const initial = 'alpha beta gamma';
         const afterFirst = 'alpha BETA gamma';

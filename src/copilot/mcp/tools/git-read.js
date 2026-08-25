@@ -5,9 +5,37 @@
  * @module copilot/mcp/tools/git-read
  */
 
-import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+// @ts-check
+/**
+ * Read-only Git MCP tools.
+ *
+ * @module copilot/mcp/tools/git-read
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import {
+    errorResult,
+    okResult,
+    requireMcpToolGitConfig,
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 import { execWorkspaceGit as execGit } from '#copilot/mcp/public/workspace/git';
 import { z } from 'zod';
+
+/** @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext */
+function createGitReadRuntime(operationContext) {
+    const workspace = requireMcpToolWorkspace(operationContext);
+    const config = requireMcpToolGitConfig(operationContext);
+    /** @param {string[]} args @param {{ timeoutMs?: number; maxBufferBytes?: number }} [options] */
+    const exec = (args, options = {}) =>
+        execGit(args, {
+            ...options,
+            cwd: workspace.workspaceRoot,
+            config,
+            ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+        });
+    return Object.freeze({ exec });
+}
 
 const gitStatusOutputSchema = z.object({
     success: z.literal(true),
@@ -32,18 +60,19 @@ const gitBranchInfoOutputSchema = z.object({
 });
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const gitReadTools = [
-    {
+    defineMcpRawTool({
         name: 'git_status',
         title: 'Git status',
         description: 'Return the current Git branch, HEAD and short status for the workspace.',
         inputSchema: {},
         outputSchema: gitStatusOutputSchema,
-        annotations: readOnlyAnnotations(),
-        handler: async () => {
-            const status = await execGit(['status', '--short', '--branch']);
+
+        handler: async (_args, operationContext) => {
+            const git = createGitReadRuntime(operationContext);
+            const status = await git.exec(['status', '--short', '--branch']);
             if (!status.success) {
                 return errorResult(status.error ?? 'Unable to read git status.', {
                     code: 'ERR_GIT_STATUS_FAILED',
@@ -52,8 +81,8 @@ export const gitReadTools = [
             }
             return okResult({ success: true, status: status.stdout }, status.stdout || '(clean)');
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_diff',
         title: 'Git diff',
         description: 'Return a unified Git diff for the workspace or for one path.',
@@ -62,12 +91,13 @@ export const gitReadTools = [
             path: z.string().optional()['describe']('Optional workspace-relative path to diff.'),
         },
         outputSchema: gitDiffOutputSchema,
-        annotations: readOnlyAnnotations(),
-        handler: async ({ staged, path }) => {
+
+        handler: async ({ staged, path }, operationContext) => {
+            const git = createGitReadRuntime(operationContext);
             const args = ['diff'];
             if (staged === true) args.push('--staged');
             if (path) args.push('--', path);
-            const diff = await execGit(args, { maxBufferBytes: 4 * 1024 * 1024 });
+            const diff = await git.exec(args, { maxBufferBytes: 4 * 1024 * 1024 });
             if (!diff.success) {
                 return errorResult(diff.error ?? 'Unable to read git diff.', {
                     code: 'ERR_GIT_DIFF_FAILED',
@@ -80,8 +110,8 @@ export const gitReadTools = [
                 diff.stdout,
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_log',
         title: 'Git log',
         description: 'Return recent Git commits for the workspace.',
@@ -89,10 +119,11 @@ export const gitReadTools = [
             limit: z.number().int().min(1).max(50).optional()['describe']('Maximum commits to return. Default: 10.'),
         },
         outputSchema: gitLogOutputSchema,
-        annotations: readOnlyAnnotations(),
-        handler: async ({ limit }) => {
+
+        handler: async ({ limit }, operationContext) => {
+            const git = createGitReadRuntime(operationContext);
             const safeLimit = String(limit ?? 10);
-            const log = await execGit(['log', '--oneline', `-${safeLimit}`]);
+            const log = await git.exec(['log', '--oneline', `-${safeLimit}`]);
             if (!log.success) {
                 return errorResult(log.error ?? 'Unable to read git log.', {
                     code: 'ERR_GIT_LOG_FAILED',
@@ -102,19 +133,20 @@ export const gitReadTools = [
             }
             return okResult({ success: true, log: log.stdout, limit: Number(safeLimit) }, log.stdout);
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_branch_info',
         title: 'Git branch info',
         description: 'Return current branch and upstream tracking information.',
         inputSchema: {},
         outputSchema: gitBranchInfoOutputSchema,
-        annotations: readOnlyAnnotations(),
-        handler: async () => {
+
+        handler: async (_args, operationContext) => {
+            const git = createGitReadRuntime(operationContext);
             const [branch, upstream, head] = await Promise.all([
-                execGit(['branch', '--show-current']),
-                execGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']),
-                execGit(['rev-parse', '--short', 'HEAD']),
+                git.exec(['branch', '--show-current']),
+                git.exec(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']),
+                git.exec(['rev-parse', '--short', 'HEAD']),
             ]);
             const structured = {
                 success: true,
@@ -124,5 +156,5 @@ export const gitReadTools = [
             };
             return okResult(structured, JSON.stringify(structured, null, 2));
         },
-    },
+    }),
 ];

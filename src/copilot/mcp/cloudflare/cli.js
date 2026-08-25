@@ -11,9 +11,9 @@
  * @module copilot/mcp/cloudflare/cli
  */
 
+import { runCloudflareCli } from '#copilot/mcp/public/composition/cloudflare-cli';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { runCloudflareCli } from './cli-commands.js';
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
     runCloudflareCli(process.argv, process.env).catch((error) => {

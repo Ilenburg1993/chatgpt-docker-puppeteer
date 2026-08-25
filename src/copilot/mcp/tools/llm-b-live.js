@@ -21,13 +21,13 @@ import {
     runModelGatewayLiveCommand,
     spawnDetachedLiveRun,
 } from '#copilot/mcp/public/integrations/model-gateway/live-runs';
-import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
-    destructiveAnnotations,
     errorResult,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolAuditCapability,
+    requireMcpToolModelGatewayLiveRunEnvironmentAuthority,
+    requireMcpToolModelGatewaySqliteFingerprintCapability,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
@@ -68,9 +68,9 @@ const commonPlanInput = {
     selectionPolicy: selectionPolicySchema.optional(),
 };
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const llmBLiveTools = [
-    {
+    defineMcpRawTool({
         name: 'llmb_live_readiness',
         title: 'LLM-B live readiness',
         description:
@@ -78,11 +78,12 @@ export const llmBLiveTools = [
         inputSchema: {
             includeSqliteRuntimeHealth: z.boolean().optional(),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ includeSqliteRuntimeHealth }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const execution = await executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth === true, {
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                sqliteFingerprint: requireMcpToolModelGatewaySqliteFingerprintCapability(operationContext),
             });
             if (!execution.success || !execution.parsed) {
                 return errorResult(execution.error ?? 'LLM-B live readiness did not return valid JSON.', {
@@ -104,8 +105,8 @@ export const llmBLiveTools = [
             };
             return okResult(parsed, JSON.stringify(parsed, null, 2));
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'llmb_live_runs',
         title: 'LLM-B persisted live runs',
         description:
@@ -113,10 +114,12 @@ export const llmBLiveTools = [
         inputSchema: {
             limit: z.number().int().min(1).max(100).optional(),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ limit }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
             const result = await readModelGatewayPersistedLiveRuns(workspace, limit ?? 20, {
+                environmentAuthority,
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
             });
             if (!result.success || !result.parsed) {
@@ -128,8 +131,8 @@ export const llmBLiveTools = [
             }
             return okResult(result.parsed, JSON.stringify(result.parsed, null, 2));
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'llmb_live_test_cancel',
         title: 'Cancel detached LLM-B live test',
         description:
@@ -137,7 +140,7 @@ export const llmBLiveTools = [
         inputSchema: {
             runId: z.string()['regex'](DETACHED_LIVE_RUN_ID_RE),
         },
-        annotations: destructiveAnnotations(),
+
         handler: async ({ runId }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             try {
@@ -168,7 +171,7 @@ export const llmBLiveTools = [
                     // stranded afterward (for example while a PTY descendant refuses to close). Explicit cancellation
                     // should be able to reap that verified leftover instead of returning a misleading no-op.
                     const cancellation = await cancelDetachedLiveRun(manifest);
-                    await appendMcpAuditEvent({
+                    await requireMcpToolAuditCapability(operationContext).append({
                         event: 'llmb_live_test_completed_process_cancelled',
                         tool: 'llmb_live_test_cancel',
                         runId,
@@ -189,7 +192,7 @@ export const llmBLiveTools = [
                     return okResult(structured, JSON.stringify(structured, null, 2));
                 }
                 const cancellation = await cancelDetachedLiveRun(manifest);
-                await appendMcpAuditEvent({
+                await requireMcpToolAuditCapability(operationContext).append({
                     event: cancellation.cancelled
                         ? 'llmb_live_test_detached_cancelled'
                         : 'llmb_live_test_detached_already_stopped',
@@ -216,14 +219,14 @@ export const llmBLiveTools = [
                 return errorResult(error instanceof Error ? error.message : String(error), { code, runId });
             }
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'llmb_live_test_plan',
         title: 'Plan canonical LLM-B live test',
         description:
             'Build an allowlisted live harness invocation and state whether it can consume GitHub Copilot AI Credits or BYOK/provider quota.',
         inputSchema: commonPlanInput,
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ mode, scenario, transport, timeoutMs, byokProfile, routeProfile, selectionPolicy }) => {
             try {
                 const plan = buildModelGatewayLiveRunPlan({
@@ -242,8 +245,8 @@ export const llmBLiveTools = [
                 });
             }
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'llmb_live_test_run',
         title: 'Run canonical LLM-B live test',
         description:
@@ -255,7 +258,7 @@ export const llmBLiveTools = [
                 .optional()
                 ['describe']('Required when the plan can invoke a model or real BYOK/provider.'),
         },
-        annotations: { ...boundedWriteAnnotations(), openWorldHint: true },
+
         handler: async (
             { mode, scenario, transport, timeoutMs, byokProfile, routeProfile, selectionPolicy, confirmModelUsage },
             operationContext,
@@ -282,15 +285,17 @@ export const llmBLiveTools = [
                     );
                 }
                 const workspace = requireMcpToolWorkspace(operationContext);
+                const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
                 if (plan.executionMode === 'detached') {
                     const manifest = await spawnDetachedLiveRun({
                         workspace,
                         args: plan.args,
                         plan,
                         timeoutMs: effectiveTimeoutMs,
+                        environmentAuthority,
                         ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                     });
-                    await appendMcpAuditEvent({
+                    await requireMcpToolAuditCapability(operationContext).append({
                         event: 'llmb_live_test_detached_started',
                         tool: 'llmb_live_test_run',
                         runId: manifest.runId,
@@ -315,7 +320,7 @@ export const llmBLiveTools = [
                 const runId = `mcp-${Date.now().toString(36)}`;
                 const outDir = `artifacts/terminal-live/${runId}`;
                 const args = [...plan.args, `--out-dir=${outDir}`];
-                await appendMcpAuditEvent({
+                await requireMcpToolAuditCapability(operationContext).append({
                     event: 'llmb_live_test_started',
                     tool: 'llmb_live_test_run',
                     runId,
@@ -330,9 +335,10 @@ export const llmBLiveTools = [
                     args,
                     timeoutMs: effectiveTimeoutMs + 30_000,
                     plan,
+                    environmentAuthority,
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 });
-                await appendMcpAuditEvent({
+                await requireMcpToolAuditCapability(operationContext).append({
                     event: result.success ? 'llmb_live_test_completed' : 'llmb_live_test_failed',
                     tool: 'llmb_live_test_run',
                     runId,
@@ -366,5 +372,5 @@ export const llmBLiveTools = [
                 });
             }
         },
-    },
+    }),
 ];

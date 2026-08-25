@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 2,
+  "computedImports": [],
+  "childProcessImportOwners": [
+    "src/copilot/mcp/cloudflare/process/cli-process.js",
+    "src/copilot/mcp/composition/cloudflare-cli/managed-stack.js",
+    "src/copilot/mcp/cloudflare/transport-benchmark/runtime.js",
+    "src/copilot/mcp/diagnostics/devcontainer-network/runtime.js",
+    "src/copilot/mcp/diagnostics/io-cache/runner.js",
+    "src/copilot/mcp/diagnostics/io-cache/scheduler.js",
+    "src/copilot/mcp/integrations/model-gateway/live-runs/runtime.js",
+    "src/copilot/mcp/maintenance/dependencies/runtime.js",
+    "src/copilot/mcp/process/terminal/runtime.js",
+    "src/copilot/mcp/runtime/reload/runner.js",
+    "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
+    "src/copilot/mcp/validation/devcontainer-shell/runtime.js",
+    "src/copilot/mcp/validation/jobs/runtime.js",
+    "src/copilot/mcp/validation/suites/runtime.js",
+    "src/copilot/mcp/workspace/git/runtime.js"
+  ],
+  "workerThreadImportOwners": [],
+  "childProcessAuthorities": [
+    {
+      "path": "src/copilot/mcp/cloudflare/process/cli-process.js",
+      "ownerId": "mcp.cloudflare.process",
+      "launchers": [
+        {
+          "id": "managed-daemons",
+          "completionModel": "managed-lifecycle",
+          "callerCancellation": "explicit-control",
+          "cwdAuthority": "process-cwd-inherited",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "stop/restart API has bounded SIGTERM wait and SIGKILL fallback"
+        },
+        {
+          "id": "cloudflared-version",
+          "completionModel": "sync-probe",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "process-cwd-inherited",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "no",
+          "bound": "spawnSync probe is synchronous and finite"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/composition/cloudflare-cli/managed-stack.js",
+      "ownerId": "mcp.composition.cloudflare-cli",
+      "launchers": [
+        {
+          "id": "foreground-cloudflared",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "process-cwd-inherited",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "no",
+          "bound": "CLI foreground lifecycle observes physical close"
+        },
+        {
+          "id": "managed-stack",
+          "completionModel": "managed-lifecycle",
+          "callerCancellation": "explicit-control",
+          "cwdAuthority": "process-cwd-inherited",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "managed daemon lifecycle delegated to Cloudflare process controller"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/transport-benchmark/runtime.js",
+      "ownerId": "mcp.cloudflare.transport-benchmark",
+      "launchers": [
+        {
+          "id": "detached-benchmark-launch",
+          "completionModel": "detached-acceptance",
+          "callerCancellation": "before-acceptance",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller owns launch until spawn acceptance; abort terminates and drains before rejection"
+        },
+        {
+          "id": "benchmark-fixed-child",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "detached benchmark runner owns bounded smoke/restart children and observes close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/devcontainer-network/runtime.js",
+      "ownerId": "mcp.diagnostics",
+      "launchers": [
+        {
+          "id": "network-state-refresh",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort/timeout terminates process group and awaits close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/io-cache/runner.js",
+      "ownerId": "mcp.diagnostics",
+      "launchers": [
+        {
+          "id": "benchmark-worker",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "detached scheduler transfers ownership to runner; runner bounds worker and observes close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/io-cache/scheduler.js",
+      "ownerId": "mcp.diagnostics",
+      "launchers": [
+        {
+          "id": "detached-io-cache-launch",
+          "completionModel": "detached-acceptance",
+          "callerCancellation": "before-acceptance",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller owns launch only until spawn acceptance; abort before acceptance terminates and drains the tree"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/integrations/model-gateway/live-runs/runtime.js",
+      "ownerId": "mcp.integrations.model-gateway.live-runs",
+      "launchers": [
+        {
+          "id": "attached-live-command",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort/timeout terminates attached command and awaits close"
+        },
+        {
+          "id": "detached-live-launch",
+          "completionModel": "detached-acceptance",
+          "callerCancellation": "before-acceptance",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller cancellation applies through durable detached-run acceptance; pre-acceptance abort terminates and drains"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/maintenance/dependencies/runtime.js",
+      "ownerId": "mcp.maintenance.dependencies",
+      "launchers": [
+        {
+          "id": "dependency-maintenance",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort/timeout terminates npm process group and awaits close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/process/terminal/runtime.js",
+      "ownerId": "mcp.process",
+      "launchers": [
+        {
+          "id": "one-shot-terminal",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "tool signal/timeout terminates one-shot process group and observes close"
+        },
+        {
+          "id": "persistent-terminal",
+          "completionModel": "persistent-session",
+          "callerCancellation": "before-acceptance-then-explicit-control",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller owns pipe-session launch until physical spawn acceptance; pre-acceptance abort terminates and drains, then accepted session intentionally outlives the open call under explicit session control"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/runtime/reload/runner.js",
+      "ownerId": "mcp.runtime",
+      "launchers": [
+        {
+          "id": "detached-reload-launch",
+          "completionModel": "detached-acceptance",
+          "callerCancellation": "before-acceptance",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller owns controlled reload only until launcher acceptance; pre-acceptance abort terminates and drains"
+        },
+        {
+          "id": "reload-fixed-child",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "accepted reload runner owns bounded restart child lifecycle"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
+      "ownerId": "mcp.transport",
+      "launchers": [
+        {
+          "id": "stateful-bootstrap-npm",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "no",
+          "bound": "bootstrap CLI remains in parent process group and truthfully observes child close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/validation/devcontainer-shell/runtime.js",
+      "ownerId": "mcp.validation",
+      "launchers": [
+        {
+          "id": "shellcheck-file",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort or timeout terminates process group and awaits close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/validation/jobs/runtime.js",
+      "ownerId": "mcp.validation",
+      "launchers": [
+        {
+          "id": "validator-job-launch",
+          "completionModel": "job-lifecycle",
+          "callerCancellation": "before-acceptance",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller owns spawn through durable acceptance; accepted job uses job_cancel/timeout lifecycle"
+        },
+        {
+          "id": "validator-wait",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "when caller waits, abort requests job cancellation and awaits completion"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/validation/suites/runtime.js",
+      "ownerId": "mcp.validation",
+      "launchers": [
+        {
+          "id": "safe-suite-step",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort terminates current suite step and awaits close"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/workspace/git/runtime.js",
+      "ownerId": "mcp.workspace.git",
+      "launchers": [
+        {
+          "id": "workspace-git",
+          "completionModel": "attached-close",
+          "callerCancellation": "drain",
+          "cwdAuthority": "caller-bounded-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "yes",
+          "bound": "caller abort/timeout terminates Git process group and awaits close"
+        }
+      ]
+    }
+  ]
+}

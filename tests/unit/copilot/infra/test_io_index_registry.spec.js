@@ -567,6 +567,43 @@ describe('io-index-registry build coalescing', () => {
         expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ pending: 1, queued: 1, domainSkipped: 1 });
     });
 
+    it('aborta domain reconcile durante o sweep sem continuar invalidations tardias', async () => {
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        const workspaceRoot = '/tmp/ws-domain-reconcile-abort';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        await requireIndexRuntime().buildDirectory(scopeRoot, {
+            workspaceRoot,
+            respectGitignore: true,
+            adoptAutoRefreshDomain: true,
+        });
+        const controller = new AbortController();
+        mocks.listIndexedFiles.mockReturnValue([
+            {
+                filePath: `${scopeRoot}/.ai/jobs/first.json`,
+                extension: '.json',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+            {
+                filePath: `${scopeRoot}/.ai/jobs/second.json`,
+                extension: '.json',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+        ]);
+        mocks.invalidatePath.mockImplementation((filePath) => {
+            if (String(filePath).endsWith('first.json')) controller.abort(new Error('stop-domain-reconcile'));
+            return true;
+        });
+
+        await assert.rejects(
+            requireIndexRuntime().reconcileAutoRefreshDomain({ signal: controller.signal }),
+            /stop-domain-reconcile/u,
+        );
+        expect(mocks.invalidatePath).toHaveBeenCalledTimes(1);
+        expect(mocks.invalidatePath).toHaveBeenCalledWith(`${scopeRoot}/.ai/jobs/first.json`);
+        expect(mocks.invalidatePath).not.toHaveBeenCalledWith(`${scopeRoot}/.ai/jobs/second.json`);
+        expect(requireIndexRuntime().stats().autoRefresh).toMatchObject({ domainReconciliations: 0, domainPruned: 0 });
+    });
+
     it('reconcilia apenas rows explicit-path contaminadas e preserva build manual legítimo', async () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-domain-reconcile';

@@ -8,12 +8,7 @@
  * @module copilot/mcp/validation/suites/runtime
  */
 
-import {
-    enableCopilotNodeCompileCache,
-    readCopilotNodeCompileCacheConfig,
-    withCopilotNodeCompileCacheEnv,
-} from '#copilot/infra/public/platform/node';
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { enableCopilotNodeCompileCache } from '#copilot/infra/public/platform/node';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
@@ -85,7 +80,7 @@ export function resolveSafeValidationSuite(suite) {
 
 /**
  * @param {SafeValidationSuiteName} suite
- * @param {{ signal?: AbortSignal; parentEnv?: NodeJS.ProcessEnv }} [options]
+ * @param {{ signal?: AbortSignal; config: import('../config.js').McpValidationProcessConfig }} options
  * @returns {Promise<{
  *     success: boolean;
  *     suite: SafeValidationSuiteName;
@@ -93,13 +88,11 @@ export function resolveSafeValidationSuite(suite) {
  *     results: SafeValidationStepResult[];
  * }>}
  */
-export async function runSafeValidationSuite(suite, options = {}) {
+export async function runSafeValidationSuite(suite, options) {
+    if (!options?.config) throw new TypeError('Safe validation suite requires a validation process config generation.');
     const startedAt = Date.now();
-    const parentEnv = options.parentEnv ?? process.env;
-    const nodeCompileCacheConfig = readCopilotNodeCompileCacheConfig(parentEnv);
-    const nodeCompileCache = enableCopilotNodeCompileCache(nodeCompileCacheConfig);
-    const { env } = buildMcpChildEnvironment({ parentEnv, overrides: { NO_COLOR: '' } });
-    const stepEnv = withCopilotNodeCompileCacheEnv(env, nodeCompileCacheConfig);
+    const nodeCompileCache = enableCopilotNodeCompileCache(options.config.nodeCompileCache);
+    const stepEnv = { ...options.config.childEnvironment };
     /** @type {SafeValidationStepResult[]} */
     const results = [];
 
@@ -204,9 +197,11 @@ async function runStep(step, runtime) {
  * Stable launcher-facing entrypoint. Domain code returns a numeric exit code and never mutates process.exitCode.
  *
  * @param {string[]} argv
+ * @param {import('../config.js').McpValidationProcessConfig} config
  * @returns {Promise<number>}
  */
-export async function runSafeValidationSuiteCli(argv) {
+export async function runSafeValidationSuiteCli(argv, config) {
+    if (!config) throw new TypeError('Safe validation suite CLI requires a validation process config generation.');
     const rawSuite = argv[0];
     if (!rawSuite || rawSuite === '--help' || rawSuite === 'help') {
         process.stdout.write('Usage: node src/copilot/mcp/scripts/run-safe-validation-suite.js <suite>\n');
@@ -217,7 +212,7 @@ export async function runSafeValidationSuiteCli(argv) {
         process.stderr.write(`Unsupported validation suite: ${rawSuite}\n`);
         return 1;
     }
-    const report = await runSafeValidationSuite(/** @type {SafeValidationSuiteName} */ (rawSuite));
+    const report = await runSafeValidationSuite(/** @type {SafeValidationSuiteName} */ (rawSuite), { config });
     process.stdout.write(`\n[safe-suite:summary]\n${JSON.stringify(report, null, 2)}\n`);
     return report.success ? 0 : 1;
 }

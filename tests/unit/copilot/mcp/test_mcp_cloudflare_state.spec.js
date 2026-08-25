@@ -9,9 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { createCloudflareStateStore, summarizeQuickTunnelState } from '#copilot/mcp/public/cloudflare/state';
+import { createCloudflareStateStore, summarizeQuickTunnelState } from '#copilot/mcp/public/cloudflare/tunnel';
 
-/** @type {import('#copilot/mcp/public/cloudflare/state').QuickTunnelState} */
+/** @type {import('#copilot/mcp/public/cloudflare/tunnel').QuickTunnelState} */
 const baseState = {
     schemaVersion: 1,
     mode: 'temporary-trycloudflare',

@@ -17,10 +17,8 @@
  */
 
 import { readMutationAppliedState } from '#copilot/infra/public/policy';
-import { authorizeMcpToolCall } from '#copilot/mcp/public/auth';
-import { bindConnectorSmokeLocalToolNamesProvider } from '#copilot/mcp/public/cloudflare/connector-smoke';
+import { authorizeMcpToolCall, readMcpAuthConfig } from '#copilot/mcp/public/auth';
 import {
-    appendMcpAuditEvent,
     readMcpHttpToolTimingMetadata,
     recordMcpHttpToolHandlerEnd,
     recordMcpHttpToolHandlerStart,
@@ -28,20 +26,27 @@ import {
     recordMcpToolInteractionStart,
     recordMcpToolMetric,
 } from '#copilot/mcp/public/observability';
-import { normalizeMcpToolDefinitions } from '#copilot/mcp/public/protocol/catalog';
+import {
+    classifyMcpToolContractRisk,
+    normalizeMcpToolDefinitions,
+    projectMcpToolAnnotations,
+    validateMcpToolContractSemantics,
+} from '#copilot/mcp/public/protocol/catalog';
 import {
     createMcpToolOperationContext,
     errorResult,
     getResultExecutionHint,
     getResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
-import { bindMcpWireToolProviders, buildMcpWireToolCatalog } from '#copilot/mcp/public/tools/catalog';
+import { buildMcpWireToolCatalog } from '#copilot/mcp/public/tools/catalog';
 import { toMcpWorkspaceRelativePath } from '#copilot/mcp/public/workspace';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
 import {
+    MCP_TOOL_SURFACE_MODES,
     applyMcpToolSurfacePolicy,
+    createMcpToolSurfacePolicy,
     describeMcpToolSurfacePolicy,
     readMcpToolSurfacePolicy,
     toolSurfaceCacheKey,
@@ -74,47 +79,7 @@ const SUSPICIOUS_DESCRIPTOR_PATTERNS = [
 ];
 
 /** @type {readonly string[]} */
-const MUTATING_TOOL_NAME_MARKERS = Object.freeze([
-    'apply',
-    'batch',
-    'create',
-    'delete',
-    'disable',
-    'edit',
-    'enable',
-    'fix',
-    'move',
-    'patch',
-    'quarantine',
-    'remove',
-    'rename',
-    'restart',
-    'restore',
-    'run',
-    'set',
-    'start',
-    'stop',
-    'update',
-    'write',
-]);
-
 /** @type {readonly string[]} */
-const HIGH_IMPACT_TOOL_NAME_MARKERS = Object.freeze([
-    'admin',
-    'autonomy',
-    'cloudflare',
-    'edge',
-    'policy',
-    'validator',
-    'doctor',
-    'run_',
-    'restart',
-    'apply',
-    'write',
-    'remove',
-    'delete',
-]);
-
 /** @type {McpToolDefinition[] | null} */
 let canonicalMcpToolsCache = null;
 /** @type {string | null} */
@@ -132,12 +97,15 @@ const toolInvocationBudgets = new Map();
 /**
  * @typedef {object} RegisterCanonicalMcpToolsOptions
  * @property {import('#copilot/mcp/public/auth').McpAuthContext} [authContext]
+ * @property {import('#copilot/mcp/public/auth').McpAuthRuntimeConfig & { resourceServer?: ReturnType<typeof import('#copilot/mcp/public/auth').createMcpAuthResourceServerRuntime> }} [authRuntime]
  * @property {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} [workspace]
+ * @property {import('#copilot/mcp/public/protocol/tools').McpToolConfigProjection} [toolConfig]
+ * @property {import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection} [toolCapabilities]
  * @property {import('./surface-policy.js').McpToolSurfacePolicy} [toolSurfacePolicy]
+ * @property {McpRegistryPolicy} [registryPolicy]
  *
  * @typedef {{
  *     strictDescriptorValidation: boolean;
- *     strictRiskValidation: boolean;
  *     enrichOpenAiMeta: boolean;
  *     handlerExceptionMode: 'throw' | 'tool-result';
  *     validateStructuredOutput: boolean;
@@ -165,7 +133,6 @@ const toolInvocationBudgets = new Map();
 export function readMcpRegistryPolicy(env = process.env) {
     return {
         strictDescriptorValidation: readBooleanEnv(env, 'COPILOT_MCP_REGISTRY_STRICT_DESCRIPTOR_VALIDATION', false),
-        strictRiskValidation: readBooleanEnv(env, 'COPILOT_MCP_REGISTRY_STRICT_RISK_VALIDATION', false),
         enrichOpenAiMeta: readBooleanEnv(env, 'COPILOT_MCP_REGISTRY_ENRICH_OPENAI_META', true),
         handlerExceptionMode: readEnumEnv(
             env,
@@ -215,25 +182,84 @@ export function readMcpRegistryPolicy(env = process.env) {
 }
 
 /**
- * @param {{
- *     toolSurfacePolicy?: import('./surface-policy.js').McpToolSurfacePolicy;
- * }} [options]
- * @returns {McpToolDefinition[]}
+ * Build and validate the normalized all-tool catalog without mutating registry cache/status state.
+ *
+ * @param {McpRegistryPolicy} registryPolicy
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} authConfig
  */
-export function getCanonicalMcpTools(options = {}) {
-    const registryPolicy = readMcpRegistryPolicy();
-    const surfacePolicy = options.toolSurfacePolicy ?? readMcpToolSurfacePolicy();
-    const cacheKey = `${toolSurfaceCacheKey(surfacePolicy)}|${registryPolicyCacheKey(registryPolicy)}`;
-    if (canonicalMcpToolsCache && canonicalMcpToolsCacheKey === cacheKey) return canonicalMcpToolsCache;
-
-    const allTools = normalizeMcpToolDefinitions(buildMcpWireToolCatalog());
+function buildCanonicalAllMcpTools(registryPolicy, authConfig) {
+    const allTools = normalizeMcpToolDefinitions(buildMcpWireToolCatalog(), { authConfig });
     const allValidation = validateMcpToolDefinitions(allTools, registryPolicy, 'all-tools');
     enforceRegistryValidation('canonical all-tool registry', allValidation, registryPolicy);
+    return { allTools, allValidation };
+}
 
+/**
+ * Materialize one selected surface from an already-normalized all-tool catalog without touching process-global cache.
+ *
+ * @param {McpToolDefinition[]} allTools
+ * @param {import('./surface-policy.js').McpToolSurfacePolicy} surfacePolicy
+ * @param {McpRegistryPolicy} registryPolicy
+ */
+function buildCanonicalMcpToolSurface(allTools, surfacePolicy, registryPolicy) {
     const surfacedTools = applyMcpToolSurfacePolicy(allTools, surfacePolicy);
     const tools = surfacedTools.map((tool) => enrichMcpToolDescriptor(tool, registryPolicy));
     const surfacedValidation = validateMcpToolDefinitions(tools, registryPolicy, 'surfaced-tools');
     enforceRegistryValidation('canonical surfaced-tool registry', surfacedValidation, registryPolicy);
+    return { tools, surfacedValidation };
+}
+
+/**
+ * Create a bounded, server-generation-owned comparison capability. The all-tool catalog and eight canonical surfaces
+ * are materialized only on the first comparison request, so normal server startup does not pay this diagnostic cost.
+ * The closure never mutates the canonical current-surface cache/status.
+ *
+ * @param {McpRegistryPolicy} registryPolicy
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} authConfig
+ */
+function createMcpToolSurfaceComparisonCapability(registryPolicy, authConfig) {
+    /** @type {readonly Readonly<{ mode:string; tools:readonly McpToolDefinition[]; names:readonly string[] }>[] | null} */
+    let cachedSurfaces = null;
+    return Object.freeze({
+        resolveCanonicalSurfaces: () => {
+            if (cachedSurfaces) return cachedSurfaces;
+            const { allTools } = buildCanonicalAllMcpTools(registryPolicy, authConfig);
+            cachedSurfaces = Object.freeze(
+                MCP_TOOL_SURFACE_MODES.map((mode) => {
+                    const { tools } = buildCanonicalMcpToolSurface(
+                        allTools,
+                        createMcpToolSurfacePolicy({ mode }),
+                        registryPolicy,
+                    );
+                    return Object.freeze({
+                        mode,
+                        tools: Object.freeze([...tools]),
+                        names: Object.freeze(tools.map((tool) => tool.name)),
+                    });
+                }),
+            );
+            return cachedSurfaces;
+        },
+    });
+}
+
+/**
+ * @param {{
+ *     toolSurfacePolicy?: import('./surface-policy.js').McpToolSurfacePolicy;
+ *     registryPolicy?: McpRegistryPolicy;
+ *     authConfig?: import('#copilot/mcp/public/auth').McpAuthConfig;
+ * }} [options]
+ * @returns {McpToolDefinition[]}
+ */
+export function getCanonicalMcpTools(options = {}) {
+    const registryPolicy = options.registryPolicy ?? readMcpRegistryPolicy();
+    const surfacePolicy = options.toolSurfacePolicy ?? readMcpToolSurfacePolicy();
+    const authConfig = options.authConfig ?? readMcpAuthConfig();
+    const cacheKey = `${toolSurfaceCacheKey(surfacePolicy)}|${registryPolicyCacheKey(registryPolicy)}|${authMetadataCacheKey(authConfig)}`;
+    if (canonicalMcpToolsCache && canonicalMcpToolsCacheKey === cacheKey) return canonicalMcpToolsCache;
+
+    const { allTools, allValidation } = buildCanonicalAllMcpTools(registryPolicy, authConfig);
+    const { tools, surfacedValidation } = buildCanonicalMcpToolSurface(allTools, surfacePolicy, registryPolicy);
 
     canonicalMcpToolsCache = tools;
     canonicalMcpToolsCacheKey = cacheKey;
@@ -253,8 +279,6 @@ export function getCanonicalMcpTools(options = {}) {
         allValidation,
         surfacedValidation,
     });
-    bindMcpWireToolProviders(() => canonicalMcpToolsCache ?? tools);
-    bindConnectorSmokeLocalToolNamesProvider(() => (canonicalMcpToolsCache ?? tools).map((tool) => tool.name));
     return tools;
 }
 
@@ -294,14 +318,16 @@ export function readMcpRegistryRuntimeState() {
 }
 
 /**
- * @param {{ includeDescriptors?: boolean; toolSurfacePolicy?: import('./surface-policy.js').McpToolSurfacePolicy }} [options]
+ * @param {{ includeDescriptors?: boolean; toolSurfacePolicy?: import('./surface-policy.js').McpToolSurfacePolicy; registryPolicy?: McpRegistryPolicy; authConfig?: import('#copilot/mcp/public/auth').McpAuthConfig }} [options]
  * @returns {Record<string, unknown>}
  */
 export function buildCanonicalMcpRegistryManifest(options = {}) {
     return buildMcpToolDescriptorManifest(
-        getCanonicalMcpTools(
-            options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy },
-        ),
+        getCanonicalMcpTools({
+            ...(options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy }),
+            ...(options.registryPolicy === undefined ? {} : { registryPolicy: options.registryPolicy }),
+            ...(options.authConfig === undefined ? {} : { authConfig: options.authConfig }),
+        }),
         { includeDescriptors: options.includeDescriptors === true },
     );
 }
@@ -325,10 +351,19 @@ export function resetCanonicalMcpToolsCacheForTests() {
  * @returns {McpToolDefinition[]}
  */
 export function registerCanonicalMcpTools(server, options = {}) {
-    const registryPolicy = readMcpRegistryPolicy();
-    const tools = getCanonicalMcpTools(
-        options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy },
-    );
+    const registryPolicy = options.registryPolicy ?? readMcpRegistryPolicy();
+    const authConfig = options.authRuntime?.config ?? readMcpAuthConfig();
+    const tools = getCanonicalMcpTools({
+        ...(options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy }),
+        registryPolicy,
+        authConfig,
+    });
+    const comparisonCapability = createMcpToolSurfaceComparisonCapability(registryPolicy, authConfig);
+    const toolSurfaceCapability = Object.freeze({
+        tools: Object.freeze([...tools]),
+        names: Object.freeze(tools.map((tool) => tool.name)),
+        resolveCanonicalSurfaces: comparisonCapability.resolveCanonicalSurfaces,
+    });
     for (const tool of tools) {
         server.registerTool(
             tool.name,
@@ -337,7 +372,8 @@ export function registerCanonicalMcpTools(server, options = {}) {
              * @param {Record<string, unknown>} args
              * @param {import('@modelcontextprotocol/server').ServerContext} serverContext
              */
-            async (args, serverContext) => guardedToolHandler(tool, args, options, registryPolicy, serverContext),
+            async (args, serverContext) =>
+                guardedToolHandler(tool, args, options, registryPolicy, serverContext, toolSurfaceCapability),
         );
     }
     return tools;
@@ -370,15 +406,21 @@ function buildMcpRegisterToolOptions(tool) {
  * @param {RegisterCanonicalMcpToolsOptions} options
  * @param {McpRegistryPolicy} registryPolicy
  * @param {import('@modelcontextprotocol/server').ServerContext} serverContext
+ * @param {NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['toolSurface']>} toolSurfaceCapability
  * @returns {Promise<import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult>}
  */
-async function guardedToolHandler(tool, args, options, registryPolicy, serverContext) {
+async function guardedToolHandler(tool, args, options, registryPolicy, serverContext, toolSurfaceCapability) {
     const startedAt = Date.now();
     if (!options.workspace) {
         throw new Error(`MCP tool ${tool.name} cannot execute without a composition-owned workspace capability.`);
     }
     const operationContext = createMcpToolOperationContext(serverContext, {
         workspace: options.workspace,
+        ...(options.toolConfig ? { config: options.toolConfig } : {}),
+        capabilities: {
+            ...(options.toolCapabilities ?? {}),
+            toolSurface: toolSurfaceCapability,
+        },
         timeoutMs: registryPolicy.toolTimeoutMs,
     });
     safeRecordMcpToolInteractionStart(tool.name, startedAt);
@@ -412,7 +454,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
     };
     const httpTimingMetadata = readMcpHttpToolTimingMetadata();
     const latencyExperimentMetadata = buildLatencyPulseAuditMetadata(tool.name, args);
-    await safeAppendMcpAuditEvent({
+    await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
         event: 'tool_call_started',
         callId,
         tool: tool.name,
@@ -433,7 +475,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
         finishPhase('rateLimit', rateLimitStartedAt);
         if (!rateLimit.allowed) {
             const durationMs = elapsedMs(startedAt);
-            await safeAppendMcpAuditEvent({
+            await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
                 event: 'tool_call_rate_limited',
                 callId,
                 tool: tool.name,
@@ -450,11 +492,19 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
         }
 
         const authorizationStartedAt = startPhase('authorization');
-        const authorization = await authorizeMcpToolCall(tool, options.authContext);
+        const authorization = options.authRuntime?.resourceServer
+            ? await options.authRuntime.resourceServer.authorize(
+                  tool,
+                  options.authContext,
+                  options.authRuntime.config,
+                  options.authRuntime.secrets,
+                  options.authRuntime.decisionCache,
+              )
+            : await authorizeMcpToolCall(tool, options.authContext);
         finishPhase('authorization', authorizationStartedAt);
         if (!authorization.allowed) {
             const durationMs = elapsedMs(startedAt);
-            await safeAppendMcpAuditEvent({
+            await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
                 event: 'tool_call_auth_denied',
                 callId,
                 tool: tool.name,
@@ -493,7 +543,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
         finishPhase('resultSize', resultSizeStartedAt);
         if (resultSizeError) {
             const durationMs = elapsedMs(startedAt);
-            await safeAppendMcpAuditEvent({
+            await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
                 event: 'tool_call_result_rejected',
                 callId,
                 tool: tool.name,
@@ -520,7 +570,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
             : [];
         finishPhase('outputValidation', outputValidationStartedAt);
         if (outputValidation.length > 0) {
-            await safeAppendMcpAuditEvent({
+            await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
                 event: 'tool_call_output_validation_warning',
                 callId,
                 tool: tool.name,
@@ -530,7 +580,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
         }
         const durationMs = elapsedMs(startedAt);
         const auditCompletionStartedAt = startPhase('auditCompletion');
-        await safeAppendMcpAuditEvent({
+        await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
             event: 'tool_call_completed',
             callId,
             tool: tool.name,
@@ -557,7 +607,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
         if (activePhase !== 'idle' && phases[activePhase] === undefined) {
             phases[activePhase] = elapsedMs(activePhaseStartedAt);
         }
-        await safeAppendMcpAuditEvent({
+        await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
             event: 'tool_call_failed',
             callId,
             tool: tool.name,
@@ -667,28 +717,89 @@ function pruneToolInvocationBudgets(now = Date.now()) {
  * @returns {Promise<import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult>}
  */
 async function runToolHandlerWithCancellation(tool, args, operationContext) {
-    if (operationContext.signal.aborted) throw buildToolCancellationError(operationContext);
+    const execution = requireMcpToolExecutionContract(tool);
+    if (operationContext.signal.aborted) throw buildToolCancellationError(operationContext, execution);
 
-    /** @type {(() => void) | undefined} */
-    let removeAbortListener;
-    const cancellation = new Promise((_, reject) => {
-        const onAbort = () => reject(buildToolCancellationError(operationContext));
-        operationContext.signal.addEventListener('abort', onAbort, { once: true });
-        removeAbortListener = () => operationContext.signal.removeEventListener('abort', onAbort);
+    const handlerOutcome = Promise.resolve()
+        .then(() => tool.handler(args, operationContext))
+        .then(
+            (value) => ({ kind: /** @type {const} */ ('value'), value }),
+            (error) => ({ kind: /** @type {const} */ ('error'), error }),
+        );
+
+    /** @type {(() => void) | null} */
+    let resolveAbort = null;
+    const aborted = new Promise((resolve) => {
+        resolveAbort = () => resolve({ kind: /** @type {const} */ ('aborted') });
+        operationContext.signal.addEventListener('abort', resolveAbort, { once: true });
     });
 
     try {
-        return await Promise.race([Promise.resolve(tool.handler(args, operationContext)), cancellation]);
+        const first = await Promise.race([handlerOutcome, aborted]);
+        if (first.kind === 'value') return first.value;
+        if (first.kind === 'error') throw first.error;
+
+        if (execution.cancellation !== 'cancellable') {
+            throw buildToolCancellationError(operationContext, execution);
+        }
+
+        const drainTimeoutMs = execution.drainTimeoutMs;
+        if (!Number.isInteger(drainTimeoutMs) || Number(drainTimeoutMs) <= 0) {
+            throw new Error(`Cancellable MCP tool ${tool.name} has no valid drainTimeoutMs.`);
+        }
+        const drained = await waitForToolHandlerDrain(handlerOutcome, Number(drainTimeoutMs));
+        if (!drained) throw buildToolCancellationDrainTimeoutError(tool, operationContext, execution);
+        throw buildToolCancellationError(operationContext, execution);
     } finally {
-        removeAbortListener?.();
+        if (resolveAbort) operationContext.signal.removeEventListener('abort', resolveAbort);
     }
 }
 
 /**
+ * Testing-only seam re-exported exclusively through `registry/testing`.
+ *
+ * @param {McpToolDefinition} tool
+ * @param {Record<string, unknown>} args
  * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} operationContext
- * @returns {Error & { code: string; cancellationSource: 'caller' | 'deadline' | 'unknown' }}
  */
-function buildToolCancellationError(operationContext) {
+export async function runToolHandlerWithCancellationForTests(tool, args, operationContext) {
+    return await runToolHandlerWithCancellation(tool, args, operationContext);
+}
+
+/**
+ * @param {Promise<{ kind: 'value'; value: import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult } | { kind: 'error'; error: unknown }>} handlerOutcome
+ * @param {number} drainTimeoutMs
+ * @returns {Promise<boolean>}
+ */
+async function waitForToolHandlerDrain(handlerOutcome, drainTimeoutMs) {
+    /** @type {NodeJS.Timeout | null} */
+    let timer = null;
+    const timeout = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(false), drainTimeoutMs);
+        timer.unref();
+    });
+    try {
+        return /** @type {boolean} */ (await Promise.race([handlerOutcome.then(() => true), timeout]));
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+/**
+ * @param {McpToolDefinition} tool
+ * @returns {import('#copilot/mcp/public/protocol/catalog').McpToolExecutionContract}
+ */
+function requireMcpToolExecutionContract(tool) {
+    if (!tool.execution) throw new Error(`MCP tool ${tool.name} is missing its internal execution contract.`);
+    return tool.execution;
+}
+
+/**
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} operationContext
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolExecutionContract} execution
+ * @returns {Error & { code: string; cancellationSource: 'caller' | 'deadline' | 'unknown'; executionPolicy: string; workMayContinue: boolean; continuationBoundMs: number | null }}
+ */
+function buildToolCancellationError(operationContext, execution) {
     /** @type {'caller' | 'deadline' | 'unknown'} */
     const source = operationContext.cancellationSource() ?? 'unknown';
     const code = source === 'deadline' ? 'MCP_TOOL_TIMEOUT' : 'MCP_TOOL_CANCELLED';
@@ -696,7 +807,38 @@ function buildToolCancellationError(operationContext) {
         source === 'deadline'
             ? `MCP tool deadline exceeded for request ${operationContext.requestId}.`
             : `MCP tool invocation cancelled for request ${operationContext.requestId}.`;
-    return Object.assign(new Error(message), { code, cancellationSource: source });
+    return Object.assign(new Error(message), {
+        code,
+        cancellationSource: source,
+        executionPolicy: execution.cancellation,
+        workMayContinue: execution.cancellation === 'bounded-non-cancellable',
+        continuationBoundMs:
+            execution.cancellation === 'bounded-non-cancellable' && Number.isInteger(execution.continuationBoundMs)
+                ? Number(execution.continuationBoundMs)
+                : null,
+    });
+}
+
+/**
+ * @param {McpToolDefinition} tool
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} operationContext
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolExecutionContract} execution
+ */
+function buildToolCancellationDrainTimeoutError(tool, operationContext, execution) {
+    /** @type {'caller' | 'deadline' | 'unknown'} */
+    const source = operationContext.cancellationSource() ?? 'unknown';
+    return Object.assign(
+        new Error(
+            `Cancellable MCP tool ${tool.name} did not drain within ${String(execution.drainTimeoutMs)}ms after ${source} cancellation.`,
+        ),
+        {
+            code: 'MCP_TOOL_CANCELLATION_DRAIN_TIMEOUT',
+            cancellationSource: source,
+            executionPolicy: execution.cancellation,
+            drainTimeoutMs: execution.drainTimeoutMs ?? null,
+            tool: tool.name,
+        },
+    );
 }
 
 /**
@@ -815,7 +957,8 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
         }
         if (typeof tool.handler !== 'function') errors.push(`${label}: handler must be a function.`);
 
-        validateAnnotations(tool, label, warnings, errors);
+        validateExecutionContract(tool, label, errors);
+        validateSemanticContract(tool, label, errors);
         validateSecuritySchemes(tool, label, warnings);
         validateToolMeta(tool, label, warnings, errors);
     }
@@ -829,6 +972,11 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
             readOnly: tools.filter((tool) => tool?.annotations?.readOnlyHint === true).length,
             destructive: tools.filter((tool) => tool?.annotations?.destructiveHint === true).length,
             openWorld: tools.filter((tool) => tool?.annotations?.openWorldHint === true).length,
+            cancellable: tools.filter((tool) => tool?.execution?.cancellation === 'cancellable').length,
+            boundedNonCancellable: tools.filter((tool) => tool?.execution?.cancellation === 'bounded-non-cancellable')
+                .length,
+            cancellationNotApplicable: tools.filter((tool) => tool?.execution?.cancellation === 'not-applicable')
+                .length,
         },
     };
 }
@@ -836,30 +984,91 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
 /**
  * @param {McpToolDefinition} tool
  * @param {string} label
- * @param {string[]} warnings
  * @param {string[]} errors
- * @returns {void}
  */
-function validateAnnotations(tool, label, warnings, errors) {
-    const annotations = tool.annotations ?? {};
-    if (!annotations || typeof annotations !== 'object' || Array.isArray(annotations)) {
-        warnings.push(`${label}: annotations should be an object.`);
+function validateExecutionContract(tool, label, errors) {
+    const execution = tool.execution;
+    if (!execution || typeof execution !== 'object') {
+        errors.push(`${label}: internal execution contract is required.`);
         return;
     }
-    const risk = classifyMcpToolRisk(tool);
-    if (annotations.readOnlyHint === true && annotations.destructiveHint === true) {
-        errors.push(`${label}: readOnlyHint and destructiveHint cannot both be true.`);
+    if (!['cancellable', 'bounded-non-cancellable', 'not-applicable'].includes(execution.cancellation)) {
+        errors.push(`${label}: invalid cancellation policy=${String(execution.cancellation)}.`);
+        return;
     }
-    if (risk.mutatingName && annotations.readOnlyHint === true) {
-        warnings.push(`${label}: mutating-looking tool is marked readOnlyHint=true.`);
+    if (typeof execution.rationale !== 'string' || execution.rationale.trim().length < 20) {
+        errors.push(`${label}: execution rationale must be a substantive string.`);
     }
-    if (risk.highImpactName && annotations.destructiveHint !== true && annotations.readOnlyHint !== true) {
-        warnings.push(`${label}: high-impact tool should declare readOnlyHint=true or destructiveHint=true.`);
+    if (execution.cancellation === 'cancellable') {
+        if (
+            !Number.isInteger(execution.drainTimeoutMs) ||
+            Number(execution.drainTimeoutMs) < 100 ||
+            Number(execution.drainTimeoutMs) > 60_000
+        ) {
+            errors.push(`${label}: cancellable execution requires drainTimeoutMs between 100 and 60000.`);
+        }
+        if (execution.continuationBoundMs !== undefined) {
+            errors.push(`${label}: cancellable execution must not declare continuationBoundMs.`);
+        }
+        return;
     }
-    for (const field of ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint']) {
-        const value = /** @type {Record<string, unknown>} */ (annotations)[field];
-        if (value !== undefined && typeof value !== 'boolean')
-            warnings.push(`${label}: annotation ${field} should be boolean.`);
+    if (execution.cancellation === 'bounded-non-cancellable') {
+        if (
+            !Number.isInteger(execution.continuationBoundMs) ||
+            Number(execution.continuationBoundMs) < 100 ||
+            Number(execution.continuationBoundMs) > 3_600_000
+        ) {
+            errors.push(
+                `${label}: bounded-non-cancellable execution requires continuationBoundMs between 100 and 3600000.`,
+            );
+        }
+        if (execution.drainTimeoutMs !== undefined) {
+            errors.push(`${label}: bounded-non-cancellable execution must not declare drainTimeoutMs.`);
+        }
+        return;
+    }
+    if (execution.drainTimeoutMs !== undefined || execution.continuationBoundMs !== undefined) {
+        errors.push(`${label}: not-applicable execution must not declare drain/continuation bounds.`);
+    }
+}
+
+/**
+ * Validate that the canonical domain contract is present, internally coherent and exactly projected to the MCP wire.
+ * Semantic risk truthfulness is fail-closed regardless of descriptor strictness settings.
+ *
+ * @param {McpToolDefinition} tool
+ * @param {string} label
+ * @param {string[]} errors
+ */
+function validateSemanticContract(tool, label, errors) {
+    const contract = tool.contract;
+    if (!contract) {
+        errors.push(`${label}: semantic tool contract is required.`);
+        return;
+    }
+    for (const semanticError of validateMcpToolContractSemantics(contract)) {
+        errors.push(`${label}: semantic contract: ${semanticError}.`);
+    }
+    const projected = projectMcpToolAnnotations(contract);
+    const annotations = tool.annotations;
+    if (!annotations || typeof annotations !== 'object' || Array.isArray(annotations)) {
+        errors.push(`${label}: protocol annotations must be the semantic-contract projection.`);
+        return;
+    }
+    /** @type {('readOnlyHint' | 'destructiveHint' | 'idempotentHint' | 'openWorldHint')[]} */
+    const fields = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'];
+    for (const field of fields) {
+        if (annotations[field] !== projected[field]) {
+            errors.push(`${label}: annotation ${field} diverges from semantic tool contract.`);
+        }
+    }
+    const specificOutput = contract.output.class === 'specific';
+    if (specificOutput !== (tool.outputSchema !== undefined)) {
+        errors.push(`${label}: outputSchema diverges from output contract=${contract.output.class}.`);
+    }
+    const contractMax = contract.resultBudget.mode === 'tool-specific' ? contract.resultBudget.maxBytes : undefined;
+    if (contractMax !== tool.maxResultBytes) {
+        errors.push(`${label}: maxResultBytes diverges from semantic result budget.`);
     }
 }
 
@@ -925,13 +1134,6 @@ function validateToolMeta(tool, label, warnings, errors) {
 function enforceRegistryValidation(context, validation, policy) {
     const errors = [...validation.errors];
     if (policy.strictDescriptorValidation) errors.push(...validation.warnings);
-    if (policy.strictRiskValidation) {
-        errors.push(
-            ...validation.warnings.filter((warning) =>
-                /readOnlyHint|destructiveHint|high-impact|mutating/u.test(warning),
-            ),
-        );
-    }
     if (errors.length > 0) {
         throw new Error(`${context} failed validation: ${errors.slice(0, 20).join('; ')}`);
     }
@@ -943,8 +1145,8 @@ function enforceRegistryValidation(context, validation, policy) {
  * @returns {McpToolDefinition}
  */
 function enrichMcpToolDescriptor(tool, policy) {
-    const risk = classifyMcpToolRisk(tool);
-    const annotations = normalizeToolAnnotations(tool.annotations, risk);
+    const contract = requireMcpToolContract(tool);
+    const annotations = projectMcpToolAnnotations(contract);
     if (!policy.enrichOpenAiMeta) return { ...tool, annotations };
 
     const meta = { ...(tool._meta ?? {}) };
@@ -958,25 +1160,6 @@ function enrichMcpToolDescriptor(tool, policy) {
         meta['openai/toolInvocation/invoked'] = buildInvocationStatus(tool, 'complete');
     }
     return { ...tool, annotations, _meta: meta };
-}
-
-/**
- * @param {import('@modelcontextprotocol/server').ToolAnnotations | undefined} annotations
- * @param {ReturnType<typeof classifyMcpToolRisk>} risk
- * @returns {import('@modelcontextprotocol/server').ToolAnnotations}
- */
-function normalizeToolAnnotations(annotations, risk) {
-    const current = annotations && typeof annotations === 'object' ? annotations : {};
-    return {
-        ...current,
-        ...(typeof current.readOnlyHint === 'boolean'
-            ? {}
-            : { readOnlyHint: !risk.mutatingName && !risk.highImpactName }),
-        ...(typeof current.destructiveHint === 'boolean'
-            ? {}
-            : { destructiveHint: risk.mutatingName && risk.highImpactName }),
-        ...(typeof current.openWorldHint === 'boolean' ? {} : { openWorldHint: risk.openWorldName }),
-    };
 }
 
 /**
@@ -1006,26 +1189,37 @@ function sanitizeStatusText(value) {
 
 /**
  * @param {McpToolDefinition} tool
- * @returns {{ mutatingName: boolean; highImpactName: boolean; openWorldName: boolean; category: string }}
+ * @returns {import('#copilot/mcp/public/protocol/catalog').McpToolContract}
+ */
+function requireMcpToolContract(tool) {
+    if (!tool.contract) throw new Error(`MCP tool ${tool.name} has no semantic tool contract.`);
+    return tool.contract;
+}
+
+/**
+ * Registry risk is a direct domain-contract projection. Names, titles and descriptions carry no authority.
+ *
+ * @param {McpToolDefinition} tool
  */
 export function classifyMcpToolRisk(tool) {
-    const name = String(tool?.name ?? '').toLowerCase();
-    const text = `${name} ${String(tool?.title ?? '').toLowerCase()} ${String(tool?.description ?? '').toLowerCase()}`;
-    const mutatingName = MUTATING_TOOL_NAME_MARKERS.some((marker) => name.includes(marker));
-    const highImpactName = HIGH_IMPACT_TOOL_NAME_MARKERS.some((marker) => name.includes(marker));
-    const openWorldName = /\b(web|cloudflare|remote|github|internet|external|connector|tunnel)\b/u.test(text);
+    return classifyMcpToolContractRisk(requireMcpToolContract(tool));
+}
+
+/**
+ * Build the canonical semantic representation of the exact `tools/list` descriptor payload owned by the registry.
+ * The fingerprint deliberately hashes the full JSON Schema constraints emitted on the wire, not only field names or
+ * schema object shape. This is the descriptor-generation authority used by positive MCP cache hints.
+ *
+ * @param {McpToolDefinition[]} tools
+ * @returns {{ schemaVersion: 1; fingerprintKind: 'tools-list-wire-sha256-v1'; fingerprint: string; descriptors: Record<string, unknown>[] }}
+ */
+export function buildMcpToolWireDescriptorSnapshot(tools) {
+    const descriptors = tools.map((tool) => projectMcpToolWireDescriptor(tool));
     return {
-        mutatingName,
-        highImpactName,
-        openWorldName,
-        category:
-            mutatingName && highImpactName
-                ? 'high-impact-write'
-                : mutatingName
-                  ? 'write'
-                  : highImpactName
-                    ? 'high-impact-read'
-                    : 'read-or-compute',
+        schemaVersion: 1,
+        fingerprintKind: 'tools-list-wire-sha256-v1',
+        fingerprint: sha256StableJson(descriptors),
+        descriptors,
     };
 }
 
@@ -1036,7 +1230,8 @@ export function classifyMcpToolRisk(tool) {
  */
 function buildMcpToolDescriptorManifest(tools, options = {}) {
     const descriptors = tools.map((tool) => descriptorManifestEntry(tool));
-    const fingerprint = sha256StableJson(descriptors);
+    const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
+    const fingerprint = wireSnapshot.fingerprint;
     return {
         schemaVersion: 1,
         implementation: {
@@ -1046,6 +1241,7 @@ function buildMcpToolDescriptorManifest(tools, options = {}) {
         generatedAt: new Date().toISOString(),
         toolCount: tools.length,
         fingerprint,
+        fingerprintKind: wireSnapshot.fingerprintKind,
         counts: {
             readOnly: tools.filter((tool) => tool.annotations?.readOnlyHint === true).length,
             destructive: tools.filter((tool) => tool.annotations?.destructiveHint === true).length,
@@ -1057,6 +1253,94 @@ function buildMcpToolDescriptorManifest(tools, options = {}) {
             ? { tools: descriptors }
             : { toolNames: descriptors.map((entry) => entry['name']) }),
     };
+}
+
+/**
+ * Mirror the SDK 2.x high-level `registerTool` → `tools/list` projection for the descriptor fields the registry owns.
+ * A focused protocol regression compares this projection against the official SDK result so SDK drift fails closed.
+ *
+ * @param {McpToolDefinition} tool
+ * @returns {Record<string, unknown>}
+ */
+function projectMcpToolWireDescriptor(tool) {
+    /** @type {Record<string, unknown>} */
+    const descriptor = {
+        name: tool.name,
+        title: tool.title,
+        description: tool.description,
+        inputSchema: projectMcpSchemaToWire(tool.inputSchema, 'input'),
+        annotations: tool.annotations,
+    };
+    if (tool.outputSchema !== undefined)
+        descriptor['outputSchema'] = projectMcpSchemaToWire(tool.outputSchema, 'output');
+    if (tool._meta !== undefined) descriptor['_meta'] = tool._meta;
+    return descriptor;
+}
+
+/**
+ * @param {McpToolDefinition['inputSchema'] | NonNullable<McpToolDefinition['outputSchema']>} schema
+ * @param {'input' | 'output'} io
+ * @returns {Record<string, unknown>}
+ */
+function projectMcpSchemaToWire(schema, io) {
+    const normalized = isMcpZodRawShape(schema)
+        ? z.object(/** @type {Record<string, import('zod').ZodType>} */ (schema))
+        : /** @type {import('zod').ZodType} */ (schema);
+    const jsonSchema = /** @type {Record<string, unknown>} */ (
+        z.toJSONSchema(normalized, { target: 'draft-2020-12', io })
+    );
+
+    if (io === 'output') {
+        if (jsonSchema['type'] !== undefined) return jsonSchema;
+        return isProvablyObjectShapedSchemaRoot(jsonSchema) ? { type: 'object', ...jsonSchema } : jsonSchema;
+    }
+    if (jsonSchema['type'] !== undefined && jsonSchema['type'] !== 'object') {
+        throw new Error(
+            `MCP input schemas must describe objects; canonical wire projection received type=${JSON.stringify(jsonSchema['type'])}.`,
+        );
+    }
+    return { type: 'object', ...jsonSchema };
+}
+
+/**
+ * Match the SDK's raw-Zod-shape recognition: plain object, not already Standard Schema, whose values are Zod v4.
+ *
+ * @param {unknown} schema
+ * @returns {boolean}
+ */
+function isMcpZodRawShape(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema) || '~standard' in schema) return false;
+    const prototype = Object.getPrototypeOf(schema);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    return Object.values(/** @type {Record<string, unknown>} */ (schema)).every((value) =>
+        Boolean(value && typeof value === 'object' && '_zod' in value),
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} schema
+ * @returns {boolean}
+ */
+function isProvablyObjectShapedSchemaRoot(schema) {
+    if (
+        'properties' in schema ||
+        'patternProperties' in schema ||
+        'additionalProperties' in schema ||
+        'required' in schema
+    ) {
+        return true;
+    }
+    for (const key of ['oneOf', 'anyOf', 'allOf']) {
+        const members = schema[key];
+        if (Array.isArray(members) && members.length > 0) {
+            return members.every((member) => {
+                if (!member || typeof member !== 'object') return false;
+                const memberRecord = /** @type {Record<string, unknown>} */ (member);
+                return memberRecord['type'] === 'object' || isProvablyObjectShapedSchemaRoot(memberRecord);
+            });
+        }
+    }
+    return false;
 }
 
 /**
@@ -1074,6 +1358,12 @@ function descriptorManifestEntry(tool) {
         hasOutputSchema: tool.outputSchema !== undefined,
         securityScopes: collectToolSecurityScopes(tool),
         risk: risk.category,
+        callerScope: tool.contract?.authority.callerScope ?? null,
+        networkAuthority: tool.contract?.authority.network ?? null,
+        credentials: [...(tool.contract?.credentials ?? [])],
+        idempotency: tool.contract?.idempotency ?? null,
+        retry: tool.contract?.retry ?? null,
+        outputContract: tool.contract?.output.class ?? null,
         metaKeys: Object.keys(tool._meta ?? {}).sort(),
     };
 }
@@ -1110,7 +1400,6 @@ function buildMcpRegistryState(tools, allTools, policy, cacheKey, validation) {
 function summarizeRegistryPolicy(policy) {
     return {
         strictDescriptorValidation: policy.strictDescriptorValidation,
-        strictRiskValidation: policy.strictRiskValidation,
         enrichOpenAiMeta: policy.enrichOpenAiMeta,
         handlerExceptionMode: policy.handlerExceptionMode,
         validateStructuredOutput: policy.validateStructuredOutput,
@@ -1130,6 +1419,16 @@ function summarizeRegistryPolicy(policy) {
  */
 function registryPolicyCacheKey(policy) {
     return stableJsonStringify(summarizeRegistryPolicy(policy));
+}
+
+/**
+ * Security metadata depends on auth mode and whether the two public OAuth diagnostics advertise noauth fallback. Do not
+ * place secret-bearing auth state in the registry cache key.
+ *
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
+ */
+function authMetadataCacheKey(config) {
+    return `${config.mode}:${config.publicOauthDiagnosticsEnabled ? 'public-diagnostics' : 'protected-diagnostics'}`;
 }
 
 /**
@@ -1266,12 +1565,14 @@ function elapsedMs(startedAt) {
 }
 
 /**
- * @param {Parameters<typeof appendMcpAuditEvent>[0] & Record<string, unknown>} event
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']} audit
+ * @param {Record<string, unknown>} event
  * @returns {Promise<void>}
  */
-async function safeAppendMcpAuditEvent(event) {
+async function safeAppendMcpAuditEvent(audit, event) {
+    if (!audit) return;
     try {
-        await appendMcpAuditEvent(event);
+        await audit.append(event);
     } catch {
         // Telemetry failures must not break a tool call.
     }

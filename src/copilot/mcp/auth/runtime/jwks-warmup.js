@@ -10,6 +10,20 @@ import { warmMcpRemoteJwks } from '../resource-server/service.js';
 
 const DEFAULT_JWKS_WARMUP_DELAY_MS = 2_000;
 
+/** @typedef {Readonly<{ enabled: boolean; delayMs: number }>} McpAuthJwksWarmupPolicy */
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {McpAuthJwksWarmupPolicy}
+ */
+export function readMcpAuthJwksWarmupPolicy(env = process.env) {
+    const defaultEnabled = env['NODE_ENV'] !== 'test' && !env['VITEST'];
+    return Object.freeze({
+        enabled: readBooleanEnv(env, 'COPILOT_MCP_JWKS_WARMUP_ENABLED', defaultEnabled),
+        delayMs: normalizeDelay(Number(env['COPILOT_MCP_JWKS_WARMUP_DELAY_MS'])),
+    });
+}
+
 /** @type {{ unref?: () => void } | NodeJS.Timeout | number | null} */
 let warmupTimer = null;
 /** @type {Promise<void> | null} */
@@ -28,20 +42,21 @@ let warmupState = createInitialState();
  *     delayMs?: number;
  *     enabled?: boolean;
  *     env?: NodeJS.ProcessEnv;
+ *     policy?: McpAuthJwksWarmupPolicy;
+ *     authConfig?: import('../resource-server/service.js').McpAuthConfig;
  *     setTimeoutFn?: (callback: () => void, delayMs: number) => { unref?: () => void };
- *     warmupRunner?: (options?: { env?: NodeJS.ProcessEnv }) => Promise<McpAuthJwksWarmupResult>;
+ *     warmupRunner?: (options?: { env?: NodeJS.ProcessEnv; config?: import('../resource-server/service.js').McpAuthConfig }) => Promise<McpAuthJwksWarmupResult>;
  *     logFn?: McpAuthJwksWarmupLogFn;
  * }} [options]
  * @returns {boolean}
  */
 export function scheduleMcpAuthJwksWarmup(options = {}) {
     if (warmupState.scheduled || warmupState.running || warmupState.completed) return false;
-    const env = options.env ?? process.env;
-    const defaultEnabled = env['NODE_ENV'] !== 'test' && !env['VITEST'];
-    const enabled = options.enabled ?? readBooleanEnv(env, 'COPILOT_MCP_JWKS_WARMUP_ENABLED', defaultEnabled);
+    const policy = options.policy ?? readMcpAuthJwksWarmupPolicy(options.env);
+    const enabled = options.enabled ?? policy.enabled;
     if (!enabled) return false;
 
-    const delayMs = normalizeDelay(options.delayMs ?? Number(env['COPILOT_MCP_JWKS_WARMUP_DELAY_MS']));
+    const delayMs = normalizeDelay(options.delayMs ?? policy.delayMs);
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const warmupRunner = options.warmupRunner ?? warmMcpRemoteJwks;
     const logFn = options.logFn ?? logMcp;
@@ -55,7 +70,12 @@ export function scheduleMcpAuthJwksWarmup(options = {}) {
     warmupTimer = setTimeoutFn(() => {
         warmupTimer = null;
         if (generation !== warmupGeneration) return;
-        const run = runWarmup(warmupRunner, env, logFn, generation);
+        const run = runWarmup(
+            warmupRunner,
+            options.authConfig ? { config: options.authConfig } : options.env ? { env: options.env } : {},
+            logFn,
+            generation,
+        );
         warmupRunPromise = run;
         void run.finally(() => {
             if (warmupRunPromise === run) warmupRunPromise = null;
@@ -105,13 +125,13 @@ function clearWarmupTimer() {
 }
 
 /**
- * @param {(options?: { env?: NodeJS.ProcessEnv }) => Promise<McpAuthJwksWarmupResult>} warmupRunner
- * @param {NodeJS.ProcessEnv} env
+ * @param {(options?: { env?: NodeJS.ProcessEnv; config?: import('../resource-server/service.js').McpAuthConfig }) => Promise<McpAuthJwksWarmupResult>} warmupRunner
+ * @param {{ env?: NodeJS.ProcessEnv; config?: import('../resource-server/service.js').McpAuthConfig }} runnerOptions
  * @param {McpAuthJwksWarmupLogFn} logFn
  * @param {number} generation
  * @returns {Promise<void>}
  */
-async function runWarmup(warmupRunner, env, logFn, generation) {
+async function runWarmup(warmupRunner, runnerOptions, logFn, generation) {
     if (generation !== warmupGeneration) return;
     warmupState = {
         ...warmupState,
@@ -120,7 +140,7 @@ async function runWarmup(warmupRunner, env, logFn, generation) {
         startedAt: new Date().toISOString(),
     };
     try {
-        const result = await warmupRunner({ env });
+        const result = await warmupRunner(runnerOptions);
         if (generation !== warmupGeneration) return;
         warmupState = {
             ...warmupState,

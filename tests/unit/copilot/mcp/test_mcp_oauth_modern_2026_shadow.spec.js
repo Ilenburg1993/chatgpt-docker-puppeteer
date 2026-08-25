@@ -1,25 +1,21 @@
 // @ts-check
 
 import { startHttpMcpServer } from '#copilot/mcp/public/adapters/http1';
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { createMcpProcessConfig } from '#copilot/mcp/public/composition/process-config';
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { MCP_PROTOCOL_MODERN_VERSION } from '#copilot/mcp/public/protocol/version';
-import { resetDevOAuthRuntimeForTests, resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
+import { resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it, vi } from 'vitest';
 
 /** @type {string[]} */
 const tempDirs = [];
-const SHADOW_WORKSPACE = createComposedMcpProcessHost({
-    hostId: 'mcp-oauth-modern-shadow-workspace',
-    backgroundServices: false,
-}).workspace;
-
 /** @param {Uint8Array} value */
 function base64Url(value) {
     return Buffer.from(value).toString('base64url');
@@ -59,6 +55,19 @@ async function closeServer(server) {
     ]);
 }
 
+/** @returns {Promise<number>} */
+async function reserveEphemeralPort() {
+    const probe = createNetServer();
+    await new Promise((resolve, reject) => {
+        probe.once('error', reject);
+        probe.listen(0, '127.0.0.1', resolve);
+    });
+    const address = probe.address();
+    assert.ok(address && typeof address === 'object');
+    await closeServer(probe);
+    return address.port;
+}
+
 /**
  * @param {'max-autonomy' | 'least-privilege'} profile
  */
@@ -69,22 +78,31 @@ async function openOAuthModernShadow(profile) {
     vi.stubEnv('COPILOT_MCP_AUTH_ENFORCEMENT', 'all');
     vi.stubEnv('COPILOT_MCP_OAUTH_INITIAL_SCOPE_PROFILE', profile);
     vi.stubEnv('COPILOT_MCP_HTTP_STATEFUL_SESSIONS', 'false');
+    vi.stubEnv('COPILOT_MCP_CLOUDFLARE_PUBLIC_URL', 'https://mcp.aurelin.org/mcp');
     vi.stubEnv('COPILOT_MCP_DEV_OAUTH_KEY_FILE', path.join(tempDir, 'oauth-key.pem'));
     vi.stubEnv('COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE', path.join(tempDir, 'refresh-tokens.json'));
     vi.stubEnv('COPILOT_MCP_DEV_OAUTH_CLIENT_FILE', path.join(tempDir, 'clients.json'));
     vi.stubEnv('COPILOT_MCP_ALLOWED_ORIGINS', 'https://chatgpt.com,http://127.0.0.1');
     resetMcpAuthRuntimeForTests();
-    resetDevOAuthRuntimeForTests();
 
-    const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0, workspace: SHADOW_WORKSPACE });
-    const address = server.address();
-    assert.ok(address && typeof address === 'object');
-    const resource = `http://127.0.0.1:${address.port}`;
+    const port = await reserveEphemeralPort();
+    const resource = `http://127.0.0.1:${port}`;
     vi.stubEnv('COPILOT_MCP_PUBLIC_URL', `${resource}/mcp`);
     resetMcpAuthRuntimeForTests();
-    resetDevOAuthRuntimeForTests();
+    const processConfig = createMcpProcessConfig(process.env);
+    const processHost = createComposedMcpProcessHost({
+        hostId: `mcp-oauth-modern-${profile}-${randomBytes(6).toString('hex')}`,
+        processConfig,
+        backgroundServices: false,
+    });
+    const server = await startHttpMcpServer({
+        host: '127.0.0.1',
+        port,
+        processHost,
+        processConfig,
+    });
 
-    const config = readMcpAuthConfig();
+    const config = processConfig.auth.config;
     assert.equal(config.initialScopeProfile, profile);
     const registered = await postJson(`${resource}/oauth/register`, {
         client_name: `MCP 2026 ${profile} shadow`,
@@ -143,11 +161,10 @@ async function openOAuthModernShadow(profile) {
     assert.equal(client.getProtocolEra(), 'modern');
     assert.equal(client.getNegotiatedProtocolVersion(), MCP_PROTOCOL_MODERN_VERSION);
 
-    return { server, client, config };
+    return { server, client, config, processHost };
 }
 
 afterEach(async () => {
-    resetDevOAuthRuntimeForTests();
     resetMcpAuthRuntimeForTests();
     vi.unstubAllEnvs();
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -182,6 +199,7 @@ describe('MCP OAuth + modern 2026 shadow', () => {
         } finally {
             await shadow.client.close().catch(() => undefined);
             await closeServer(shadow.server);
+            await shadow.processHost.dispose();
         }
     });
 
@@ -210,6 +228,7 @@ describe('MCP OAuth + modern 2026 shadow', () => {
         } finally {
             await shadow.client.close().catch(() => undefined);
             await closeServer(shadow.server);
+            await shadow.processHost.dispose();
         }
     });
 });

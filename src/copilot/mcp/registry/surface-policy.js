@@ -25,9 +25,20 @@
  * @property {boolean} allowEmpty
  */
 
+export const MCP_TOOL_SURFACE_MODES = Object.freeze([
+    'full',
+    'latency',
+    'minimal',
+    'cloudflare',
+    'readonly',
+    'claude',
+    'safe',
+    'research',
+]);
+
 const DEFAULT_TOOL_SURFACE = 'full';
 
-const LATENCY_SURFACE_TOOL_NAMES = new Set([
+const LATENCY_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_root_tree',
     'repo_tree',
@@ -41,8 +52,17 @@ const LATENCY_SURFACE_TOOL_NAMES = new Set([
     'repo_find_orphan_imports',
     'search',
     'fetch',
+    'terminal_exec',
+    'terminal_session_control',
+    'terminal_session_read',
+    'repo_working_set',
+    'repo_index_status',
     'repo_patch_plan',
     'repo_apply_patch',
+    'repo_apply_patch_batch',
+    'repo_apply_file_batch',
+    'repo_write_file',
+    'repo_remove_file',
     'repo_create_file',
     'repo_move_file',
     'repo_quarantine_file',
@@ -92,7 +112,7 @@ const LATENCY_SURFACE_TOOL_NAMES = new Set([
     'chatgpt_connector_url_check',
 ]);
 
-const MINIMAL_SURFACE_TOOL_NAMES = new Set([
+const MINIMAL_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_search_text',
     'repo_read_file',
@@ -112,7 +132,7 @@ const MINIMAL_SURFACE_TOOL_NAMES = new Set([
     'mcp_cloudflare_edge_policy_diff',
 ]);
 
-const CLOUDFLARE_SURFACE_TOOL_NAMES = new Set([
+const CLOUDFLARE_SURFACE_TOOL_NAMES = Object.freeze([
     'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_tunnel_status',
@@ -142,7 +162,7 @@ const CLOUDFLARE_SURFACE_TOOL_NAMES = new Set([
     'git_diff',
 ]);
 
-const SAFE_RESEARCH_SURFACE_TOOL_NAMES = new Set([
+const SAFE_RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_tree',
     'repo_search_text',
@@ -186,16 +206,31 @@ const SAFE_RESEARCH_SURFACE_TOOL_NAMES = new Set([
 ]);
 
 /**
+ * Build one exact immutable surface policy without consulting ambient process state.
+ *
+ * @param {{ mode?: unknown; include?: Iterable<string>; exclude?: Iterable<string>; allowEmpty?: boolean }} [input]
+ * @returns {McpToolSurfacePolicy}
+ */
+export function createMcpToolSurfacePolicy(input = {}) {
+    return {
+        mode: normalizeMode(input.mode),
+        include: new Set(Array.from(input.include ?? [], normalizeToolName).filter(Boolean)),
+        exclude: new Set(Array.from(input.exclude ?? [], normalizeToolName).filter(Boolean)),
+        allowEmpty: input.allowEmpty === true,
+    };
+}
+
+/**
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {McpToolSurfacePolicy}
  */
 export function readMcpToolSurfacePolicy(env = process.env) {
-    return {
-        mode: normalizeMode(env['COPILOT_MCP_TOOL_SURFACE']),
-        include: readCsvSet(env['COPILOT_MCP_TOOL_SURFACE_INCLUDE']),
-        exclude: readCsvSet(env['COPILOT_MCP_TOOL_SURFACE_EXCLUDE']),
+    return createMcpToolSurfacePolicy({
+        mode: env['COPILOT_MCP_TOOL_SURFACE'],
+        include: readCsv(env['COPILOT_MCP_TOOL_SURFACE_INCLUDE']),
+        exclude: readCsv(env['COPILOT_MCP_TOOL_SURFACE_EXCLUDE']),
         allowEmpty: readBoolean(env['COPILOT_MCP_TOOL_SURFACE_ALLOW_EMPTY'], false),
-    };
+    });
 }
 
 /**
@@ -263,44 +298,39 @@ export function describeMcpToolSurfacePolicy(selectedTools, allTools, policy) {
  */
 function matchesToolSurfaceMode(tool, mode) {
     if (mode === 'full') return true;
-    if (mode === 'latency') return LATENCY_SURFACE_TOOL_NAMES.has(tool.name);
-    if (mode === 'minimal') return MINIMAL_SURFACE_TOOL_NAMES.has(tool.name);
-    if (mode === 'cloudflare') return CLOUDFLARE_SURFACE_TOOL_NAMES.has(tool.name);
+    if (mode === 'latency') return LATENCY_SURFACE_TOOL_NAMES.includes(tool.name);
+    if (mode === 'minimal') return MINIMAL_SURFACE_TOOL_NAMES.includes(tool.name);
+    if (mode === 'cloudflare') return CLOUDFLARE_SURFACE_TOOL_NAMES.includes(tool.name);
     if (mode === 'claude' || mode === 'safe' || mode === 'research')
-        return SAFE_RESEARCH_SURFACE_TOOL_NAMES.has(tool.name);
+        return SAFE_RESEARCH_SURFACE_TOOL_NAMES.includes(tool.name);
     if (mode === 'readonly') return tool.annotations?.readOnlyHint === true;
     return true;
 }
 
-/**
- * @param {unknown} value
- * @returns {McpToolSurfaceMode}
- */
+/** @param {unknown} value @returns {McpToolSurfaceMode} */
 function normalizeMode(value) {
     const raw = String(value ?? DEFAULT_TOOL_SURFACE)
         .trim()
         .toLowerCase();
-    if (raw === 'latency' || raw === 'fast' || raw === 'turbo') return 'latency';
-    if (raw === 'minimal' || raw === 'tiny') return 'minimal';
-    if (raw === 'cloudflare' || raw === 'edge' || raw === 'transport') return 'cloudflare';
-    if (raw === 'claude') return 'claude';
-    if (raw === 'safe' || raw === 'safety') return 'safe';
-    if (raw === 'research' || raw === 'read-validate' || raw === 'read_validate') return 'research';
-    if (raw === 'readonly' || raw === 'read-only' || raw === 'read_only') return 'readonly';
-    return 'full';
+    if (MCP_TOOL_SURFACE_MODES.includes(/** @type {McpToolSurfaceMode} */ (raw))) {
+        return /** @type {McpToolSurfaceMode} */ (raw);
+    }
+    throw new TypeError(
+        `Unsupported MCP tool surface ${JSON.stringify(raw)}; expected one of ${MCP_TOOL_SURFACE_MODES.join(', ')}.`,
+    );
 }
 
-/**
- * @param {unknown} value
- * @returns {Set<string>}
- */
-function readCsvSet(value) {
-    return new Set(
-        String(value ?? '')
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
-    );
+/** @param {unknown} value @returns {string[]} */
+function readCsv(value) {
+    return String(value ?? '')
+        .split(',')
+        .map(normalizeToolName)
+        .filter(Boolean);
+}
+
+/** @param {unknown} value @returns {string} */
+function normalizeToolName(value) {
+    return String(value ?? '').trim();
 }
 
 /**

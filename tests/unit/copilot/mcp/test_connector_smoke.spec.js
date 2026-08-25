@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
-import { runCanonicalConnectorSmoke } from '#copilot/mcp/public/cloudflare/connector-smoke';
 import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
+import { runCanonicalConnectorSmoke } from '#copilot/mcp/public/cloudflare/observability';
 
 /** @returns {Awaited<
-    ReturnType<typeof import('#copilot/testing/mcp/cloudflare/cli-smoke').runCloudflareSmoke>
+    ReturnType<typeof import('#copilot/testing/mcp/cloudflare/observability').runCloudflareSmoke>
 >} */
 function healthyUnauthenticatedSmoke() {
     return {
@@ -57,6 +57,19 @@ function healthyOauthSmoke() {
     };
 }
 
+function testSmokeEnvironment() {
+    return buildCloudflareConnectorSmokeEnvironment(
+        {
+            PATH: '/usr/bin',
+            COPILOT_MCP_PROTOCOL_VERSION: '2026-07-28',
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+        },
+        { publicMcpUrl: 'https://mcp.example.com/mcp' },
+    );
+}
+
+const TEST_LOCAL_TOOL_NAMES = Object.freeze(['repo_status']);
+
 function testConfig() {
     return readCloudflareTunnelConfig({
         COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
@@ -84,10 +97,12 @@ function requireFixtureIndex(values, index, label) {
 
 describe('canonical connector smoke', () => {
     it('fails the canonical gate when authenticated OAuth fails even if the public challenge is healthy', async () => {
-        /** @type {{ state: import('#copilot/mcp/public/cloudflare/state').ConnectorSmokeState }[]} */
+        /** @type {{ state: import('#copilot/mcp/public/cloudflare/tunnel').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
+            env: testSmokeEnvironment(),
+            localToolNames: TEST_LOCAL_TOOL_NAMES,
             deps: {
                 runUnauthenticatedSmoke: async () => healthyUnauthenticatedSmoke(),
                 runOauthSmoke: async () => ({
@@ -114,10 +129,12 @@ describe('canonical connector smoke', () => {
     });
 
     it('persists authenticated tool-registry evidence instead of the expected unauthenticated 401 tools response', async () => {
-        /** @type {{ state: import('#copilot/mcp/public/cloudflare/state').ConnectorSmokeState }[]} */
+        /** @type {{ state: import('#copilot/mcp/public/cloudflare/tunnel').ConnectorSmokeState }[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
+            env: testSmokeEnvironment(),
+            localToolNames: TEST_LOCAL_TOOL_NAMES,
             deps: {
                 runUnauthenticatedSmoke: async () => healthyUnauthenticatedSmoke(),
                 runOauthSmoke: async () => healthyOauthSmoke(),
@@ -164,6 +181,7 @@ describe('canonical connector smoke', () => {
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
             env,
+            localToolNames: TEST_LOCAL_TOOL_NAMES,
             persistState: false,
             deps: {
                 runUnauthenticatedSmoke: async (input) => {
@@ -178,8 +196,8 @@ describe('canonical connector smoke', () => {
         });
 
         assert.equal(report['ok'], true);
-        assert.equal(unauthEnv, env);
-        assert.equal(oauthEnv, env);
+        assert.equal(unauthEnv, oauthEnv);
+        assert.deepEqual(unauthEnv, env);
         assert.equal(env['COPILOT_MCP_PROTOCOL_VERSION'], '2026-07-28');
         assert.equal(env['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
         assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
@@ -200,6 +218,8 @@ describe('canonical connector smoke', () => {
 
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
+            env: testSmokeEnvironment(),
+            localToolNames: TEST_LOCAL_TOOL_NAMES,
             persistState: false,
             deps: {
                 runUnauthenticatedSmoke: async () => {

@@ -1,131 +1,213 @@
 // @ts-check
-/** Tests for the bootstrap-bound MCP audit runtime. */
+/** Tests for explicit process-host-owned MCP audit capabilities. */
 
+import { createMcpAuditCapability, readMcpAuditProcessConfig } from '#copilot/testing/mcp/observability';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, it, vi } from 'vitest';
+import { describe, it } from 'vitest';
 
-const AUDIT_FILE_ENV = 'COPILOT_MCP_AUDIT_FILE';
-const AUDIT_SYNC_ENV = 'COPILOT_MCP_AUDIT_SYNC';
-const AUDIT_DISABLED_ENV = 'COPILOT_MCP_AUDIT_DISABLED';
-
-/** @param {string} auditFile */
-async function loadAuditModule(auditFile) {
-    process.env[AUDIT_FILE_ENV] = auditFile;
-    vi.resetModules();
-    return import('#copilot/testing/mcp/observability');
-}
-
-function captureAuditEnv() {
-    return {
-        file: process.env[AUDIT_FILE_ENV],
-        sync: process.env[AUDIT_SYNC_ENV],
-        disabled: process.env[AUDIT_DISABLED_ENV],
-    };
-}
-
-/** @param {ReturnType<typeof captureAuditEnv>} previous */
-function restoreAuditEnv(previous) {
-    if (previous.file === undefined) delete process.env[AUDIT_FILE_ENV];
-    else process.env[AUDIT_FILE_ENV] = previous.file;
-    if (previous.sync === undefined) delete process.env[AUDIT_SYNC_ENV];
-    else process.env[AUDIT_SYNC_ENV] = previous.sync;
-    if (previous.disabled === undefined) delete process.env[AUDIT_DISABLED_ENV];
-    else process.env[AUDIT_DISABLED_ENV] = previous.disabled;
-}
-
-describe('copilot MCP audit', () => {
-    it('default artifact identity remains under src/copilot/.ai after owner relocation', async () => {
-        const previous = captureAuditEnv();
-        try {
-            delete process.env[AUDIT_FILE_ENV];
-            vi.resetModules();
-            const audit = await import('#copilot/testing/mcp/observability');
-            assert.equal(
-                audit.getMcpAuditFileForTests(),
-                path.join(process.cwd(), 'src/copilot/.ai/audit/mcp-tool-calls.jsonl'),
-            );
-        } finally {
-            restoreAuditEnv(previous);
-        }
+describe('copilot MCP audit capability', () => {
+    it('keeps the default artifact identity under src/copilot/.ai after owner relocation', () => {
+        const config = readMcpAuditProcessConfig({});
+        const audit = createMcpAuditCapability(config);
+        assert.equal(config.filePath, path.join(process.cwd(), 'src/copilot/.ai/audit/mcp-tool-calls.jsonl'));
+        assert.equal(audit.filePath, config.filePath);
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(audit), true);
     });
-    it('appends and bounded-reads JSONL events from one bootstrap-bound audit file', async () => {
+
+    it('appends and bounded-reads JSONL events from one explicit capability', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-'));
         const auditFile = path.join(dir, 'audit.jsonl');
-        const previous = captureAuditEnv();
-        process.env[AUDIT_SYNC_ENV] = 'true';
-        delete process.env[AUDIT_DISABLED_ENV];
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
         try {
-            const audit = await loadAuditModule(auditFile);
-            await audit.appendMcpAuditEvent({ event: 'test_event', tool: 'repo_status' });
-            const text = await readFile(auditFile, 'utf8');
-            const row = JSON.parse(text.trim());
+            await audit.append({ event: 'test_event', tool: 'repo_status' });
+            const row = JSON.parse((await readFile(auditFile, 'utf8')).trim());
             assert.equal(row.event, 'test_event');
             assert.equal(row.tool, 'repo_status');
             assert.equal(row.component, 'copilot-mcp');
-
-            const tail = await audit.readMcpAuditEventTail({ tailBytes: 64 * 1024, maxEvents: 100 });
+            const tail = await audit.readTail({ tailBytes: 64 * 1024, maxEvents: 100 });
             assert.equal(tail.ok, true);
             assert.equal(tail.parsedEvents, 1);
             assert.equal(tail.events[0]?.['event'], 'test_event');
         } finally {
-            restoreAuditEnv(previous);
+            await audit.flush();
             await rm(dir, { recursive: true, force: true });
         }
     });
 
-    it('preserves logical order when strict sync is enabled after queued async events', async () => {
+    it('persists only a fixed privacy-safe compatibility projection and returns aggregate retirement evidence', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-compat-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            await audit.recordCompatibility({
+                kind: 'protocol-request',
+                protocolEra: '2026',
+                transportMode: 'modern-2026',
+                rpcClass: 'tools-call',
+                continuity: 'stream-resume',
+                clientId: 'must-never-persist',
+                token: 'must-never-persist',
+            });
+            await audit.recordCompatibility({
+                kind: 'oauth-client',
+                clientSource: 'cimd',
+                hostClass: 'chatgpt',
+                resolution: 'trusted-fallback',
+                outcome: 'succeeded',
+                redirectUri: 'https://example.invalid/private',
+            });
+            await audit.recordCompatibility({
+                kind: 'oauth-grant',
+                grantType: 'refresh_token',
+                clientSource: 'cimd',
+                hostClass: 'chatgpt',
+                outcome: 'succeeded',
+                subject: 'must-never-persist',
+            });
+
+            const text = await readFile(auditFile, 'utf8');
+            assert.doesNotMatch(text, /must-never-persist|example\.invalid/u);
+            const rows = text
+                .trim()
+                .split('\n')
+                .map((line) => JSON.parse(line));
+            assert.deepEqual(Object.keys(rows[0]).sort(), [
+                'component',
+                'continuity',
+                'event',
+                'kind',
+                'protocolEra',
+                'rpcClass',
+                'schemaVersion',
+                'transportMode',
+                'ts',
+            ]);
+
+            const summary = await audit.readCompatibilitySummary({ tailBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(summary.observations, 3);
+            assert.equal(summary.protocol.totalRequests, 1);
+            assert.equal(summary.protocol.byEra['2026'], 1);
+            assert.equal(summary.protocol.byContinuity['stream-resume'], 1);
+            assert.equal(summary.oauth.clientActivity.bySource.cimd, 1);
+            assert.equal(summary.oauth.clientActivity.byHostClass.chatgpt, 1);
+            assert.equal(summary.oauth.clientActivity.successfulByHostClass.chatgpt, 1);
+            assert.equal(summary.oauth.clientActivity.byOutcome.succeeded, 1);
+            assert.equal(summary.oauth.grants.byGrantType.refresh_token, 1);
+            assert.equal(summary.oauth.grants.byOutcome.succeeded, 1);
+            assert.ok(summary.window.firstObservedAt);
+            assert.ok(summary.window.lastObservedAt);
+            await assert.rejects(
+                () =>
+                    audit.recordCompatibility({
+                        kind: 'protocol-request',
+                        protocolEra: '2099',
+                        transportMode: 'modern-2026',
+                        rpcClass: 'tools-call',
+                        continuity: 'none',
+                    }),
+                /Invalid MCP compatibility protocolEra/u,
+            );
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('captures disabled/sync/file policy once and does not drift with source environment mutation', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-config-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        try {
+            const env = {
+                COPILOT_MCP_AUDIT_FILE: auditFile,
+                COPILOT_MCP_AUDIT_SYNC: 'false',
+                COPILOT_MCP_AUDIT_DISABLED: 'false',
+            };
+            const config = readMcpAuditProcessConfig(env);
+            const audit = createMcpAuditCapability(config);
+            env.COPILOT_MCP_AUDIT_FILE = path.join(dir, 'mutated.jsonl');
+            env.COPILOT_MCP_AUDIT_SYNC = 'true';
+            env.COPILOT_MCP_AUDIT_DISABLED = 'true';
+            assert.equal(audit.config.filePath, auditFile);
+            assert.equal(audit.config.sync, false);
+            assert.equal(audit.config.disabled, false);
+            await audit.flush();
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('preserves logical order within one capability', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-order-'));
         const auditFile = path.join(dir, 'audit.jsonl');
-        const previous = captureAuditEnv();
-        delete process.env[AUDIT_SYNC_ENV];
-        delete process.env[AUDIT_DISABLED_ENV];
+        const audit = createMcpAuditCapability(readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile }));
         try {
-            const audit = await loadAuditModule(auditFile);
-            await audit.appendMcpAuditEvent({ event: 'queued_first' });
-            await audit.appendMcpAuditEvent({ event: 'queued_second' });
-            process.env[AUDIT_SYNC_ENV] = 'true';
-            await audit.appendMcpAuditEvent({ event: 'sync_last' });
-            await audit.flushMcpAuditEvents();
-
+            await audit.append({ event: 'queued_first' });
+            await audit.append({ event: 'queued_second' });
+            await audit.append({ event: 'queued_third' });
+            await audit.flush();
             const rows = (await readFile(auditFile, 'utf8'))
                 .trim()
                 .split('\n')
                 .map((line) => JSON.parse(line));
             assert.deepEqual(
                 rows.map((row) => row.event),
-                ['queued_first', 'queued_second', 'sync_last'],
+                ['queued_first', 'queued_second', 'queued_third'],
             );
         } finally {
-            restoreAuditEnv(previous);
+            await audit.flush();
             await rm(dir, { recursive: true, force: true });
         }
     });
 
-    it('does not retarget writer or reader when COPILOT_MCP_AUDIT_FILE changes after bootstrap binding', async () => {
+    it('allows independent audit generations without mutable module rebinding', async () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-binding-'));
-        const boundFile = path.join(dir, 'bound.jsonl');
-        const retargetFile = path.join(dir, 'retarget.jsonl');
-        const previous = captureAuditEnv();
-        process.env[AUDIT_SYNC_ENV] = 'true';
-        delete process.env[AUDIT_DISABLED_ENV];
+        const firstFile = path.join(dir, 'first.jsonl');
+        const secondFile = path.join(dir, 'second.jsonl');
+        const first = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: firstFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        const second = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: secondFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
         try {
-            const audit = await loadAuditModule(boundFile);
-            process.env[AUDIT_FILE_ENV] = retargetFile;
-            await audit.appendMcpAuditEvent({ event: 'bound_identity' });
-            await audit.flushMcpAuditEvents();
+            await first.append({ event: 'first_identity' });
+            await second.append({ event: 'second_identity' });
+            assert.match(await readFile(firstFile, 'utf8'), /first_identity/u);
+            assert.doesNotMatch(await readFile(firstFile, 'utf8'), /second_identity/u);
+            assert.match(await readFile(secondFile, 'utf8'), /second_identity/u);
+            assert.doesNotMatch(await readFile(secondFile, 'utf8'), /first_identity/u);
+        } finally {
+            await Promise.all([first.flush(), second.flush()]);
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
 
-            assert.match(await readFile(boundFile, 'utf8'), /bound_identity/u);
+    it('suppresses persistence when its immutable generation disables audit', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-disabled-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({
+                COPILOT_MCP_AUDIT_FILE: auditFile,
+                COPILOT_MCP_AUDIT_DISABLED: 'true',
+                COPILOT_MCP_AUDIT_SYNC: 'true',
+            }),
+        );
+        try {
+            await audit.append({ event: 'must_not_persist' });
+            await audit.flush();
             await assert.rejects(
-                () => readFile(retargetFile, 'utf8'),
+                () => readFile(auditFile, 'utf8'),
                 (error) => /** @type {{ code?: unknown }} */ (error)?.code === 'ENOENT',
             );
-            const tail = await audit.readMcpAuditEventTail({ tailBytes: 64 * 1024, maxEvents: 100 });
-            assert.equal(tail.events.at(-1)?.['event'], 'bound_identity');
         } finally {
-            restoreAuditEnv(previous);
             await rm(dir, { recursive: true, force: true });
         }
     });

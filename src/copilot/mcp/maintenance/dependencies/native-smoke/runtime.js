@@ -13,14 +13,14 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const requireFromHere = createRequire(import.meta.url);
-const dependencySmokeWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: process.cwd() });
 const DEFAULT_PTY_TIMEOUT_MS = 5_000;
 
-/** @returns {Promise<Set<string>>} */
-async function readDeclaredPackages() {
+/** @param {string} workspaceRoot @returns {Promise<Set<string>>} */
+async function readDeclaredPackages(workspaceRoot) {
+    const workspaceIo = createWorkspaceReadIo({ workspaceRoot });
     const parsed = JSON.parse(
         (
-            await dependencySmokeWorkspaceIo.readTextFresh(path.resolve(process.cwd(), 'package.json'), {
+            await workspaceIo.readTextFresh(path.resolve(workspaceRoot, 'package.json'), {
                 includeHash: false,
             })
         ).content,
@@ -65,7 +65,8 @@ async function smokeBetterSqlite3() {
     }
 }
 
-async function smokeNodePty() {
+/** @param {{ workspaceRoot: string; childEnvironment: Readonly<NodeJS.ProcessEnv> }} runtime */
+async function smokeNodePty(runtime) {
     const pty = await import('node-pty');
     if (typeof pty.spawn !== 'function') throw new Error('node-pty does not export spawn().');
     return await new Promise((resolve, reject) => {
@@ -75,9 +76,9 @@ async function smokeNodePty() {
                 ? ['-NoProfile', '-Command', "Write-Output -NoNewline 'node-pty-ok'"]
                 : ['-lc', "printf 'node-pty-ok'"];
         const terminal = pty.spawn(shell, args, {
-            cwd: process.cwd(),
+            cwd: runtime.workspaceRoot,
             env: /** @type {Record<string, string>} */ (
-                Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined))
+                Object.fromEntries(Object.entries(runtime.childEnvironment).filter(([, value]) => value !== undefined))
             ),
             cols: 80,
             rows: 24,
@@ -124,6 +125,7 @@ async function smokeLanceDb() {
 }
 
 /**
+ * @param {{ workspaceRoot: string; childEnvironment: Readonly<NodeJS.ProcessEnv> }} runtime
  * @returns {Promise<{
  *     success: boolean;
  *     checkedCount: number;
@@ -131,12 +133,17 @@ async function smokeLanceDb() {
  *     checks: Record<string, unknown>[];
  * }>}
  */
-export async function runDependencyNativeSmoke() {
-    const declared = await readDeclaredPackages();
+export async function runDependencyNativeSmoke(runtime) {
+    if (!runtime?.workspaceRoot || !path.isAbsolute(runtime.workspaceRoot)) {
+        throw new TypeError('Dependency native smoke requires an absolute workspaceRoot.');
+    }
+    if (!runtime.childEnvironment)
+        throw new TypeError('Dependency native smoke requires a projected child environment.');
+    const declared = await readDeclaredPackages(runtime.workspaceRoot);
     /** @type {Array<[string, () => Promise<Record<string, unknown>>]>} */
     const candidates = [
         ['better-sqlite3', smokeBetterSqlite3],
-        ['node-pty', smokeNodePty],
+        ['node-pty', () => smokeNodePty(runtime)],
         ['@lancedb/lancedb', smokeLanceDb],
     ];
     const checks = [];

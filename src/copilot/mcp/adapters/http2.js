@@ -2,8 +2,8 @@
 /**
  * Hardened HTTPS + HTTP/2 Streamable HTTP adapter for the Copilot MCP endpoint.
  *
- * This adapter is intentionally small at the application layer: all MCP/OAuth routing remains centralized in
- * http-shared.js, while this module owns the TLS/HTTP/2 transport envelope, origin safety, graceful shutdown, and
+ * This adapter is intentionally small at the application layer: MCP/OAuth request routing is delegated to the cohesive
+ * http/handler.js assembly, while this module owns the TLS/HTTP/2 transport envelope, origin safety, graceful shutdown, and
  * protocol-level hardening needed for Cloudflare Tunnel http2Origin.
  *
  * Version: 1.1.0
@@ -17,12 +17,10 @@ import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto'
 import { createSecureServer, constants as http2Constants } from 'node:http2';
 import { isIP } from 'node:net';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
-import {
-    configureHttp2ServerTiming,
-    createMcpHttpRequestHandler,
-    MCP_PATH,
-    readMcpHttpSessionRuntimeState,
-} from './http-shared.js';
+import { readMcpHttpServerTimingPolicy } from './http/config.js';
+import { createMcpHttpRequestHandler } from './http/handler.js';
+import { MCP_PATH } from './http/route-policy.js';
+import { applyHttp2ServerTimingPolicy } from './http/server-timing.js';
 
 export const MCP_HTTP2_ADAPTER_NAME = 'copilot-mcp-http2-adapter';
 export const MCP_HTTP2_ADAPTER_VERSION = '1.1.0';
@@ -44,11 +42,12 @@ const DEFAULT_HTTP2_STREAM_RESET_BURST = 100;
 const DEFAULT_HTTP2_STREAM_RESET_RATE = 33;
 const DEFAULT_HTTP2_UNKNOWN_PROTOCOL_TIMEOUT_MS = 2_000;
 const DEFAULT_HTTP2_SHUTDOWN_DESTROY_AFTER_MS = 3_500;
-const DEFAULT_HTTP2_SESSION_IDLE_TIMEOUT_MS = 95_000;
+// Cloudflared owns the persistent H2 origin pool. Zero disables origin-side idle GOAWAY by default.
+const DEFAULT_HTTP2_SESSION_IDLE_TIMEOUT_MS = 0;
 const DEFAULT_HTTP2_CERT_EXPIRY_WARN_DAYS = 14;
 const DEFAULT_TLS_MIN_VERSION = /** @type {import('node:tls').SecureVersion} */ ('TLSv1.2');
 const MAX_TLS_FILE_BYTES = 1024 * 1024;
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const LOOPBACK_HOSTS = Object.freeze(['localhost', '127.0.0.1', '::1', '[::1]']);
 const PRIVATE_KEY_BEGIN_PATTERN = /^-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/u;
 const PRIVATE_KEY_END_PATTERN = /-----END (?:RSA |EC )?PRIVATE KEY-----\s*$/u;
 const ENCRYPTED_PRIVATE_KEY_PATTERN = /^-----BEGIN ENCRYPTED PRIVATE KEY-----/u;
@@ -195,7 +194,7 @@ export function readMcpHttp2ServerPolicy(env = process.env) {
             env,
             'COPILOT_MCP_HTTP2_SESSION_IDLE_TIMEOUT_MS',
             DEFAULT_HTTP2_SESSION_IDLE_TIMEOUT_MS,
-            1_000,
+            0,
             10 * 60 * 1000,
         ),
         expectedCertificateHostnames: readExpectedCertificateHostnames(env),
@@ -217,12 +216,26 @@ export function readMcpHttp2ServerPolicy(env = process.env) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{ host: string; port: number; policy: McpHttp2ServerPolicy }}
+ */
+export function readMcpHttp2ListenerConfig(env = process.env) {
+    return {
+        host: normalizeListenHost(env['COPILOT_MCP_HOST'] ?? DEFAULT_HTTP2_HOST),
+        port: normalizeListenPort(Number(env['COPILOT_MCP_PORT'] ?? DEFAULT_HTTP2_PORT)),
+        policy: readMcpHttp2ServerPolicy(env),
+    };
+}
+
+/**
  * @typedef {{
  *     host?: string;
  *     port?: number;
- *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>;
+ *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost> & { toolCapabilities?: import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection; authRuntime?: ReturnType<typeof import('#copilot/mcp/public/composition/process-host').createComposedMcpProcessHost>['authRuntime'] };
  *     database?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
  *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     processConfig?: NonNullable<Parameters<typeof createMcpHttpRequestHandler>[0]>['processConfig'];
+ *     policy?: McpHttp2ServerPolicy;
  * }} McpHttp2StartOptions
  */
 
@@ -251,7 +264,8 @@ export async function startHttp2McpServer(opts = {}) {
     const workspace = requireHttp2WorkspaceCapability(opts);
     const host = normalizeListenHost(opts.host ?? process.env['COPILOT_MCP_HOST'] ?? DEFAULT_HTTP2_HOST);
     const port = normalizeListenPort(opts.port ?? Number(process.env['COPILOT_MCP_PORT'] ?? DEFAULT_HTTP2_PORT));
-    const policy = readMcpHttp2ServerPolicy();
+    const policy = opts.policy ?? readMcpHttp2ServerPolicy();
+    const timingPolicy = opts.processConfig?.transport.http.request.timing ?? readMcpHttpServerTimingPolicy();
     assertLoopbackBindAllowed(host, policy);
     await opts.processHost?.prepare();
     const tlsIo = createConfiguredFsIo(
@@ -274,6 +288,9 @@ export async function startHttp2McpServer(opts = {}) {
         protocolState,
         publicScheme: 'https',
         workspace,
+        ...(opts.processConfig ? { processConfig: opts.processConfig } : {}),
+        ...(opts.processHost?.toolCapabilities ? { toolCapabilities: opts.processHost.toolCapabilities } : {}),
+        ...(opts.processHost?.authRuntime ? { authRuntime: opts.processHost.authRuntime } : {}),
         ...(opts.database ? { database: opts.database } : {}),
     });
     const http2Server = /** @type {McpHttp2SecureServer} */ (
@@ -286,7 +303,7 @@ export async function startHttp2McpServer(opts = {}) {
     /** @type {{ value: Awaited<ReturnType<NonNullable<typeof opts.processHost>['acquire']>> | null }} */
     const processHostLease = { value: null };
     const runtime = installHttp2RuntimeGuards(http2Server, policy, requestHandler, () => processHostLease.value);
-    const timingPolicy = configureHttp2ServerTiming(http2Server);
+    applyHttp2ServerTimingPolicy(http2Server, timingPolicy);
     await listenHttp2Server(http2Server, host, port);
     try {
         processHostLease.value = opts.processHost ? await opts.processHost.acquire({ reason: 'http2-listener' }) : null;
@@ -298,7 +315,7 @@ export async function startHttp2McpServer(opts = {}) {
         adapter: { name: MCP_HTTP2_ADAPTER_NAME, version: MCP_HTTP2_ADAPTER_VERSION },
         url: `https://${host}:${port}${MCP_PATH}`,
         timingPolicy,
-        sessionRuntime: readMcpHttpSessionRuntimeState(),
+        sessionRuntime: requestHandler.readSessionRuntimeState(),
         http2: redactHttp2PolicyForLog(policy),
         tls: {
             ...tlsReport,
@@ -418,12 +435,14 @@ function installHttp2RuntimeGuards(server, policy, requestHandler, getProcessHos
         }
         runtime.acceptedSessions += 1;
         runtime.activeSessions.add(session);
-        session.setTimeout(policy.sessionIdleTimeoutMs, () => {
-            logMcp('WARN', 'Closing idle MCP HTTP/2 session after timeout.', {
-                sessionIdleTimeoutMs: policy.sessionIdleTimeoutMs,
+        if (policy.sessionIdleTimeoutMs > 0) {
+            session.setTimeout(policy.sessionIdleTimeoutMs, () => {
+                logMcp('WARN', 'Closing idle MCP HTTP/2 session after explicit timeout.', {
+                    sessionIdleTimeoutMs: policy.sessionIdleTimeoutMs,
+                });
+                closeHttp2Session(session, http2Constants.NGHTTP2_NO_ERROR);
             });
-            closeHttp2Session(session, http2Constants.NGHTTP2_NO_ERROR);
-        });
+        }
         session.on('close', () => runtime.activeSessions.delete(session));
         session.on('error', (error) => {
             runtime.sessionErrors += 1;
@@ -918,7 +937,7 @@ function normalizeRemoteAddress(address) {
  */
 function isLoopbackAddress(value) {
     const normalized = normalizeRemoteAddress(value).toLowerCase().replace(/^\[/u, '').replace(/\]$/u, '');
-    if (LOOPBACK_HOSTS.has(normalized)) return true;
+    if (LOOPBACK_HOSTS.includes(normalized)) return true;
     if (isIP(normalized) === 4) return normalized.startsWith('127.');
     return normalized === '::1';
 }

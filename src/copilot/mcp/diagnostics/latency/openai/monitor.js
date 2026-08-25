@@ -9,13 +9,17 @@
  */
 
 import { logMcp } from '#copilot/mcp/public/observability';
+import { MCP_LATENCY_CONFIG_DEFAULTS, readMcpLatencyProcessConfig } from '../config.js';
 import { appendOpenAiEndpointLatencySnapshot, measureOpenAiEndpointLatency } from './latency.js';
 
-const DEFAULT_INITIAL_DELAY_MS = 30_000;
-const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
+/** @type {number} */
+const DEFAULT_INITIAL_DELAY_MS = MCP_LATENCY_CONFIG_DEFAULTS.openAiMonitor.initialDelayMs;
+/** @type {number} */
+const DEFAULT_INTERVAL_MS = MCP_LATENCY_CONFIG_DEFAULTS.openAiMonitor.intervalMs;
 const MIN_INTERVAL_MS = 60_000;
 const MAX_INTERVAL_MS = 60 * 60 * 1000;
-const DEFAULT_TIMEOUT_MS = 2_500;
+/** @type {number} */
+const DEFAULT_TIMEOUT_MS = MCP_LATENCY_CONFIG_DEFAULTS.openAiMonitor.timeoutMs;
 
 /** @type {NodeJS.Timeout | null} */
 let monitorTimer = null;
@@ -45,6 +49,7 @@ function createInitialState() {
 
 /**
  * @param {{
+ *     policy?: import('../config.js').McpLatencyProcessConfig['openAiMonitor'];
  *     enabled?: boolean;
  *     initialDelayMs?: number;
  *     intervalMs?: number;
@@ -56,30 +61,25 @@ function createInitialState() {
  */
 export function scheduleOpenAiEndpointLatencyMonitor(options = {}) {
     if (monitorTimer || monitorState.scheduled || monitorState.running) return false;
-    const defaultEnabled = process.env['NODE_ENV'] !== 'test' && !process.env['VITEST'];
-    const enabled = options.enabled ?? readBooleanEnv('COPILOT_MCP_OPENAI_ENDPOINT_MONITOR_ENABLED', defaultEnabled);
+    const policy = options.policy ?? readMcpLatencyProcessConfig().openAiMonitor;
+    const enabled = options.enabled ?? policy.enabled;
     if (!enabled) {
         monitorState = { ...monitorState, enabled: false, scheduled: false, nextRunAt: null };
         return false;
     }
     const initialDelayMs = boundedDelay(
-        options.initialDelayMs ?? Number(process.env['COPILOT_MCP_OPENAI_ENDPOINT_MONITOR_INITIAL_DELAY_MS']),
+        options.initialDelayMs ?? policy.initialDelayMs,
         DEFAULT_INITIAL_DELAY_MS,
         0,
         10 * 60 * 1000,
     );
     const intervalMs = boundedDelay(
-        options.intervalMs ?? Number(process.env['COPILOT_MCP_OPENAI_ENDPOINT_MONITOR_INTERVAL_MS']),
+        options.intervalMs ?? policy.intervalMs,
         DEFAULT_INTERVAL_MS,
         MIN_INTERVAL_MS,
         MAX_INTERVAL_MS,
     );
-    const timeoutMs = boundedDelay(
-        options.timeoutMs ?? Number(process.env['COPILOT_MCP_OPENAI_ENDPOINT_MONITOR_TIMEOUT_MS']),
-        DEFAULT_TIMEOUT_MS,
-        500,
-        10_000,
-    );
+    const timeoutMs = boundedDelay(options.timeoutMs ?? policy.timeoutMs, DEFAULT_TIMEOUT_MS, 500, 10_000);
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const measureFn = options.measureFn ?? measureOpenAiEndpointLatency;
     const persistFn = options.persistFn ?? appendOpenAiEndpointLatencySnapshot;
@@ -246,13 +246,4 @@ function boundedDelay(value, fallback, min, max) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, Math.round(parsed)));
-}
-
-/** @param {string} name @param {boolean} fallback */
-function readBooleanEnv(name, fallback) {
-    const value = String(process.env[name] ?? '')
-        .trim()
-        .toLowerCase();
-    if (!value) return fallback;
-    return ['1', 'true', 'yes', 'on'].includes(value);
 }

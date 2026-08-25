@@ -5,19 +5,29 @@
  * @module copilot/mcp/tools/cloudflare-edge-diff
  */
 
-import { diffCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge-diff';
+import { diffCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareEdgePolicyDiffTool = {
+
+/**
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ */
+export const mcpCloudflareEdgePolicyDiffTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_policy_diff',
     title: 'Cloudflare edge policy diff',
     description:
         'Compare the actual Cloudflare edge ruleset audit with the desired plan-only MCP edge policy and return non-mutating gaps.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await diffCloudflareEdgePolicy()),
-};
+
+    handler: async (_input, operationContext) =>
+        okResult(
+            await diffCloudflareEdgePolicy({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+            }),
+        ),
+});

@@ -8,11 +8,21 @@
  * @module copilot/mcp/tools/restart-control
  */
 
-import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
+// @ts-check
+/**
+ * Controlled MCP lifecycle planning tool.
+ *
+ * This tool intentionally starts as plan-first: dryRun is the default and real execution requires a follow-up patchable
+ * runner path. It never accepts arbitrary shell or user-provided commands.
+ *
+ * @module copilot/mcp/tools/restart-control
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolAuditCapability,
+    requireMcpToolReloadConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import {
@@ -27,8 +37,8 @@ import { z } from 'zod';
 
 const restartProfileSchema = z.enum(MCP_RELOAD_REQUEST_PROFILES);
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpReloadPlanTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpReloadPlanTool = defineMcpRawTool({
     name: 'mcp_reload_plan',
     title: 'Plan controlled MCP reload',
     description:
@@ -40,32 +50,34 @@ export const mcpReloadPlanTool = {
         delayMs: z.number().int().min(MCP_RELOAD_MIN_DELAY_MS).max(MCP_RELOAD_MAX_DELAY_MS).optional(),
         reason: z.string().max(240).optional(),
     },
-    annotations: readOnlyAnnotations(),
-    handler: async ({ profile, delayMs, reason }) => {
+
+    handler: async ({ profile, delayMs, reason }, operationContext) => {
+        const reloadConfig = requireMcpToolReloadConfig(operationContext);
         const plan = buildControlledMcpReloadPlan({
+            config: reloadConfig,
             profile: profile ?? 'current',
             ...(delayMs === undefined ? {} : { delayMs }),
             reason: reason ?? null,
         });
         return okResult(plan, JSON.stringify(plan, null, 2));
     },
-};
+});
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpReloadStatusTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpReloadStatusTool = defineMcpRawTool({
     name: 'mcp_reload_status',
     title: 'Read MCP reload status',
     description: 'Read the fixed persisted state of the most recent controlled MCP reload request.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
+
     handler: async (_args, operationContext) => {
         const state = await readMcpReloadState(requireMcpToolWorkspace(operationContext));
         return okResult({ success: true, state }, JSON.stringify({ success: true, state }, null, 2));
     },
-};
+});
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpReloadScheduleTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpReloadScheduleTool = defineMcpRawTool({
     name: 'mcp_reload_schedule',
     title: 'Schedule controlled MCP reload',
     description:
@@ -76,10 +88,12 @@ export const mcpReloadScheduleTool = {
         reason: z.string().max(240).optional(),
         confirmRestart: z.literal(true),
     },
-    annotations: boundedWriteAnnotations(),
+
     handler: async ({ profile, delayMs, reason }, operationContext) => {
         const workspace = requireMcpToolWorkspace(operationContext);
+        const reloadConfig = requireMcpToolReloadConfig(operationContext);
         const plan = buildControlledMcpReloadPlan({
+            config: reloadConfig,
             profile: profile ?? 'current',
             ...(delayMs === undefined ? {} : { delayMs }),
             reason: reason ?? null,
@@ -90,10 +104,11 @@ export const mcpReloadScheduleTool = {
             profile: resolvedProfile,
             delayMs: plan.delayMs,
             reason: plan.reason,
+            runnerEnvironment: reloadConfig.runnerEnvironment,
             ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
         });
         const { requestId, acceptedAt, runnerPid } = scheduled;
-        await appendMcpAuditEvent({
+        await requireMcpToolAuditCapability(operationContext).append({
             event: 'mcp_reload_scheduled',
             tool: 'mcp_reload_schedule',
             requestId,
@@ -107,7 +122,7 @@ export const mcpReloadScheduleTool = {
             `MCP reload ${requestId} scheduled in ${String(plan.delayMs)}ms using ${resolvedProfile}; this response returns before restart.`,
         );
     },
-};
+});
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const mcpReloadTools = [mcpReloadPlanTool, mcpReloadStatusTool, mcpReloadScheduleTool];

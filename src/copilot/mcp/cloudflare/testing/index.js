@@ -1,5 +1,4 @@
 // @ts-check
-/** Test-only membrane for Cloudflare process/runtime internals. */
+/** Testing-only membrane for shared Cloudflare foundation authority. */
 
-export { createCloudflareManagedProcessController } from '../cli-process.js';
-export { observeForegroundCloudflared } from '../cli-runtime.js';
+export { projectCloudflareAuthorityFileEnvironment } from '../environment-authority.js';

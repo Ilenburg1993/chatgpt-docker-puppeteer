@@ -11,6 +11,15 @@ Status: ativo, normativo e continuamente atualizado
 > mesma idempotency key, autorização explícita registrada e TTL válido; não existe fallback
 > implícito para sessão nova. Os checkboxes históricos correspondentes foram atualizados nesta
 > revisão, e itens sem evidência atual permanecem abertos.
+>
+> **Reconciliação 2026-08-24 — readiness como caso de uso canônico de domínio:** a implementação
+> real de live readiness deixou de pertencer a `scripts/model-gateway/commands/`. O application
+> service agora vive em `src/copilot/model-gateway/readiness/`, com public capability exata
+> `#copilot/model-gateway/readiness`; CLI e MCP consomem a mesma implementação. O worker de
+> redaction também foi reduzido a entrypoint e delega ao serviço de domínio. A sonda read-only
+> pós-migração retornou `ok=true` em ~7,8 s e o MCP passou de um `import()` computado de script para
+> dependency estática de domínio. A convergência global de todos os casos de uso de `/byok`
+> permanece aberta.
 
 Escopo exclusivo: `src/copilot`
 
@@ -701,6 +710,8 @@ As descriptions devem explicar à LLM-B:
   - [x] Terminal e tool de probes usam `executeModelGatewayProbe`.
   - [x] `/model`, `/byok model` e tools usam a troca transacional do control-plane.
   - [x] Tool, `/byok provider`, `/byok use` e automação usam o mesmo executor de route switch.
+  - [x] CLI live-readiness e MCP usam `#copilot/model-gateway/readiness`; `scripts/` ficou apenas
+        como launcher/worker entrypoint e não contém mais a implementação canônica do caso de uso.
   - [ ] Migrar os demais casos de uso ainda implementados diretamente em
         `terminal/commands/byok.js`.
 - [ ] Remover parsing textual como requisito de automação.
@@ -1981,6 +1992,38 @@ As descriptions devem explicar à LLM-B:
 - [x] Validação
   - `npx eslint src/copilot/terminal/commands/help.js` passou;
   - `git diff --check -- src/copilot` passou.
+
+### 2026-08-24 — incremento 42: readiness absorvido pelo domínio canônico
+
+- [x] Ownership do caso de uso
+  - `scripts/model-gateway/commands/model-gateway-live-readiness.mjs` deixou de conter a aplicação
+    de readiness e virou launcher fino;
+  - `src/copilot/model-gateway/readiness/live-readiness.js` passou a ser a implementação canônica;
+  - `src/copilot/model-gateway/readiness/public/index.js` expõe a capability exata
+    `#copilot/model-gateway/readiness`;
+  - o adapter MCP `integrations/model-gateway/live-runs/readiness.js` importa essa capability
+    estaticamente, sem carregar business logic de `scripts/`.
+- [x] Redaction worker
+  - a lógica de auditoria de catálogo/SQLite saiu do worker script e passou para
+    `readiness/redaction-audit.js`;
+  - `model-gateway-live-redaction-worker.mjs` ficou responsável apenas por bootstrap SQLite,
+    worker/CLI messaging e delegação ao serviço canônico;
+  - o readiness service recebe explicitamente paths de runner/worker e mantém o worker como boundary
+    de isolamento, não como owner da regra de negócio.
+- [x] Prova focal
+  - `node scripts/model-gateway/commands/model-gateway-live-readiness.mjs --help` passou;
+  - import direto de `#copilot/model-gateway/readiness` expôs exatamente os serviços esperados;
+  - `node scripts/model-gateway/commands/model-gateway-live-readiness.mjs --json` concluiu com
+    `ok=true`, paridade SQLite verde, zero leaks de redaction e 7/7 profiles selecionados;
+  - duração observada: ~7,8 s de serviço / ~8,6 s de processo, sem executar provider/model/runtime
+    probes;
+  - o architecture checker MCP confirmou `declared=0 actual=0` para computed dynamic imports após a
+    convergência.
+- [ ] Continuidade da Faixa G
+  - os demais casos de uso ainda concentrados diretamente em `terminal/commands/byok.js` continuam
+    abertos;
+  - este incremento fecha readiness como semântica paralela, não autoriza marcar a convergência
+    terminal/tools inteira como concluída.
 
 ## 12. Referências técnicas externas
 

@@ -69,11 +69,13 @@ export const CLOUDFLARE_CONNECTOR_SMOKE_ENV_KEYS = Object.freeze([
 /**
  * Build the bounded environment for connector smoke/benchmark execution.
  *
- * @param {NodeJS.ProcessEnv} [parentEnv]
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @param {{ compact?: boolean; publicMcpUrl?: string | null }} [options]
  * @returns {NodeJS.ProcessEnv}
  */
-export function buildCloudflareConnectorSmokeEnvironment(parentEnv = process.env, options = {}) {
+export function buildCloudflareConnectorSmokeEnvironment(parentEnv, options = {}) {
+    if (!parentEnv)
+        throw new TypeError('Cloudflare connector smoke environment requires an explicit parent environment.');
     /** @type {Record<string, string | null>} */
     const overrides = {};
     for (const key of CLOUDFLARE_CONNECTOR_SMOKE_ENV_KEYS) {

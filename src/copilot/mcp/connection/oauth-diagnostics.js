@@ -8,11 +8,7 @@
  * @module copilot/mcp/connection/oauth-diagnostics
  */
 
-import {
-    buildProtectedResourceMetadata,
-    buildWwwAuthenticateChallenge,
-    readMcpAuthConfig,
-} from '#copilot/mcp/public/auth';
+import { buildProtectedResourceMetadata, buildWwwAuthenticateChallenge } from '#copilot/mcp/public/auth';
 import { mcpFetchText } from '#copilot/mcp/public/integrations/http';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
@@ -175,11 +171,12 @@ function normalizeDiagnosticTimeoutMs(value) {
 /**
  * @param {string} url
  * @param {number} timeoutMs
+ * @param {boolean} allowLoopback
  * @returns {Promise<MetadataProbeResult>}
  */
-async function fetchOAuthMetadata(url, timeoutMs) {
+async function fetchOAuthMetadata(url, timeoutMs, allowLoopback) {
     const parsed = new URL(url);
-    const hostCheck = await assertFetchHostAllowed(parsed);
+    const hostCheck = await assertFetchHostAllowed(parsed, allowLoopback);
     if (!hostCheck.ok) {
         return {
             ok: false,
@@ -260,13 +257,11 @@ async function fetchOAuthMetadata(url, timeoutMs) {
 
 /**
  * @param {URL} url
+ * @param {boolean} allowLoopback
  * @returns {Promise<{ ok: true } | { ok: false; reason: string }>}
  */
-async function assertFetchHostAllowed(url) {
-    if (
-        url.protocol !== 'https:' &&
-        !(url.protocol === 'http:' && isLoopbackDiagnosticsEnabled() && isLoopbackHostname(url.hostname))
-    ) {
+async function assertFetchHostAllowed(url, allowLoopback) {
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && allowLoopback && isLoopbackHostname(url.hostname))) {
         return { ok: false, reason: 'Only HTTPS metadata endpoints are allowed by default.' };
     }
     if (url.username || url.password) return { ok: false, reason: 'Metadata URL must not contain credentials.' };
@@ -282,16 +277,6 @@ async function assertFetchHostAllowed(url) {
     } catch (error) {
         return { ok: false, reason: error instanceof Error ? error.message : String(error) };
     }
-}
-
-/**
- * @returns {boolean}
- */
-function isLoopbackDiagnosticsEnabled() {
-    const raw = String(process.env['COPILOT_MCP_OAUTH_DIAGNOSTICS_ALLOW_LOOPBACK'] ?? '')
-        .trim()
-        .toLowerCase();
-    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
 /**
@@ -375,9 +360,19 @@ function parseIpv4Address(value) {
 }
 
 /**
+ * @param {import('./config.js').McpConnectionConfig | undefined} connectionConfig
+ * @returns {import('./config.js').McpConnectionConfig}
+ */
+function requireConnectionConfig(connectionConfig) {
+    if (!connectionConfig) throw new TypeError('MCP OAuth connection diagnostics require a process-scoped config.');
+    return connectionConfig;
+}
+
+/**
  * @param {Record<string, unknown> | undefined} metadata
  * @param {string[]} requiredScopes
  * @param {string} expectedIssuer
+ * @param {boolean} allowLoopback
  * @returns {{
  *     ready: boolean;
  *     missingFields: string[];
@@ -386,7 +381,7 @@ function parseIpv4Address(value) {
  *     summary: Record<string, unknown>;
  * }}
  */
-function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer) {
+function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer, allowLoopback) {
     /** @type {string[]} */
     const missingFields = [];
     /** @type {string[]} */
@@ -452,7 +447,7 @@ function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer) {
     for (const field of endpointFields) {
         const raw = normalizeOptionalString(metadata[field]);
         if (!raw) continue;
-        const validation = normalizeEndpointUrl(raw);
+        const validation = normalizeEndpointUrl(raw, allowLoopback);
         if (!validation.ok) endpointWarnings.push(`${field}: ${validation.reason}`);
     }
 
@@ -487,20 +482,21 @@ function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer) {
 
 /**
  * @param {string} value
+ * @param {boolean} allowLoopback
  * @returns {{ ok: true } | { ok: false; reason: string }}
  */
-function normalizeEndpointUrl(value) {
+function normalizeEndpointUrl(value, allowLoopback) {
     try {
         const url = new URL(value);
         if (
             url.protocol !== 'https:' &&
-            !(isLoopbackDiagnosticsEnabled() && url.protocol === 'http:' && isLoopbackHostname(url.hostname))
+            !(allowLoopback && url.protocol === 'http:' && isLoopbackHostname(url.hostname))
         ) {
             return { ok: false, reason: 'endpoint must use HTTPS except explicit loopback diagnostics.' };
         }
         if (url.username || url.password || url.hash)
             return { ok: false, reason: 'endpoint must not contain credentials or fragment.' };
-        if (isLocalOrPrivateHostname(url.hostname) && !isLoopbackDiagnosticsEnabled()) {
+        if (isLocalOrPrivateHostname(url.hostname) && !allowLoopback) {
             return { ok: false, reason: 'endpoint host is local or private.' };
         }
         return { ok: true };
@@ -512,6 +508,7 @@ function normalizeEndpointUrl(value) {
 /**
  * @param {Record<string, unknown> | undefined} metadata
  * @param {string} expectedClientId
+ * @param {boolean} allowLoopback
  * @returns {{
  *     ready: boolean;
  *     missingFields: string[];
@@ -520,7 +517,7 @@ function normalizeEndpointUrl(value) {
  *     summary: Record<string, unknown>;
  * }}
  */
-function summarizeClientMetadataDocument(metadata, expectedClientId) {
+function summarizeClientMetadataDocument(metadata, expectedClientId, allowLoopback) {
     /** @type {string[]} */
     const missingFields = [];
     /** @type {string[]} */
@@ -535,7 +532,7 @@ function summarizeClientMetadataDocument(metadata, expectedClientId) {
     const redirectUris = normalizeStringArray(metadata['redirect_uris']);
     if (redirectUris.length === 0) missingFields.push('redirect_uris');
     for (const redirectUri of redirectUris) {
-        const validation = normalizeEndpointUrl(redirectUri);
+        const validation = normalizeEndpointUrl(redirectUri, allowLoopback);
         if (!validation.ok) warnings.push(`redirect_uri ${redirectUri}: ${validation.reason}`);
     }
 
@@ -559,7 +556,7 @@ function summarizeClientMetadataDocument(metadata, expectedClientId) {
 }
 
 /**
- * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {Record<string, Record<string, string>>}
  */
 function buildAuthEnvironmentTemplates(config) {
@@ -626,7 +623,7 @@ function buildAuthEnvironmentTemplates(config) {
 }
 
 /**
- * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} config
  * @returns {Record<string, unknown>}
  */
 export function buildConnectionAuthReadiness(config) {
@@ -666,9 +663,12 @@ export function buildConnectionAuthReadiness(config) {
     };
 }
 
-/** @param {{ scopes?: string[] | undefined }} [input] */
-export function readMcpConnectionAuthProfile(input = {}) {
-    const config = readMcpAuthConfig();
+/**
+ * @param {{ scopes?: string[] | undefined }} [input]
+ * @param {import('./config.js').McpConnectionConfig | undefined} [connectionConfig]
+ */
+export function readMcpConnectionAuthProfile(input = {}, connectionConfig) {
+    const config = requireConnectionConfig(connectionConfig).auth;
     const challengeScopes =
         Array.isArray(input.scopes) && input.scopes.length > 0
             ? uniqueStrings(input.scopes, 16)
@@ -706,13 +706,16 @@ export function readMcpConnectionAuthProfile(input = {}) {
     };
 }
 
-/** @param {{ issuer?: string | undefined; timeoutMs?: number | undefined }} [input] */
-export async function diagnoseMcpOAuthIssuer(input = {}) {
-    const config = readMcpAuthConfig();
+/**
+ * @param {{ issuer?: string | undefined; timeoutMs?: number | undefined }} [input]
+ * @param {import('./config.js').McpConnectionConfig | undefined} [connectionConfig]
+ */
+export async function diagnoseMcpOAuthIssuer(input = {}, connectionConfig) {
+    const ownerConfig = requireConnectionConfig(connectionConfig);
+    const config = ownerConfig.auth;
+    const allowLoopback = ownerConfig.oauthDiagnosticsAllowLoopback;
     const timeout = normalizeDiagnosticTimeoutMs(input.timeoutMs);
-    const normalized = normalizeIssuerUrl(input.issuer ?? config.expectedIssuer, {
-        allowLoopback: isLoopbackDiagnosticsEnabled(),
-    });
+    const normalized = normalizeIssuerUrl(input.issuer ?? config.expectedIssuer, { allowLoopback });
     if (!normalized.ok) {
         return {
             success: true,
@@ -731,20 +734,22 @@ export async function diagnoseMcpOAuthIssuer(input = {}) {
     }
     const checked = [];
     for (const metadataPath of OAUTH_METADATA_PATHS) {
-        checked.push(await fetchOAuthMetadata(normalized.url + metadataPath, timeout));
+        checked.push(await fetchOAuthMetadata(normalized.url + metadataPath, timeout, allowLoopback));
         if (checked[checked.length - 1]?.ok === true) break;
     }
     const firstOk = checked.find((candidate) => candidate.ok);
-    const summary = summarizeOAuthMetadata(firstOk?.metadata, config.scopesSupported, normalized.url);
+    const summary = summarizeOAuthMetadata(firstOk?.metadata, config.scopesSupported, normalized.url, allowLoopback);
     const clientMetadataUrl =
         firstOk &&
         firstOk.metadata?.['client_id_metadata_document_supported'] === true &&
         normalized.url === config.resource
             ? normalized.url + '/.well-known/oauth-client/codex-smoke.json'
             : null;
-    const clientMetadataProbe = clientMetadataUrl ? await fetchOAuthMetadata(clientMetadataUrl, timeout) : null;
+    const clientMetadataProbe = clientMetadataUrl
+        ? await fetchOAuthMetadata(clientMetadataUrl, timeout, allowLoopback)
+        : null;
     const clientMetadataSummary = clientMetadataProbe
-        ? summarizeClientMetadataDocument(clientMetadataProbe.metadata, clientMetadataUrl ?? '')
+        ? summarizeClientMetadataDocument(clientMetadataProbe.metadata, clientMetadataUrl ?? '', allowLoopback)
         : null;
     const warnings = [
         ...summary.warnings,

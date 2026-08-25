@@ -10,10 +10,11 @@
 
 import { createProcessInfra } from '#copilot/infra/public/composition/process';
 import { readIoProcessHealthSnapshot } from '#copilot/infra/public/observability/process';
+import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { assertIoCacheBenchmarkRequestId, assertIoCacheBenchmarkWorkerMode } from './contracts.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -102,13 +103,22 @@ async function runPass(io, benchmarkRuntime, processInfra) {
     };
 }
 
-async function main() {
-    const { requestId, mode } = parseArgs(process.argv.slice(2));
-    // InfraRuntime snapshots operational config at construction. Set the benchmark profile first so each child process
-    // actually measures the requested mode instead of inheriting whatever profile existed at module import time.
-    process.env['IO_L2_CACHE_PROFILE'] = mode === 'l2' || mode === 'l2-prime' ? 'experimental' : 'off';
-
-    const processInfra = createProcessInfra({ processId: `mcp-io-cache-benchmark:${process.pid}` });
+/** @param {string[]} argv @param {NodeJS.ProcessEnv} parentEnv */
+export async function runIoCacheBenchmarkWorker(argv, parentEnv) {
+    if (!parentEnv) throw new TypeError('IO-cache benchmark worker requires an explicit process environment.');
+    const { requestId, mode } = parseArgs(argv);
+    // Re-project even the worker launcher's input: this function is public through the owner membrane and must remain
+    // safe when called directly with a broader environment than the scheduled runner normally supplies.
+    const benchmarkEnv = buildMcpChildEnvironment({
+        parentEnv,
+        overrides: {
+            IO_L2_CACHE_PROFILE: mode === 'l2' || mode === 'l2-prime' ? 'experimental' : 'off',
+        },
+    }).env;
+    const processInfra = createProcessInfra({
+        processId: `mcp-io-cache-benchmark:${process.pid}`,
+        env: benchmarkEnv,
+    });
     const benchmarkRuntime = processInfra.createRuntime({ runtimeId: `mcp-io-cache-benchmark:${process.pid}:runtime` });
     const workspaceIo = benchmarkRuntime.workspace(repoRoot).io;
     /** @type {null | (() => void)} */
@@ -150,13 +160,4 @@ async function main() {
             closeDatabase?.();
         }
     }
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-    main().catch((error) => {
-        process.stdout.write(
-            `${JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) })}\n`,
-        );
-        process.exitCode = 1;
-    });
 }

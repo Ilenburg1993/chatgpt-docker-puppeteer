@@ -34,6 +34,7 @@ export const DEFAULT_MCP_HTTP_LOG_FILE = 'src/copilot/.ai/cloudflare/mcp-http.lo
 export const DEFAULT_CLOUDFLARE_TUNNEL_TOKEN_FILE = 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token';
 export const DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR = 'src/copilot/.ai/cloudflare/edge-snapshots';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_CLOUDFLARE_PROCESS_STOP_TIMEOUT_MS = 5_000;
 export const DEFAULT_CLOUDFLARE_METRICS_ADDR = '127.0.0.1:60123';
 export const DEFAULT_CLOUDFLARE_LOGLEVEL = 'info';
 export const DEFAULT_CLOUDFLARE_TRANSPORT_PROTOCOL = 'auto';
@@ -80,6 +81,7 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a
  * @property {string} managedTunnelLogFile
  * @property {string} mcpHttpLogFile
  * @property {number} staleAfterMs
+ * @property {number} processStopTimeoutMs
  * @property {{
  *     http2PlusDefault: true;
  *     edgeTransportDefault: CloudflareTunnelTransportProtocol;
@@ -90,10 +92,11 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a
  */
 
 /**
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv} env
  * @returns {CloudflareTunnelConfig}
  */
-export function readCloudflareTunnelConfig(env = process.env) {
+export function readCloudflareTunnelConfig(env) {
+    if (!env) throw new TypeError('Cloudflare tunnel config requires an explicit environment.');
     const mode = normalizeTunnelMode(env['COPILOT_MCP_CLOUDFLARE_MODE']);
     const originTransport = normalizeOriginTransport(
         env['COPILOT_MCP_ORIGIN_TRANSPORT'],
@@ -146,6 +149,7 @@ export function readCloudflareTunnelConfig(env = process.env) {
         managedTunnelLogFile: DEFAULT_MANAGED_TUNNEL_LOG_FILE,
         mcpHttpLogFile: DEFAULT_MCP_HTTP_LOG_FILE,
         staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),
+        processStopTimeoutMs: normalizeProcessStopTimeoutMs(env['COPILOT_MCP_PROCESS_STOP_TIMEOUT_MS']),
         http2Plus: {
             http2PlusDefault: /** @type {const} */ (true),
             edgeTransportDefault: /** @type {CloudflareTunnelTransportProtocol} */ (
@@ -337,6 +341,19 @@ export function normalizeStateFile(value, fallback = DEFAULT_QUICK_TUNNEL_STATE_
  * @param {string | undefined} value
  * @returns {number}
  */
+export function normalizeProcessStopTimeoutMs(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return DEFAULT_CLOUDFLARE_PROCESS_STOP_TIMEOUT_MS;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 500 && parsed <= 120_000
+        ? Math.floor(parsed)
+        : DEFAULT_CLOUDFLARE_PROCESS_STOP_TIMEOUT_MS;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {number}
+ */
 export function normalizeStaleAfterMs(value) {
     const raw = String(value ?? '').trim();
     if (!raw) return DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS;
@@ -353,7 +370,7 @@ export function normalizeStaleAfterMs(value) {
  * @returns {string}
  */
 export function normalizeOriginUrl(value, options = {}) {
-    const originTransport = options.originTransport ?? inferOriginTransportFromEnv();
+    const originTransport = options.originTransport ?? DEFAULT_MCP_ORIGIN_TRANSPORT;
     const fallback = originTransport === 'http2' ? DEFAULT_CLOUDFLARE_H2_ORIGIN_URL : DEFAULT_CLOUDFLARE_ORIGIN_URL;
     const raw = String(value ?? fallback).trim();
     if (!raw) return fallback;
@@ -498,16 +515,6 @@ function normalizePublicMcpUrl(value, mode, publicHostname) {
         throw new Error('Temporary Cloudflare tunnel public URL must use a trycloudflare.com hostname.');
     }
     return normalized;
-}
-
-/**
- * @returns {McpOriginTransport}
- */
-function inferOriginTransportFromEnv() {
-    return normalizeOriginTransport(
-        process.env['COPILOT_MCP_ORIGIN_TRANSPORT'],
-        process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'],
-    );
 }
 
 /**

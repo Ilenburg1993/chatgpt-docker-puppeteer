@@ -690,6 +690,32 @@ export function createIoIndexRegistryRuntime(options) {
             if (mayCoalesce) inflightBuilds.set(key, buildPromise);
             return await buildPromise;
         },
+        /** @param {string} scopeRoot @param {Parameters<IoIndexStore['verifyHashSample']>[1]} [verifyOptions] */
+        async verifyHashSample(scopeRoot, verifyOptions = {}) {
+            assertActive();
+            const store = ensureIndex();
+            if (!store) {
+                return {
+                    available: false,
+                    scopeRoot: resolve(scopeRoot),
+                    cursor: verifyOptions.cursor ?? '',
+                    nextCursor: verifyOptions.cursor ?? '',
+                    maxFiles: verifyOptions.maxFiles ?? 0,
+                    candidateCount: 0,
+                    wrapped: false,
+                    hashVerifications: 0,
+                    hashVerificationHits: 0,
+                    hashVerificationMisses: 0,
+                    metadataMismatches: 0,
+                    errors: 0,
+                    mismatchCount: 0,
+                    mismatches: [],
+                    durationMs: 0,
+                    reason: 'index-unavailable',
+                };
+            }
+            return await store.verifyHashSample(scopeRoot, verifyOptions);
+        },
         /** @param {readonly string[]} filePaths @param {Parameters<typeof executeIoIndexPathRefresh>[2]} refreshOptions */
         refreshPaths(filePaths, refreshOptions) {
             return refreshPathsInternal(filePaths, refreshOptions, true);
@@ -709,8 +735,10 @@ export function createIoIndexRegistryRuntime(options) {
             configureDomain(scopeRoot, domainOptions);
         },
         flushAutoRefresh,
-        async reconcileAutoRefreshDomain() {
+        /** @param {{ signal?: AbortSignal }} [reconcileOptions] */
+        async reconcileAutoRefreshDomain(reconcileOptions = {}) {
             assertActive();
+            reconcileOptions.signal?.throwIfAborted();
             const store = ensureIndex();
             const domain = auto.domain;
             if (!store || !domain)
@@ -722,10 +750,12 @@ export function createIoIndexRegistryRuntime(options) {
                     pruned: 0,
                 };
             const matcher = domain.respectGitignore ? await loadGitignoreMatcher(domain.workspaceRoot) : null;
+            reconcileOptions.signal?.throwIfAborted();
             const rows = store.listIndexedFiles();
             let explicitRefreshRows = 0;
             let pruned = 0;
             for (const row of rows) {
+                reconcileOptions.signal?.throwIfAborted();
                 let metadata;
                 try {
                     metadata = /** @type {Record<string,unknown>|null} */ (

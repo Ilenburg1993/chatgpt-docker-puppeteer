@@ -116,7 +116,11 @@ async function startStdioTransport(logMcp) {
         await processHost.prepare();
         flushCopilotNodeCompileCache();
         restoreStdout();
-        const runtime = await startStdioMcpServer({ processHost, workspace: processHost.workspace });
+        const runtime = await startStdioMcpServer({
+            processHost,
+            workspace: processHost.workspace,
+            processConfig: processHost.processConfig,
+        });
         installStdioShutdownHandlers(runtime, logMcp);
     } catch (error) {
         restoreStdout();
@@ -131,22 +135,35 @@ async function startStdioTransport(logMcp) {
  * @returns {Promise<McpHttpRuntime>}
  */
 async function startHttpTransport(transport, logMcp) {
-    const [{ createComposedMcpProcessHost, readComposedMcpSqliteDatabase }, startServer] = await Promise.all([
-        import('#copilot/mcp/public/composition/process-host'),
-        transport === 'http2'
-            ? import('#copilot/mcp/public/adapters/http2').then((module) => module.startHttp2McpServer)
-            : import('#copilot/mcp/public/adapters/http1').then((module) => module.startHttpMcpServer),
-    ]);
+    const { createComposedMcpProcessHost, readComposedMcpSqliteDatabase } =
+        await import('#copilot/mcp/public/composition/process-host');
     const processHost = createComposedMcpProcessHost({ hostId: `mcp-${transport}-process-host` });
     try {
         await processHost.prepare();
         const database = readComposedMcpSqliteDatabase();
-        const adapterOptions = {
-            processHost,
-            workspace: processHost.workspace,
-            ...(database ? { database } : {}),
-        };
-        const server = await startServer(adapterOptions);
+        let server;
+        if (transport === 'http2') {
+            const { startHttp2McpServer } = await import('#copilot/mcp/public/adapters/http2');
+            server = await startHttp2McpServer({
+                processHost,
+                workspace: processHost.workspace,
+                processConfig: processHost.processConfig,
+                host: processHost.processConfig.transport.http2.host,
+                port: processHost.processConfig.transport.http2.port,
+                policy: processHost.processConfig.transport.http2.policy,
+                ...(database ? { database } : {}),
+            });
+        } else {
+            const { startHttpMcpServer } = await import('#copilot/mcp/public/adapters/http1');
+            server = await startHttpMcpServer({
+                processHost,
+                workspace: processHost.workspace,
+                processConfig: processHost.processConfig,
+                policy: processHost.processConfig.transport.http1.policy,
+                originPosture: processHost.processConfig.transport.http1.originPosture,
+                ...(database ? { database } : {}),
+            });
+        }
         flushCopilotNodeCompileCache();
         logMcp('INFO', 'MCP HTTP server started.', {
             transport,

@@ -19,35 +19,10 @@ import {
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 import { resetMcpAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-const readTool = {
-    name: 'repo_read_file',
-    title: 'Read file',
-    description: 'Read a workspace file.',
-    inputSchema: {},
-    annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-    },
-    handler: () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: {} }),
-};
-
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-const writeTool = {
-    name: 'repo_apply_patch',
-    title: 'Apply patch',
-    description: 'Apply a bounded patch.',
-    inputSchema: {},
-    annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-    },
-    handler: () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: {} }),
-};
+const canonicalTools = getCanonicalMcpTools();
+const readTool = canonicalTools.find((tool) => tool.name === 'repo_read_file');
+const writeTool = canonicalTools.find((tool) => tool.name === 'repo_apply_patch');
+if (!readTool || !writeTool) throw new Error('Canonical auth-hardening tool fixtures are missing.');
 
 describe('MCP auth hardening', () => {
     it('parses only unambiguous bearer tokens', () => {

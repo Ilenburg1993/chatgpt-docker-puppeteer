@@ -26,7 +26,10 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_PROCESS_HOST.workspace },
+    {
+        workspace: TEST_PROCESS_HOST.workspace,
+        capabilities: TEST_PROCESS_HOST.toolCapabilities,
+    },
 );
 
 /** @param {string} value */

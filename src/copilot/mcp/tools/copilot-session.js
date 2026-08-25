@@ -5,7 +5,15 @@
  * @module copilot/mcp/tools/copilot-session
  */
 
-import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+// @ts-check
+/**
+ * Read-only MCP tools for Copilot SDK/LLM-B session state.
+ *
+ * @module copilot/mcp/tools/copilot-session
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
 import { getActiveSdkSession, listActiveSdkSessions } from '#copilot/sdk/session';
 import { z } from 'zod';
 
@@ -23,17 +31,17 @@ function publicSessionSummary(entry) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const copilotSessionTools = [
-    {
+    defineMcpRawTool({
         name: 'copilot_sessions_list',
         title: 'List Copilot sessions',
         description: 'List active Copilot SDK/LLM-B sessions known in this process without starting a new session.',
         inputSchema: {
             limit: z.number().int().min(1).max(100).optional()['describe']('Maximum sessions to return. Default: 50.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ limit }) => {
             const max = typeof limit === 'number' ? limit : 50;
             const sessions = listActiveSdkSessions().slice(0, max).map(publicSessionSummary);
@@ -43,15 +51,15 @@ export const copilotSessionTools = [
                 sessions,
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'copilot_session_get',
         title: 'Get Copilot session',
         description: 'Return read-only metadata for one active Copilot SDK/LLM-B session by id.',
         inputSchema: {
             sessionId: z.string().min(1)['describe']('Copilot SDK session id.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ sessionId }) => {
             const entry = getActiveSdkSession(sessionId);
             if (!entry) {
@@ -66,5 +74,5 @@ export const copilotSessionTools = [
                 session: publicSessionSummary({ sessionId, ...entry }),
             });
         },
-    },
+    }),
 ];

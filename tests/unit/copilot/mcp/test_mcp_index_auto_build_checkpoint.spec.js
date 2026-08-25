@@ -4,14 +4,20 @@ import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/databas
 
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
-import { describe, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { beforeEach, describe, it } from 'vitest';
 
+import { maybeStartMcpIndexAutoBuild, readMcpIndexAutoBuildConfig } from '#copilot/mcp/public/indexing/auto-build';
+import { createMcpGitProcessConfig } from '#copilot/mcp/public/workspace/git';
 import {
     classifyIndexJournalReplayRows,
     parseGitNameStatusZ,
     parseGitStatusZ,
     planIndexStartup,
     readIndexStartupCheckpoint,
+    resetMcpIndexAutoBuildStateForTests,
     writeIndexStartupCheckpoint,
 } from '#copilot/testing/mcp/indexing/auto-build';
 
@@ -27,6 +33,18 @@ function cleanSnapshot(head = 'abc') {
 }
 
 describe('MCP index startup checkpoint', () => {
+    beforeEach(() => resetMcpIndexAutoBuildStateForTests());
+
+    it('captures bounded hash-sample and no-change SLO policy in config generation v2', () => {
+        const config = readMcpIndexAutoBuildConfig({
+            COPILOT_MCP_INDEX_HASH_VERIFY_SAMPLE_FILES: '17',
+            COPILOT_MCP_INDEX_NO_CHANGE_SLO_MS: '750',
+        });
+        assert.equal(config.schemaVersion, 2);
+        assert.equal(config.hashVerifySampleFiles, 17);
+        assert.equal(config.noChangeSloMs, 750);
+        assert.match(config.generationKey, /^v2:/u);
+    });
     it('parses scoped porcelain status and marks conflicts uncertain', () => {
         const parsed = parseGitStatusZ(' M src/copilot/a.js\0?? src/copilot/new.md\0 D src/copilot/old.js\0');
         assert.deepEqual(
@@ -246,6 +264,7 @@ describe('MCP index startup checkpoint', () => {
         `);
         const checkpoint = readIndexStartupCheckpoint('src/copilot', adaptBetterSqliteDatabase(db));
         assert.equal(checkpoint?.journalSequence, 0);
+        assert.equal(checkpoint?.hashVerificationCursor, '');
         const columns = /** @type {{ name: string }[]} */ (
             db.prepare('PRAGMA table_info(copilot_mcp_index_startup_checkpoint)').all()
         );
@@ -253,7 +272,174 @@ describe('MCP index startup checkpoint', () => {
             columns.some((column) => column.name === 'journal_sequence'),
             true,
         );
+        assert.equal(
+            columns.some((column) => column.name === 'hash_verification_cursor'),
+            true,
+        );
         db.close();
+    });
+
+    it('does not publish a successful full-reconcile checkpoint after cancellation inside index build', async () => {
+        const sqlite = new Database(':memory:');
+        const db = adaptBetterSqliteDatabase(sqlite);
+        const config = readMcpIndexAutoBuildConfig({
+            COPILOT_MCP_INDEX_AUTO_BUILD: 'true',
+            COPILOT_MCP_INDEX_AUTO_BUILD_PATH: 'src/copilot/mcp',
+            COPILOT_MCP_INDEX_FULL_RECONCILE_INTERVAL_MS: '1',
+        });
+        const gitConfig = createMcpGitProcessConfig({ PATH: process.env['PATH'], HOME: process.env['HOME'] });
+        const controller = new AbortController();
+        let buildCalls = 0;
+        let reconcileCalls = 0;
+        const indexRegistry = {
+            status: () => ({ available: true, schemaVersion: 2, files: 0 }),
+            filterRefreshDomainPaths: async (paths) => ({ paths, domainSkipped: 0, gitignoredSkipped: 0 }),
+            refreshPaths: async () => ({ available: true, failed: 0 }),
+            buildDirectory: async (_path, options) => {
+                buildCalls += 1;
+                assert.equal(options.signal, controller.signal);
+                controller.abort(new Error('abort-during-full-index-build'));
+                options.signal?.throwIfAborted();
+                return { available: true, indexed: 1, failed: 0 };
+            },
+            reconcileAutoRefreshDomain: async () => {
+                reconcileCalls += 1;
+                return { available: true };
+            },
+        };
+        const workspace = {
+            workspaceRoot: process.cwd(),
+            indexRegistry,
+            resolveReadPath: async () => ({
+                ok: true,
+                resolved: `${process.cwd()}/src/copilot/mcp`,
+                relative: 'src/copilot/mcp',
+            }),
+        };
+        try {
+            const state = await maybeStartMcpIndexAutoBuild({
+                workspace: /** @type {any} */ (workspace),
+                config,
+                gitConfig,
+                signal: controller.signal,
+                db,
+                reason: 'unit-cancellation-proof',
+            });
+            assert.equal(buildCalls, 1);
+            assert.equal(reconcileCalls, 0);
+            assert.equal(state.status, 'failed');
+            assert.equal(state.reason, 'aborted');
+            assert.match(String(state.error?.message ?? ''), /abort-during-full-index-build/u);
+            assert.equal(readIndexStartupCheckpoint(config.path, db), null);
+        } finally {
+            sqlite.close();
+        }
+    });
+
+    it('uses bounded hash verification on the no-change fast path and full-reconciles on mismatch', async () => {
+        const root = await mkdtemp(join(process.cwd(), 'tmp', '.mcp-index-fast-path-'));
+        const scopeRoot = join(root, 'scope');
+        await mkdir(scopeRoot, { recursive: true });
+        await writeFile(join(scopeRoot, 'stable.md'), 'stable\n', 'utf8');
+        execFileSync('git', ['init', '-q'], { cwd: root });
+        execFileSync('git', ['config', 'user.email', 'mcp-index-test@example.invalid'], { cwd: root });
+        execFileSync('git', ['config', 'user.name', 'MCP Index Test'], { cwd: root });
+        execFileSync('git', ['add', '.'], { cwd: root });
+        execFileSync('git', ['commit', '-qm', 'initial'], { cwd: root });
+        const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+        const sqlite = new Database(':memory:');
+        const db = adaptBetterSqliteDatabase(sqlite);
+        const config = readMcpIndexAutoBuildConfig({
+            COPILOT_MCP_INDEX_AUTO_BUILD: 'true',
+            COPILOT_MCP_INDEX_AUTO_BUILD_PATH: 'scope',
+            COPILOT_MCP_INDEX_HASH_VERIFY_SAMPLE_FILES: '1',
+            COPILOT_MCP_INDEX_NO_CHANGE_SLO_MS: '1000',
+        });
+        const gitConfig = createMcpGitProcessConfig({ PATH: process.env['PATH'], HOME: process.env['HOME'] });
+        writeIndexStartupCheckpoint(
+            {
+                scopePath: config.path,
+                head,
+                schemaVersion: 2,
+                mode: 'full-reconcile',
+                nowMs: Date.now(),
+                journalSequence: 0,
+                hashVerificationCursor: '/previous/cursor',
+            },
+            db,
+        );
+        let mismatch = false;
+        let buildCalls = 0;
+        const indexRegistry = {
+            status: () => ({ available: true, schemaVersion: 2, files: 1 }),
+            filterRefreshDomainPaths: async (paths) => ({ paths, domainSkipped: 0, gitignoredSkipped: 0 }),
+            refreshPaths: async () => ({ available: true, failed: 0 }),
+            verifyHashSample: async (_scope, options) => ({
+                available: true,
+                scopeRoot,
+                cursor: options.cursor ?? '',
+                nextCursor: join(scopeRoot, 'stable.md'),
+                maxFiles: options.maxFiles ?? 0,
+                candidateCount: 1,
+                wrapped: false,
+                hashVerifications: 1,
+                hashVerificationHits: mismatch ? 0 : 1,
+                hashVerificationMisses: mismatch ? 1 : 0,
+                metadataMismatches: 0,
+                errors: 0,
+                mismatchCount: mismatch ? 1 : 0,
+                mismatches: mismatch
+                    ? [{ filePath: join(scopeRoot, 'stable.md'), reason: 'content-hash-mismatch' }]
+                    : [],
+                durationMs: 1,
+            }),
+            buildDirectory: async () => {
+                buildCalls += 1;
+                return { available: true, indexed: 1, failed: 0, hashVerifications: 0, durationMs: 2 };
+            },
+            reconcileAutoRefreshDomain: async () => ({ available: true }),
+        };
+        const workspace = {
+            workspaceRoot: root,
+            indexRegistry,
+            resolveReadPath: async () => ({ ok: true, resolved: scopeRoot, relative: 'scope' }),
+        };
+        try {
+            const skipped = await maybeStartMcpIndexAutoBuild({
+                workspace: /** @type {any} */ (workspace),
+                config,
+                gitConfig,
+                db,
+                reason: 'unit-fast-path',
+            });
+            assert.equal(skipped.status, 'skipped');
+            assert.equal(skipped.result?.['mode'], 'skip');
+            assert.equal(skipped.result?.['hashVerifications'], 1);
+            assert.equal(skipped.result?.['noChangeSloMs'], 1000);
+            assert.equal(skipped.result?.['noChangeSloMet'], true);
+            assert.equal(buildCalls, 0);
+            assert.equal(
+                readIndexStartupCheckpoint(config.path, db)?.hashVerificationCursor,
+                join(scopeRoot, 'stable.md'),
+            );
+
+            mismatch = true;
+            const reconciled = await maybeStartMcpIndexAutoBuild({
+                workspace: /** @type {any} */ (workspace),
+                config,
+                gitConfig,
+                db,
+                reason: 'unit-fast-path-mismatch',
+            });
+            assert.equal(reconciled.status, 'completed');
+            assert.equal(reconciled.result?.['mode'], 'full-reconcile');
+            assert.equal(reconciled.result?.['fallbackReason'], 'bounded-hash-verification-mismatch');
+            assert.equal(buildCalls, 1);
+            assert.equal(readIndexStartupCheckpoint(config.path, db)?.hashVerificationCursor, '');
+        } finally {
+            sqlite.close();
+            await rm(root, { recursive: true, force: true });
+        }
     });
 
     it('persists checkpoint while preserving the last full-reconcile clock on incremental/skip writes', () => {
@@ -266,6 +452,18 @@ describe('MCP index startup checkpoint', () => {
                 mode: 'full-reconcile',
                 nowMs: 1_000,
                 journalSequence: 7,
+            },
+            adaptBetterSqliteDatabase(db),
+        );
+        writeIndexStartupCheckpoint(
+            {
+                scopePath: 'src/copilot',
+                head: 'abc',
+                schemaVersion: 2,
+                mode: 'skip',
+                nowMs: 1_500,
+                journalSequence: 8,
+                hashVerificationCursor: '/workspace/src/copilot/b.js',
             },
             adaptBetterSqliteDatabase(db),
         );
@@ -285,6 +483,7 @@ describe('MCP index startup checkpoint', () => {
         assert.equal(checkpoint?.completedAtMs, 2_000);
         assert.equal(checkpoint?.lastFullReconcileAtMs, 1_000);
         assert.equal(checkpoint?.journalSequence, 9);
+        assert.equal(checkpoint?.hashVerificationCursor, '/workspace/src/copilot/b.js');
         db.close();
     });
 });

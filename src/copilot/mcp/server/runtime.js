@@ -7,16 +7,23 @@ import { McpServer } from '@modelcontextprotocol/server';
  * this module intentionally side-effect-light: HTTP transports create a fresh stateless MCP SDK server per request, so
  * expensive validation and noisy startup logging must be bounded.
  *
- * Version: 1.3.0
+ * Version: 1.4.0
  *
  * @module copilot/mcp/server/runtime
  */
 
 import { logMcp } from '#copilot/mcp/public/observability';
 import { registerCopilotAppsSdkResources } from '#copilot/mcp/public/protocol/apps-sdk';
-import { readMcpSchemaConvergenceState, recordMcpDescriptorObservation } from '#copilot/mcp/public/protocol/catalog';
+import {
+    classifyMcpToolContractRisk,
+    projectMcpToolAnnotations,
+    readMcpSchemaConvergenceState,
+    recordMcpDescriptorObservation,
+    validateMcpToolContractSemantics,
+} from '#copilot/mcp/public/protocol/catalog';
 import { MCP_PROTOCOL_SUPPORT } from '#copilot/mcp/public/protocol/version';
 import {
+    buildMcpToolWireDescriptorSnapshot,
     getCanonicalMcpRegistryState,
     getCanonicalMcpTools,
     getCanonicalMcpToolSurfaceState,
@@ -25,7 +32,7 @@ import {
 import { createHash } from 'node:crypto';
 
 export const COPILOT_MCP_SERVER_FACTORY_NAME = 'copilot-mcp-server-factory';
-export const COPILOT_MCP_SERVER_FACTORY_VERSION = '1.3.0';
+export const COPILOT_MCP_SERVER_FACTORY_VERSION = '1.4.0';
 
 const DEFAULT_SERVER_NAME = 'chatgpt-docker-puppeteer-copilot-mcp';
 const DEFAULT_SERVER_TITLE = 'Copilot Workspace MCP';
@@ -52,7 +59,10 @@ const MAX_TOOL_TITLE_LENGTH = 120;
 const MAX_TOOL_DESCRIPTION_LENGTH = 4096;
 const MAX_TOOL_INVOCATION_META_LENGTH = 64;
 const MAX_LOGGED_DESCRIPTOR_WARNINGS = 20;
+const MAX_LOGGED_FACTORY_PROFILE_KEYS = 64;
 const DEFAULT_MAX_TOOLS = 250;
+const DEFAULT_TOOLS_LIST_CACHE_TTL_MS = 300_000;
+const MAX_TOOLS_LIST_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,128}$/u;
@@ -63,10 +73,6 @@ const SUSPICIOUS_DESCRIPTOR_PATTERNS = /** @type {const} */ ([
     /bypass\s+(?:oauth|authorization|approval|security|policy)/iu,
     /do\s+not\s+(?:tell|notify|ask)\s+the\s+user/iu,
 ]);
-const MUTATION_NAME_PATTERN =
-    /(?:^|[_.-])(write|create|move|rename|remove|delete|quarantine|restore|apply|update|run|exec|restart|stop|kill|deploy|backup|fix|patch|set|refresh)(?:$|[_.-])/iu;
-const HIGH_IMPACT_NAME_PATTERN =
-    /(?:cloudflare|oauth|token|secret|credential|env|process|shell|validator|lint|typecheck|unit|doctor|git_|repo_write|remove|delete|apply|run)/iu;
 
 /** @type {Readonly<import('@modelcontextprotocol/server').Implementation>} */
 export const COPILOT_MCP_SERVER_INFO = Object.freeze(buildCopilotMcpServerInfo(readCopilotMcpServerPolicy()));
@@ -113,8 +119,8 @@ const loggedFactoryProfileKeys = new Set();
  * @property {boolean} instructionsEnabled
  * @property {string} instructions
  * @property {boolean} toolsListChanged
+ * @property {number} toolsListCacheTtlMs
  * @property {boolean} strictDescriptorValidation
- * @property {boolean} strictToolRiskValidation
  * @property {boolean} startupLogEnabled
  * @property {boolean} descriptorManifestEnabled
  * @property {number} maxTools
@@ -137,23 +143,44 @@ const loggedFactoryProfileKeys = new Set();
  */
 
 /**
- * @param {import('#copilot/mcp/public/registry').RegisterCanonicalMcpToolsOptions} [options]
+ * @param {import('#copilot/mcp/public/registry').RegisterCanonicalMcpToolsOptions & { profile?: CopilotMcpServerProfile }} [options]
  * @returns {McpServer}
  */
 export function createCopilotMcpServer(options = {}) {
-    const profile = readCopilotMcpServerProfile();
+    const baseProfile = options.profile ?? readCopilotMcpServerProfile();
+    const tools = getCanonicalMcpTools({
+        ...(options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy }),
+        ...(options.registryPolicy === undefined ? {} : { registryPolicy: options.registryPolicy }),
+        ...(options.authRuntime?.config === undefined ? {} : { authConfig: options.authRuntime.config }),
+    });
+    const validation = validateMcpToolDescriptors(tools, baseProfile.policy);
+    if (validation.errors.length > 0 && baseProfile.policy.strictDescriptorValidation) {
+        throw new Error(`MCP server descriptor validation failed: ${validation.errors.slice(0, 5).join('; ')}`);
+    }
+
+    // A positive tools/list TTL is safe across reconnect only when the SDK cache partition changes with both
+    // descriptor generation and cache policy. The registry owns the exact tools/list wire fingerprint; the server
+    // owns the effective cache namespace because TTL/scope are server policy.
+    const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
+    const descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(baseProfile, wireSnapshot.fingerprint);
+    const profile = bindMcpServerProfileToCacheGeneration(baseProfile, descriptorCacheGeneration);
+    const manifest = buildMcpToolDescriptorManifest(
+        tools,
+        validation,
+        profile,
+        wireSnapshot.fingerprint,
+        wireSnapshot.fingerprintKind,
+        descriptorCacheGeneration,
+    );
     const server = new McpServer(
         profile.serverInfo,
         /** @type {ConstructorParameters<typeof McpServer>[1]} */ (profile.sdkOptions),
     );
 
-    registerCopilotAppsSdkResources(server);
-    const tools = registerCanonicalMcpTools(server, options);
-    const validation = validateMcpToolDescriptors(tools, profile.policy);
-    const manifest = buildMcpToolDescriptorManifest(tools, validation, profile);
-
-    if (validation.errors.length > 0 && profile.policy.strictDescriptorValidation) {
-        throw new Error(`MCP server descriptor validation failed: ${validation.errors.slice(0, 5).join('; ')}`);
+    registerCopilotAppsSdkResources(server, options.toolConfig?.companyKnowledge);
+    const registeredTools = registerCanonicalMcpTools(server, options);
+    if (registeredTools !== tools) {
+        throw new Error('MCP canonical tool generation changed during server construction.');
     }
 
     updateServerFactoryRuntime(tools, validation, manifest, profile);
@@ -165,16 +192,31 @@ export function createCopilotMcpServer(options = {}) {
  * Build the same descriptor manifest used by the server factory without instantiating a concrete SDK server. This is
  * intended for smoke tests, CI gates, and status/reporting tools.
  *
- * @param {{ toolSurfacePolicy?: import('#copilot/mcp/public/registry').McpToolSurfacePolicy }} [options]
+ * @param {{
+ *     toolSurfacePolicy?: import('#copilot/mcp/public/registry').McpToolSurfacePolicy;
+ *     registryPolicy?: import('#copilot/mcp/public/registry').McpRegistryPolicy;
+ *     profile?: CopilotMcpServerProfile;
+ * }} [options]
  * @returns {Record<string, unknown>}
  */
 export function buildCopilotMcpServerDescriptorManifest(options = {}) {
-    const profile = readCopilotMcpServerProfile();
-    const tools = getCanonicalMcpTools(
-        options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy },
+    const baseProfile = options.profile ?? readCopilotMcpServerProfile();
+    const tools = getCanonicalMcpTools({
+        ...(options.toolSurfacePolicy === undefined ? {} : { toolSurfacePolicy: options.toolSurfacePolicy }),
+        ...(options.registryPolicy === undefined ? {} : { registryPolicy: options.registryPolicy }),
+    });
+    const validation = validateMcpToolDescriptors(tools, baseProfile.policy);
+    const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
+    const descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(baseProfile, wireSnapshot.fingerprint);
+    const profile = bindMcpServerProfileToCacheGeneration(baseProfile, descriptorCacheGeneration);
+    return buildMcpToolDescriptorManifest(
+        tools,
+        validation,
+        profile,
+        wireSnapshot.fingerprint,
+        wireSnapshot.fingerprintKind,
+        descriptorCacheGeneration,
     );
-    const validation = validateMcpToolDescriptors(tools, profile.policy);
-    return buildMcpToolDescriptorManifest(tools, validation, profile);
 }
 
 /**
@@ -196,6 +238,7 @@ export function readCopilotMcpServerPolicy(env = process.env) {
     const version = normalizeServerVersion(
         firstNonEmpty([env['COPILOT_MCP_SERVER_VERSION'], env['npm_package_version'], DEFAULT_PACKAGE_VERSION]),
     );
+    const toolsListChanged = readBooleanEnv(env, 'COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED', true);
     return {
         name: normalizeServerName(env['COPILOT_MCP_SERVER_NAME'], DEFAULT_SERVER_NAME),
         title: normalizeBoundedText(env['COPILOT_MCP_SERVER_TITLE'], DEFAULT_SERVER_TITLE, MAX_SERVER_TITLE_LENGTH),
@@ -221,9 +264,15 @@ export function readCopilotMcpServerPolicy(env = process.env) {
             DEFAULT_INSTRUCTIONS,
             MAX_SERVER_INSTRUCTIONS_LENGTH,
         ),
-        toolsListChanged: readBooleanEnv(env, 'COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED', true),
+        toolsListChanged,
+        toolsListCacheTtlMs: readPositiveIntegerEnv(
+            env,
+            'COPILOT_MCP_SERVER_TOOLS_LIST_CACHE_TTL_MS',
+            DEFAULT_TOOLS_LIST_CACHE_TTL_MS,
+            0,
+            MAX_TOOLS_LIST_CACHE_TTL_MS,
+        ),
         strictDescriptorValidation: readBooleanEnv(env, 'COPILOT_MCP_SERVER_STRICT_DESCRIPTOR_VALIDATION', false),
-        strictToolRiskValidation: readBooleanEnv(env, 'COPILOT_MCP_SERVER_STRICT_TOOL_RISK_VALIDATION', false),
         startupLogEnabled: readBooleanEnv(env, 'COPILOT_MCP_SERVER_FACTORY_STARTUP_LOG', true),
         descriptorManifestEnabled: readBooleanEnv(env, 'COPILOT_MCP_SERVER_DESCRIPTOR_MANIFEST_ENABLED', true),
         maxTools: readPositiveIntegerEnv(env, 'COPILOT_MCP_SERVER_MAX_TOOLS', DEFAULT_MAX_TOOLS, 1, 1000),
@@ -306,11 +355,76 @@ function buildMcpServerSdkOptions(policy) {
             },
         },
     };
+    if (policy.toolsListChanged && policy.toolsListCacheTtlMs > 0) {
+        options['cacheHints'] = {
+            'tools/list': {
+                ttlMs: policy.toolsListCacheTtlMs,
+                cacheScope: 'private',
+            },
+        };
+    }
     if (policy.instructionsEnabled && policy.instructions) options['instructions'] = policy.instructions;
     return options;
 }
 
 /**
+ * Build the cache generation from the complete tools/list descriptor fingerprint plus the active hint. Including the
+ * TTL makes a TTL change itself an invalidation event, so reducing or disabling a previous cache policy cannot inherit
+ * the older freshness window through a persistent consumer-owned store.
+ *
+ * @param {CopilotMcpServerProfile} profile
+ * @param {string} descriptorFingerprint
+ * @returns {string | null}
+ */
+function buildMcpDescriptorCacheGeneration(profile, descriptorFingerprint) {
+    const cacheHints = /** @type {Record<string, unknown> | undefined} */ (profile.sdkOptions['cacheHints']);
+    const toolsListHint =
+        cacheHints && typeof cacheHints['tools/list'] === 'object' && cacheHints['tools/list'] !== null
+            ? /** @type {Record<string, unknown>} */ (cacheHints['tools/list'])
+            : null;
+    if (!toolsListHint || Number(toolsListHint['ttlMs'] ?? 0) <= 0) return null;
+    return sha256Hex(
+        stableJson({
+            descriptorFingerprint,
+            toolsListHint: {
+                ttlMs: Number(toolsListHint['ttlMs']),
+                cacheScope: String(toolsListHint['cacheScope'] ?? 'private'),
+            },
+        }),
+    );
+}
+
+/**
+ * Bind a positive descriptor cache to a bounded immutable generation. The MCP client SDK partitions persistent stores
+ * by serverInfo.name@version. A 128-bit prefix of the SHA-256 cache generation is sufficient for namespace identity,
+ * while the full SHA-256 remains in the descriptor manifest for audit. The effective version stays within the same
+ * 64-character bound as the configured base version.
+ *
+ * @param {CopilotMcpServerProfile} profile
+ * @param {string | null} cacheGeneration
+ * @returns {CopilotMcpServerProfile}
+ */
+function bindMcpServerProfileToCacheGeneration(profile, cacheGeneration) {
+    if (!cacheGeneration) return profile;
+
+    const generation = Buffer.from(cacheGeneration.slice(0, 32), 'hex').toString('base64url');
+    const baseVersion = String(profile.serverInfo.version ?? profile.policy.version);
+    const separator = baseVersion.includes('+') ? '.' : '+';
+    const suffix = `${separator}mcp.${generation}`;
+    const boundedBaseVersion = baseVersion.slice(0, Math.max(1, MAX_SERVER_VERSION_LENGTH - suffix.length));
+    const serverInfo = Object.freeze(
+        /** @type {import('@modelcontextprotocol/server').Implementation} */ ({
+            ...profile.serverInfo,
+            version: `${boundedBaseVersion}${suffix}`,
+        }),
+    );
+    return { ...profile, serverInfo };
+}
+
+/**
+ * Validate descriptor hygiene plus the fail-closed semantic Tool Contract projection.
+ * Risk/authority are never inferred from a tool name, title or description.
+ *
  * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
  * @param {CopilotMcpServerPolicy} policy
  * @returns {ToolDescriptorValidation}
@@ -326,10 +440,12 @@ function validateMcpToolDescriptors(tools, policy) {
     let readOnly = 0;
     let destructive = 0;
     let openWorld = 0;
-    let mutationNamed = 0;
-    let highImpactNamed = 0;
+    let mutating = 0;
+    let highImpact = 0;
+    let external = 0;
+    let specificOutput = 0;
+    let intentionalUntypedOutput = 0;
     let suspiciousDescriptors = 0;
-    let missingOutputSchemaWithStructuredContentHint = 0;
 
     if (tools.length > policy.maxTools)
         errors.push(`MCP tool surface has ${tools.length} tools; limit is ${policy.maxTools}.`);
@@ -343,17 +459,11 @@ function validateMcpToolDescriptors(tools, policy) {
         const name = String(tool.name ?? '');
         const title = typeof tool.title === 'string' ? tool.title : '';
         const description = typeof tool.description === 'string' ? tool.description : '';
-        const annotations = tool.annotations ?? {};
-        const readOnlyHint = annotations.readOnlyHint;
-        const destructiveHint = annotations.destructiveHint;
-        const openWorldHint = annotations.openWorldHint;
-        const nameLooksMutating = MUTATION_NAME_PATTERN.test(name);
-        const nameLooksHighImpact = HIGH_IMPACT_NAME_PATTERN.test(name);
+        const contract = tool.contract;
 
         if (!TOOL_NAME_PATTERN.test(name)) toolErrors.push(`Invalid MCP tool name: ${name}`);
         if (names.has(name)) toolErrors.push(`Duplicate MCP tool name: ${name}`);
         names.add(name);
-
         if (!title || hasControlCharacters(title) || title.length > MAX_TOOL_TITLE_LENGTH) {
             toolWarnings.push(`Tool ${name} has an invalid or too-long title.`);
         }
@@ -363,58 +473,49 @@ function validateMcpToolDescriptors(tools, policy) {
         if (!tool.inputSchema || typeof tool.inputSchema !== 'object')
             toolErrors.push(`Tool ${name} has no valid inputSchema.`);
 
-        if (readOnlyHint === true) readOnly += 1;
-        if (destructiveHint === true) destructive += 1;
-        if (openWorldHint === true) openWorld += 1;
-        if (nameLooksMutating) mutationNamed += 1;
-        if (nameLooksHighImpact) highImpactNamed += 1;
-
-        if (readOnlyHint !== true && readOnlyHint !== false)
-            toolWarnings.push(`Tool ${name} does not declare readOnlyHint as a boolean.`);
-        if (destructiveHint !== true && destructiveHint !== false)
-            toolWarnings.push(`Tool ${name} does not declare destructiveHint as a boolean.`);
-        if (openWorldHint !== true && openWorldHint !== false)
-            toolWarnings.push(`Tool ${name} does not declare openWorldHint as a boolean.`);
-
-        if (readOnlyHint === true && destructiveHint === true)
-            toolErrors.push(`Tool ${name} is both read-only and destructive.`);
-        if (readOnlyHint === true && nameLooksMutating)
-            toolWarnings.push(`Tool ${name} is read-only but has a mutating name.`);
-        if (nameLooksMutating && destructiveHint !== true && readOnlyHint !== true) {
-            toolWarnings.push(`Tool ${name} looks mutating but does not declare destructiveHint=true.`);
-        }
-        if (nameLooksHighImpact && openWorldHint !== false && !String(name).startsWith('mcp_')) {
-            toolWarnings.push(
-                `Tool ${name} looks high-impact and should usually declare openWorldHint=false or document boundary controls.`,
-            );
+        if (!contract) {
+            toolErrors.push(`Tool ${name} has no semantic Tool Contract.`);
+        } else {
+            for (const semanticError of validateMcpToolContractSemantics(contract)) {
+                toolErrors.push(`Tool ${name} semantic contract: ${semanticError}.`);
+            }
+            const projected = projectMcpToolAnnotations(contract);
+            /** @type {('readOnlyHint' | 'destructiveHint' | 'idempotentHint' | 'openWorldHint')[]} */
+            const annotationFields = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'];
+            for (const field of annotationFields) {
+                if (tool.annotations?.[field] !== projected[field]) {
+                    toolErrors.push(`Tool ${name} annotation ${field} diverges from semantic Tool Contract.`);
+                }
+            }
+            const risk = classifyMcpToolContractRisk(contract);
+            if (projected.readOnlyHint === true) readOnly += 1;
+            if (projected.destructiveHint === true) destructive += 1;
+            if (projected.openWorldHint === true) openWorld += 1;
+            if (risk.mutating) mutating += 1;
+            if (risk.highImpact) highImpact += 1;
+            if (risk.external) external += 1;
+            if (contract.output.class === 'specific') specificOutput += 1;
+            else intentionalUntypedOutput += 1;
+            if ((contract.output.class === 'specific') !== (tool.outputSchema !== undefined)) {
+                toolErrors.push(`Tool ${name} output schema diverges from output contract=${contract.output.class}.`);
+            }
+            const contractMax =
+                contract.resultBudget.mode === 'tool-specific' ? contract.resultBudget.maxBytes : undefined;
+            if (contractMax !== tool.maxResultBytes) {
+                toolErrors.push(`Tool ${name} maxResultBytes diverges from semantic result budget.`);
+            }
         }
 
         if (containsSuspiciousDescriptorText(title) || containsSuspiciousDescriptorText(description)) {
             suspiciousDescriptors += 1;
             toolWarnings.push(`Tool ${name} descriptor contains suspicious instruction-like wording.`);
         }
-
         validateOpenAiToolMeta(tool, toolWarnings, name);
-
-        if (tool.outputSchema === undefined && description.toLowerCase().includes('structured')) {
-            missingOutputSchemaWithStructuredContentHint += 1;
-        }
-
-        if (policy.strictToolRiskValidation && toolWarnings.some((item) => item.includes('mutating'))) {
-            toolErrors.push(`Tool ${name} failed strict tool-risk validation.`);
-        }
-
         errors.push(...toolErrors);
         warnings.push(...toolWarnings);
         if (toolErrors.length > 0 || toolWarnings.length > 0) {
             perToolFindings.push({ name, errors: toolErrors, warnings: toolWarnings });
         }
-    }
-
-    if (missingOutputSchemaWithStructuredContentHint > 0) {
-        warnings.push(
-            `${missingOutputSchemaWithStructuredContentHint} tools mention structured output but do not declare outputSchema.`,
-        );
     }
 
     return {
@@ -425,10 +526,12 @@ function validateMcpToolDescriptors(tools, policy) {
             readOnly,
             destructive,
             openWorld,
-            mutationNamed,
-            highImpactNamed,
+            mutating,
+            highImpact,
+            external,
+            specificOutput,
+            intentionalUntypedOutput,
             suspiciousDescriptors,
-            missingOutputSchemaWithStructuredContentHint,
             toolsWithFindings: perToolFindings.length,
         },
         perToolFindings: perToolFindings.slice(0, MAX_LOGGED_DESCRIPTOR_WARNINGS),
@@ -441,12 +544,18 @@ function validateMcpToolDescriptors(tools, policy) {
  * @param {CopilotMcpServerProfile} profile
  * @returns {Record<string, unknown>}
  */
-function buildMcpToolDescriptorManifest(tools, validation, profile) {
+function buildMcpToolDescriptorManifest(
+    tools,
+    validation,
+    profile,
+    descriptorFingerprint = buildMcpToolWireDescriptorSnapshot(tools).fingerprint,
+    descriptorFingerprintKind = 'tools-list-wire-sha256-v1',
+    descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(profile, descriptorFingerprint),
+) {
     const descriptors = tools.map((tool) => canonicalizeToolDescriptorForManifest(tool));
-    const descriptorFingerprint = sha256Hex(stableJson(descriptors));
     const surfaceState = getCanonicalMcpToolSurfaceState();
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: new Date().toISOString(),
         implementation: {
             name: COPILOT_MCP_SERVER_FACTORY_NAME,
@@ -455,9 +564,12 @@ function buildMcpToolDescriptorManifest(tools, validation, profile) {
         },
         serverInfo: profile.serverInfo,
         capabilities: profile.sdkOptions['capabilities'],
+        cacheHints: profile.sdkOptions['cacheHints'] ?? {},
         instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
         toolCount: tools.length,
         descriptorFingerprint,
+        descriptorFingerprintKind,
+        descriptorCacheGeneration,
         validation: {
             errorCount: validation.errors.length,
             warningCount: validation.warnings.length,
@@ -480,6 +592,7 @@ function canonicalizeToolDescriptorForManifest(tool) {
         name: tool.name,
         title: tool.title,
         description: tool.description,
+        contract: sanitizeForManifest(tool.contract ?? null),
         annotations: sanitizeForManifest(tool.annotations ?? {}),
         securitySchemes: sanitizeForManifest(tool.securitySchemes ?? []),
         meta: sanitizeForManifest(tool._meta ?? {}),
@@ -588,6 +701,11 @@ function logServerFactoryProfileOnce(profile, toolCount, validation, manifest) {
     if (!profile.policy.startupLogEnabled) return;
     const key = stableProfileKey(profile, manifest);
     if (loggedFactoryProfileKeys.has(key)) return;
+    while (loggedFactoryProfileKeys.size >= MAX_LOGGED_FACTORY_PROFILE_KEYS) {
+        const oldest = loggedFactoryProfileKeys.values().next().value;
+        if (typeof oldest !== 'string') break;
+        loggedFactoryProfileKeys.delete(oldest);
+    }
     loggedFactoryProfileKeys.add(key);
     logMcp(validation.errors.length > 0 ? 'WARN' : 'INFO', 'MCP server factory initialized.', {
         implementation: {
@@ -598,6 +716,7 @@ function logServerFactoryProfileOnce(profile, toolCount, validation, manifest) {
         serverInfo: profile.serverInfo,
         sdkOptions: {
             capabilities: profile.sdkOptions['capabilities'],
+            cacheHints: profile.sdkOptions['cacheHints'] ?? {},
             instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
             instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
@@ -624,6 +743,7 @@ function redactProfileForStatus(profile) {
         serverInfo: profile.serverInfo,
         sdkOptions: {
             capabilities: profile.sdkOptions['capabilities'],
+            cacheHints: profile.sdkOptions['cacheHints'] ?? {},
             instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
             instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
@@ -637,8 +757,9 @@ function redactProfileForStatus(profile) {
             instructionsEnabled: profile.policy.instructionsEnabled,
             instructionsLength: profile.policy.instructions.length,
             toolsListChanged: profile.policy.toolsListChanged,
+            toolsListCacheTtlMs: profile.policy.toolsListCacheTtlMs,
+            toolsListCacheEnabled: Boolean(profile.sdkOptions['cacheHints']),
             strictDescriptorValidation: profile.policy.strictDescriptorValidation,
-            strictToolRiskValidation: profile.policy.strictToolRiskValidation,
             startupLogEnabled: profile.policy.startupLogEnabled,
             descriptorManifestEnabled: profile.policy.descriptorManifestEnabled,
             maxTools: profile.policy.maxTools,
@@ -658,11 +779,11 @@ function stableProfileKey(profile, manifest) {
         descriptorFingerprint: manifest['descriptorFingerprint'],
         sdkOptions: {
             capabilities: profile.sdkOptions['capabilities'],
+            cacheHints: profile.sdkOptions['cacheHints'] ?? {},
             instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
             instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
         strictDescriptorValidation: profile.policy.strictDescriptorValidation,
-        strictToolRiskValidation: profile.policy.strictToolRiskValidation,
     });
 }
 

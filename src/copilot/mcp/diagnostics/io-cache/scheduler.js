@@ -9,8 +9,7 @@
  * @module copilot/mcp/diagnostics/io-cache/scheduler
  */
 
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import { signalProcessTreeDetailed } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
@@ -20,13 +19,13 @@ import { IO_CACHE_BENCHMARK_LAUNCHER, assertIoCacheBenchmarkRequestId } from './
 /**
  * @typedef {{
  *     workspaceRoot: string;
+ *     runnerEnvironment: Readonly<NodeJS.ProcessEnv>;
  *     signal?: AbortSignal;
  * }} IoCacheBenchmarkScheduleInput
  *
  * @typedef {{
  *     spawnChild?: typeof spawn;
  *     createRequestId?: () => string;
- *     parentEnv?: NodeJS.ProcessEnv;
  * }} IoCacheBenchmarkSchedulerDependencies
  */
 
@@ -47,25 +46,28 @@ export function scheduleIoCacheBenchmark(input) {
  */
 export async function scheduleIoCacheBenchmarkWithDependencies(input, dependencies) {
     if (!input?.workspaceRoot) throw new TypeError('IO cache benchmark scheduling requires workspaceRoot.');
+    if (!input.runnerEnvironment) {
+        throw new TypeError('IO cache benchmark scheduling requires a projected runner environment.');
+    }
     if (input.signal?.aborted) throw input.signal.reason ?? new Error('IO cache benchmark scheduling aborted.');
 
     const requestId = assertIoCacheBenchmarkRequestId(
         dependencies.createRequestId?.() ?? `mcp-io-cache-benchmark-${randomUUID()}`,
     );
-    const { env } = buildMcpChildEnvironment({ parentEnv: dependencies.parentEnv ?? process.env });
     const spawnChild = dependencies.spawnChild ?? spawn;
     const child = spawnChild(process.execPath, [IO_CACHE_BENCHMARK_LAUNCHER, '--request-id', requestId], {
         cwd: input.workspaceRoot,
-        env,
+        env: { ...input.runnerEnvironment },
         detached: true,
         stdio: 'ignore',
     });
 
+    const supervisor = createAttachedChildProcessSupervisor(child, { processGroup: true });
     const abortSignal = input.signal;
     let accepted = false;
     const terminateBeforeAcceptance = () => {
         if (accepted) return;
-        signalProcessTreeDetailed(child.pid, 'SIGTERM', { child, processGroup: true });
+        supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
     };
     abortSignal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
     try {
@@ -82,6 +84,7 @@ export async function scheduleIoCacheBenchmarkWithDependencies(input, dependenci
         if (!child.pid) throw new Error('IO cache benchmark launcher did not expose a child pid.');
         if (abortSignal?.aborted) {
             terminateBeforeAcceptance();
+            await supervisor.closed;
             throw abortSignal.reason ?? new Error('IO cache benchmark scheduling aborted before acceptance.');
         }
         accepted = true;
@@ -89,6 +92,9 @@ export async function scheduleIoCacheBenchmarkWithDependencies(input, dependenci
         return { requestId, runnerPid: child.pid, stateFile: IO_CACHE_BENCHMARK_STATE_PATH };
     } finally {
         abortSignal?.removeEventListener('abort', terminateBeforeAcceptance);
-        if (!accepted && child.pid) terminateBeforeAcceptance();
+        if (!accepted && child.pid && supervisor.snapshot().state !== 'closed') {
+            terminateBeforeAcceptance();
+            await supervisor.closed;
+        }
     }
 }

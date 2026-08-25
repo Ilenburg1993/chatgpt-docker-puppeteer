@@ -11,7 +11,7 @@ import { afterEach, describe, it } from 'vitest';
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
-import { repoWriteTestHarness, repoWriteTools } from '#copilot/testing/mcp/tools/repo-write';
+import { createRepoWriteTools, repoWriteTools } from '#copilot/testing/mcp/tools/repo-write';
 
 import {
     getValidatedMutableWorkspacePathStats,
@@ -32,18 +32,36 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_WORKSPACE },
+    { workspace: TEST_WORKSPACE, capabilities: TEST_PROCESS_HOST.toolCapabilities },
 );
 
-/** @param {string} name */
-function findRepoWriteTool(name) {
-    const definition = repoWriteTools.find((tool) => tool.name === name);
+/** @param {AbortSignal} signal */
+function createRepoWriteOperationContext(signal) {
+    return createMcpToolOperationContext(
+        {
+            mcpReq: {
+                id: `mcp-repo-write-unit-${Date.now()}`,
+                method: 'tools/call',
+                signal,
+                _meta: { caller: 'test_mcp_repo_write' },
+                envelope: { protocol: '2026' },
+            },
+        },
+        { workspace: TEST_WORKSPACE, capabilities: TEST_PROCESS_HOST.toolCapabilities },
+    );
+}
+
+/**
+ * @param {string} name
+ * @param {typeof repoWriteTools} [definitions]
+ * @param {typeof TOOL_OPERATION_CONTEXT} [operationContext]
+ */
+function findRepoWriteTool(name, definitions = repoWriteTools, operationContext = TOOL_OPERATION_CONTEXT) {
+    const definition = definitions.find((tool) => tool.name === name);
     assert.ok(definition, `missing repo write tool ${name}`);
     return {
         ...definition,
-        handler: /** @type {typeof definition.handler} */ (
-            (input) => definition.handler(input, TOOL_OPERATION_CONTEXT)
-        ),
+        handler: /** @type {typeof definition.handler} */ ((input) => definition.handler(input, operationContext)),
     };
 }
 
@@ -62,7 +80,6 @@ const removeFileTool = findRepoWriteTool('repo_remove_file');
 
 describe('copilot MCP repo write tools', () => {
     afterEach(() => {
-        repoWriteTestHarness.resetQuarantineMetadataWriter();
         resetValidatedMutableWorkspacePathStatsForTest();
     });
 
@@ -491,26 +508,64 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(filePath, 'still here\n', 'utf8');
 
         let writeCount = 0;
-        repoWriteTestHarness.setQuarantineMetadataWriter(async (runtime, metadata, metadataPath) => {
-            writeCount += 1;
-            if (writeCount === 2) {
-                const error = /** @type {Error & { code?: string }} */ (new Error('simulated metadata failure'));
-                error.code = 'EIO';
-                throw error;
-            }
-            await repoWriteTestHarness.writeQuarantineMetadataDefault(runtime, metadata, metadataPath);
+        /** @type {string | null} */
+        let observedQuarantineId = null;
+        const isolatedTools = createRepoWriteTools({
+            quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
+                observedQuarantineId = metadata.quarantineId;
+                writeCount += 1;
+                if (writeCount === 2) {
+                    const error = /** @type {Error & { code?: string }} */ (new Error('simulated metadata failure'));
+                    error.code = 'EIO';
+                    throw error;
+                }
+                await writeDefault(io, metadata, metadataPath);
+            },
         });
+        const isolatedQuarantineFileTool = findRepoWriteTool('repo_quarantine_file', isolatedTools);
 
-        const result = await quarantineFileTool.handler({ path: filePath });
+        const result = await isolatedQuarantineFileTool.handler({ path: filePath });
         assert.equal(result.isError, true);
         assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(filePath, 'utf8'), 'still here\n');
+        assert.ok(observedQuarantineId);
+        const quarantineDir = path.join(process.cwd(), 'src/copilot/.ai/quarantine');
+        await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.data`)), { code: 'ENOENT' });
+        await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.json`)), { code: 'ENOENT' });
+    });
 
-        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
-        assert.equal(
-            quarantineEntries.some((entry) => entry.includes('quarantine-commit-rollback.txt')),
-            false,
+    it('rolls a quarantine move back even when caller cancellation aborts the final metadata commit', async () => {
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'quarantine-cancel-rollback.txt');
+        await fs.writeFile(filePath, 'must return to source\n', 'utf8');
+        const controller = new AbortController();
+        let writeCount = 0;
+        /** @type {string | null} */
+        let observedQuarantineId = null;
+        const isolatedTools = createRepoWriteTools({
+            quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
+                observedQuarantineId = metadata.quarantineId;
+                writeCount += 1;
+                if (writeCount === 2) controller.abort(new Error('cancel-quarantine-final-metadata'));
+                await writeDefault(io, metadata, metadataPath);
+            },
+        });
+        const tool = findRepoWriteTool(
+            'repo_quarantine_file',
+            isolatedTools,
+            createRepoWriteOperationContext(controller.signal),
         );
+
+        const result = await tool.handler({ path: filePath });
+
+        assert.equal(result.isError, true);
+        assert.equal(writeCount, 2);
+        assert.equal(controller.signal.aborted, true);
+        assert.equal(await fs.readFile(filePath, 'utf8'), 'must return to source\n');
+        assert.ok(observedQuarantineId);
+        const quarantineDir = path.join(process.cwd(), 'src/copilot/.ai/quarantine');
+        await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.data`)), { code: 'ENOENT' });
+        await assert.rejects(fs.access(path.join(quarantineDir, `${observedQuarantineId}.json`)), { code: 'ENOENT' });
     });
 
     it('restores the previous destination when restore metadata commit fails', async () => {
@@ -528,17 +583,22 @@ describe('copilot MCP repo write tools', () => {
         const quarantineId = String(quarantined.structuredContent['quarantineId']);
 
         let writeCount = 0;
-        repoWriteTestHarness.setQuarantineMetadataWriter(async (runtime, metadata, metadataPath) => {
-            writeCount += 1;
-            if (writeCount === 2) {
-                const error = /** @type {Error & { code?: string }} */ (new Error('simulated restore commit failure'));
-                error.code = 'EIO';
-                throw error;
-            }
-            await repoWriteTestHarness.writeQuarantineMetadataDefault(runtime, metadata, metadataPath);
+        const isolatedTools = createRepoWriteTools({
+            quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
+                writeCount += 1;
+                if (writeCount === 2) {
+                    const error = /** @type {Error & { code?: string }} */ (
+                        new Error('simulated restore commit failure')
+                    );
+                    error.code = 'EIO';
+                    throw error;
+                }
+                await writeDefault(io, metadata, metadataPath);
+            },
         });
+        const isolatedRestoreQuarantinedFileTool = findRepoWriteTool('repo_restore_quarantined_file', isolatedTools);
 
-        const result = await restoreQuarantinedFileTool.handler({
+        const result = await isolatedRestoreQuarantinedFileTool.handler({
             quarantineId,
             destinationPath: destination,
             overwrite: true,
@@ -548,7 +608,53 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(destination, 'utf8'), 'previous destination\n');
 
-        repoWriteTestHarness.resetQuarantineMetadataWriter();
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, undefined);
+        assert.equal(inspected.structuredContent['restorable'], true);
+        assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
+        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
+        assert.equal(
+            quarantineEntries.some((entry) => entry.includes(`${quarantineId}.restore-backup-`)),
+            false,
+        );
+    });
+
+    it('restores quarantine and destination invariants when cancellation aborts the restore commit', async () => {
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'restore-cancel-source.txt');
+        const destination = path.join(dir, 'restore-cancel-destination.txt');
+        await fs.writeFile(source, 'quarantined after cancel\n', 'utf8');
+        await fs.writeFile(destination, 'destination survives cancel\n', 'utf8');
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        assert.equal(quarantined.isError, undefined);
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
+
+        const controller = new AbortController();
+        let writeCount = 0;
+        const isolatedTools = createRepoWriteTools({
+            quarantineMetadataWriter: async (io, metadata, metadataPath, writeDefault) => {
+                writeCount += 1;
+                if (writeCount === 2) controller.abort(new Error('cancel-restore-final-metadata'));
+                await writeDefault(io, metadata, metadataPath);
+            },
+        });
+        const tool = findRepoWriteTool(
+            'repo_restore_quarantined_file',
+            isolatedTools,
+            createRepoWriteOperationContext(controller.signal),
+        );
+
+        const result = await tool.handler({
+            quarantineId,
+            destinationPath: destination,
+            overwrite: true,
+            confirmOverwrite: true,
+        });
+
+        assert.equal(result.isError, true);
+        assert.equal(controller.signal.aborted, true);
+        assert.ok(writeCount >= 3, 'rollback must publish cancellation-shielded metadata repair');
+        assert.equal(await fs.readFile(destination, 'utf8'), 'destination survives cancel\n');
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);

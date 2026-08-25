@@ -15,6 +15,19 @@ const MAX_TTL_MS = 5 * 60 * 1000;
 const MAX_ENTRIES = 4096;
 const EXPIRY_SKEW_MS = 5 * 1000;
 
+/** @typedef {Readonly<{ disabled: boolean; ttlMs: number }>} McpAuthDecisionCachePolicy */
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {McpAuthDecisionCachePolicy}
+ */
+export function readMcpAuthDecisionCachePolicy(env = process.env) {
+    return Object.freeze({
+        disabled: env['COPILOT_MCP_AUTH_DECISION_CACHE_DISABLED'] === 'true',
+        ttlMs: readPositiveMs(env['COPILOT_MCP_AUTH_DECISION_CACHE_TTL_MS'], DEFAULT_TTL_MS, MAX_TTL_MS),
+    });
+}
+
 /** @type {Map<
     string,
     { decision: import('./service.js').McpAuthorizationDecision; expiresAt: number; cachedAt: number }
@@ -115,8 +128,14 @@ function shouldBypassContext(context) {
  * @param {import('./service.js').McpAuthContext | undefined} context
  * @returns {import('./service.js').McpAuthorizationDecision | null}
  */
-export function readCachedMcpAuthorizationDecision(credential, requiredScopes, config, context) {
-    if (process.env['COPILOT_MCP_AUTH_DECISION_CACHE_DISABLED'] === 'true' || shouldBypassContext(context)) {
+export function readCachedMcpAuthorizationDecision(
+    credential,
+    requiredScopes,
+    config,
+    context,
+    policy = readMcpAuthDecisionCachePolicy(),
+) {
+    if (policy.disabled || shouldBypassContext(context)) {
         stats.bypasses += 1;
         return null;
     }
@@ -148,8 +167,16 @@ export function readCachedMcpAuthorizationDecision(credential, requiredScopes, c
  * @param {import('./service.js').McpAuthorizationDecision} decision
  * @returns {void}
  */
-export function rememberMcpAuthorizationDecision(credential, requiredScopes, config, context, payload, decision) {
-    if (process.env['COPILOT_MCP_AUTH_DECISION_CACHE_DISABLED'] === 'true') return;
+export function rememberMcpAuthorizationDecision(
+    credential,
+    requiredScopes,
+    config,
+    context,
+    payload,
+    decision,
+    policy = readMcpAuthDecisionCachePolicy(),
+) {
+    if (policy.disabled) return;
     if (!decision.allowed || decision.method !== 'oauth-jwks') return;
     if (shouldBypassContext(context)) {
         stats.bypasses += 1;
@@ -160,7 +187,7 @@ export function rememberMcpAuthorizationDecision(credential, requiredScopes, con
         stats.bypasses += 1;
         return;
     }
-    const ttlMs = readPositiveMs(process.env['COPILOT_MCP_AUTH_DECISION_CACHE_TTL_MS'], DEFAULT_TTL_MS, MAX_TTL_MS);
+    const ttlMs = policy.ttlMs;
     const expMs = Number(payload.exp) > 0 ? Number(payload.exp) * 1000 : Date.now() + ttlMs;
     const expiresAt = Math.min(Date.now() + ttlMs, expMs - EXPIRY_SKEW_MS);
     if (expiresAt <= Date.now()) return;
@@ -181,14 +208,15 @@ export function rememberMcpAuthorizationDecision(credential, requiredScopes, con
 /**
  * @returns {Record<string, unknown>}
  */
-export function getMcpAuthDecisionCacheStats() {
+export function getMcpAuthDecisionCacheStats(policy = readMcpAuthDecisionCachePolicy()) {
     return {
         ...stats,
         size: cache.size,
         maxEntries: MAX_ENTRIES,
         defaultTtlMs: DEFAULT_TTL_MS,
         maxTtlMs: MAX_TTL_MS,
-        disabled: process.env['COPILOT_MCP_AUTH_DECISION_CACHE_DISABLED'] === 'true',
+        disabled: policy.disabled,
+        configuredTtlMs: policy.ttlMs,
     };
 }
 

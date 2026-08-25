@@ -7,14 +7,70 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
+    MCP_TOOL_SURFACE_MODES,
+    createMcpToolSurfacePolicy,
     getCanonicalMcpToolSurfaceState,
     getCanonicalMcpTools,
     readMcpRegistryRuntimeState,
 } from '#copilot/mcp/public/registry';
 import { getAdvertisedMcpToolNames } from '#copilot/mcp/public/tools/capabilities';
-import { resetCanonicalMcpToolsCacheForTests } from '#copilot/testing/mcp/registry';
+import { buildMcpWireToolCatalog, readMcpToolContractCoverage } from '#copilot/mcp/public/tools/catalog';
+import {
+    resetCanonicalMcpToolsCacheForTests,
+    runToolHandlerWithCancellationForTests,
+} from '#copilot/testing/mcp/registry';
+
+/** @param {AbortController} controller */
+function testOperationContext(controller) {
+    return /** @type {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} */ (
+        /** @type {unknown} */ ({
+            signal: controller.signal,
+            requestId: 'registry-cancellation-test',
+            cancellationSource: () => (controller.signal.aborted ? 'caller' : null),
+        })
+    );
+}
+
+/**
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolExecutionContract} execution
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition['handler']} handler
+ */
+function testTool(execution, handler) {
+    return /** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */ ({
+        name: 'test_execution_contract',
+        title: 'Test execution contract',
+        description: 'Testing-only registry execution contract.',
+        inputSchema: {},
+        annotations: {},
+        execution,
+        handler,
+    });
+}
 
 describe('copilot MCP registry', () => {
+    it('builds the semantic wire catalog deterministically without hidden provider state', () => {
+        const first = buildMcpWireToolCatalog();
+        const second = buildMcpWireToolCatalog();
+        const firstNames = first.map((tool) => tool.name);
+        const secondNames = second.map((tool) => tool.name);
+
+        assert.equal(first.length, 131);
+        assert.equal(new Set(firstNames).size, first.length);
+        assert.deepEqual(secondNames, firstNames);
+        assert.notStrictEqual(second, first);
+        assert.ok(first.every((tool, index) => tool !== second[index]));
+        assert.ok(
+            first.every(
+                (tool) =>
+                    Object.isFrozen(tool.contract) &&
+                    Object.isFrozen(tool.contract.effects) &&
+                    Object.isFrozen(tool.contract.authority) &&
+                    Object.isFrozen(tool.contract.execution) &&
+                    Object.isFrozen(tool.contract.output),
+            ),
+        );
+    });
+
     it('exposes the initial read-only tool surface', () => {
         const tools = getCanonicalMcpTools();
         const names = tools.map((tool) => tool.name).sort();
@@ -172,16 +228,11 @@ describe('copilot MCP registry', () => {
         assert.ok(tools.every((tool) => tool.annotations.destructiveHint !== true));
     });
 
-    it.each(['full', 'latency', 'minimal', 'cloudflare', 'readonly', 'claude', 'safe', 'research'])(
+    it.each(MCP_TOOL_SURFACE_MODES)(
         'keeps the %s tool surface non-empty, unique and within registry limits',
         (mode) => {
             const tools = getCanonicalMcpTools({
-                toolSurfacePolicy: {
-                    mode: /** @type {any} */ (mode),
-                    include: new Set(),
-                    exclude: new Set(),
-                    allowEmpty: false,
-                },
+                toolSurfacePolicy: createMcpToolSurfacePolicy({ mode }),
             });
             const names = tools.map((tool) => tool.name);
             assert.ok(names.length > 0);
@@ -196,6 +247,28 @@ describe('copilot MCP registry', () => {
             );
         },
     );
+
+    it('keeps the latency surface operationally coherent with the observed high-use workspace primitives', () => {
+        const full = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'full' }) });
+        const latency = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'latency' }) });
+        const names = new Set(latency.map((tool) => tool.name));
+        for (const name of [
+            'terminal_exec',
+            'terminal_session_control',
+            'terminal_session_read',
+            'repo_bulk_inspect',
+            'repo_apply_patch_batch',
+            'repo_apply_file_batch',
+            'repo_working_set',
+            'repo_index_status',
+            'repo_write_file',
+            'repo_remove_file',
+        ]) {
+            assert.equal(names.has(name), true, name);
+        }
+        assert.ok(latency.length < full.length);
+        assert.equal(latency.length, 71);
+    });
 
     it('warns before the configured tool-count limit is exhausted', () => {
         const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
@@ -323,6 +396,178 @@ describe('copilot MCP registry', () => {
         });
         assert.equal(JSON.stringify(state).includes('subject'), false);
         assert.equal(JSON.stringify(state).includes('token'), false);
+    });
+
+    it('classifies every canonical tool with an explicit execution contract', () => {
+        const tools = getCanonicalMcpTools();
+        const coverage = readMcpToolContractCoverage();
+        assert.deepEqual(coverage, {
+            total: 131,
+            readOnly: 93,
+            boundedWrite: 30,
+            destructive: 8,
+            openWorld: 10,
+            idempotent: 92,
+            scopes: { read: 89, write: 20, validate: 9, admin: 13 },
+            cancellation: { cancellable: 30, boundedNonCancellable: 88, notApplicable: 13 },
+            output: { specific: 10, intentionalUntyped: 121 },
+        });
+        assert.equal(tools.length, coverage.total);
+        for (const tool of tools) {
+            assert.ok(tool.execution, `missing execution contract: ${tool.name}`);
+            assert.ok(tool.execution.rationale.length >= 20, `weak execution rationale: ${tool.name}`);
+            if (tool.execution.cancellation === 'cancellable') {
+                assert.ok(Number(tool.execution.drainTimeoutMs) >= 100, tool.name);
+            } else if (tool.execution.cancellation === 'bounded-non-cancellable') {
+                assert.ok(Number(tool.execution.continuationBoundMs) >= 100, tool.name);
+            }
+        }
+    });
+
+    it('does not invoke a handler when cancellation already happened', async () => {
+        const controller = new AbortController();
+        controller.abort(new Error('pre-abort'));
+        let invoked = false;
+        const tool = testTool(
+            {
+                cancellation: 'cancellable',
+                drainTimeoutMs: 500,
+                rationale: 'Testing contract propagates cancellation and drains all call-scoped work.',
+            },
+            async () => {
+                invoked = true;
+                return /** @type {any} */ ({ content: [] });
+            },
+        );
+        await assert.rejects(
+            runToolHandlerWithCancellationForTests(tool, {}, testOperationContext(controller)),
+            (error) => {
+                const failure = /** @type {any} */ (error);
+                assert.equal(failure.code, 'MCP_TOOL_CANCELLED');
+                assert.equal(failure.executionPolicy, 'cancellable');
+                assert.equal(failure.workMayContinue, false);
+                return true;
+            },
+        );
+        assert.equal(invoked, false);
+    });
+
+    it('waits for cooperative handler drain before reporting cancellation', async () => {
+        const controller = new AbortController();
+        /** @type {() => void} */
+        let markStarted = () => {};
+        const started = new Promise((resolve) => {
+            markStarted = () => resolve(undefined);
+        });
+        let cleaned = false;
+        const tool = testTool(
+            {
+                cancellation: 'cancellable',
+                drainTimeoutMs: 500,
+                rationale: 'Testing contract propagates cancellation and drains all call-scoped work.',
+            },
+            async (_args, operationContext) => {
+                markStarted();
+                await new Promise((resolve) => {
+                    operationContext?.signal.addEventListener(
+                        'abort',
+                        () => {
+                            setTimeout(() => {
+                                cleaned = true;
+                                resolve(undefined);
+                            }, 40).unref();
+                        },
+                        { once: true },
+                    );
+                });
+                return /** @type {any} */ ({ content: [] });
+            },
+        );
+        const pending = runToolHandlerWithCancellationForTests(tool, {}, testOperationContext(controller));
+        await started;
+        controller.abort(new Error('cancel-and-drain'));
+        await assert.rejects(pending, (error) => {
+            const failure = /** @type {any} */ (error);
+            assert.equal(failure.code, 'MCP_TOOL_CANCELLED');
+            assert.equal(failure.workMayContinue, false);
+            return true;
+        });
+        assert.equal(cleaned, true);
+    });
+
+    it('fails loudly when a tool claiming cancellable does not drain', async () => {
+        const controller = new AbortController();
+        /** @type {() => void} */
+        let markStarted = () => {};
+        const started = new Promise((resolve) => {
+            markStarted = () => resolve(undefined);
+        });
+        const tool = testTool(
+            {
+                cancellation: 'cancellable',
+                drainTimeoutMs: 100,
+                rationale: 'Testing contract intentionally violates drain to prove fail-loud registry behavior.',
+            },
+            async () => {
+                markStarted();
+                await new Promise(() => {});
+                return /** @type {any} */ ({ content: [] });
+            },
+        );
+        const pending = runToolHandlerWithCancellationForTests(tool, {}, testOperationContext(controller));
+        await started;
+        controller.abort(new Error('broken-drain'));
+        await assert.rejects(pending, (error) => {
+            const failure = /** @type {any} */ (error);
+            assert.equal(failure.code, 'MCP_TOOL_CANCELLATION_DRAIN_TIMEOUT');
+            assert.equal(failure.executionPolicy, 'cancellable');
+            assert.equal(failure.drainTimeoutMs, 100);
+            assert.equal(failure.tool, 'test_execution_contract');
+            return true;
+        });
+    });
+
+    it('labels bounded non-cancellable cancellation as work that may continue', async () => {
+        const controller = new AbortController();
+        /** @type {() => void} */
+        let markStarted = () => {};
+        /** @type {() => void} */
+        let markSettled = () => {};
+        const started = new Promise((resolve) => {
+            markStarted = () => resolve(undefined);
+        });
+        const settled = new Promise((resolve) => {
+            markSettled = () => resolve(undefined);
+        });
+        let handlerSettled = false;
+        const tool = testTool(
+            {
+                cancellation: 'bounded-non-cancellable',
+                continuationBoundMs: 1_000,
+                rationale: 'Testing contract is bounded but intentionally does not cooperate with caller cancellation.',
+            },
+            async () => {
+                markStarted();
+                await new Promise((resolve) => setTimeout(resolve, 60));
+                handlerSettled = true;
+                markSettled();
+                return /** @type {any} */ ({ content: [] });
+            },
+        );
+        const pending = runToolHandlerWithCancellationForTests(tool, {}, testOperationContext(controller));
+        await started;
+        controller.abort(new Error('bounded-cancel'));
+        await assert.rejects(pending, (error) => {
+            const failure = /** @type {any} */ (error);
+            assert.equal(failure.code, 'MCP_TOOL_CANCELLED');
+            assert.equal(failure.executionPolicy, 'bounded-non-cancellable');
+            assert.equal(failure.workMayContinue, true);
+            assert.equal(failure.continuationBoundMs, 1_000);
+            return true;
+        });
+        assert.equal(handlerSettled, false);
+        await settled;
+        assert.equal(handlerSettled, true);
     });
 
     it('keeps capability metadata in parity with the canonical registry', () => {

@@ -5,12 +5,15 @@
  * @module copilot/mcp/tools/repo-plan
  */
 
-import {
-    errorResult,
-    okResult,
-    readOnlyAnnotations,
-    requireMcpToolWorkspace,
-} from '#copilot/mcp/public/protocol/tools';
+// @ts-check
+/**
+ * Read-only plan tools for sensitive repo operations.
+ *
+ * @module copilot/mcp/tools/repo-plan
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { errorResult, okResult, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
 import { resolveFocusedUnitTestCommand, resolveValidatorCommand } from '#copilot/mcp/public/validation';
 import { z } from 'zod';
 
@@ -126,10 +129,10 @@ async function pathExists(workspaceIo, absolutePath) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const repoPlanTools = [
-    {
+    defineMcpRawTool({
         name: 'repo_create_file_plan',
         title: 'Plan repository file creation',
         description: 'Read-only plan for creating a UTF-8 workspace file. Does not create or modify files.',
@@ -142,7 +145,7 @@ export const repoPlanTools = [
                 .optional()
                 ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, content, maxDiffLines, includeDiffPreview }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const resolved = await workspace.resolveWritePath(path);
@@ -169,8 +172,8 @@ export const repoPlanTools = [
                 includeDiffPreview === true ? diff.diff : 'Create file plan ready; diff preview suppressed.',
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_patch_plan',
         title: 'Plan repository patch',
         description: 'Read-only exact-string patch plan for one workspace file. Does not modify files.',
@@ -186,7 +189,7 @@ export const repoPlanTools = [
                 .optional()
                 ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async (
             { path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview },
             operationContext,
@@ -235,8 +238,8 @@ export const repoPlanTools = [
                 includeDiffPreview === true ? diff.diff : 'Patch plan ready; diff preview suppressed.',
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_quarantine_file_plan',
         title: 'Plan repository file quarantine',
         description:
@@ -244,7 +247,7 @@ export const repoPlanTools = [
         inputSchema: {
             path: z.string().min(1)['describe']('Workspace-relative file path to plan for quarantine.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const resolved = await workspace.resolveWritePath(path);
@@ -263,8 +266,8 @@ export const repoPlanTools = [
                 },
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_move_file_plan',
         title: 'Plan repository file move',
         description: 'Read-only plan for moving or renaming one workspace file. Does not move files.',
@@ -273,7 +276,7 @@ export const repoPlanTools = [
             destination: z.string().min(1)['describe']('Workspace-relative destination path.'),
             overwrite: z.boolean().optional()['describe']('Plan overwrite. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ source, destination, overwrite }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             // A move mutates its source; the plan must use the same write-policy class as the eventual apply.
@@ -303,8 +306,8 @@ export const repoPlanTools = [
                 },
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'repo_index_refresh_plan',
         title: 'Plan repository index refresh',
         description: 'Read-only plan for refreshing the shared Copilot IO index. Does not build or mutate the index.',
@@ -312,7 +315,7 @@ export const repoPlanTools = [
             path: z.string().optional()['describe']('Workspace-relative directory path. Default: src/copilot.'),
             maxFiles: z.number().int().positive().max(25_000).optional()['describe']('Planned max files.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ path, maxFiles }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const resolved = await workspace.resolveReadPath(
@@ -340,8 +343,8 @@ export const repoPlanTools = [
                 },
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_validation_plan',
         title: 'Plan MCP validation',
         description: 'Plan validation escalation; defaults to inspect-first and no validator.',
@@ -357,7 +360,7 @@ export const repoPlanTools = [
                 .optional()
                 ['describe']('Explicit tests/unit/copilot/**/*.spec.js path.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ suite, testFile }) => {
             if (suite && testFile) {
                 return errorResult('Choose testFile or suite, not both.', {
@@ -433,5 +436,5 @@ export const repoPlanTools = [
                 warning: 'Broad suites are not the default; use only when focused evidence is insufficient.',
             });
         },
-    },
+    }),
 ];

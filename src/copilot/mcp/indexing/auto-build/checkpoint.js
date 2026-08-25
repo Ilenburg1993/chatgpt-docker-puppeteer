@@ -9,11 +9,8 @@
  * @module copilot/mcp/indexing/auto-build/checkpoint
  */
 
-import { execFile } from 'node:child_process';
+import { execWorkspaceGit } from '#copilot/mcp/public/workspace/git';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
 const TABLE = 'copilot_mcp_index_startup_checkpoint';
 const GIT_TIMEOUT_MS = 5_000;
 const GIT_MAX_BUFFER = 16 * 1024 * 1024;
@@ -37,6 +34,7 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
  *     completedAtMs: number;
  *     lastFullReconcileAtMs: number;
  *     journalSequence: number;
+ *     hashVerificationCursor: string;
  * }} IndexStartupCheckpoint
  *
  * @typedef {{
@@ -60,12 +58,16 @@ function ensureCheckpointSchema(db) {
             schema_version INTEGER NOT NULL,
             completed_at_ms INTEGER NOT NULL,
             last_full_reconcile_at_ms INTEGER NOT NULL,
-            journal_sequence INTEGER NOT NULL DEFAULT 0
+            journal_sequence INTEGER NOT NULL DEFAULT 0,
+            hash_verification_cursor TEXT NOT NULL DEFAULT ''
         ) STRICT;
     `);
     const columns = /** @type {{ name?: string }[]} */ (db.prepare(`PRAGMA table_info(${TABLE})`).all());
     if (!columns.some((column) => column.name === 'journal_sequence')) {
         db.exec(`ALTER TABLE ${TABLE} ADD COLUMN journal_sequence INTEGER NOT NULL DEFAULT 0`);
+    }
+    if (!columns.some((column) => column.name === 'hash_verification_cursor')) {
+        db.exec(`ALTER TABLE ${TABLE} ADD COLUMN hash_verification_cursor TEXT NOT NULL DEFAULT ''`);
     }
     return db;
 }
@@ -78,7 +80,7 @@ export function readIndexStartupCheckpoint(scopePath, db) {
             .prepare(
                 `SELECT scope_path AS scopePath, head, schema_version AS schemaVersion,
                         completed_at_ms AS completedAtMs, last_full_reconcile_at_ms AS lastFullReconcileAtMs,
-                        journal_sequence AS journalSequence
+                        journal_sequence AS journalSequence, hash_verification_cursor AS hashVerificationCursor
                  FROM ${TABLE} WHERE scope_path = ?`,
             )
             .get(scopePath)
@@ -94,6 +96,7 @@ export function readIndexStartupCheckpoint(scopePath, db) {
  *     mode: 'full-reconcile' | 'incremental' | 'skip';
  *     nowMs?: number;
  *     journalSequence?: number;
+ *     hashVerificationCursor?: string;
  * }} input
  * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  */
@@ -103,16 +106,29 @@ export function writeIndexStartupCheckpoint(input, db) {
     const nowMs = input.nowMs ?? Date.now();
     const lastFullReconcileAtMs = input.mode === 'full-reconcile' ? nowMs : (previous?.lastFullReconcileAtMs ?? nowMs);
     const journalSequence = normalizeJournalSequence(input.journalSequence, previous?.journalSequence ?? 0);
+    const hashVerificationCursor = normalizeHashVerificationCursor(
+        input.hashVerificationCursor,
+        input.mode === 'full-reconcile' ? '' : (previous?.hashVerificationCursor ?? ''),
+    );
     db.prepare(
-        `INSERT INTO ${TABLE}(scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms, journal_sequence)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO ${TABLE}(scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms, journal_sequence, hash_verification_cursor)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(scope_path) DO UPDATE SET
              head = excluded.head,
              schema_version = excluded.schema_version,
              completed_at_ms = excluded.completed_at_ms,
              last_full_reconcile_at_ms = excluded.last_full_reconcile_at_ms,
-             journal_sequence = excluded.journal_sequence`,
-    ).run(input.scopePath, input.head, input.schemaVersion, nowMs, lastFullReconcileAtMs, journalSequence);
+             journal_sequence = excluded.journal_sequence,
+             hash_verification_cursor = excluded.hash_verification_cursor`,
+    ).run(
+        input.scopePath,
+        input.head,
+        input.schemaVersion,
+        nowMs,
+        lastFullReconcileAtMs,
+        journalSequence,
+        hashVerificationCursor,
+    );
     return {
         scopePath: input.scopePath,
         head: input.head,
@@ -120,27 +136,25 @@ export function writeIndexStartupCheckpoint(input, db) {
         completedAtMs: nowMs,
         lastFullReconcileAtMs,
         journalSequence,
+        hashVerificationCursor,
     };
 }
 
 /**
- * @param {{ workspaceRoot: string; scopePath: string }} input
+ * @param {{ workspaceRoot: string; scopePath: string; gitConfig: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig; signal?: AbortSignal }} input
  * @returns {Promise<IndexGitSnapshot>}
  */
 export async function readIndexGitSnapshot(input) {
     const startedAt = Date.now();
     try {
         const [headResult, statusResult] = await Promise.all([
-            runGit(input.workspaceRoot, ['rev-parse', 'HEAD']),
-            runGit(input.workspaceRoot, [
-                'status',
-                '--porcelain=v1',
-                '-z',
-                '--untracked-files=all',
-                '--no-renames',
-                '--',
-                input.scopePath,
-            ]),
+            runGit(input.workspaceRoot, ['rev-parse', 'HEAD'], input.gitConfig, input.signal),
+            runGit(
+                input.workspaceRoot,
+                ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames', '--', input.scopePath],
+                input.gitConfig,
+                input.signal,
+            ),
         ]);
         const head = headResult.trim();
         const parsed = parseGitStatusZ(statusResult);
@@ -165,22 +179,18 @@ export async function readIndexGitSnapshot(input) {
 }
 
 /**
- * @param {{ workspaceRoot: string; scopePath: string; fromHead: string; toHead: string }} input
+ * @param {{ workspaceRoot: string; scopePath: string; fromHead: string; toHead: string; gitConfig: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig; signal?: AbortSignal }} input
  */
 export async function readCommittedIndexChanges(input) {
     if (input.fromHead === input.toHead) return { available: true, changes: [], uncertain: false, durationMs: 0 };
     const startedAt = Date.now();
     try {
-        const output = await runGit(input.workspaceRoot, [
-            'diff',
-            '--name-status',
-            '-z',
-            '--no-renames',
-            input.fromHead,
-            input.toHead,
-            '--',
-            input.scopePath,
-        ]);
+        const output = await runGit(
+            input.workspaceRoot,
+            ['diff', '--name-status', '-z', '--no-renames', input.fromHead, input.toHead, '--', input.scopePath],
+            input.gitConfig,
+            input.signal,
+        );
         const parsed = parseGitNameStatusZ(output);
         return {
             available: true,
@@ -357,13 +367,24 @@ function normalizeJournalSequence(value, fallback) {
     return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-/** @param {string} cwd @param {string[]} args */
-async function runGit(cwd, args) {
-    const { stdout } = await execFileAsync('git', args, {
+/**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @param {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig} gitConfig
+ * @param {AbortSignal | undefined} signal
+ */
+async function runGit(cwd, args, gitConfig, signal) {
+    const result = await execWorkspaceGit(args, {
         cwd,
-        timeout: GIT_TIMEOUT_MS,
-        maxBuffer: GIT_MAX_BUFFER,
-        encoding: 'utf8',
+        config: gitConfig,
+        timeoutMs: GIT_TIMEOUT_MS,
+        maxBufferBytes: GIT_MAX_BUFFER,
+        ...(signal ? { signal } : {}),
     });
-    return String(stdout ?? '');
+    if (!result.success) throw new Error(result.error ?? 'Index Git evidence command failed.');
+    return result.stdout;
+}
+/** @param {unknown} value @param {string} fallback */
+function normalizeHashVerificationCursor(value, fallback) {
+    return typeof value === 'string' ? value : fallback;
 }

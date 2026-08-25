@@ -77,6 +77,7 @@ describe('MCP OAuth smoke hardening', () => {
         vi.stubGlobal('fetch', fetchMock);
 
         const result = await runMcpOAuthSmoke({
+            env: {},
             resource: authorizationServer,
             retryAttempts: 1,
             retryBaseDelayMs: 0,
@@ -149,6 +150,7 @@ describe('MCP OAuth smoke hardening', () => {
         );
 
         const result = await runMcpOAuthSmoke({
+            env: {},
             resource: authorizationServer,
             retryAttempts: 1,
             retryBaseDelayMs: 0,

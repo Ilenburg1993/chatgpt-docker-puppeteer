@@ -44,12 +44,13 @@ export async function chmodFileLocked(filePath, mode, options = {}, invalidation
             riskClass,
         });
         try {
-            const value = await lease.run(() =>
-                chmodFileUnlocked(filePath, mode, {
+            const value = await lease.run(() => {
+                options.signal?.throwIfAborted();
+                return chmodFileUnlocked(filePath, mode, {
                     ...(options.durability === undefined ? {} : { durability: options.durability }),
                     ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
-                }),
-            );
+                });
+            });
             if (value.changed) invalidateIoCoherencePath(filePath, {}, invalidationBus);
             const io = publishIoOperationResult(
                 buildIoMeta({

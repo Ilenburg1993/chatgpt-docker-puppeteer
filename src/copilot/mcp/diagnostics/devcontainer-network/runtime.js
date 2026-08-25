@@ -9,23 +9,16 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { spawn } from 'node:child_process';
-import { isAbsolute, resolve } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, MCP_DEVCONTAINER_NETWORK_REPO_ROOT } from './config.js';
 
 const LOCAL_DNS_SUMMARY = '/tmp/devcontainer-local-dns-cache.summary';
 const LOCAL_DNS_ACTION_SUMMARY = '/tmp/devcontainer-local-dns-cache.action.summary';
 const LOCAL_DNS_STATUS = '/tmp/devcontainer-local-dns-cache.status';
 const NETWORK_CONTROL_PLANE_SUMMARY = '/tmp/devcontainer-network-control-plane.summary';
 const NETWORK_CONTROL_PLANE_EVENTS = '/tmp/devcontainer-network-control-plane.events.tsv';
-const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
-const CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT = resolve(
-    REPO_ROOT,
-    '.devcontainer/scripts/network-control-plane-state.sh',
-);
 const NETWORK_CONTROL_PLANE_REFRESH_TIMEOUT_MS = 10_000;
 const NETWORK_CONTROL_PLANE_REFRESH_MAX_OUTPUT_BYTES = 64 * 1024;
 const NETWORK_POSTURE_FIXED_IO = createConfiguredFsIo(
@@ -37,7 +30,7 @@ const NETWORK_POSTURE_FIXED_IO = createConfiguredFsIo(
             LOCAL_DNS_STATUS,
             NETWORK_CONTROL_PLANE_SUMMARY,
             NETWORK_CONTROL_PLANE_EVENTS,
-            CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT,
+            MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT,
         ],
         operations: ['read', 'stat'],
         symlinkPolicy: 'deny',
@@ -77,7 +70,7 @@ function createNetworkScriptIo(configuredScript) {
     return createConfiguredFsIo(
         createConfiguredFsGrant({
             id: 'mcp.diagnostics.devcontainer-network.configured-script',
-            exactPaths: [...new Set([configuredScript, CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT])],
+            exactPaths: [...new Set([configuredScript, MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT])],
             operations: ['read', 'stat'],
             symlinkPolicy: 'deny',
             durability: ['file-and-directory'],
@@ -86,11 +79,13 @@ function createNetworkScriptIo(configuredScript) {
 }
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; signal?: AbortSignal }} [options]
+ * @param {{ config: import('./config.js').McpDevcontainerNetworkConfig; signal?: AbortSignal }} options
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function refreshDevcontainerNetworkControlPlaneState(options = {}) {
-    const script = await inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, NETWORK_POSTURE_FIXED_IO);
+export async function refreshDevcontainerNetworkControlPlaneState(options) {
+    if (!options?.config)
+        throw new TypeError('DevContainer network refresh requires a process configuration generation.');
+    const script = await inspectFile(MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, NETWORK_POSTURE_FIXED_IO);
     if (!script.readable || !script.isFile) {
         return {
             success: false,
@@ -101,7 +96,7 @@ export async function refreshDevcontainerNetworkControlPlaneState(options = {}) 
     }
     const startedAt = Date.now();
     const result = await runPassiveNetworkControlPlaneSummary({
-        parentEnv: options.env ?? process.env,
+        childEnvironment: options.config.childEnvironment,
         ...(options.signal ? { signal: options.signal } : {}),
     });
     if (!result.success) {
@@ -114,7 +109,7 @@ export async function refreshDevcontainerNetworkControlPlaneState(options = {}) 
             execution: result,
         };
     }
-    const audit = await auditDevcontainerNetworkPosture({ env: options.env ?? process.env });
+    const audit = await auditDevcontainerNetworkPosture({ config: options.config });
     return {
         success: true,
         mode: 'fixed-passive-network-control-plane-refresh',
@@ -128,7 +123,7 @@ export async function refreshDevcontainerNetworkControlPlaneState(options = {}) 
 }
 
 /**
- * @param {{ parentEnv: NodeJS.ProcessEnv; signal?: AbortSignal }} input
+ * @param {{ childEnvironment: Readonly<NodeJS.ProcessEnv>; signal?: AbortSignal }} input
  */
 async function runPassiveNetworkControlPlaneSummary(input) {
     if (input.signal?.aborted) {
@@ -144,10 +139,9 @@ async function runPassiveNetworkControlPlaneSummary(input) {
             error: 'Passive DevContainer network-control-plane refresh aborted before spawn.',
         };
     }
-    const { env } = buildMcpChildEnvironment({ parentEnv: input.parentEnv });
-    const child = spawn('bash', [CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, '--quiet', 'summary'], {
-        cwd: REPO_ROOT,
-        env,
+    const child = spawn('bash', [MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, '--quiet', 'summary'], {
+        cwd: MCP_DEVCONTAINER_NETWORK_REPO_ROOT,
+        env: { ...input.childEnvironment },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
     });
@@ -239,18 +233,19 @@ async function runPassiveNetworkControlPlaneSummary(input) {
 }
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ config: import('./config.js').McpDevcontainerNetworkConfig }} options
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function auditDevcontainerNetworkPosture(options = {}) {
-    const env = options.env ?? process.env;
+export async function auditDevcontainerNetworkPosture(options) {
+    if (!options?.config)
+        throw new TypeError('DevContainer network audit requires a process configuration generation.');
     const [dnsStatus, dnsSummary, dnsActionSummary, controlSummary, controlEvents, controlRuntime] = await Promise.all([
         readSingleLine(LOCAL_DNS_STATUS),
         readKvFile(LOCAL_DNS_SUMMARY),
         readKvFile(LOCAL_DNS_ACTION_SUMMARY),
         readKvFile(NETWORK_CONTROL_PLANE_SUMMARY),
         readTailLines(NETWORK_CONTROL_PLANE_EVENTS, 20),
-        inspectNetworkControlPlaneRuntime(env),
+        inspectNetworkControlPlaneRuntime(options.config),
     ]);
     const dns = pickKeys(dnsSummary.values, DNS_KEYS);
     const findings = buildDevcontainerNetworkFindings(dns, controlSummary.values, controlRuntime);
@@ -371,37 +366,27 @@ function buildNextActions(findings) {
     ];
 }
 
-/** @param {NodeJS.ProcessEnv} env @returns {Promise<Record<string, unknown>>} */
-async function inspectNetworkControlPlaneRuntime(env) {
-    const enabled = !['0', 'false', 'off', 'disabled'].includes(
-        String(env['DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE'] ?? 'true')
-            .trim()
-            .toLowerCase(),
-    );
-    const configuredRaw = String(env['DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT'] ?? '').trim();
-    const expanded = configuredRaw.replaceAll('${containerWorkspaceFolder}', REPO_ROOT.replace(/\/$/u, ''));
-    const configuredScript = expanded
-        ? isAbsolute(expanded)
-            ? expanded
-            : resolve(REPO_ROOT, expanded)
-        : CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT;
+/** @param {import('./config.js').McpDevcontainerNetworkConfig} config @returns {Promise<Record<string, unknown>>} */
+async function inspectNetworkControlPlaneRuntime(config) {
+    const enabled = config.enabled;
+    const configuredScript = config.configuredScript;
     const scriptIo = createNetworkScriptIo(configuredScript);
     const [configured, canonical, configuredVersion, canonicalVersion] = await Promise.all([
         inspectFile(configuredScript, scriptIo),
-        inspectFile(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, scriptIo),
+        inspectFile(MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, scriptIo),
         readScriptDeclaredVersion(configuredScript, scriptIo),
-        readScriptDeclaredVersion(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT, scriptIo),
+        readScriptDeclaredVersion(MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, scriptIo),
     ]);
-    const configuredMatchesCanonical = configuredScript === CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT;
+    const configuredMatchesCanonical = configuredScript === MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT;
     const fallbackActive =
         !configuredMatchesCanonical && !configured.readable && canonical.readable && canonical.isFile;
     const effectiveScript =
         configured.readable && configured.isFile
             ? configuredScript
             : fallbackActive
-              ? CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT
+              ? MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT
               : configuredScript;
-    const expectedVersion = env['DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED'] ?? null;
+    const expectedVersion = config.expectedVersion;
     const expectedVersionMismatch =
         typeof expectedVersion === 'string' &&
         typeof canonicalVersion === 'string' &&
@@ -412,7 +397,7 @@ async function inspectNetworkControlPlaneRuntime(env) {
         configuredScriptReadable: configured.readable,
         configuredScriptIsFile: configured.isFile,
         configuredVersion,
-        canonicalScript: CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT,
+        canonicalScript: MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT,
         canonicalScriptReadable: canonical.readable,
         canonicalScriptIsFile: canonical.isFile,
         canonicalVersion,

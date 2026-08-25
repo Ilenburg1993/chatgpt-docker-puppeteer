@@ -11,8 +11,8 @@ import {
     classifyMcpPostSessionRequirement,
     isMcpInitializeRequestBody,
     normalizeMcpSessionId,
-    readMcpHttpJsonBody,
-} from '#copilot/mcp/public/adapters/http-body';
+} from '#copilot/mcp/public/transport/http/stateful/request-contract';
+import { readMcpHttpJsonBody } from '#copilot/testing/mcp/adapters/http';
 
 /**
  * @param {string | Buffer} body
@@ -47,7 +47,6 @@ describe('MCP HTTP JSON body helpers', () => {
         );
 
         assert.equal(result.ok, true);
-        assert.equal(result.ok ? result.initializeRequest : false, true);
         assert.equal(result.ok ? isMcpInitializeRequestBody(result.body) : false, true);
     });
 

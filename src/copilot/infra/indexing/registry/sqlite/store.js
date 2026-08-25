@@ -12,6 +12,7 @@
 import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
 import { richFingerprintMatches } from '#copilot/infra/internal/platform/fingerprint';
 import { createIoIndexDirectoryBuilder } from './directory-builder.js';
+import { createIoIndexHashSampleVerifier } from './hash-sample.js';
 import { createIoIndexMetadataPolicy } from './metadata.js';
 import { normalizeIndexPath } from './path/index.js';
 import { createIoIndexQueryApi } from './query-api.js';
@@ -119,7 +120,8 @@ export function createIoIndexSqlite(options) {
     });
 
     const statements = createIoIndexStatements(db);
-    const { stmtGetFingerprint, stmtListIndexedFiles, stmtRefreshFingerprint } = statements;
+    const { stmtGetFingerprint, stmtListHashVerificationCandidates, stmtListIndexedFiles, stmtRefreshFingerprint } =
+        statements;
 
     const { buildIndexMetadataJson, parserProjectionIsCurrent } = createIoIndexMetadataPolicy({ schemaVersion });
     const assertCurrentFileSnapshot = createIoIndexSnapshotVerifier(
@@ -133,6 +135,12 @@ export function createIoIndexSqlite(options) {
         buildIndexMetadataJson,
         assertCurrentFileSnapshot,
         ...(options.parserWorkerRuntime ? { parserWorkerRuntime: options.parserWorkerRuntime } : {}),
+    });
+    const verifyHashSample = createIoIndexHashSampleVerifier({
+        stats,
+        hashVerifyMaxBytes,
+        stmtListHashVerificationCandidates,
+        assertCurrentFileSnapshot,
     });
     const indexDirectory = createIoIndexDirectoryBuilder({
         stats,
@@ -206,6 +214,7 @@ export function createIoIndexSqlite(options) {
         indexTextFile,
 
         indexDirectory,
+        verifyHashSample,
 
         ...queryApi,
 

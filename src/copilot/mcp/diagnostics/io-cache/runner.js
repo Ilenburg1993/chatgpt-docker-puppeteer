@@ -46,14 +46,15 @@ function parseArgs(argv) {
  *
  * @param {'cold' | 'l1' | 'l2-prime' | 'l2'} mode
  * @param {string} requestId
+ * @param {NodeJS.ProcessEnv} parentEnv
  */
-async function runWorker(mode, requestId) {
+async function runWorker(mode, requestId, parentEnv) {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
     /** @type {string | null} */
     let spawnError = null;
-    const { env } = buildMcpChildEnvironment();
+    const { env } = buildMcpChildEnvironment({ parentEnv });
     const child = spawn(process.execPath, [IO_CACHE_BENCHMARK_WORKER, '--request-id', requestId, '--mode', mode], {
         cwd: repoRoot,
         env,
@@ -198,11 +199,11 @@ function buildDecision(cold, l1, l2) {
     };
 }
 
-/** @param {'cold' | 'l1' | 'l2'} mode @param {string} requestId */
-async function collectPhase(mode, requestId) {
+/** @param {'cold' | 'l1' | 'l2'} mode @param {string} requestId @param {NodeJS.ProcessEnv} parentEnv */
+async function collectPhase(mode, requestId, parentEnv) {
     const samples = [];
     for (let sample = 1; sample <= SAMPLE_COUNT; sample += 1) {
-        const worker = await runWorker(mode, requestId);
+        const worker = await runWorker(mode, requestId, parentEnv);
         const result =
             worker.result && typeof worker.result === 'object' && !Array.isArray(worker.result)
                 ? /** @type {Record<string, unknown>} */ (worker.result)
@@ -223,8 +224,8 @@ async function collectPhase(mode, requestId) {
     return samples;
 }
 
-/** @param {string[]} argv */
-async function runScheduledIoCacheBenchmarkUnsafe(argv) {
+/** @param {string[]} argv @param {NodeJS.ProcessEnv} parentEnv */
+async function runScheduledIoCacheBenchmarkUnsafe(argv, parentEnv) {
     const { requestId } = parseArgs(argv);
     const benchmarkRoot = path.join(repoRoot, 'src/copilot/.ai/mcp/io-cache-benchmark');
     await workspaceIo.mkdirPathLocked(benchmarkRoot, { recursive: true });
@@ -252,7 +253,7 @@ async function runScheduledIoCacheBenchmarkUnsafe(argv) {
     /** @type {Record<string, any>} */
     let finalState = { status: 'failed' };
     try {
-        const coldSamples = await collectPhase('cold', requestId);
+        const coldSamples = await collectPhase('cold', requestId, parentEnv);
         const cold = summarizePhase(coldSamples, 'l1-miss');
         await writeState({
             schemaVersion: 2,
@@ -264,7 +265,7 @@ async function runScheduledIoCacheBenchmarkUnsafe(argv) {
             autoEnable: false,
         });
 
-        const l1Samples = await collectPhase('l1', requestId);
+        const l1Samples = await collectPhase('l1', requestId, parentEnv);
         const l1 = summarizePhase(l1Samples, 'l1-hit');
         await writeState({
             schemaVersion: 2,
@@ -276,11 +277,11 @@ async function runScheduledIoCacheBenchmarkUnsafe(argv) {
             autoEnable: false,
         });
 
-        const prime = await runWorker('l2-prime', requestId);
+        const prime = await runWorker('l2-prime', requestId, parentEnv);
         if (prime.exitCode !== 0 || !prime.result || prime.result.success !== true) {
             throw new Error(`L2 prime failed: ${prime.error ?? prime.stderr ?? 'unknown worker failure'}`);
         }
-        const l2Samples = await collectPhase('l2', requestId);
+        const l2Samples = await collectPhase('l2', requestId, parentEnv);
         const l2 = summarizePhase(l2Samples, 'l2-hit');
         const decision = buildDecision(cold, l1, l2);
         const completedAt = Date.now();
@@ -336,11 +337,13 @@ async function runScheduledIoCacheBenchmarkUnsafe(argv) {
  * terminal state as measurement failures so the thin launcher never owns diagnostic state semantics.
  *
  * @param {string[]} argv
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<Record<string, any>>}
  */
-export async function runScheduledIoCacheBenchmark(argv) {
+export async function runScheduledIoCacheBenchmark(argv, parentEnv) {
+    if (!parentEnv) throw new TypeError('Scheduled IO-cache benchmark requires an explicit process environment.');
     try {
-        return await runScheduledIoCacheBenchmarkUnsafe(argv);
+        return await runScheduledIoCacheBenchmarkUnsafe(argv, parentEnv);
     } catch (error) {
         /** @type {Record<string, any>} */
         const failed = {

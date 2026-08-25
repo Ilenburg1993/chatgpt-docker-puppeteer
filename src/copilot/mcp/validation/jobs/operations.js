@@ -19,7 +19,7 @@ import {
     waitForJobCompletion,
 } from './runtime.js';
 
-const DEFAULT_INLINE_WAIT_VALIDATORS = new Set([
+const DEFAULT_INLINE_WAIT_VALIDATORS = Object.freeze([
     'typecheck',
     'lint',
     'unit-focused',
@@ -27,7 +27,7 @@ const DEFAULT_INLINE_WAIT_VALIDATORS = new Set([
     'network-contracts',
     'dependency-outdated',
 ]);
-const COMPATIBILITY_MAINTENANCE_VALIDATORS = new Set(['dependency-outdated']);
+const COMPATIBILITY_MAINTENANCE_VALIDATORS = Object.freeze(['dependency-outdated']);
 
 /** @type {Record<string, string[]>} */
 const EFFECTIVE_CHECKS_BY_VALIDATOR = {
@@ -201,9 +201,11 @@ function recommendValidationAction(effectiveChecks) {
  *     failureTailBytes?: number | undefined;
  * }} request
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {import('../config.js').McpValidationProcessConfig} config
+ * @param {AbortSignal} [signal]
  * @returns {Promise<ValidationJobOperationResult>}
  */
-export async function executeValidatorRequest(request, workspace) {
+export async function executeValidatorRequest(request, workspace, config, signal) {
     const { validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes } = request;
     if (!isCopilotValidatorName(validator)) {
         return failure('Unsupported validator.', {
@@ -229,12 +231,14 @@ export async function executeValidatorRequest(request, workspace) {
     try {
         const job = await spawnValidatorJob(validator, {
             workspace,
+            config,
             ...(timeoutMs === undefined ? {} : { timeoutMs }),
             ...(focused && testFile !== undefined ? { testFiles: [testFile] } : {}),
+            ...(signal ? { signal } : {}),
         });
         const shouldWait =
             waitForCompletion !== false &&
-            (waitForCompletion === true || waitMs !== undefined || DEFAULT_INLINE_WAIT_VALIDATORS.has(validator));
+            (waitForCompletion === true || waitMs !== undefined || DEFAULT_INLINE_WAIT_VALIDATORS.includes(validator));
         if (!shouldWait) {
             return success(
                 { success: true, ...(focused ? { testFile } : {}), job },
@@ -242,7 +246,7 @@ export async function executeValidatorRequest(request, workspace) {
             );
         }
         const effectiveWaitMs = waitMs ?? 30_000;
-        const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs);
+        const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs, signal);
         if (!waitedJob) {
             return failure('Validator job disappeared while waiting for completion.', {
                 code: 'ERR_VALIDATOR_JOB_WAIT_LOST',
@@ -252,7 +256,7 @@ export async function executeValidatorRequest(request, workspace) {
         const summary = summarizeValidationJob(waitedJob);
         const completedWithinWait = waitedJob.status !== 'running';
         const failed = waitedJob.status === 'failed';
-        const compatibilityMaintenance = COMPATIBILITY_MAINTENANCE_VALIDATORS.has(validator);
+        const compatibilityMaintenance = COMPATIBILITY_MAINTENANCE_VALIDATORS.includes(validator);
         const failureOutput = failed ? await readJobOutput(job.id, failureTailBytes ?? 4000) : { output: '' };
         const maintenanceOutput =
             compatibilityMaintenance && completedWithinWait ? await readJobOutput(job.id, 50_000) : { output: '' };
@@ -302,14 +306,17 @@ export async function executeValidatorRequest(request, workspace) {
 /**
  * @param {import('./runtime.js').CopilotValidatorName} validator
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
- * @param {{ timeoutMs?: number | undefined }} [options]
+ * @param {import('../config.js').McpValidationProcessConfig} config
+ * @param {{ timeoutMs?: number | undefined; signal?: AbortSignal }} [options]
  * @returns {Promise<ValidationJobOperationResult>}
  */
-export async function startValidatorJobOperation(validator, workspace, options = {}) {
+export async function startValidatorJobOperation(validator, workspace, config, options = {}) {
     try {
         const job = await spawnValidatorJob(validator, {
             workspace,
+            config,
             ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+            ...(options.signal ? { signal: options.signal } : {}),
         });
         return success({ success: true, job }, `Started job ${job.id} (${validator}).`);
     } catch (error) {
@@ -389,8 +396,8 @@ export async function readLastValidationSummary(input) {
     });
 }
 
-/** @param {{ includeRunning?: boolean|undefined; includeLatest?: boolean|undefined; includeDetails?: boolean|undefined; limit?: number|undefined }} input */
-export async function readValidationDashboard(input) {
+/** @param {{ includeRunning?: boolean|undefined; includeLatest?: boolean|undefined; includeDetails?: boolean|undefined; limit?: number|undefined }} input @param {import('../config.js').McpValidationProcessConfig} config */
+export async function readValidationDashboard(input, config) {
     const includeDetails = input.includeDetails === true;
     const jobs = await listJobs({ includeCompleted: true, limit: input.limit ?? 80 });
     const running = jobs
@@ -405,7 +412,7 @@ export async function readValidationDashboard(input) {
     const effectiveChecks = buildEffectiveValidationChecks(jobs);
     const base = {
         success: true,
-        validatorCapacity: readCopilotValidatorCapacityState(),
+        validatorCapacity: readCopilotValidatorCapacityState(config),
         runningCount: running.length,
         orphanedCount: orphaned.length,
         latestCount: latest.length,

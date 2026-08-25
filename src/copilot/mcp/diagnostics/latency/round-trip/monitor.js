@@ -6,10 +6,12 @@
  */
 
 import { logMcp } from '#copilot/mcp/public/observability';
-import { getMcpRoundTripAnalytics } from './analytics.js';
+import { MCP_LATENCY_CONFIG_DEFAULTS, readMcpLatencyProcessConfig } from '../config.js';
 
-const DEFAULT_INITIAL_DELAY_MS = 20_000;
-const DEFAULT_INTERVAL_MS = 60_000;
+/** @type {number} */
+const DEFAULT_INITIAL_DELAY_MS = MCP_LATENCY_CONFIG_DEFAULTS.roundTripMonitor.initialDelayMs;
+/** @type {number} */
+const DEFAULT_INTERVAL_MS = MCP_LATENCY_CONFIG_DEFAULTS.roundTripMonitor.intervalMs;
 const MIN_INTERVAL_MS = 30_000;
 const MAX_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -49,6 +51,7 @@ function createInitialState() {
 
 /**
  * @param {{
+ *     policy?: import('../config.js').McpLatencyProcessConfig['roundTripMonitor'];
  *     enabled?: boolean;
  *     initialDelayMs?: number;
  *     intervalMs?: number;
@@ -58,27 +61,29 @@ function createInitialState() {
  */
 export function scheduleMcpRoundTripAnalyticsMonitor(options = {}) {
     if (monitorTimer || monitorState.scheduled || monitorState.running) return false;
-    const defaultEnabled = process.env['NODE_ENV'] !== 'test' && !process.env['VITEST'];
-    const enabled =
-        options.enabled ?? readBooleanEnv('COPILOT_MCP_ROUND_TRIP_ANALYTICS_MONITOR_ENABLED', defaultEnabled);
+    const policy = options.policy ?? readMcpLatencyProcessConfig().roundTripMonitor;
+    const enabled = options.enabled ?? policy.enabled;
     if (!enabled) {
         monitorState = { ...monitorState, enabled: false, scheduled: false, nextRunAt: null };
         return false;
     }
     const initialDelayMs = boundedDelay(
-        options.initialDelayMs ?? Number(process.env['COPILOT_MCP_ROUND_TRIP_ANALYTICS_INITIAL_DELAY_MS']),
+        options.initialDelayMs ?? policy.initialDelayMs,
         DEFAULT_INITIAL_DELAY_MS,
         0,
         10 * 60 * 1000,
     );
     const intervalMs = boundedDelay(
-        options.intervalMs ?? Number(process.env['COPILOT_MCP_ROUND_TRIP_ANALYTICS_INTERVAL_MS']),
+        options.intervalMs ?? policy.intervalMs,
         DEFAULT_INTERVAL_MS,
         MIN_INTERVAL_MS,
         MAX_INTERVAL_MS,
     );
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
-    const syncFn = options.syncFn ?? (() => getMcpRoundTripAnalytics().sync());
+    const syncFn = options.syncFn;
+    if (typeof syncFn !== 'function') {
+        throw new TypeError('MCP round-trip analytics monitor requires an explicit sync capability.');
+    }
     const generation = ++monitorGeneration;
     monitorState = {
         ...monitorState,
@@ -230,13 +235,4 @@ function boundedDelay(value, fallback, min, max) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, Math.round(parsed)));
-}
-
-/** @param {string} name @param {boolean} fallback */
-function readBooleanEnv(name, fallback) {
-    const value = String(process.env[name] ?? '')
-        .trim()
-        .toLowerCase();
-    if (!value) return fallback;
-    return ['1', 'true', 'yes', 'on'].includes(value);
 }

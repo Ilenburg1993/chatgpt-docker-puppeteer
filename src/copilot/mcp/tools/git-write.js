@@ -8,13 +8,22 @@
  * @module copilot/mcp/tools/git-write
  */
 
-import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
+// @ts-check
+/**
+ * Governed Git mutation tools for the MCP connector.
+ *
+ * The surface deliberately does not expose arbitrary Git commands, remotes, refspecs or force flags. Stage operations
+ * are path-bounded, commits are HEAD-preconditioned, and pushes use only the already-configured upstream.
+ *
+ * @module copilot/mcp/tools/git-write
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
-    destructiveAnnotations,
     errorResult,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolAuditCapability,
+    requireMcpToolGitConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
 } from '#copilot/mcp/public/protocol/tools';
@@ -28,14 +37,26 @@ const HEAD_RE = /^[0-9a-f]{7,64}$/iu;
 const PATHSPEC_MAGIC_RE = /^(?::|[-])|[*?[\]{}!]/u;
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} GitWriteWorkspaceCapability */
-/** @typedef {Readonly<{ workspace: GitWriteWorkspaceCapability; exec: typeof execGit }>} GitWriteRuntime */
+/** @typedef {{ timeoutMs?: number; maxBufferBytes?: number }} GitWriteExecOptions */
+/** @typedef {(args: string[], options?: GitWriteExecOptions) => ReturnType<typeof execGit>} GitWriteExec */
+/** @typedef {Readonly<{ workspace: GitWriteWorkspaceCapability; exec: GitWriteExec; audit: NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']> }>} GitWriteRuntime */
 
-/** @param {GitWriteWorkspaceCapability} workspace @returns {GitWriteRuntime} */
-function createGitWriteRuntime(workspace) {
-    return Object.freeze({
-        workspace,
-        exec: (args, options = {}) => execGit(args, { ...options, cwd: workspace.workspaceRoot }),
-    });
+/**
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
+ * @returns {GitWriteRuntime}
+ */
+function createGitWriteRuntime(operationContext) {
+    const workspace = requireMcpToolWorkspace(operationContext);
+    const config = requireMcpToolGitConfig(operationContext);
+    /** @type {GitWriteExec} */
+    const exec = (args, options = {}) =>
+        execGit(args, {
+            ...options,
+            cwd: workspace.workspaceRoot,
+            config,
+            ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+        });
+    return Object.freeze({ workspace, exec, audit: requireMcpToolAuditCapability(operationContext) });
 }
 
 const explicitPathsSchema = z
@@ -285,24 +306,24 @@ function isFileCoveredBySelectedPaths(file, selected) {
     );
 }
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const gitWriteTools = [
-    {
+    defineMcpRawTool({
         name: 'git_stage_plan',
         title: 'Plan bounded Git stage',
         description:
             'Validate explicit workspace paths and enumerate the exact changed files that bounded staging would affect.',
         inputSchema: { paths: explicitPathsSchema },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ paths }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const plan = await planStage(runtime, paths);
             if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
             const head = await readHead(runtime);
             return okResult({ success: true, ...plan, head }, JSON.stringify({ ...plan, head }, null, 2));
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_stage',
         title: 'Stage explicit Git paths',
         description:
@@ -318,9 +339,9 @@ export const gitWriteTools = [
                 .literal(true)
                 ['describe']('Explicit acknowledgement that the enumerated path set should be staged.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ paths, expectedHead }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const head = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, head);
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
@@ -340,7 +361,7 @@ export const gitWriteTools = [
                     paths: plan.paths,
                 });
             const staged = await readStagedSummary(runtime);
-            await appendMcpAuditEvent({
+            await runtime.audit.append({
                 event: 'git_stage',
                 tool: 'git_stage',
                 head,
@@ -364,8 +385,8 @@ export const gitWriteTools = [
                 staged.stat || staged.names.join('\n'),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_commit_plan',
         title: 'Plan Git commit',
         description:
@@ -374,9 +395,9 @@ export const gitWriteTools = [
             message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
             expectedHead: z.string().max(64).optional(),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ message, expectedHead }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const [head, identity, staged] = await Promise.all([
                 readHead(runtime),
                 readCommitIdentity(runtime),
@@ -396,8 +417,8 @@ export const gitWriteTools = [
             };
             return okResult(plan, JSON.stringify(plan, null, 2));
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_commit',
         title: 'Create bounded Git commit',
         description:
@@ -407,9 +428,9 @@ export const gitWriteTools = [
             expectedHead: z.string().max(64).optional(),
             confirmCommit: z.literal(true),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ message, expectedHead }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const [head, identity, staged] = await Promise.all([
                 readHead(runtime),
                 readCommitIdentity(runtime),
@@ -435,7 +456,7 @@ export const gitWriteTools = [
                     stagedFiles: staged.names,
                 });
             const newHead = await readHead(runtime);
-            await appendMcpAuditEvent({
+            await runtime.audit.append({
                 event: 'git_commit',
                 tool: 'git_commit',
                 previousHead: head,
@@ -455,8 +476,8 @@ export const gitWriteTools = [
                 result.stdout || String(newHead),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_push_plan',
         title: 'Check upstream Git push',
         description:
@@ -468,9 +489,9 @@ export const gitWriteTools = [
                 .optional()
                 ['describe']('Contact the configured upstream with git push --dry-run. Default: true.'),
         },
-        annotations: { ...readOnlyAnnotations(), openWorldHint: true },
+
         handler: async ({ expectedHead, runDryRun }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const state = await buildPushState(runtime);
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
             if (headError)
@@ -503,8 +524,8 @@ export const gitWriteTools = [
                 JSON.stringify({ ...state, dryRun }, null, 2),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_publish_changes',
         title: 'Stage, commit and optionally push explicit changes',
         description:
@@ -524,9 +545,9 @@ export const gitWriteTools = [
                 .literal(true)
                 ['describe']('Explicit acknowledgement of stage + commit + optional upstream push.'),
         },
-        annotations: { ...destructiveAnnotations(), openWorldHint: true },
+
         handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const startedAt = Date.now();
             const initialHead = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, initialHead);
@@ -657,7 +678,7 @@ export const gitWriteTools = [
                 afterPush = await buildPushState(runtime);
             }
 
-            await appendMcpAuditEvent({
+            await runtime.audit.append({
                 event: 'git_publish_changes',
                 tool: 'git_publish_changes',
                 previousHead: initialHead,
@@ -702,8 +723,8 @@ export const gitWriteTools = [
                 mode: shouldPush ? 'git-publish:stage-commit-push' : 'git-publish:stage-commit',
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'git_push',
         title: 'Push current branch to configured upstream',
         description:
@@ -727,9 +748,9 @@ export const gitWriteTools = [
                 ),
             confirmPush: z.literal(true),
         },
-        annotations: { ...destructiveAnnotations(), openWorldHint: true },
+
         handler: async ({ expectedHead, expectedUpstream, pushDryRunFirst }, operationContext) => {
-            const runtime = createGitWriteRuntime(requireMcpToolWorkspace(operationContext));
+            const runtime = createGitWriteRuntime(operationContext);
             const state = await buildPushState(runtime);
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
             if (headError)
@@ -769,7 +790,7 @@ export const gitWriteTools = [
                     stderr: result.stderr,
                 });
             const after = await buildPushState(runtime);
-            await appendMcpAuditEvent({
+            await runtime.audit.append({
                 event: 'git_push',
                 tool: 'git_push',
                 head: state['head'],
@@ -790,5 +811,5 @@ export const gitWriteTools = [
                 result.stdout || result.stderr || 'Push completed.',
             );
         },
-    },
+    }),
 ];

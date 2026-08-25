@@ -2,6 +2,6 @@
 /** Exact public membrane for the Model Gateway SQLite fingerprint integration. */
 
 export {
-    configureModelGatewayIntegrationDatabase,
+    createModelGatewaySqliteFingerprintCapability,
     readModelGatewaySqliteFingerprint,
 } from '../runtime.js';

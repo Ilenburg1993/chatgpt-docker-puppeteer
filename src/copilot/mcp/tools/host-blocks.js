@@ -5,12 +5,11 @@
  * @module copilot/mcp/tools/host-blocks
  */
 
-import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
+import { defineMcpRawTool, readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
-    readOnlyAnnotations,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
@@ -48,13 +47,13 @@ function optionalHttpStatus(value) {
 
 /**
  * @param {{
- *     mcpReachedServer?: boolean;
- *     httpStatus?: number;
- *     wwwAuthenticatePresent?: boolean;
- *     cloudflareRayIdPresent?: boolean;
- *     mcpAuditEventPresent?: boolean;
- *     schemaErrorPresent?: boolean;
- *     toolResultIsError?: boolean;
+ *     mcpReachedServer?: boolean | undefined;
+ *     httpStatus?: number | undefined;
+ *     wwwAuthenticatePresent?: boolean | undefined;
+ *     cloudflareRayIdPresent?: boolean | undefined;
+ *     mcpAuditEventPresent?: boolean | undefined;
+ *     schemaErrorPresent?: boolean | undefined;
+ *     toolResultIsError?: boolean | undefined;
  * }} input
  * @returns {{
  *     code: string;
@@ -154,7 +153,7 @@ function classifyByEvidence(input) {
 }
 
 /**
- * @param {{ toolName?: string; hostMessage?: string; operationKind?: string; argsShape?: string }} input
+ * @param {{ toolName?: string | undefined; hostMessage?: string | undefined; operationKind?: string | undefined; argsShape?: string | undefined }} input
  * @returns {{
  *     code: string;
  *     layer: string;
@@ -241,9 +240,9 @@ function classifyHostBlock(input) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpHostBlockDiagnosticsTool = {
+export const mcpHostBlockDiagnosticsTool = defineMcpRawTool({
     name: 'mcp_host_block_diagnostics',
     title: 'MCP host block diagnostics',
     description:
@@ -282,7 +281,7 @@ export const mcpHostBlockDiagnosticsTool = {
             ['describe']('Whether the error was an input schema or argument validation failure.'),
         toolResultIsError: z.boolean().optional()['describe']('Whether MCP returned a tool result with isError=true.'),
     },
-    annotations: readOnlyAnnotations(),
+
     handler: async ({
         toolName,
         hostMessage,
@@ -348,4 +347,4 @@ export const mcpHostBlockDiagnosticsTool = {
             ],
         });
     },
-};
+});

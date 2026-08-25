@@ -642,6 +642,51 @@ describe('createIoIndexSqlite', () => {
         });
     });
 
+    it('verifica hashes em amostra bounded com cursor rotativo e detecta drift same-size', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'hash-sample');
+        await mkdir(root);
+        const alpha = join(root, 'a.md');
+        const beta = join(root, 'b.md');
+        const gamma = join(root, 'c.md');
+        await writeFile(alpha, 'alpha0\n', 'utf8');
+        await writeFile(beta, 'beta00\n', 'utf8');
+        await writeFile(gamma, 'gamma0\n', 'utf8');
+        const db = new Database(':memory:');
+        const index = createPreparedIoIndex({ db, hashVerifyMaxBytes: 1024 });
+        await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        const first = await index.verifyHashSample(root, { maxFiles: 1 });
+        expect(first).toMatchObject({
+            candidateCount: 1,
+            hashVerifications: 1,
+            hashVerificationHits: 1,
+            mismatchCount: 0,
+            wrapped: false,
+        });
+        expect(first.nextCursor).toBe(alpha);
+
+        await writeFile(beta, 'beta11\n', 'utf8');
+        const second = await index.verifyHashSample(root, { cursor: first.nextCursor, maxFiles: 1 });
+        expect(second).toMatchObject({
+            candidateCount: 1,
+            hashVerifications: 1,
+            hashVerificationHits: 0,
+            hashVerificationMisses: 1,
+            mismatchCount: 1,
+            wrapped: false,
+        });
+        expect(second.nextCursor).toBe(beta);
+        expect(second.mismatches).toEqual([{ filePath: beta, reason: 'content-hash-mismatch' }]);
+
+        const third = await index.verifyHashSample(root, { cursor: second.nextCursor, maxFiles: 1 });
+        expect(third.nextCursor).toBe(gamma);
+        expect(third.mismatchCount).toBe(0);
+        const wrapped = await index.verifyHashSample(root, { cursor: third.nextCursor, maxFiles: 1 });
+        expect(wrapped).toMatchObject({ wrapped: true, mismatchCount: 0 });
+        expect(wrapped.nextCursor).toBe(alpha);
+    });
+
     it('repete snapshot quando processo externo substitui arquivo antes do commit', async () => {
         expect(tmpDir).toBeTruthy();
         const root = join(/** @type {string} */ (tmpDir), 'external-race');

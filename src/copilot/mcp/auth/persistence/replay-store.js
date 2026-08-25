@@ -131,88 +131,77 @@ export function createOAuthReplayStore(db, options = {}) {
     };
 }
 
-/** @type {ReturnType<typeof createOAuthReplayStore> | null} */
-let persistentStore = null;
-/** @type {string | null} */
-let persistentStoreError = null;
-
 /**
- * Bind the process-scoped OAuth replay store from composition. The replay owner keeps the store; leaf auth/issuer code
- * never discovers application infrastructure on its own.
+ * Build a process-generation replay capability over a lazy database reader. The capability can exist before SQLite is
+ * bootstrapped; once a concrete database generation becomes available, the store is materialized locally and reused
+ * only while that database identity remains current.
  *
- * @param {ReturnType<typeof createOAuthReplayStore>} store
+ * @param {() => import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} readDatabase
+ * @param {import('./config.js').OAuthReplayStoreConfig} [config]
  */
-export function configurePersistentOAuthReplayStore(store) {
-    if (!store || typeof store.remember !== 'function' || typeof store.status !== 'function') {
-        throw new TypeError('configurePersistentOAuthReplayStore requires a replay store capability.');
-    }
-    persistentStore = store;
-    persistentStoreError = null;
-    return () => {
-        if (persistentStore !== store) return;
-        persistentStore = null;
-        persistentStoreError = null;
+export function createOAuthReplayCapability(
+    readDatabase,
+    config = { maxEntriesPerNamespace: DEFAULT_MAX_ENTRIES_PER_NAMESPACE },
+) {
+    if (typeof readDatabase !== 'function') throw new TypeError('OAuth replay capability requires a database reader.');
+    const maxEntriesPerNamespace = normalizeMaxEntries(config.maxEntriesPerNamespace);
+    /** @type {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} */
+    let boundDatabase = null;
+    /** @type {ReturnType<typeof createOAuthReplayStore> | null} */
+    let store = null;
+    /** @type {string | null} */
+    let lastError = null;
+
+    const requireStore = () => {
+        const database = readDatabase();
+        if (!database) throw new Error('Persistent OAuth replay database capability is unavailable.');
+        if (database !== boundDatabase || !store) {
+            boundDatabase = database;
+            store = createOAuthReplayStore(database, { maxEntriesPerNamespace });
+        }
+        return store;
     };
+
+    return Object.freeze({
+        /**
+         * @param {string} namespace
+         * @param {string} replayKey
+         * @param {number} expiresAtMs
+         * @returns {OAuthReplayRememberResult}
+         */
+        remember(namespace, replayKey, expiresAtMs) {
+            try {
+                const result = requireStore().remember(namespace, replayKey, expiresAtMs);
+                lastError = null;
+                return result;
+            } catch (error) {
+                lastError = error instanceof Error ? error.message : String(error);
+                return { replay: false, stored: false, available: false, pruned: 0, evicted: 0, error: lastError };
+            }
+        },
+        /** @returns {{ available: boolean; entries: number | null; maxEntriesPerNamespace: number; error: string | null }} */
+        status() {
+            try {
+                const status = requireStore().status();
+                lastError = null;
+                return { ...status, error: null };
+            } catch (error) {
+                lastError = error instanceof Error ? error.message : String(error);
+                return { available: false, entries: null, maxEntriesPerNamespace, error: lastError };
+            }
+        },
+    });
 }
 
 /**
  * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {import('./config.js').OAuthReplayStoreConfig} [config]
  */
-export function createConfiguredOAuthReplayStore(db, env = process.env) {
-    return createOAuthReplayStore(db, { maxEntriesPerNamespace: readConfiguredMaxEntries(env) });
-}
-
-/**
- * @param {string} namespace
- * @param {string} replayKey
- * @param {number} expiresAtMs
- * @returns {OAuthReplayRememberResult}
- */
-export function rememberPersistentOAuthReplay(namespace, replayKey, expiresAtMs) {
-    try {
-        const store = getPersistentStore();
-        return store.remember(namespace, replayKey, expiresAtMs);
-    } catch (error) {
-        persistentStoreError = error instanceof Error ? error.message : String(error);
-        return {
-            replay: false,
-            stored: false,
-            available: false,
-            pruned: 0,
-            evicted: 0,
-            error: persistentStoreError,
-        };
-    }
-}
-
-/**
- * @returns {{ available: boolean; entries: number | null; maxEntriesPerNamespace: number; error: string | null }}
- */
-export function readPersistentOAuthReplayStatus() {
-    try {
-        const status = getPersistentStore().status();
-        persistentStoreError = null;
-        return { ...status, error: null };
-    } catch (error) {
-        persistentStoreError = error instanceof Error ? error.message : String(error);
-        return {
-            available: false,
-            entries: null,
-            maxEntriesPerNamespace: readConfiguredMaxEntries(),
-            error: persistentStoreError,
-        };
-    }
-}
-
-function getPersistentStore() {
-    if (persistentStore) return persistentStore;
-    throw new Error('Persistent OAuth replay store has not been configured by MCP process composition.');
-}
-
-/** @param {NodeJS.ProcessEnv} [env] */
-function readConfiguredMaxEntries(env = process.env) {
-    return normalizeMaxEntries(Number(env['COPILOT_MCP_OAUTH_REPLAY_MAX_ENTRIES_PER_NAMESPACE']));
+export function createConfiguredOAuthReplayStore(
+    db,
+    config = { maxEntriesPerNamespace: DEFAULT_MAX_ENTRIES_PER_NAMESPACE },
+) {
+    return createOAuthReplayStore(db, { maxEntriesPerNamespace: config.maxEntriesPerNamespace });
 }
 
 /**

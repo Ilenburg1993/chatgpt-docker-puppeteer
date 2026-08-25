@@ -9,18 +9,19 @@
  */
 
 import { createWorkspaceReadIo } from '#copilot/infra/public/composition/workspace/read-io';
+import { parse } from '@babel/parser';
 import { posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const architectureWorkspaceIo = createWorkspaceReadIo({ workspaceRoot: ROOT });
 const PRESENTATION_ROOT = 'src/copilot/presentation';
-const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts']);
+const SOURCE_EXTENSIONS = Object.freeze(['.js', '.mjs', '.cjs', '.ts']);
 
 const HOTSPOT_BUDGETS = Object.freeze([
     { path: 'src/copilot/terminal/commands/byok.js', maxBytes: 375_000, maxLines: 8_700 },
     { path: 'src/copilot/model-gateway/catalog/sqlite-catalog-store.js', maxBytes: 175_000 },
-    { path: 'src/copilot/mcp/auth/issuer/dev-oauth.js', maxBytes: 165_000 },
+    { path: 'src/copilot/mcp/auth/issuer/dev-oauth.js', maxBytes: 247_500 },
     { path: 'src/copilot/terminal/commands/session.js', maxBytes: 135_000 },
     { path: 'src/copilot/terminal/commands/sdk.js', maxBytes: 120_000 },
     { path: 'src/copilot/terminal/events/sdk-session-events.js', maxBytes: 112_000 },
@@ -49,10 +50,849 @@ async function collectSourceFiles(path) {
         const info = (await architectureWorkspaceIo.lstatPath(resolve(ROOT, relative))).stats;
         if (info.isSymbolicLink()) continue;
         if (info.isDirectory()) files.push(...(await collectSourceFiles(relative)));
-        else if (info.isFile() && SOURCE_EXTENSIONS.has(entryName.slice(entryName.lastIndexOf('.'))))
+        else if (info.isFile() && SOURCE_EXTENSIONS.includes(entryName.slice(entryName.lastIndexOf('.'))))
             files.push(relative);
     }
     return files;
+}
+
+/** @param {unknown} value */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
+/**
+ * Collect code-loading/process-authority facts that cannot be proven by the legacy literal-import regex alone.
+ *
+ * @param {string} source
+ * @param {string} path
+ */
+function collectModuleAuthorityFacts(source, path) {
+    /** @type {ReturnType<typeof parse>} */
+    let ast;
+    try {
+        ast = parse(source, { sourceType: 'module' });
+    } catch (error) {
+        return {
+            parseError: `${path}: ${error instanceof Error ? error.message : String(error)}`,
+            computedImports: /** @type {{ line: number | null; expressionType: string }[]} */ ([]),
+            childProcessImport: false,
+            workerThreadImport: false,
+            processEnvReferences: 0,
+            broadChildEnvironmentLines: /** @type {number[]} */ ([]),
+            broadEnvironmentSpreadLines: /** @type {number[]} */ ([]),
+            topLevelStateDeclarations: /** @type {{ name: string; kind: string; collection?: string }[]} */ ([]),
+            processSemantics: {
+                abortAware: false,
+                observesClose: false,
+                detachedLaunch: false,
+                spawnAcceptance: false,
+            },
+        };
+    }
+
+    /** @type {{ line: number | null; expressionType: string }[]} */
+    const computedImports = [];
+    let childProcessImport = false;
+    let workerThreadImport = false;
+    let processEnvReferences = 0;
+    /** @type {number[]} */
+    const broadChildEnvironmentLines = [];
+    /** @type {number[]} */
+    const broadEnvironmentSpreadLines = [];
+    const childProcessFunctionBindings = new Set();
+    const childProcessNamespaceBindings = new Set();
+    const childProcessCreationMethods = new Set([
+        'spawn',
+        'spawnSync',
+        'exec',
+        'execSync',
+        'execFile',
+        'execFileSync',
+        'fork',
+    ]);
+
+    /** @type {{ name: string; kind: string; collection?: string }[]} */
+    const topLevelStateDeclarations = [];
+    for (const statement of ast.program.body) {
+        if (statement.type !== 'VariableDeclaration') continue;
+        for (const declaration of statement.declarations) {
+            const init = declaration.init;
+            const collection =
+                init?.type === 'NewExpression' &&
+                init.callee.type === 'Identifier' &&
+                ['Map', 'Set', 'WeakMap', 'WeakSet'].includes(init.callee.name)
+                    ? init.callee.name
+                    : null;
+            if (statement.kind !== 'let' && !collection) continue;
+            const name = declaration.id.type === 'Identifier' ? declaration.id.name : declaration.id.type;
+            topLevelStateDeclarations.push({
+                name,
+                kind: statement.kind,
+                ...(collection ? { collection } : {}),
+            });
+        }
+    }
+
+    /** @param {Record<string, unknown>} node */
+    function readNodeStartLine(node) {
+        const loc = asRecord(node['loc']);
+        const start = asRecord(loc['start']);
+        return typeof start['line'] === 'number' ? start['line'] : null;
+    }
+
+    /** @param {unknown} candidate @returns {boolean} */
+    function containsProcessEnv(candidate) {
+        if (!candidate || typeof candidate !== 'object') return false;
+        const node = asRecord(candidate);
+        if (node['type'] === 'MemberExpression') {
+            const objectNode = asRecord(node['object']);
+            const propertyNode = asRecord(node['property']);
+            if (
+                objectNode['type'] === 'Identifier' &&
+                objectNode['name'] === 'process' &&
+                ((propertyNode['type'] === 'Identifier' && propertyNode['name'] === 'env') ||
+                    (node['computed'] === true &&
+                        propertyNode['type'] === 'StringLiteral' &&
+                        propertyNode['value'] === 'env'))
+            ) {
+                return true;
+            }
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (['loc', 'start', 'end', 'extra', 'comments', 'tokens'].includes(key)) continue;
+            if (Array.isArray(value)) {
+                if (value.some((item) => containsProcessEnv(item))) return true;
+            } else if (value && typeof value === 'object' && containsProcessEnv(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @param {unknown} candidate @returns {boolean} */
+    function isBroadEnvironmentSpread(candidate) {
+        const node = asRecord(candidate);
+        if (containsProcessEnv(node)) return true;
+        return (
+            node['type'] === 'Identifier' &&
+            /^(?:env|parentEnv|sourceEnv|environment)$/u.test(String(node['name'] ?? ''))
+        );
+    }
+
+    /** @param {Record<string, unknown>} callNode @returns {boolean} */
+    function isProcessCreationCall(callNode) {
+        const callee = asRecord(callNode['callee']);
+        if (callee['type'] === 'Identifier') {
+            return childProcessFunctionBindings.has(String(callee['name'] ?? ''));
+        }
+        if (callee['type'] !== 'MemberExpression') return false;
+        const object = asRecord(callee['object']);
+        if (object['type'] !== 'Identifier' || !childProcessNamespaceBindings.has(String(object['name'] ?? ''))) {
+            return false;
+        }
+        const property = asRecord(callee['property']);
+        const method = property['type'] === 'Identifier' ? property['name'] : property['value'];
+        return childProcessCreationMethods.has(String(method ?? ''));
+    }
+
+    /** @param {Record<string, unknown>} callNode */
+    function recordBroadChildEnvironment(callNode) {
+        if (!isProcessCreationCall(callNode)) return;
+        const args = Array.isArray(callNode['arguments']) ? callNode['arguments'] : [];
+        let hasExplicitEnvironment = false;
+        let broadEnvironment = false;
+        for (const rawArg of args) {
+            const arg = asRecord(rawArg);
+            if (arg['type'] !== 'ObjectExpression') continue;
+            const properties = Array.isArray(arg['properties']) ? arg['properties'] : [];
+            for (const rawProperty of properties) {
+                const property = asRecord(rawProperty);
+                if (property['type'] === 'SpreadElement' && containsProcessEnv(property['argument'])) {
+                    broadEnvironment = true;
+                    continue;
+                }
+                if (property['type'] !== 'ObjectProperty') continue;
+                const key = asRecord(property['key']);
+                const keyName = key['type'] === 'Identifier' ? key['name'] : key['value'];
+                if (keyName !== 'env') continue;
+                hasExplicitEnvironment = true;
+                if (containsProcessEnv(property['value'])) broadEnvironment = true;
+            }
+        }
+        // Node child_process inherits process.env when options.env is omitted. Treat omission as ambient authority rather
+        // than as a harmless default; callers must choose an explicit projected environment, including `{}` when none
+        // is required.
+        if (!hasExplicitEnvironment || broadEnvironment) {
+            broadChildEnvironmentLines.push(readNodeStartLine(callNode) ?? 0);
+        }
+    }
+
+    /** @param {unknown} candidate */
+    function walk(candidate) {
+        if (!candidate || typeof candidate !== 'object') return;
+        const node = asRecord(candidate);
+        const nodeType = node['type'];
+        if (nodeType === 'ImportDeclaration') {
+            const sourceNode = asRecord(node['source']);
+            const specifier = sourceNode['value'];
+            if (specifier === 'node:child_process' || specifier === 'child_process') {
+                childProcessImport = true;
+                const importSpecifiers = Array.isArray(node['specifiers']) ? node['specifiers'] : [];
+                for (const rawSpecifier of importSpecifiers) {
+                    const importSpecifier = asRecord(rawSpecifier);
+                    const local = asRecord(importSpecifier['local']);
+                    const localName = local['type'] === 'Identifier' ? String(local['name'] ?? '') : '';
+                    if (!localName) continue;
+                    if (
+                        importSpecifier['type'] === 'ImportNamespaceSpecifier' ||
+                        importSpecifier['type'] === 'ImportDefaultSpecifier'
+                    ) {
+                        childProcessNamespaceBindings.add(localName);
+                        continue;
+                    }
+                    if (importSpecifier['type'] !== 'ImportSpecifier') continue;
+                    const imported = asRecord(importSpecifier['imported']);
+                    const importedName = String(imported['name'] ?? imported['value'] ?? '');
+                    if (childProcessCreationMethods.has(importedName)) childProcessFunctionBindings.add(localName);
+                }
+            }
+            if (specifier === 'node:worker_threads' || specifier === 'worker_threads') workerThreadImport = true;
+        }
+        if (nodeType === 'SpreadElement' && isBroadEnvironmentSpread(node['argument'])) {
+            broadEnvironmentSpreadLines.push(readNodeStartLine(node) ?? 0);
+        }
+        if (nodeType === 'MemberExpression') {
+            const objectNode = asRecord(node['object']);
+            const propertyNode = asRecord(node['property']);
+            if (
+                objectNode['type'] === 'Identifier' &&
+                objectNode['name'] === 'process' &&
+                ((propertyNode['type'] === 'Identifier' && propertyNode['name'] === 'env') ||
+                    (node['computed'] === true &&
+                        propertyNode['type'] === 'StringLiteral' &&
+                        propertyNode['value'] === 'env'))
+            ) {
+                processEnvReferences += 1;
+            }
+        }
+        if (nodeType === 'ImportExpression') {
+            const sourceNode = asRecord(node['source']);
+            if (sourceNode['type'] !== 'StringLiteral') {
+                computedImports.push({
+                    line: readNodeStartLine(node),
+                    expressionType: String(sourceNode['type'] ?? 'unknown'),
+                });
+            }
+        }
+        if (nodeType === 'CallExpression') {
+            recordBroadChildEnvironment(node);
+            const calleeNode = asRecord(node['callee']);
+            const argumentNodes = Array.isArray(node['arguments']) ? node['arguments'] : [];
+            if (calleeNode['type'] === 'Import') {
+                const sourceNode = asRecord(argumentNodes[0]);
+                if (sourceNode['type'] !== 'StringLiteral') {
+                    computedImports.push({
+                        line: readNodeStartLine(node),
+                        expressionType: String(sourceNode['type'] ?? 'unknown'),
+                    });
+                }
+            }
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (['loc', 'start', 'end', 'extra', 'comments', 'tokens'].includes(key)) continue;
+            if (Array.isArray(value)) {
+                for (const item of value) walk(item);
+            } else if (value && typeof value === 'object') {
+                walk(value);
+            }
+        }
+    }
+    walk(ast.program);
+    return {
+        parseError: null,
+        computedImports,
+        childProcessImport,
+        workerThreadImport,
+        processEnvReferences,
+        broadChildEnvironmentLines,
+        broadEnvironmentSpreadLines,
+        topLevelStateDeclarations,
+        processSemantics: {
+            abortAware: /(?:addEventListener\(\s*['"]abort['"]|\.aborted\b|AbortSignal\b)/u.test(source),
+            observesClose: /(?:\.closed\b|once\(\s*['"]close['"])/u.test(source),
+            detachedLaunch: /detached\s*:\s*(?:true|process\.platform\s*!==\s*['"]win32['"])/u.test(source),
+            spawnAcceptance: /once\(\s*['"]spawn['"]/u.test(source),
+        },
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} manifest
+ * @param {string[]} mcpSourceFiles
+ */
+function validateMcpOwnerManifest(manifest, mcpSourceFiles) {
+    const ownerRows = Array.isArray(manifest['owners']) ? manifest['owners'].map(asRecord) : [];
+    const violations = [];
+    const byId = new Map();
+    const byPath = new Map();
+    for (const owner of ownerRows) {
+        const ownerId = owner['ownerId'];
+        const ownerPath = owner['path'];
+        const kind = owner['kind'];
+        if (typeof ownerId !== 'string' || !ownerId) {
+            violations.push('owner with missing ownerId');
+            continue;
+        }
+        if (typeof ownerPath !== 'string' || !ownerPath.startsWith('src/copilot/mcp')) {
+            violations.push(`${ownerId}: invalid path=${String(ownerPath)}`);
+            continue;
+        }
+        if (!['owner', 'taxonomy', 'entrypoint-space'].includes(String(kind))) {
+            violations.push(`${ownerId}: invalid kind=${String(kind)}`);
+        }
+        if (byId.has(ownerId)) violations.push(`duplicate ownerId=${ownerId}`);
+        if (byPath.has(ownerPath)) violations.push(`duplicate owner path=${ownerPath}`);
+        byId.set(ownerId, owner);
+        byPath.set(ownerPath, owner);
+    }
+    for (const [ownerId, owner] of byId.entries()) {
+        const parentOwnerId = owner['parentOwnerId'];
+        if (parentOwnerId === null) continue;
+        if (typeof parentOwnerId !== 'string' || !byId.has(parentOwnerId)) {
+            violations.push(`${ownerId}: missing parent=${String(parentOwnerId)}`);
+            continue;
+        }
+        const parentPath = byId.get(parentOwnerId)?.['path'];
+        if (typeof parentPath === 'string' && !String(owner['path']).startsWith(`${parentPath}/`)) {
+            violations.push(`${ownerId}: path is outside parent ${parentOwnerId}`);
+        }
+        const visited = new Set([ownerId]);
+        /** @type {string | null} */
+        let cursor = parentOwnerId;
+        while (cursor) {
+            if (visited.has(cursor)) {
+                violations.push(`${ownerId}: parent cycle through ${cursor}`);
+                break;
+            }
+            visited.add(cursor);
+            const nextParentOwnerId = /** @type {unknown} */ (byId.get(cursor)?.['parentOwnerId']);
+            cursor = typeof nextParentOwnerId === 'string' && nextParentOwnerId ? nextParentOwnerId : null;
+        }
+    }
+
+    const mcpPrefix = 'src/copilot/mcp/';
+    const physicalTopLevel = new Set(
+        mcpSourceFiles
+            .map((path) => path.slice(mcpPrefix.length).split('/'))
+            .filter((parts) => parts.length > 1)
+            .map((parts) => `${mcpPrefix}${parts[0]}`),
+    );
+    const manifestTopLevel = new Set(
+        ownerRows
+            .filter((owner) => owner['parentOwnerId'] === manifest['rootOwnerId'])
+            .map((owner) => owner['path'])
+            .filter((path) => typeof path === 'string'),
+    );
+    for (const path of physicalTopLevel)
+        if (!manifestTopLevel.has(path)) violations.push(`unclassified top-level path=${path}`);
+    for (const path of manifestTopLevel)
+        if (!physicalTopLevel.has(path)) violations.push(`stale top-level owner path=${path}`);
+
+    return {
+        violations,
+        owners: ownerRows,
+        protectedRoots: ownerRows
+            .filter((owner) => owner['protectedBoundary'] === true && typeof owner['path'] === 'string')
+            .map((owner) => /** @type {string} */ (owner['path'])),
+    };
+}
+
+/**
+ * Find risk annotations declared directly on raw wire-tool object literals. Canonical protocol annotations must be
+ * projected from the exhaustive semantic Tool Contract, never authored independently by a wire tool.
+ *
+ * @param {string} source
+ * @param {string} path
+ */
+function collectRawToolAnnotationDeclarations(source, path) {
+    /** @type {ReturnType<typeof parse>} */
+    let ast;
+    try {
+        ast = parse(source, { sourceType: 'module' });
+    } catch {
+        return [];
+    }
+    /** @type {number[]} */
+    const lines = [];
+    /** @param {unknown} candidate */
+    function walk(candidate) {
+        if (!candidate || typeof candidate !== 'object') return;
+        const node = asRecord(candidate);
+        if (node['type'] === 'ObjectExpression') {
+            const properties = Array.isArray(node['properties']) ? node['properties'].map(asRecord) : [];
+            const keys = new Set(
+                properties
+                    .filter((property) => property['type'] === 'ObjectProperty' && property['computed'] !== true)
+                    .map((property) => {
+                        const key = asRecord(property['key']);
+                        return String(key['name'] ?? key['value'] ?? '');
+                    }),
+            );
+            if (
+                keys.has('name') &&
+                keys.has('description') &&
+                keys.has('inputSchema') &&
+                keys.has('handler') &&
+                keys.has('annotations')
+            ) {
+                const loc = asRecord(node['loc']);
+                const start = asRecord(loc['start']);
+                lines.push(typeof start['line'] === 'number' ? start['line'] : 0);
+            }
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (['loc', 'start', 'end', 'extra', 'comments', 'tokens'].includes(key)) continue;
+            if (Array.isArray(value)) for (const item of value) walk(item);
+            else if (value && typeof value === 'object') walk(value);
+        }
+    }
+    walk(ast.program);
+    return lines.map((line) => `${path}:${line || 'unknown-line'}`);
+}
+
+/**
+ * Measure the raw-tool definition boundary. Every literal tool definition must be contextually typed by
+ * defineMcpRawTool(inputSchema -> Zod output) before entering the heterogeneous catalog.
+ *
+ * @param {string} source
+ * @param {string} path
+ * @returns {{ definitions: number; wrapped: number; violations: string[] }}
+ */
+function collectRawToolDefinitionBoundaryFacts(source, path) {
+    /** @type {ReturnType<typeof parse>} */
+    let ast;
+    try {
+        ast = parse(source, { sourceType: 'module' });
+    } catch {
+        return { definitions: 0, wrapped: 0, violations: [`${path}:parse-failed`] };
+    }
+    let definitions = 0;
+    let wrapped = 0;
+    /** @type {string[]} */
+    const violations = [];
+    /** @param {unknown} candidate @param {Record<string, unknown> | null} parent */
+    function walk(candidate, parent) {
+        if (!candidate || typeof candidate !== 'object') return;
+        const node = asRecord(candidate);
+        if (node['type'] === 'ObjectExpression') {
+            const properties = Array.isArray(node['properties']) ? node['properties'].map(asRecord) : [];
+            const keys = new Set(
+                properties
+                    .filter((property) => property['type'] === 'ObjectProperty' && property['computed'] !== true)
+                    .map((property) => {
+                        const key = asRecord(property['key']);
+                        return String(key['name'] ?? key['value'] ?? '');
+                    }),
+            );
+            if (
+                keys.has('name') &&
+                keys.has('title') &&
+                keys.has('description') &&
+                keys.has('inputSchema') &&
+                keys.has('handler')
+            ) {
+                definitions += 1;
+                const callee = parent?.['type'] === 'CallExpression' ? asRecord(parent['callee']) : {};
+                const isWrapped = callee['type'] === 'Identifier' && callee['name'] === 'defineMcpRawTool';
+                if (isWrapped) wrapped += 1;
+                else {
+                    const loc = asRecord(node['loc']);
+                    const start = asRecord(loc['start']);
+                    const line = typeof start['line'] === 'number' ? start['line'] : 'unknown-line';
+                    violations.push(`${path}:${line}:missing-defineMcpRawTool`);
+                }
+            }
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (['loc', 'start', 'end', 'extra', 'comments', 'tokens'].includes(key)) continue;
+            if (Array.isArray(value)) for (const item of value) walk(item, node);
+            else if (value && typeof value === 'object') walk(value, node);
+        }
+    }
+    walk(ast.program, null);
+    return { definitions, wrapped, violations };
+}
+
+const MCP_PROCESS_COMPLETION_MODELS = Object.freeze([
+    'attached-close',
+    'detached-acceptance',
+    'managed-lifecycle',
+    'job-lifecycle',
+    'persistent-session',
+    'sync-probe',
+]);
+const MCP_PROCESS_CANCELLATION_MODES = Object.freeze([
+    'drain',
+    'before-acceptance',
+    'before-acceptance-then-explicit-control',
+    'explicit-control',
+    'not-applicable',
+]);
+const MCP_PROCESS_CWD_AUTHORITIES = Object.freeze([
+    'fixed-workspace',
+    'caller-bounded-workspace',
+    'process-cwd-inherited',
+]);
+
+/**
+ * @param {Record<string, unknown>} manifest
+ * @param {Set<string>} actualChildProcessOwners
+ * @param {Map<string, ReturnType<typeof collectModuleAuthorityFacts>>} moduleAuthorityFacts
+ * @param {ReturnType<typeof validateMcpOwnerManifest>} ownerManifestReport
+ */
+function validateMcpChildProcessAuthorityManifest(
+    manifest,
+    actualChildProcessOwners,
+    moduleAuthorityFacts,
+    ownerManifestReport,
+) {
+    const violations = [];
+    const rows = Array.isArray(manifest['childProcessAuthorities'])
+        ? manifest['childProcessAuthorities'].map(asRecord)
+        : [];
+    const byPath = new Map();
+    const ownersById = new Map(ownerManifestReport.owners.map((owner) => [owner['ownerId'], owner]));
+    for (const row of rows) {
+        const path = row['path'];
+        const ownerId = row['ownerId'];
+        if (typeof path !== 'string' || !path) {
+            violations.push('process authority with missing path');
+            continue;
+        }
+        if (byPath.has(path)) violations.push(`${path}: duplicate process authority`);
+        byPath.set(path, row);
+        if (!actualChildProcessOwners.has(path)) violations.push(`${path}: stale process authority`);
+        const owner = typeof ownerId === 'string' ? ownersById.get(ownerId) : undefined;
+        if (!owner) violations.push(`${path}: unknown ownerId=${String(ownerId)}`);
+        else {
+            const ownerPath = String(owner['path'] ?? '');
+            if (!(path === ownerPath || path.startsWith(`${ownerPath}/`))) {
+                violations.push(`${path}: outside owner=${String(ownerId)}`);
+            }
+        }
+        const launchers = Array.isArray(row['launchers']) ? row['launchers'].map(asRecord) : [];
+        if (launchers.length === 0) violations.push(`${path}: no launcher contracts`);
+        const ids = new Set();
+        const facts = moduleAuthorityFacts.get(path);
+        for (const launcher of launchers) {
+            const id = launcher['id'];
+            const completionModel = String(launcher['completionModel'] ?? '');
+            const callerCancellation = String(launcher['callerCancellation'] ?? '');
+            const cwdAuthority = String(launcher['cwdAuthority'] ?? '');
+            const environmentAuthority = String(launcher['environmentAuthority'] ?? '');
+            const processGroup = String(launcher['processGroup'] ?? '');
+            const bound = launcher['bound'];
+            if (typeof id !== 'string' || !id) violations.push(`${path}: launcher missing id`);
+            else if (ids.has(id)) violations.push(`${path}: duplicate launcher id=${id}`);
+            else ids.add(id);
+            if (!MCP_PROCESS_COMPLETION_MODELS.includes(completionModel))
+                violations.push(`${path}:${String(id)} invalid completionModel=${completionModel}`);
+            if (!MCP_PROCESS_CANCELLATION_MODES.includes(callerCancellation))
+                violations.push(`${path}:${String(id)} invalid callerCancellation=${callerCancellation}`);
+            if (!MCP_PROCESS_CWD_AUTHORITIES.includes(cwdAuthority))
+                violations.push(`${path}:${String(id)} invalid cwdAuthority=${cwdAuthority}`);
+            if (environmentAuthority !== 'explicit-projection')
+                violations.push(`${path}:${String(id)} invalid environmentAuthority=${environmentAuthority}`);
+            if (!['yes', 'no'].includes(processGroup))
+                violations.push(`${path}:${String(id)} invalid processGroup=${processGroup}`);
+            if (typeof bound !== 'string' || bound.trim().length < 12)
+                violations.push(`${path}:${String(id)} missing bound/rationale`);
+            if (
+                callerCancellation === 'drain' &&
+                (!facts?.processSemantics.abortAware || !facts.processSemantics.observesClose)
+            ) {
+                violations.push(`${path}:${String(id)} claims drain without abort+close evidence`);
+            }
+            if (
+                (callerCancellation === 'before-acceptance' ||
+                    callerCancellation === 'before-acceptance-then-explicit-control') &&
+                (!facts?.processSemantics.abortAware ||
+                    !facts.processSemantics.detachedLaunch ||
+                    !facts.processSemantics.spawnAcceptance ||
+                    !facts.processSemantics.observesClose)
+            ) {
+                violations.push(
+                    `${path}:${String(id)} claims a pre-acceptance cancellation boundary without abort+detached+spawn+close evidence`,
+                );
+            }
+            if (
+                callerCancellation === 'before-acceptance-then-explicit-control' &&
+                completionModel !== 'persistent-session'
+            ) {
+                violations.push(
+                    `${path}:${String(id)} may transfer from caller cancellation to explicit control only for persistent-session lifecycle`,
+                );
+            }
+            if (completionModel === 'attached-close' && !facts?.processSemantics.observesClose)
+                violations.push(`${path}:${String(id)} claims attached-close without close evidence`);
+            if (
+                completionModel === 'detached-acceptance' &&
+                (!facts?.processSemantics.detachedLaunch || !facts.processSemantics.spawnAcceptance)
+            ) {
+                violations.push(`${path}:${String(id)} claims detached-acceptance without detached+spawn evidence`);
+            }
+        }
+    }
+    for (const path of actualChildProcessOwners)
+        if (!byPath.has(path)) violations.push(`${path}: undeclared process authority`);
+    return { violations, rows };
+}
+
+const MCP_STATE_SCOPES = Object.freeze([
+    'process',
+    'process-generation',
+    'workspace',
+    'config-identity',
+    'transport-identity',
+]);
+const MCP_STATE_LIFECYCLES = Object.freeze([
+    'bounded-cache',
+    'weak-identity-cache',
+    'timer-service',
+    'singleton-runtime',
+    'state-machine',
+    'registry',
+    'session-manager',
+    'job-manager',
+    'last-value',
+    'counter',
+    'provider-binding',
+]);
+const MCP_STATE_BOUNDEDNESS = Object.freeze([
+    'bounded',
+    'weak-keyed',
+    'single-value',
+    'externally-bounded',
+    'persistent-bounded',
+    'unbounded-review',
+]);
+
+/**
+ * @param {Record<string, unknown>} manifest
+ * @param {Map<string, ReturnType<typeof collectModuleAuthorityFacts>>} moduleAuthorityFacts
+ * @param {ReturnType<typeof validateMcpOwnerManifest>} ownerManifestReport
+ */
+function validateMcpStateScopeManifest(manifest, moduleAuthorityFacts, ownerManifestReport) {
+    const violations = [];
+    const rawEntries = Array.isArray(manifest['entries']) ? manifest['entries'].map(asRecord) : [];
+    /** @type {Map<string, { declarations: Record<string, unknown>[]; migrationTarget: boolean }>} */
+    const declared = new Map();
+    const owners = ownerManifestReport.owners;
+    /** @param {string} sourcePath */
+    const resolveOwnerId = (sourcePath) =>
+        owners
+            .filter(
+                (owner) =>
+                    typeof owner['path'] === 'string' &&
+                    (sourcePath === owner['path'] || sourcePath.startsWith(`${owner['path']}/`)),
+            )
+            .sort((left, right) => String(right['path']).length - String(left['path']).length)[0]?.['ownerId'] ?? null;
+    let migrationTargetCount = 0;
+    let declarationCount = 0;
+
+    for (const entry of rawEntries) {
+        const sourcePath = entry['path'];
+        if (typeof sourcePath !== 'string' || !sourcePath.startsWith('src/copilot/mcp/')) {
+            violations.push(`state manifest invalid path=${String(sourcePath)}`);
+            continue;
+        }
+        if (declared.has(sourcePath)) {
+            violations.push(`${sourcePath}: duplicate state-scope declaration`);
+            continue;
+        }
+        if (!MCP_STATE_SCOPES.includes(String(entry['scope'])))
+            violations.push(`${sourcePath}: invalid scope=${String(entry['scope'])}`);
+        if (!MCP_STATE_LIFECYCLES.includes(String(entry['lifecycle'])))
+            violations.push(`${sourcePath}: invalid lifecycle=${String(entry['lifecycle'])}`);
+        if (!MCP_STATE_BOUNDEDNESS.includes(String(entry['boundedness'])))
+            violations.push(`${sourcePath}: invalid boundedness=${String(entry['boundedness'])}`);
+        if (typeof entry['bound'] !== 'string' || !entry['bound'])
+            violations.push(`${sourcePath}: missing bound rationale`);
+        if (typeof entry['rationale'] !== 'string' || !entry['rationale'])
+            violations.push(`${sourcePath}: missing state rationale`);
+        const expectedOwner = resolveOwnerId(sourcePath);
+        if (entry['ownerId'] !== expectedOwner)
+            violations.push(
+                `${sourcePath}: owner mismatch declared=${String(entry['ownerId'])} actual=${String(expectedOwner)}`,
+            );
+        const declarations = Array.isArray(entry['declarations']) ? entry['declarations'].map(asRecord) : [];
+        if (declarations.length === 0) violations.push(`${sourcePath}: empty state declaration list`);
+        declarationCount += declarations.length;
+        const migrationTarget = entry['migrationTarget'] === true;
+        if (migrationTarget) migrationTargetCount += 1;
+        declared.set(sourcePath, { declarations, migrationTarget });
+    }
+
+    /** @param {Record<string, unknown>} entry */
+    const normalizeDeclaration = (entry) =>
+        `${String(entry['name'])}:${String(entry['kind'])}:${String(entry['collection'] ?? '')}`;
+    let actualFileCount = 0;
+    let actualDeclarationCount = 0;
+    for (const [sourcePath, facts] of moduleAuthorityFacts.entries()) {
+        const actualDeclarations = facts.topLevelStateDeclarations;
+        if (actualDeclarations.length === 0) continue;
+        actualFileCount += 1;
+        actualDeclarationCount += actualDeclarations.length;
+        const manifestEntry = declared.get(sourcePath);
+        if (!manifestEntry) {
+            violations.push(`${sourcePath}: undeclared top-level mutable state count=${actualDeclarations.length}`);
+            continue;
+        }
+        const actual = actualDeclarations.map((entry) => normalizeDeclaration(entry)).sort();
+        const expected = manifestEntry.declarations.map((entry) => normalizeDeclaration(entry)).sort();
+        if (actual.join('|') !== expected.join('|')) {
+            violations.push(
+                `${sourcePath}: state declaration drift actual=${actual.join(',')} declared=${expected.join(',')}`,
+            );
+        }
+    }
+    for (const [sourcePath] of declared.entries()) {
+        const facts = moduleAuthorityFacts.get(sourcePath);
+        if (!facts) violations.push(`${sourcePath}: stale state-scope path`);
+        else if (facts.topLevelStateDeclarations.length === 0)
+            violations.push(`${sourcePath}: stale zero-state manifest entry`);
+    }
+    const policy = asRecord(manifest['policy']);
+    if (policy['unknownTopLevelMutableState'] !== 'reject')
+        violations.push('state policy must reject unknown mutable state');
+    if (policy['staleEntries'] !== 'reject') violations.push('state policy must reject stale entries');
+    if (policy['migrationTargetRatchet'] !== 'exact') violations.push('state migration target ratchet must be exact');
+
+    return {
+        violations,
+        declaredFileCount: declared.size,
+        declaredDeclarationCount: declarationCount,
+        actualFileCount,
+        actualDeclarationCount,
+        migrationTargetCount,
+    };
+}
+
+const MCP_CONFIG_AUTHORITY_CLASSES = Object.freeze([
+    'canonical-snapshot',
+    'config-parser-default',
+    'environment-projector',
+    'process-entrypoint',
+    'migration-target',
+]);
+
+/**
+ * Validate the exact set of source files still entitled to read ambient process environment. Migration targets are
+ * exact-count ratchets: reducing one requires shrinking the manifest immediately, so the old budget can never regrow
+ * silently. Stable parser/entrypoint/projector authorities use ceilings but stale zero-reference entries are rejected.
+ *
+ * @param {Record<string, unknown>} manifest
+ * @param {Map<string, ReturnType<typeof collectModuleAuthorityFacts>>} moduleAuthorityFacts
+ * @param {ReturnType<typeof validateMcpOwnerManifest>} ownerManifestReport
+ */
+function validateMcpConfigAuthorityManifest(manifest, moduleAuthorityFacts, ownerManifestReport) {
+    const violations = [];
+    const authorities = asRecord(manifest['authorities']);
+    const declaredByPath = new Map();
+    let migrationTargetCount = 0;
+
+    for (const [authorityClass, rawEntries] of Object.entries(authorities)) {
+        if (!MCP_CONFIG_AUTHORITY_CLASSES.includes(authorityClass)) {
+            violations.push(`unknown authority class=${authorityClass}`);
+            continue;
+        }
+        if (!Array.isArray(rawEntries)) {
+            violations.push(`${authorityClass}: entries must be an array`);
+            continue;
+        }
+        for (const rawEntry of rawEntries) {
+            const entry = asRecord(rawEntry);
+            const path = entry['path'];
+            const maxReferences = Number(entry['maxReferences']);
+            if (typeof path !== 'string' || !path.startsWith('src/copilot/mcp/')) {
+                violations.push(`${authorityClass}: invalid path=${String(path)}`);
+                continue;
+            }
+            if (!Number.isInteger(maxReferences) || maxReferences < 1) {
+                violations.push(`${path}: invalid maxReferences=${String(entry['maxReferences'])}`);
+                continue;
+            }
+            if (declaredByPath.has(path)) {
+                violations.push(`${path}: duplicate config authority declaration`);
+                continue;
+            }
+            declaredByPath.set(path, { authorityClass, maxReferences });
+            if (authorityClass === 'migration-target') migrationTargetCount += 1;
+        }
+    }
+
+    let actualFileCount = 0;
+    let actualReferenceCount = 0;
+    for (const [path, facts] of moduleAuthorityFacts.entries()) {
+        const actual = facts.processEnvReferences;
+        if (actual <= 0) continue;
+        actualFileCount += 1;
+        actualReferenceCount += actual;
+        const declared = declaredByPath.get(path);
+        if (!declared) {
+            violations.push(`${path}: undeclared process.env authority actual=${actual}`);
+            continue;
+        }
+        if (actual > declared.maxReferences) {
+            violations.push(`${path}: process.env budget exceeded actual=${actual} max=${declared.maxReferences}`);
+        }
+        if (declared.authorityClass === 'migration-target' && actual !== declared.maxReferences) {
+            violations.push(`${path}: migration ratchet stale actual=${actual} declared=${declared.maxReferences}`);
+        }
+    }
+    for (const [path] of declaredByPath.entries()) {
+        const facts = moduleAuthorityFacts.get(path);
+        if (!facts) violations.push(`${path}: stale config authority path`);
+        else if (facts.processEnvReferences === 0) violations.push(`${path}: stale zero-reference config authority`);
+    }
+
+    const policy = asRecord(manifest['policy']);
+    const canonicalSnapshotPath = policy['canonicalSnapshotPath'];
+    const canonicalSnapshotOwner = policy['canonicalSnapshotOwner'];
+    const canonicalEntries = [...declaredByPath.entries()].filter(
+        ([, value]) => value.authorityClass === 'canonical-snapshot',
+    );
+    if (canonicalEntries.length !== 1) {
+        violations.push(`canonical-snapshot authority count=${canonicalEntries.length}, expected=1`);
+    }
+    const canonicalDeclaredPath = canonicalEntries[0]?.[0];
+    if (typeof canonicalSnapshotPath !== 'string' || canonicalDeclaredPath !== canonicalSnapshotPath) {
+        violations.push(
+            `canonical snapshot path mismatch policy=${String(canonicalSnapshotPath)} declared=${String(canonicalDeclaredPath)}`,
+        );
+    }
+    const canonicalOwner = ownerManifestReport.owners.find((owner) => owner['ownerId'] === canonicalSnapshotOwner);
+    if (!canonicalOwner) {
+        violations.push(`canonical snapshot owner missing=${String(canonicalSnapshotOwner)}`);
+    } else if (
+        typeof canonicalSnapshotPath === 'string' &&
+        typeof canonicalOwner['path'] === 'string' &&
+        !canonicalSnapshotPath.startsWith(`${canonicalOwner['path']}/`)
+    ) {
+        violations.push(`${canonicalSnapshotPath}: outside canonical owner=${String(canonicalSnapshotOwner)}`);
+    }
+
+    return {
+        violations,
+        declaredFileCount: declaredByPath.size,
+        actualFileCount,
+        actualReferenceCount,
+        migrationTargetCount,
+        canonicalSnapshotPath,
+    };
 }
 
 /**
@@ -91,12 +931,305 @@ export async function runArchitectureContractCheck() {
     });
 
     const mcpSourceFiles = await collectSourceFiles('src/copilot/mcp');
-    const broadChildEnvironmentPattern = /(?:\.\.\.\s*process\.env|\benv\s*:\s*process\.env\b)/u;
-    const broadChildEnvironmentViolations = [];
+    const ownerManifest = asRecord(JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-owners.json')));
+    const dynamicGraphManifest = asRecord(
+        JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-dynamic-graph.json')),
+    );
+    const configAuthorityManifest = asRecord(
+        JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-config-authorities.json')),
+    );
+    const stateScopeManifest = asRecord(
+        JSON.parse(await readWorkspaceText('config/architecture/copilot-mcp-state-scopes.json')),
+    );
+    const ownerManifestReport = validateMcpOwnerManifest(ownerManifest, mcpSourceFiles);
+    checks.push({
+        name: 'mcp-owner-manifest-is-complete-and-consistent',
+        passed: ownerManifestReport.violations.length === 0,
+        detail:
+            ownerManifestReport.violations.length === 0
+                ? `owners=${ownerManifestReport.owners.length} protectedBoundaries=${ownerManifestReport.protectedRoots.length}`
+                : `violations=${ownerManifestReport.violations.join(',')}`,
+    });
+
+    const moduleAuthorityFacts = new Map();
+    const moduleFactParseErrors = [];
     for (const path of mcpSourceFiles) {
-        if (broadChildEnvironmentPattern.test(await readWorkspaceText(path))) {
-            broadChildEnvironmentViolations.push(path);
+        const facts = collectModuleAuthorityFacts(await readWorkspaceText(path), path);
+        moduleAuthorityFacts.set(path, facts);
+        if (facts.parseError) moduleFactParseErrors.push(facts.parseError);
+    }
+    checks.push({
+        name: 'mcp-dynamic-authority-scan-parses-all-source-files',
+        passed: moduleFactParseErrors.length === 0,
+        detail:
+            moduleFactParseErrors.length === 0
+                ? `parsed=${mcpSourceFiles.length}`
+                : `errors=${moduleFactParseErrors.join(',')}`,
+    });
+
+    const stateScopeReport = validateMcpStateScopeManifest(
+        stateScopeManifest,
+        moduleAuthorityFacts,
+        ownerManifestReport,
+    );
+    checks.push({
+        name: 'mcp-top-level-mutable-state-is-declared-and-ratcheted',
+        passed: stateScopeReport.violations.length === 0,
+        detail:
+            stateScopeReport.violations.length === 0
+                ? `files=${stateScopeReport.actualFileCount} declarations=${stateScopeReport.actualDeclarationCount} migrationTargets=${stateScopeReport.migrationTargetCount}`
+                : `violations=${stateScopeReport.violations.join(',')}`,
+    });
+
+    const configAuthorityReport = validateMcpConfigAuthorityManifest(
+        configAuthorityManifest,
+        moduleAuthorityFacts,
+        ownerManifestReport,
+    );
+    checks.push({
+        name: 'mcp-process-env-authorities-are-declared-and-ratcheted',
+        passed: configAuthorityReport.violations.length === 0,
+        detail:
+            configAuthorityReport.violations.length === 0
+                ? `files=${configAuthorityReport.actualFileCount} refs=${configAuthorityReport.actualReferenceCount} migrationTargets=${configAuthorityReport.migrationTargetCount}`
+                : `violations=${configAuthorityReport.violations.join(',')}`,
+    });
+    checks.push({
+        name: 'mcp-process-config-snapshot-authority-is-singular',
+        passed:
+            configAuthorityReport.violations.length === 0 &&
+            configAuthorityReport.canonicalSnapshotPath === 'src/copilot/mcp/composition/process-config/runtime.js',
+        detail:
+            configAuthorityReport.violations.length === 0
+                ? `canonical=${String(configAuthorityReport.canonicalSnapshotPath)}`
+                : `violations=${configAuthorityReport.violations.join(',')}`,
+    });
+
+    const declaredComputedImports = Array.isArray(dynamicGraphManifest['computedImports'])
+        ? dynamicGraphManifest['computedImports'].map(asRecord)
+        : [];
+    const declaredComputedBySource = new Map(
+        declaredComputedImports
+            .filter((entry) => typeof entry['source'] === 'string')
+            .map((entry) => [entry['source'], Number(entry['expectedCount'] ?? 0)]),
+    );
+    const computedImportViolations = [];
+    for (const [path, facts] of moduleAuthorityFacts.entries()) {
+        const actualCount = facts.computedImports.length;
+        const declaredCount = declaredComputedBySource.get(path) ?? 0;
+        if (actualCount !== declaredCount) {
+            computedImportViolations.push(`${path}: actual=${actualCount} declared=${declaredCount}`);
         }
+    }
+    for (const source of declaredComputedBySource.keys()) {
+        if (!moduleAuthorityFacts.has(source))
+            computedImportViolations.push(`${source}: stale computed-import manifest entry`);
+    }
+    checks.push({
+        name: 'mcp-computed-dynamic-imports-are-explicit-and-ratcheted',
+        passed: computedImportViolations.length === 0,
+        detail:
+            computedImportViolations.length === 0
+                ? `declared=${declaredComputedImports.length} actual=${[...moduleAuthorityFacts.values()].reduce((sum, facts) => sum + facts.computedImports.length, 0)}`
+                : `violations=${computedImportViolations.join(',')}`,
+    });
+
+    const httpHandlerSource = await readWorkspaceText('src/copilot/mcp/adapters/http/handler.js');
+    const httpBodyReaderSource = await readWorkspaceText('src/copilot/mcp/adapters/http-body.js');
+    const lazyCompatibilitySpecifiers = [
+        '#copilot/mcp/public/transport/http/stateful/request-contract',
+        '#copilot/mcp/public/transport/http/stateful/router',
+        '#copilot/mcp/public/transport/http/compat/stateless',
+    ];
+    const httpCompatibilityClosureViolations = [];
+    for (const specifier of lazyCompatibilitySpecifiers) {
+        const hasStaticImport =
+            httpHandlerSource.includes(`from '${specifier}'`) || httpHandlerSource.includes(`from "${specifier}"`);
+        const hasLiteralDynamicImport =
+            httpHandlerSource.includes(`import('${specifier}')`) ||
+            httpHandlerSource.includes(`import("${specifier}")`);
+        if (hasStaticImport) httpCompatibilityClosureViolations.push(`eager=${specifier}`);
+        if (!hasLiteralDynamicImport) httpCompatibilityClosureViolations.push(`missing-lazy=${specifier}`);
+    }
+    if (httpHandlerSource.includes('NodeStreamableHTTPServerTransport')) {
+        httpCompatibilityClosureViolations.push('adapter-owns-NodeStreamableHTTPServerTransport');
+    }
+    checks.push({
+        name: 'mcp-modern-http-handler-keeps-compatibility-transports-lazy',
+        passed: httpCompatibilityClosureViolations.length === 0,
+        detail:
+            httpCompatibilityClosureViolations.length === 0
+                ? `literalLazyEdges=${lazyCompatibilitySpecifiers.length} eagerCompatEdges=0`
+                : `violations=${httpCompatibilityClosureViolations.join(',')}`,
+    });
+    const httpBodyReaderBoundaryViolations = [];
+    if (httpBodyReaderSource.includes('#copilot/mcp/public/transport/http/')) {
+        httpBodyReaderBoundaryViolations.push('body-reader-imports-transport-semantics');
+    }
+    if (
+        /\b(?:isMcpInitializeRequestBody|classifyMcpPostSessionRequirement|normalizeMcpSessionId)\b/u.test(
+            httpBodyReaderSource,
+        )
+    ) {
+        httpBodyReaderBoundaryViolations.push('body-reader-owns-session-classification');
+    }
+    checks.push({
+        name: 'mcp-http-body-reader-is-host-io-only',
+        passed: httpBodyReaderBoundaryViolations.length === 0,
+        detail:
+            httpBodyReaderBoundaryViolations.length === 0
+                ? 'bounded Node body I/O is separate from stateful transport/session semantics'
+                : `violations=${httpBodyReaderBoundaryViolations.join(',')}`,
+    });
+
+    const rawToolAnnotationViolations = [];
+    for (const path of mcpToolFiles) {
+        rawToolAnnotationViolations.push(...collectRawToolAnnotationDeclarations(await readWorkspaceText(path), path));
+    }
+    checks.push({
+        name: 'mcp-raw-tools-declare-no-independent-risk-annotations',
+        passed: rawToolAnnotationViolations.length === 0,
+        detail:
+            rawToolAnnotationViolations.length === 0
+                ? 'canonical annotations are projected only from the semantic Tool Contract'
+                : `violations=${rawToolAnnotationViolations.join(',')}`,
+    });
+
+    let rawToolDefinitionCount = 0;
+    let typedRawToolDefinitionCount = 0;
+    const rawToolDefinitionBoundaryViolations = [];
+    for (const path of mcpToolFiles) {
+        const facts = collectRawToolDefinitionBoundaryFacts(await readWorkspaceText(path), path);
+        rawToolDefinitionCount += facts.definitions;
+        typedRawToolDefinitionCount += facts.wrapped;
+        rawToolDefinitionBoundaryViolations.push(...facts.violations);
+    }
+    const rawToolContractSource = await readWorkspaceText('src/copilot/mcp/protocol/catalog/contracts/types.js');
+    const rawToolDefinitionSource = await readWorkspaceText('src/copilot/mcp/protocol/catalog/contracts/definition.js');
+    const rawToolCatalogPublicSource = await readWorkspaceText('src/copilot/mcp/protocol/catalog/public/index.js');
+    if (/\bargs:\s*any\b/u.test(rawToolContractSource)) {
+        rawToolDefinitionBoundaryViolations.push('catalog/contracts/types.js:raw-handler-args-any');
+    }
+    if (!/\bargs:\s*unknown\b/u.test(rawToolContractSource)) {
+        rawToolDefinitionBoundaryViolations.push('catalog/contracts/types.js:raw-handler-args-not-unknown');
+    }
+    if (!rawToolDefinitionSource.includes("import('zod').output<import('zod').ZodObject<TShape>>")) {
+        rawToolDefinitionBoundaryViolations.push('catalog/contracts/definition.js:missing-zod-output-inference');
+    }
+    if (
+        !rawToolCatalogPublicSource.includes('defineMcpRawTool') ||
+        !rawToolCatalogPublicSource.includes('contracts/definition.js')
+    ) {
+        rawToolDefinitionBoundaryViolations.push('catalog/public/index.js:missing-defineMcpRawTool-public-membrane');
+    }
+    checks.push({
+        name: 'mcp-raw-tool-handlers-are-zod-inferred-and-type-erased-once',
+        passed: rawToolDefinitionBoundaryViolations.length === 0,
+        detail:
+            rawToolDefinitionBoundaryViolations.length === 0
+                ? `definitions=${rawToolDefinitionCount} typed=${typedRawToolDefinitionCount} storageArgs=unknown inference=zod-output`
+                : `violations=${rawToolDefinitionBoundaryViolations.join(',')}`,
+    });
+
+    const semanticRiskAuthorityFiles = [
+        'src/copilot/mcp/registry/runtime.js',
+        'src/copilot/mcp/server/runtime.js',
+        'src/copilot/mcp/auth/resource-server/service.js',
+    ];
+    const retiredRiskHeuristicTokens = [
+        'MUTATING_TOOL_NAME_MARKERS',
+        'HIGH_IMPACT_TOOL_NAME_MARKERS',
+        'MUTATION_NAME_PATTERN',
+        'HIGH_IMPACT_NAME_PATTERN',
+        'mutatingName',
+        'highImpactName',
+        'COPILOT_MCP_REGISTRY_STRICT_RISK_VALIDATION',
+        'COPILOT_MCP_SERVER_STRICT_TOOL_RISK_VALIDATION',
+    ];
+    const semanticRiskAuthorityViolations = [];
+    for (const path of semanticRiskAuthorityFiles) {
+        const content = await readWorkspaceText(path);
+        for (const token of retiredRiskHeuristicTokens) {
+            if (content.includes(token)) semanticRiskAuthorityViolations.push(`${path}:${token}`);
+        }
+    }
+    checks.push({
+        name: 'mcp-tool-risk-authority-is-semantic-not-name-heuristic',
+        passed: semanticRiskAuthorityViolations.length === 0,
+        detail:
+            semanticRiskAuthorityViolations.length === 0
+                ? 'registry, server and auth consume explicit semantic contracts rather than tool-name heuristics'
+                : `violations=${semanticRiskAuthorityViolations.join(',')}`,
+    });
+
+    const declaredChildProcessOwners = new Set(
+        Array.isArray(dynamicGraphManifest['childProcessImportOwners'])
+            ? dynamicGraphManifest['childProcessImportOwners'].filter((path) => typeof path === 'string')
+            : [],
+    );
+    const actualChildProcessOwners = new Set(
+        [...moduleAuthorityFacts.entries()].filter(([, facts]) => facts.childProcessImport).map(([path]) => path),
+    );
+    const childProcessManifestViolations = [
+        ...[...actualChildProcessOwners]
+            .filter((path) => !declaredChildProcessOwners.has(path))
+            .map((path) => `undeclared=${path}`),
+        ...[...declaredChildProcessOwners]
+            .filter((path) => !actualChildProcessOwners.has(path))
+            .map((path) => `stale=${path}`),
+    ];
+    checks.push({
+        name: 'mcp-child-process-import-authorities-match-manifest',
+        passed: childProcessManifestViolations.length === 0,
+        detail:
+            childProcessManifestViolations.length === 0
+                ? `owners=${actualChildProcessOwners.size}`
+                : `violations=${childProcessManifestViolations.join(',')}`,
+    });
+
+    const childProcessAuthorityReport = validateMcpChildProcessAuthorityManifest(
+        dynamicGraphManifest,
+        actualChildProcessOwners,
+        moduleAuthorityFacts,
+        ownerManifestReport,
+    );
+    checks.push({
+        name: 'mcp-child-process-authorities-have-explicit-lifecycle-contracts',
+        passed: childProcessAuthorityReport.violations.length === 0,
+        detail:
+            childProcessAuthorityReport.violations.length === 0
+                ? `owners=${childProcessAuthorityReport.rows.length} launcherContracts=${childProcessAuthorityReport.rows.reduce((sum, row) => sum + (Array.isArray(row['launchers']) ? row['launchers'].length : 0), 0)}`
+                : `violations=${childProcessAuthorityReport.violations.join(',')}`,
+    });
+
+    const declaredWorkerOwners = new Set(
+        Array.isArray(dynamicGraphManifest['workerThreadImportOwners'])
+            ? dynamicGraphManifest['workerThreadImportOwners'].filter((path) => typeof path === 'string')
+            : [],
+    );
+    const actualWorkerOwners = new Set(
+        [...moduleAuthorityFacts.entries()].filter(([, facts]) => facts.workerThreadImport).map(([path]) => path),
+    );
+    const workerManifestViolations = [
+        ...[...actualWorkerOwners]
+            .filter((path) => !declaredWorkerOwners.has(path))
+            .map((path) => `undeclared=${path}`),
+        ...[...declaredWorkerOwners].filter((path) => !actualWorkerOwners.has(path)).map((path) => `stale=${path}`),
+    ];
+    checks.push({
+        name: 'mcp-worker-thread-import-authorities-match-manifest',
+        passed: workerManifestViolations.length === 0,
+        detail:
+            workerManifestViolations.length === 0
+                ? `owners=${actualWorkerOwners.size}`
+                : `violations=${workerManifestViolations.join(',')}`,
+    });
+
+    const broadChildEnvironmentViolations = [];
+    for (const [path, facts] of moduleAuthorityFacts.entries()) {
+        if (facts.broadChildEnvironmentLines.length === 0) continue;
+        const lines = facts.broadChildEnvironmentLines.filter((/** @type {number} */ line) => line > 0);
+        broadChildEnvironmentViolations.push(`${path}:${lines.join('|') || 'unknown-line'}`);
     }
     checks.push({
         name: 'mcp-child-processes-never-inherit-broad-ambient-environment',
@@ -107,32 +1240,23 @@ export async function runArchitectureContractCheck() {
                 : `violations=${broadChildEnvironmentViolations.join(',')}`,
     });
 
+    const broadEnvironmentSpreadViolations = [];
+    for (const [path, facts] of moduleAuthorityFacts.entries()) {
+        if (facts.broadEnvironmentSpreadLines.length === 0) continue;
+        const lines = facts.broadEnvironmentSpreadLines.filter((/** @type {number} */ line) => line > 0);
+        broadEnvironmentSpreadViolations.push(`${path}:${lines.join('|') || 'unknown-line'}`);
+    }
+    checks.push({
+        name: 'mcp-raw-environment-objects-are-never-broadly-spread',
+        passed: broadEnvironmentSpreadViolations.length === 0,
+        detail:
+            broadEnvironmentSpreadViolations.length === 0
+                ? 'raw env/parentEnv/process.env objects are projected instead of broadly copied'
+                : `violations=${broadEnvironmentSpreadViolations.join(',')}`,
+    });
+
     const importSpecifierPattern = /(?:\bfrom\s*|\bimport\s*\()\s*['"]([^'"]+)['"]/gu;
-    const protectedMcpOwnerRoots = [
-        'src/copilot/mcp/adapters',
-        'src/copilot/mcp/cloudflare',
-        'src/copilot/mcp/composition/process-host',
-        'src/copilot/mcp/connection',
-        'src/copilot/mcp/diagnostics/http-smoke',
-        'src/copilot/mcp/diagnostics/latency/attribution',
-        'src/copilot/mcp/diagnostics/latency/benchmark',
-        'src/copilot/mcp/diagnostics/runtime-health',
-        'src/copilot/mcp/diagnostics/oauth-smoke',
-        'src/copilot/mcp/diagnostics/tool-payload',
-        'src/copilot/mcp/indexing/repository',
-        'src/copilot/mcp/integrations/model-gateway/sqlite-fingerprint',
-        'src/copilot/mcp/maintenance/dependencies/native-smoke',
-        'src/copilot/mcp/openai',
-        'src/copilot/mcp/protocol/apps-sdk',
-        'src/copilot/mcp/registry',
-        'src/copilot/mcp/server',
-        'src/copilot/mcp/tools',
-        'src/copilot/mcp/workspace/git',
-        'src/copilot/mcp/workspace/repository/status',
-        'src/copilot/mcp/workspace/repository/read',
-        'src/copilot/mcp/workspace/repository/read-cache',
-        'src/copilot/mcp/workspace/repository/patch',
-    ];
+    const protectedMcpOwnerRoots = ownerManifestReport.protectedRoots;
     const privateOwnerImportViolations = [];
     const crossTopRelativeImportViolations = [];
     const bootAuthorityViolations = [];
@@ -175,7 +1299,7 @@ export async function runArchitectureContractCheck() {
         passed: crossTopRelativeImportViolations.length === 0,
         detail:
             crossTopRelativeImportViolations.length === 0
-                ? 'static/dynamic/type relative imports do not cross MCP top-level domains'
+                ? 'literal static/dynamic/type relative imports do not cross MCP top-level domains'
                 : `violations=${crossTopRelativeImportViolations.join(',')}`,
     });
     checks.push({
@@ -297,6 +1421,11 @@ export async function runArchitectureContractCheck() {
         '#copilot/mcp/scripts',
         '#copilot/mcp/tools',
         '#copilot/mcp/openai',
+        '#copilot/mcp/public/adapters/http-shared',
+        '#copilot/mcp/public/adapters/http-body',
+        '#copilot/mcp/public/adapters/http-stateful',
+        '#copilot/testing/mcp/adapters/http-shared',
+        '#copilot/testing/mcp/adapters/http-protocol',
     ];
     const presentRetiredAliases = retiredMcpAggregateAliases.filter((key) => key in packageImports);
     const retiredMcpAggregateFiles = [
@@ -315,6 +1444,13 @@ export async function runArchitectureContractCheck() {
         'src/copilot/mcp/tools/index.js',
         'src/copilot/mcp/openai/index.js',
         'src/copilot/mcp/tools/testing/latency-attribution.js',
+        'src/copilot/mcp/adapters/http-shared.js',
+        'src/copilot/mcp/adapters/http-stateful-router.js',
+        'src/copilot/mcp/adapters/public/http-shared.js',
+        'src/copilot/mcp/adapters/public/http-body.js',
+        'src/copilot/mcp/adapters/public/http-stateful.js',
+        'src/copilot/mcp/adapters/testing/http-shared.js',
+        'src/copilot/mcp/protocol/tools/contracts/annotations.js',
     ];
     const presentRetiredFiles = [];
     for (const path of retiredMcpAggregateFiles) {
@@ -335,6 +1471,7 @@ export async function runArchitectureContractCheck() {
     for (const [key, target] of Object.entries(packageImports)) {
         const checkedSurface =
             key.startsWith('#copilot/sdk') ||
+            key.startsWith('#copilot/model-gateway/') ||
             key.startsWith('#copilot/mcp/public/') ||
             key.startsWith('#copilot/testing/mcp/');
         if (!checkedSurface || key.includes('*') || typeof target !== 'string' || !target.startsWith('./')) continue;

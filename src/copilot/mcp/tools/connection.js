@@ -17,8 +17,10 @@ import {
     readClaudeConnectorProfileReport,
     readMcpConnectionAuthProfile,
     readMcpConnectionReadiness,
+    requireMcpToolConnectionConfig,
 } from '#copilot/mcp/public/connection';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const {
@@ -27,9 +29,9 @@ const {
     maxUrlLength: MAX_URL_LENGTH,
 } = MCP_CONNECTION_DIAGNOSTIC_LIMITS;
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const connectionTools = [
-    {
+    defineMcpRawTool({
         name: 'chatgpt_connector_profile',
         title: 'ChatGPT connector profile',
         description:
@@ -40,10 +42,13 @@ export const connectionTools = [
                 .optional()
                 ['describe']('Optional public HTTPS /mcp URL from Cloudflare Tunnel or Secure MCP Tunnel.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ publicMcpUrl }) => okResult(readChatGptConnectorProfileReport({ publicMcpUrl })),
-    },
-    {
+
+        handler: async ({ publicMcpUrl }, operationContext) =>
+            okResult(
+                readChatGptConnectorProfileReport({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
+            ),
+    }),
+    defineMcpRawTool({
         name: 'claude_connector_profile',
         title: 'Claude connector profile',
         description:
@@ -54,29 +59,33 @@ export const connectionTools = [
                 .optional()
                 ['describe']('Optional public HTTPS /mcp URL. Defaults to the permanent Cloudflare hostname.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ publicMcpUrl }) => okResult(readClaudeConnectorProfileReport({ publicMcpUrl })),
-    },
-    {
+
+        handler: async ({ publicMcpUrl }, operationContext) =>
+            okResult(
+                readClaudeConnectorProfileReport({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
+            ),
+    }),
+    defineMcpRawTool({
         name: 'chatgpt_connector_url_check',
         title: 'Check ChatGPT connector URL',
         description: 'Validate that a candidate ChatGPT connector URL is HTTPS, canonical and ends with /mcp.',
         inputSchema: {
             publicMcpUrl: z.string().min(1).max(MAX_URL_LENGTH)['describe']('Candidate public connector URL.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ publicMcpUrl }) => okResult(checkChatGptConnectorUrl(publicMcpUrl)),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'chatgpt_connector_current_url_status',
         title: 'Current ChatGPT connector URL status',
         description:
             'Return the currently saved ChatGPT connector URL, validation, tunnel age, OAuth readiness and HTTP/2+ posture without requiring the client to pass a public URL.',
         inputSchema: {},
-        annotations: readOnlyAnnotations(),
-        handler: async () => okResult(await readChatGptConnectorCurrentUrlStatus()),
-    },
-    {
+
+        handler: async (_args, operationContext) =>
+            okResult(await readChatGptConnectorCurrentUrlStatus(requireMcpToolConnectionConfig(operationContext))),
+    }),
+    defineMcpRawTool({
         name: 'mcp_auth_profile',
         title: 'MCP auth profile',
         description:
@@ -88,10 +97,13 @@ export const connectionTools = [
                 .optional()
                 ['describe']('Optional scopes to include in the challenge preview.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ scopes }) => okResult(readMcpConnectionAuthProfile({ scopes })),
-    },
-    {
+
+        handler: async ({ scopes }, operationContext) => {
+            const config = requireMcpToolConnectionConfig(operationContext);
+            return okResult(readMcpConnectionAuthProfile({ scopes }, config.owner));
+        },
+    }),
+    defineMcpRawTool({
         name: 'mcp_oauth_issuer_diagnostics',
         title: 'MCP OAuth issuer diagnostics',
         description:
@@ -112,10 +124,13 @@ export const connectionTools = [
                 .optional()
                 ['describe']('Per-request timeout in milliseconds.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ issuer, timeoutMs }) => okResult(await diagnoseMcpOAuthIssuer({ issuer, timeoutMs })),
-    },
-    {
+
+        handler: async ({ issuer, timeoutMs }, operationContext) => {
+            const config = requireMcpToolConnectionConfig(operationContext);
+            return okResult(await diagnoseMcpOAuthIssuer({ issuer, timeoutMs }, config.owner));
+        },
+    }),
+    defineMcpRawTool({
         name: 'mcp_connection_readiness',
         title: 'MCP connection readiness',
         description:
@@ -127,7 +142,10 @@ export const connectionTools = [
                 .optional()
                 ['describe']('Optional public HTTPS /mcp URL to validate instead of the configured/current URL.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ publicMcpUrl }) => okResult(await readMcpConnectionReadiness({ publicMcpUrl })),
-    },
+
+        handler: async ({ publicMcpUrl }, operationContext) =>
+            okResult(
+                await readMcpConnectionReadiness({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
+            ),
+    }),
 ];

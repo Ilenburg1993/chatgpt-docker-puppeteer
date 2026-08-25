@@ -12,13 +12,25 @@ import { buildStatefulProcessEnv, ensureStatefulEnvFile } from '#copilot/testing
 
 const testEnvPath = 'src/copilot/.ai/mcp/unit-stateful-session.env';
 const absoluteTestEnvPath = resolve(process.cwd(), testEnvPath);
+const bootstrapParentEnv = process.env;
 
 describe('MCP stateful env manager', () => {
+    it('requires explicit parent environment projection below the launcher boundary', async () => {
+        await assert.rejects(
+            () => ensureStatefulEnvFile(testEnvPath, /** @type {any} */ ({})),
+            /explicit parent environment projection/u,
+        );
+        await assert.rejects(
+            () => buildStatefulProcessEnv(testEnvPath, /** @type {any} */ ({})),
+            /explicit parent environment projection/u,
+        );
+    });
+
     it('creates a stable git-ignored secret env file without returning the raw secret', async () => {
         rmSync(absoluteTestEnvPath, { force: true });
 
-        const first = await ensureStatefulEnvFile(testEnvPath);
-        const second = await ensureStatefulEnvFile(testEnvPath);
+        const first = await ensureStatefulEnvFile(testEnvPath, { parentEnv: bootstrapParentEnv });
+        const second = await ensureStatefulEnvFile(testEnvPath, { parentEnv: bootstrapParentEnv });
         const text = readFileSync(absoluteTestEnvPath, 'utf8');
         const secretLine = text
             .split(/\r?\n/u)
@@ -31,7 +43,7 @@ describe('MCP stateful env manager', () => {
         assert.ok(secretLine);
         assert.equal(JSON.stringify(first).includes(String(secretLine).split('=').slice(1).join('=')), false);
 
-        const env = await buildStatefulProcessEnv(testEnvPath);
+        const env = await buildStatefulProcessEnv(testEnvPath, { parentEnv: bootstrapParentEnv });
         assert.equal(env['COPILOT_MCP_HTTP_STATEFUL_SESSIONS'], 'true');
         assert.equal(env['COPILOT_MCP_HTTP_STATELESS_COMPAT'], 'false');
         assert.equal(env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'], 'true');
@@ -41,7 +53,7 @@ describe('MCP stateful env manager', () => {
 
     it('projects only operational plus stateful session authority from parent and persisted env state', async () => {
         rmSync(absoluteTestEnvPath, { force: true });
-        await ensureStatefulEnvFile(testEnvPath);
+        await ensureStatefulEnvFile(testEnvPath, { parentEnv: bootstrapParentEnv });
         const original = readFileSync(absoluteTestEnvPath, 'utf8');
         writeFileSync(
             absoluteTestEnvPath,
@@ -71,9 +83,15 @@ describe('MCP stateful env manager', () => {
     });
 
     it('rejects absolute paths and lexical traversal outside the MCP state root', async () => {
-        await assert.rejects(() => ensureStatefulEnvFile('/tmp/copilot-stateful-session.env'), /repo-relative/u);
         await assert.rejects(
-            () => ensureStatefulEnvFile('src/copilot/.ai/mcp/../escaped-stateful-session.env'),
+            () => ensureStatefulEnvFile('/tmp/copilot-stateful-session.env', { parentEnv: bootstrapParentEnv }),
+            /repo-relative/u,
+        );
+        await assert.rejects(
+            () =>
+                ensureStatefulEnvFile('src/copilot/.ai/mcp/../escaped-stateful-session.env', {
+                    parentEnv: bootstrapParentEnv,
+                }),
             /inside src\/copilot\/\.ai\/mcp/u,
         );
     });
@@ -87,7 +105,10 @@ describe('MCP stateful env manager', () => {
         symlinkSync(targetPath, linkPath);
         try {
             await assert.rejects(
-                () => ensureStatefulEnvFile('src/copilot/.ai/mcp/unit-stateful-link.env'),
+                () =>
+                    ensureStatefulEnvFile('src/copilot/.ai/mcp/unit-stateful-link.env', {
+                        parentEnv: bootstrapParentEnv,
+                    }),
                 (error) => /** @type {{ code?: unknown }} */ (error)?.code === 'ERR_CONFIGURED_FS_SYMLINK',
             );
         } finally {
@@ -110,9 +131,9 @@ describe('MCP stateful env manager', () => {
             { mode: 0o644 },
         );
 
-        const result = await ensureStatefulEnvFile(testEnvPath);
+        const result = await ensureStatefulEnvFile(testEnvPath, { parentEnv: bootstrapParentEnv });
         const text = readFileSync(absoluteTestEnvPath, 'utf8');
-        const env = await buildStatefulProcessEnv(testEnvPath);
+        const env = await buildStatefulProcessEnv(testEnvPath, { parentEnv: bootstrapParentEnv });
 
         assert.equal(result.warnings.includes('env-file-upgraded'), true);
         assert.equal(text.includes(stableSecret), true);

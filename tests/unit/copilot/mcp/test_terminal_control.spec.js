@@ -10,10 +10,12 @@ import {
     executeTerminalCommandBatch,
     getTerminalCapabilities,
     openTerminalSession,
+    readMcpTerminalProcessConfig,
     readTerminalSession,
 } from '#copilot/mcp/public/process/terminal';
 
-const TERMINAL_TEST_RUNTIME = Object.freeze({ workspaceRoot: process.cwd() });
+const TERMINAL_TEST_CONFIG = readMcpTerminalProcessConfig(process.env);
+const TERMINAL_TEST_RUNTIME = Object.freeze({ workspaceRoot: process.cwd(), config: TERMINAL_TEST_CONFIG });
 
 /** @param {Parameters<typeof executeTerminalCommand>[0]} input */
 const executeTerminalCommandForTest = (input) => executeTerminalCommand(input, TERMINAL_TEST_RUNTIME);
@@ -41,7 +43,7 @@ function asArray(value) {
 }
 
 async function closeAllSessions() {
-    const listed = asRecord(readTerminalSession({ action: 'list', limit: 128 }));
+    const listed = asRecord(readTerminalSession({ action: 'list', limit: 128 }, TERMINAL_TEST_RUNTIME));
     for (const sessionValue of asArray(listed['sessions'])) {
         const session = asRecord(sessionValue);
         const sessionId = String(session['id']);
@@ -62,7 +64,9 @@ async function waitForSessionText(sessionId, expected, timeoutMs = 2_000) {
     let afterSeq = 0;
     let combined = '';
     while (Date.now() < deadline) {
-        const read = asRecord(readTerminalSession({ action: 'read', sessionId, afterSeq, maxBytes: 128 * 1024 }));
+        const read = asRecord(
+            readTerminalSession({ action: 'read', sessionId, afterSeq, maxBytes: 128 * 1024 }, TERMINAL_TEST_RUNTIME),
+        );
         for (const eventValue of asArray(read['events'])) {
             const event = asRecord(eventValue);
             combined += String(event['data'] ?? '');
@@ -167,6 +171,7 @@ describe('MCP terminal control plane', () => {
             workspaceRoot: process.cwd(),
             signal: controller.signal,
             cancellationSource: () => /** @type {const} */ ('caller'),
+            config: TERMINAL_TEST_CONFIG,
         };
         const startedAt = Date.now();
         const execution = executeTerminalCommand(
@@ -233,6 +238,70 @@ describe('MCP terminal control plane', () => {
         }
     });
 
+    it('terminates and drains a persistent pipe child when caller cancellation wins before spawn acceptance', async () => {
+        const controller = new AbortController();
+        const runtime = {
+            workspaceRoot: process.cwd(),
+            signal: controller.signal,
+            cancellationSource: () => /** @type {const} */ ('caller'),
+            config: TERMINAL_TEST_CONFIG,
+        };
+        const pending = openTerminalSession(
+            {
+                command: process.execPath,
+                args: ['-e', 'setInterval(() => {}, 1000)'],
+                shell: false,
+                backend: 'pipe',
+            },
+            runtime,
+        );
+        controller.abort(new Error('cancel-before-terminal-session-acceptance'));
+
+        const result = asRecord(await pending);
+        assert.equal(result['success'], false);
+        assert.equal(result['code'], 'MCP_TOOL_CANCELLED');
+        assert.match(String(result['error'] ?? ''), /cancel-before-terminal-session-acceptance/u);
+
+        const listed = asRecord(readTerminalSession({ action: 'list', limit: 128 }, TERMINAL_TEST_RUNTIME));
+        assert.equal(Number(listed['total'] ?? -1), 0);
+    });
+
+    it('transfers lifecycle authority after persistent pipe session spawn acceptance', async () => {
+        const controller = new AbortController();
+        const runtime = {
+            workspaceRoot: process.cwd(),
+            signal: controller.signal,
+            cancellationSource: () => /** @type {const} */ ('caller'),
+            config: TERMINAL_TEST_CONFIG,
+        };
+        const opened = asRecord(
+            await openTerminalSession(
+                {
+                    command: process.execPath,
+                    args: ['-e', 'setInterval(() => {}, 1000)'],
+                    shell: false,
+                    backend: 'pipe',
+                },
+                runtime,
+            ),
+        );
+        assert.equal(opened['success'], true);
+        const session = asRecord(opened['session']);
+        const sessionId = String(session['id']);
+        assert.equal(session['status'], 'running');
+
+        controller.abort(new Error('caller-no-longer-owns-accepted-session'));
+        await new Promise((resolve) => setTimeout(resolve, 75));
+
+        const status = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        assert.equal(status['success'], true);
+        assert.equal(asRecord(status['session'])['status'], 'running');
+
+        const closed = asRecord(await controlTerminalSession({ action: 'close', sessionId, graceMs: 250 }));
+        assert.equal(closed['success'], true);
+        assert.notEqual(asRecord(closed['session'])['status'], 'running');
+    });
+
     it('opens a persistent pipe session and supports write/read/close lifecycle', async () => {
         const opened = asRecord(
             await openTerminalSessionForTest({
@@ -260,8 +329,35 @@ describe('MCP terminal control plane', () => {
         assert.notEqual(asRecord(closed['session'])['status'], 'running');
     });
 
+    it('keeps shell and operational environment bound to the captured generation', async () => {
+        const config = readMcpTerminalProcessConfig({
+            PATH: '/usr/bin:/bin',
+            SHELL: '/bin/sh',
+            AURELIN_TEST_AMBIENT_SECRET: 'must-not-cross',
+        });
+        const runtime = Object.freeze({ workspaceRoot: process.cwd(), config });
+        vi.stubEnv('SHELL', '/bin/false');
+        vi.stubEnv('AURELIN_TEST_AMBIENT_SECRET', 'late-secret');
+        const capabilities = asRecord(getTerminalCapabilities(config));
+        assert.equal(capabilities['defaultShell'], '/bin/sh');
+        assert.equal(config.operationalEnvironment['AURELIN_TEST_AMBIENT_SECRET'], undefined);
+        const result = asRecord(
+            await executeTerminalCommand(
+                {
+                    command: process.execPath,
+                    args: ['-e', "process.stdout.write(process.env.AURELIN_TEST_AMBIENT_SECRET??'missing')"],
+                    shell: false,
+                },
+                runtime,
+            ),
+        );
+        assert.equal(result['stdout'], 'missing');
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.operationalEnvironment), true);
+    });
+
     it('reports PTY capability without requiring node-pty at MCP startup', () => {
-        const capabilities = asRecord(getTerminalCapabilities());
+        const capabilities = asRecord(getTerminalCapabilities(TERMINAL_TEST_CONFIG));
         assert.equal(capabilities['arbitraryCommands'], true);
         assert.equal(capabilities['persistentSessions'], true);
         assert.equal(capabilities['ambientCredentialInheritance'], false);

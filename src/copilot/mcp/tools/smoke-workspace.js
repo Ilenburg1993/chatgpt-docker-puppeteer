@@ -6,17 +6,36 @@
  */
 
 import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
-import { okResult, readOnlyAnnotations, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import {
+    okResult,
+    requireMcpToolCloudflareConfig,
+    requireMcpToolGitConfig,
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpSmokeWorkspaceTool = {
+
+/**
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ */
+export const mcpSmokeWorkspaceTool = defineMcpRawTool({
     name: 'mcp_smoke_workspace',
     title: 'MCP workspace smoke',
     description: 'Run a read-only end-to-end smoke suite over the workspace MCP surface.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
+
     handler: async (_args, operationContext) =>
-        okResult(await runMcpWorkspaceSmoke(requireMcpToolWorkspace(operationContext))),
-};
+        okResult(
+            await runMcpWorkspaceSmoke(
+                requireMcpToolWorkspace(operationContext),
+                requireMcpToolCloudflareConfig(operationContext),
+                {
+                    gitConfig: requireMcpToolGitConfig(operationContext),
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                },
+            ),
+        ),
+});

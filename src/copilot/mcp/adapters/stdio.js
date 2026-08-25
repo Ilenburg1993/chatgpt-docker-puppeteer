@@ -11,14 +11,36 @@ import { createCopilotMcpServer } from '#copilot/mcp/public/server';
 
 /**
  * @param {{
- *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost>;
+ *     processHost?: ReturnType<typeof import('#copilot/mcp/public/process/host').createMcpProcessHost> & { toolCapabilities?: import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection; authRuntime?: ReturnType<typeof import('#copilot/mcp/public/composition/process-host').createComposedMcpProcessHost>['authRuntime'] };
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     processConfig?: {
+ *         server: ReturnType<typeof import('#copilot/mcp/public/server').readCopilotMcpServerProfile>;
+ *         registry: {
+ *             policy: import('#copilot/mcp/public/registry').McpRegistryPolicy;
+ *             surfacePolicy: import('#copilot/mcp/public/registry').McpToolSurfacePolicy;
+ *         };
+ *         auth: import('#copilot/mcp/public/auth').McpAuthRuntimeConfig;
+ *         toolConfig: import('#copilot/mcp/public/protocol/tools').McpToolConfigProjection;
+ *         toolCapabilities: import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection;
+ *     };
  * }} options
  */
 export async function startStdioMcpServer(options) {
     if (!options?.workspace) throw new TypeError('MCP stdio requires a composition-owned workspace capability.');
     await options.processHost?.prepare();
-    const server = createCopilotMcpServer({ workspace: options.workspace });
+    const server = createCopilotMcpServer({
+        workspace: options.workspace,
+        ...(options.processConfig
+            ? {
+                  profile: options.processConfig.server,
+                  registryPolicy: options.processConfig.registry.policy,
+                  toolSurfacePolicy: options.processConfig.registry.surfacePolicy,
+                  authRuntime: options.processHost?.authRuntime ?? options.processConfig.auth,
+                  toolConfig: options.processConfig.toolConfig,
+                  toolCapabilities: options.processHost?.toolCapabilities ?? options.processConfig.toolCapabilities,
+              }
+            : {}),
+    });
     const transport = new StdioServerTransport();
     await server.connect(transport);
     const lease = options.processHost ? await options.processHost.acquire({ reason: 'stdio-transport' }) : null;

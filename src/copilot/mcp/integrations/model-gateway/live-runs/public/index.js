@@ -2,6 +2,12 @@
 /** Public membrane for governed Model Gateway / LLM-B live-run execution. */
 
 export {
+    MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND,
+    MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION,
+    createModelGatewayLiveRunEnvironmentAuthority,
+} from '../environment.js';
+/** @typedef {import('../environment.js').ModelGatewayLiveRunEnvironmentAuthority} ModelGatewayLiveRunEnvironmentAuthority */
+export {
     MODEL_GATEWAY_LIVE_READINESS_SCRIPT,
     MODEL_GATEWAY_LIVE_RUNNER_SCRIPT,
     MODEL_GATEWAY_LIVE_RUNS_SCRIPT,

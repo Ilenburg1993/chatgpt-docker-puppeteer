@@ -58,7 +58,14 @@ describe('MCP incremental round-trip analytics', () => {
             code: 'ERR_PATCH_NOT_FOUND',
             failureClass: 'stale-context',
             retryability: 'caller-refresh',
+            causalByCodeJson: null,
+            failureClassCountsJson: null,
+            retryabilityCountsJson: null,
             recoveryRequired: 1,
+            inlineNextActionProvided: null,
+            inlineNextActionTargetCount: null,
+            inlineRecoveryAnchorProvided: null,
+            inlineRecoveryAnchorTargetCount: null,
             workflowSuccess: null,
             partial: null,
             applyMode: null,
@@ -75,6 +82,29 @@ describe('MCP incremental round-trip analytics', () => {
         assert.equal(normalizeMcpRoundTripAuditEvent({ ts: iso(10_000), event: 'unrelated_event' }), null);
     });
 
+    it('normalizes aggregate batch taxonomy and same-call actionability as bounded metadata only', () => {
+        const normalized = normalizeMcpRoundTripAuditEvent({
+            ts: iso(11_000),
+            event: 'repo_apply_patch_batch_preflight_blocked',
+            tool: 'repo_apply_patch_batch',
+            causalFailureCount: 3,
+            recoveryRequiredTargetCount: 2,
+            inlineNextActionTargetCount: 3,
+            inlineRecoveryAnchorTargetCount: 1,
+            causalByCode: { ERR_PATCH_NOT_FOUND: 2, EEXPECTEDHASH: 1 },
+            failureClassCounts: { 'stale-context': 2, integrity: 1 },
+            retryabilityCounts: { 'caller-refresh': 3 },
+            failures: [{ old_string: 'must-not-enter-derived-index', nextAction: 'also-not-indexed-as-text' }],
+        });
+        assert.equal(normalized?.causalByCodeJson, JSON.stringify({ EEXPECTEDHASH: 1, ERR_PATCH_NOT_FOUND: 2 }));
+        assert.equal(normalized?.failureClassCountsJson, JSON.stringify({ integrity: 1, 'stale-context': 2 }));
+        assert.equal(normalized?.retryabilityCountsJson, JSON.stringify({ 'caller-refresh': 3 }));
+        assert.equal(normalized?.inlineNextActionTargetCount, 3);
+        assert.equal(normalized?.inlineRecoveryAnchorTargetCount, 1);
+        assert.equal(JSON.stringify(normalized).includes('must-not-enter-derived-index'), false);
+        assert.equal(JSON.stringify(normalized).includes('also-not-indexed-as-text'), false);
+    });
+
     it('summarizes fail→inspect→retry, plan→apply, validator polling and Git strategy pressure', () => {
         const rows = [
             {
@@ -85,6 +115,9 @@ describe('MCP incremental round-trip analytics', () => {
                 code: 'ERR_PATCH_NOT_FOUND',
                 failure_class: 'stale-context',
                 retryability: 'caller-refresh',
+                recovery_required: 1,
+                inline_next_action_provided: 1,
+                inline_recovery_anchor_provided: 1,
             },
             { id: 2, ts_ms: 2_000, event: 'tool_call_started', tool: 'repo_read_file' },
             { id: 3, ts_ms: 2_100, event: 'tool_call_completed', tool: 'repo_read_file' },
@@ -103,6 +136,12 @@ describe('MCP incremental round-trip analytics', () => {
         assert.deepEqual(summary.failures.byCode, { ERR_PATCH_NOT_FOUND: 1 });
         assert.deepEqual(summary.failures.byClass, { 'stale-context': 1 });
         assert.deepEqual(summary.failures.byRetryability, { 'caller-refresh': 1 });
+        assert.equal(summary.failures.causalFailureCount, 1);
+        assert.equal(summary.failures.recoveryRequiredTargetCount, 1);
+        assert.equal(summary.failures.inlineNextActionTargetCount, 1);
+        assert.equal(summary.failures.inlineRecoveryAnchorTargetCount, 1);
+        assert.equal(summary.failures.inlineNextActionCoverage, 1);
+        assert.equal(summary.failures.inlineRecoveryAnchorCoverage, 1);
         assert.equal(summary.recovery.traceCount, 1);
         assert.equal(summary.recovery.withInspectionCount, 1);
         assert.equal(summary.recovery.roundTrips, 2);
@@ -121,11 +160,70 @@ describe('MCP incremental round-trip analytics', () => {
         });
         assert.equal(summary.workflowPressure.gitOneShotCalls, 1);
         assert.equal(summary.workflowPressure.gitGranularToOneShotRatio, 2);
+        assert.equal(summary.optimizationEvidence.newCompositeRecommendation, 'none-from-analytics-alone');
+        assert.ok(
+            summary.optimizationEvidence.existingMechanisms.some(
+                (row) => row.mechanism === 'inline-causal-next-action/recovery-evidence',
+            ),
+        );
         assert.ok(
             summary.topTransitions.some(
                 (row) => row.from === 'repo_patch_batch_plan' && row.to === 'repo_apply_patch_batch',
             ),
         );
+    });
+
+    it('aggregates causal batch maps and reports same-call actionability coverage', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                {
+                    id: 1,
+                    ts_ms: 1_000,
+                    event: 'repo_apply_patch_batch_preflight_blocked',
+                    tool: 'repo_apply_patch_batch',
+                    causal_failure_count: 3,
+                    recovery_required_target_count: 2,
+                    inline_next_action_target_count: 3,
+                    inline_recovery_anchor_target_count: 1,
+                    causal_by_code_json: JSON.stringify({ ERR_PATCH_NOT_FOUND: 2, EEXPECTEDHASH: 1 }),
+                    failure_class_counts_json: JSON.stringify({ 'stale-context': 2, integrity: 1 }),
+                    retryability_counts_json: JSON.stringify({ 'caller-refresh': 3 }),
+                },
+            ],
+            { windowMs: 20_000, top: 20, includeSynthetic: false },
+        );
+        assert.deepEqual(summary.failures.byCode, { ERR_PATCH_NOT_FOUND: 2, EEXPECTEDHASH: 1 });
+        assert.deepEqual(summary.failures.byClass, { 'stale-context': 2, integrity: 1 });
+        assert.deepEqual(summary.failures.byRetryability, { 'caller-refresh': 3 });
+        assert.equal(summary.failures.causalFailureCount, 3);
+        assert.equal(summary.failures.recoveryRequiredTargetCount, 2);
+        assert.equal(summary.failures.inlineNextActionTargetCount, 3);
+        assert.equal(summary.failures.inlineRecoveryAnchorTargetCount, 1);
+        assert.equal(summary.failures.inlineNextActionCoverage, 1);
+        assert.equal(summary.failures.inlineRecoveryAnchorCoverage, 0.3333);
+    });
+
+    it('reports only repeated completed→next-start transitions as recurring sequence evidence', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                { id: 1, ts_ms: 1_000, event: 'tool_call_completed', tool: 'repo_read_file' },
+                { id: 2, ts_ms: 1_100, event: 'tool_call_started', tool: 'repo_apply_patch' },
+                { id: 3, ts_ms: 2_000, event: 'tool_call_completed', tool: 'repo_read_file' },
+                { id: 4, ts_ms: 2_100, event: 'tool_call_started', tool: 'repo_apply_patch' },
+                { id: 5, ts_ms: 3_000, event: 'tool_call_completed', tool: 'repo_file_stats' },
+                { id: 6, ts_ms: 3_100, event: 'tool_call_started', tool: 'repo_apply_patch' },
+            ],
+            { windowMs: 20_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.sequenceEvidence.recurringTransitionCount, 1);
+        assert.deepEqual(summary.sequenceEvidence.recurringTransitions[0], {
+            from: 'repo_read_file',
+            to: 'repo_apply_patch',
+            count: 2,
+            totalGapMs: 200,
+            p50GapMs: 100,
+            p95GapMs: 100,
+        });
     });
 
     it('segments long idle/recovery gaps instead of ranking them as interactive round trips', () => {
@@ -167,6 +265,61 @@ describe('MCP incremental round-trip analytics', () => {
         assert.deepEqual(after, before);
     });
 
+    it('migrates a v2 derived event table with the v3 sanitized causal columns', () => {
+        const db = createDb();
+        db.exec(`
+            CREATE TABLE copilot_mcp_round_trip_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_identity TEXT NOT NULL,
+                source_offset INTEGER NOT NULL,
+                ts_ms INTEGER NOT NULL,
+                event TEXT NOT NULL,
+                tool TEXT,
+                duration_ms INTEGER,
+                is_error INTEGER,
+                code TEXT,
+                failure_class TEXT,
+                retryability TEXT,
+                recovery_required INTEGER,
+                workflow_success INTEGER,
+                partial INTEGER,
+                apply_mode TEXT,
+                operation_count INTEGER,
+                target_count INTEGER,
+                applied_count INTEGER,
+                failed_count INTEGER,
+                causal_failure_count INTEGER,
+                aborted_operation_count INTEGER,
+                recovery_required_target_count INTEGER,
+                convergence_candidate_count INTEGER,
+                synthetic INTEGER NOT NULL DEFAULT 0 CHECK(synthetic IN (0, 1)),
+                UNIQUE(source_identity, source_offset)
+            ) STRICT;
+        `);
+        createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice: async () => ({ ok: false, error: 'not-used' }),
+        });
+        const columns = /** @type {{ name: string }[]} */ (
+            db.prepare('PRAGMA table_info(copilot_mcp_round_trip_events)').all()
+        );
+        for (const name of [
+            'causal_by_code_json',
+            'failure_class_counts_json',
+            'retryability_counts_json',
+            'inline_next_action_provided',
+            'inline_next_action_target_count',
+            'inline_recovery_anchor_provided',
+            'inline_recovery_anchor_target_count',
+        ]) {
+            assert.equal(
+                columns.some((column) => column.name === name),
+                true,
+                name,
+            );
+        }
+    });
+
     it('replays from zero when only an older normalizer cursor exists and upserts derived rows', async () => {
         const db = createDb();
         const nowMs = 100_000;
@@ -194,7 +347,7 @@ describe('MCP incremental round-trip analytics', () => {
         db.prepare(
             `INSERT OR REPLACE INTO copilot_mcp_round_trip_cursor
              (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
-             VALUES ('mcp-audit:v1', 'dev:ino-a', 900, 900, ?)`,
+             VALUES ('mcp-audit:v2', 'dev:ino-a', 900, 900, ?)`,
         ).run(nowMs - 1_000);
         db.prepare(
             `INSERT OR REPLACE INTO copilot_mcp_round_trip_events
@@ -241,12 +394,12 @@ describe('MCP incremental round-trip analytics', () => {
         });
         const report = await analytics.summarize({ windowMs: 20_000 });
         assert.deepEqual(requestedOffsets, [0]);
-        assert.equal(report.schemaVersion, 2);
-        assert.equal(report.normalizerVersion, 2);
+        assert.equal(report.schemaVersion, 3);
+        assert.equal(report.normalizerVersion, 3);
         assert.deepEqual(report.failures.byClass, { 'stale-context': 1 });
         assert.deepEqual(report.failures.byCode, { ERR_PATCH_NOT_FOUND: 1 });
         const cursor = db
-            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v2'")
+            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v3'")
             .get();
         assert.ok(cursor && typeof cursor === 'object');
         assert.equal(Number(/** @type {Record<string, unknown>} */ (cursor)['byte_offset']), 100);

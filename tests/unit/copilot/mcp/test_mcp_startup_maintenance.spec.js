@@ -1,7 +1,8 @@
 // @ts-check
 
-import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/state';
+import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/tunnel';
 import {
+    readMcpStartupMaintenanceConfig,
     readMcpStartupMaintenanceState,
     resetMcpStartupMaintenanceForTests,
     scheduleMcpStartupMaintenance,
@@ -22,6 +23,21 @@ afterEach(async () => {
 });
 
 describe('MCP startup maintenance', () => {
+    it('captures one immutable startup policy generation without ambient drift', () => {
+        const env = {
+            NODE_ENV: 'production',
+            COPILOT_MCP_STARTUP_SMOKE_ENABLED: 'true',
+            COPILOT_MCP_STARTUP_SMOKE_DELAY_MS: '4321',
+        };
+        const policy = readMcpStartupMaintenanceConfig(env);
+        env.COPILOT_MCP_STARTUP_SMOKE_ENABLED = 'false';
+        env.COPILOT_MCP_STARTUP_SMOKE_DELAY_MS = '9999';
+
+        assert.equal(policy.enabled, true);
+        assert.equal(policy.delayMs, 4_321);
+        assert.equal(Object.isFrozen(policy), true);
+    });
+
     it('schedules once and records the smoke result without blocking startup', async () => {
         /** @type {(() => void)[]} */
         const callbacks = [];

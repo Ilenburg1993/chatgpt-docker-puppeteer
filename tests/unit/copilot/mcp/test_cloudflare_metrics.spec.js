@@ -1,4 +1,4 @@
-import { parsePrometheusMetrics, summarizeCloudflaredMetrics } from '#copilot/mcp/public/cloudflare/metrics';
+import { parsePrometheusMetrics, summarizeCloudflaredMetrics } from '#copilot/mcp/public/cloudflare/observability';
 import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/metrics', () => {

@@ -9,7 +9,6 @@
  * @module copilot/mcp/validation/devcontainer-shell/runtime
  */
 
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
@@ -47,16 +46,18 @@ function appendBoundedOutput(current, chunk) {
  *
  * @param {string} command
  * @param {string[]} args
- * @param {{ timeoutMs: number; cwd?: string; env?: NodeJS.ProcessEnv }} options
+ * @param {{ timeoutMs: number; cwd?: string; env: Readonly<NodeJS.ProcessEnv>; signal?: AbortSignal }} options
  */
 export async function runBoundedDevcontainerValidationProcess(command, args, options) {
     const startedAt = performance.now();
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let cancelled = false;
     /** @type {string | null} */
     let spawnError = null;
-    const env = options.env ?? buildMcpChildEnvironment().env;
+    if (!options.env) throw new TypeError('DevContainer validation process requires an explicit child environment.');
+    const env = { ...options.env };
 
     /** @type {import('node:child_process').ChildProcess} */
     let child;
@@ -72,6 +73,7 @@ export async function runBoundedDevcontainerValidationProcess(command, args, opt
         return {
             ok: false,
             timedOut: false,
+            cancelled: false,
             terminationRequested: false,
             exitCode: null,
             signal: null,
@@ -92,6 +94,12 @@ export async function runBoundedDevcontainerValidationProcess(command, args, opt
     child.once('error', (error) => {
         spawnError = error.message;
     });
+    const onAbort = () => {
+        cancelled = true;
+        supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
+    };
+    if (options.signal?.aborted) onAbort();
+    else options.signal?.addEventListener('abort', onAbort, { once: true });
     const timeoutTimer = setTimeout(() => {
         timedOut = true;
         supervisor.requestTermination({ graceMs: 0, initialSignal: 'SIGKILL', forceSignal: 'SIGKILL' });
@@ -100,10 +108,12 @@ export async function runBoundedDevcontainerValidationProcess(command, args, opt
 
     const closed = await supervisor.closed;
     clearTimeout(timeoutTimer);
+    options.signal?.removeEventListener('abort', onAbort);
     if (spawnError) stderr = appendBoundedOutput(stderr, spawnError);
     return {
-        ok: !timedOut && spawnError === null && closed.exitCode === 0,
+        ok: !timedOut && !cancelled && spawnError === null && closed.exitCode === 0,
         timedOut,
+        cancelled,
         terminationRequested: closed.terminationRequested,
         exitCode: closed.exitCode,
         signal: closed.signal,
@@ -116,25 +126,30 @@ export async function runBoundedDevcontainerValidationProcess(command, args, opt
 
 /**
  * @param {string} file
- * @param {{ timeoutMs?: number; parentEnv?: NodeJS.ProcessEnv }} [options]
+ * @param {{ timeoutMs?: number; childEnvironment: Readonly<NodeJS.ProcessEnv>; signal?: AbortSignal }} options
  */
-export async function validateDevcontainerBashFile(file, options = {}) {
+export async function validateDevcontainerBashFile(file, options) {
+    if (!options?.childEnvironment)
+        throw new TypeError('DevContainer Bash validation requires an explicit child environment.');
     const timeoutMs =
         Number.isInteger(options.timeoutMs) && Number(options.timeoutMs) > 0
             ? Number(options.timeoutMs)
             : PER_FILE_TIMEOUT_MS;
-    const { env } = buildMcpChildEnvironment({
-        ...(options.parentEnv ? { parentEnv: options.parentEnv } : {}),
-    });
     const result = await runBoundedDevcontainerValidationProcess(
         'shellcheck',
         ['--shell=bash', '--severity=error', '--format=gcc', file],
-        { timeoutMs, cwd: MCP_WORKSPACE_ROOT, env },
+        {
+            timeoutMs,
+            cwd: MCP_WORKSPACE_ROOT,
+            env: options.childEnvironment,
+            ...(options.signal ? { signal: options.signal } : {}),
+        },
     );
     return {
         file,
         ok: result.ok,
         timedOut: result.timedOut,
+        cancelled: result.cancelled,
         killScope: result.timedOut ? (process.platform === 'win32' ? 'child' : 'process-group') : null,
         terminationRequested: result.terminationRequested,
         exitCode: result.exitCode,
@@ -151,11 +166,14 @@ export async function validateDevcontainerBashFile(file, options = {}) {
  * @param {{
  *     concurrency?: number;
  *     timeoutMs?: number;
- *     parentEnv?: NodeJS.ProcessEnv;
+ *     childEnvironment: Readonly<NodeJS.ProcessEnv>;
+ *     signal?: AbortSignal;
  *     onResult?: (row: Awaited<ReturnType<typeof validateDevcontainerBashFile>>) => void;
- * }} [options]
+ * }} options
  */
-export async function validateDevcontainerBashFiles(files, options = {}) {
+export async function validateDevcontainerBashFiles(files, options) {
+    if (!options?.childEnvironment)
+        throw new TypeError('DevContainer Bash validation requires an explicit child environment.');
     const concurrency = Number.isInteger(options.concurrency)
         ? Math.max(1, Math.min(8, Number(options.concurrency)))
         : DEFAULT_CONCURRENCY;
@@ -164,14 +182,16 @@ export async function validateDevcontainerBashFiles(files, options = {}) {
     let cursor = 0;
     const workers = Array.from({ length: Math.min(concurrency, files.length) }, async () => {
         while (true) {
+            if (options.signal?.aborted) return;
             const index = cursor;
             cursor += 1;
             if (index >= files.length) return;
             const file = files[index];
             if (file === undefined) return;
             const row = await validateDevcontainerBashFile(file, {
+                childEnvironment: options.childEnvironment,
                 ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-                ...(options.parentEnv ? { parentEnv: options.parentEnv } : {}),
+                ...(options.signal ? { signal: options.signal } : {}),
             });
             results[index] = row;
             options.onResult?.(row);
@@ -191,9 +211,12 @@ export async function validateDevcontainerBashFiles(files, options = {}) {
     };
 }
 
-/** @returns {Promise<number>} */
-export async function runDevcontainerShellValidationCli() {
+/** @param {import('../config.js').McpValidationProcessConfig} config @returns {Promise<number>} */
+export async function runDevcontainerShellValidationCli(config) {
+    if (!config)
+        throw new TypeError('DevContainer shell validation CLI requires a validation process config generation.');
     const report = await validateDevcontainerBashFiles(DEVCONTAINER_BASH_SYNTAX_FILES, {
+        childEnvironment: config.childEnvironment,
         onResult: (row) => {
             process.stdout.write(
                 `[devcontainer-shell] ${row.ok ? 'ok' : row.timedOut ? 'timeout' : 'failed'} ${row.file} ${String(row.durationMs)}ms${row.killScope ? ` kill=${row.killScope}` : ''}${row.stderr ? ` :: ${row.stderr.replaceAll('\n', ' ').slice(0, 500)}` : ''}\n`,

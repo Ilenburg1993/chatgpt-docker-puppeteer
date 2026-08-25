@@ -7,12 +7,13 @@
 
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import { readMcpProjectDoctor } from '#copilot/mcp/public/diagnostics/project-doctor';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
     errorResult,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
-    readOnlyAnnotations,
+    requireMcpToolGitConfig,
+    requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
 } from '#copilot/mcp/public/protocol/tools';
@@ -154,26 +155,31 @@ function compactValidatorBatchResults(execution, requests) {
  * @param {string} name
  * @param {string} title
  * @param {string} description
- * @returns {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @returns {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
 function buildValidatorAliasTool(validator, name, title, description) {
-    return {
+    return defineMcpRawTool({
         name,
         title,
         description,
         inputSchema: {
             timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Timeout ms.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ timeoutMs }, operationContext) =>
             frameValidationJobOperation(
-                await startValidatorJobOperation(validator, requireMcpToolWorkspace(operationContext), { timeoutMs }),
+                await startValidatorJobOperation(
+                    validator,
+                    requireMcpToolWorkspace(operationContext),
+                    requireMcpToolValidationConfig(operationContext),
+                    { timeoutMs, ...(operationContext?.signal ? { signal: operationContext.signal } : {}) },
+                ),
             ),
-    };
+    });
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const jobTools = [
     buildValidatorAliasTool(
@@ -194,7 +200,7 @@ export const jobTools = [
         'Run Copilot unit tests',
         'Start the canonical full unit test job for src/copilot.',
     ),
-    {
+    defineMcpRawTool({
         name: 'mcp_run_safe_validation_suite',
         title: 'Run safe MCP validation suite',
         description: 'Run a fixed broad validation suite. Escalation-only for cross-cutting risk or release gates.',
@@ -202,7 +208,7 @@ export const jobTools = [
             suite: safeValidationSuiteSchema['describe']('Broad suite: mcp-fast, mcp-full, or copilot-fast.'),
             timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Timeout ms.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ suite, timeoutMs }, operationContext) => {
             const validator = SAFE_VALIDATION_SUITE_TO_VALIDATOR[String(suite)];
             if (!validator) {
@@ -213,22 +219,33 @@ export const jobTools = [
                 });
             }
             return frameValidationJobOperation(
-                await startValidatorJobOperation(validator, requireMcpToolWorkspace(operationContext), { timeoutMs }),
+                await startValidatorJobOperation(
+                    validator,
+                    requireMcpToolWorkspace(operationContext),
+                    requireMcpToolValidationConfig(operationContext),
+                    { timeoutMs, ...(operationContext?.signal ? { signal: operationContext.signal } : {}) },
+                ),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'run_project_doctor',
         title: 'Run project doctor',
         description: 'Return the Copilot MCP project doctor report.',
         inputSchema: {
             includeScripts: z.boolean().optional()['describe']('Include scripts. Default: true.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ includeScripts }, operationContext) =>
-            okResult(await readMcpProjectDoctor(requireMcpToolWorkspace(operationContext), { includeScripts })),
-    },
-    {
+            okResult(
+                await readMcpProjectDoctor(requireMcpToolWorkspace(operationContext), {
+                    ...(includeScripts === undefined ? {} : { includeScripts }),
+                    gitConfig: requireMcpToolGitConfig(operationContext),
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                }),
+            ),
+    }),
+    defineMcpRawTool({
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
         description:
@@ -275,7 +292,7 @@ export const jobTools = [
                     'Compatibility input accepts 1-2 for stale clients, but execution is always serialized at 1 to protect WSL/DevContainer headroom.',
                 ),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async (
             {
                 validator,
@@ -291,6 +308,7 @@ export const jobTools = [
             operationContext,
         ) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const validationConfig = requireMcpToolValidationConfig(operationContext);
             if (batch !== undefined) {
                 if (
                     validator !== undefined ||
@@ -320,6 +338,8 @@ export const jobTools = [
                                 await executeValidatorRequest(
                                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
                                     workspace,
+                                    validationConfig,
+                                    operationContext?.signal,
                                 ),
                             );
                         },
@@ -403,11 +423,13 @@ export const jobTools = [
                 await executeValidatorRequest(
                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
                     workspace,
+                    validationConfig,
+                    operationContext?.signal,
                 ),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'job_list',
         title: 'List validator jobs',
         description: 'List active and recent validator jobs, including persisted manifests.',
@@ -417,11 +439,11 @@ export const jobTools = [
             limit: z.number().int().min(1).max(200).optional()['describe']('Max jobs. Default: 50.'),
             includeCompleted: z.boolean().optional()['describe']('Include finished jobs. Default: true.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ status, validator, limit, includeCompleted }) =>
             frameValidationJobOperation(await listValidationJobs({ status, validator, limit, includeCompleted })),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_last_validation_summary',
         title: 'Last MCP validation summary',
         description: 'Return the latest persisted job per validator without starting validation.',
@@ -430,11 +452,11 @@ export const jobTools = [
             includeOutputTail: z.boolean().optional()['describe']('Include short log tails. Default: false.'),
             tailBytes: z.number().int().min(1000).max(20000).optional()['describe']('Tail bytes.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ validator, includeOutputTail, tailBytes }) =>
             frameValidationJobOperation(await readLastValidationSummary({ validator, includeOutputTail, tailBytes })),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_validation_dashboard',
         title: 'MCP validation dashboard',
         description: 'Return compact validation status without starting jobs or long logs.',
@@ -444,23 +466,26 @@ export const jobTools = [
             includeDetails: z.boolean().optional()['describe']('Include job arrays. Default: false.'),
             limit: z.number().int().min(10).max(200).optional()['describe']('Max manifests. Default: 80.'),
         },
-        annotations: readOnlyAnnotations(),
-        handler: async ({ includeRunning, includeLatest, includeDetails, limit }) =>
+
+        handler: async ({ includeRunning, includeLatest, includeDetails, limit }, operationContext) =>
             frameValidationJobOperation(
-                await readValidationDashboard({ includeRunning, includeLatest, includeDetails, limit }),
+                await readValidationDashboard(
+                    { includeRunning, includeLatest, includeDetails, limit },
+                    requireMcpToolValidationConfig(operationContext),
+                ),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'job_get_summary',
         title: 'Get job summary',
         description: 'Return compact status for one validator job; no log output.',
         inputSchema: {
             jobId: z.string().min(1)['describe']('Validator job id.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ jobId }) => frameValidationJobOperation(await readValidationJobSummary(jobId)),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'job_get_output',
         title: 'Get job output',
         description: 'Read a bounded validator-job log tail and status.',
@@ -468,18 +493,18 @@ export const jobTools = [
             jobId: z.string().min(1)['describe']('Validator job id.'),
             tailBytes: z.number().int().min(1000).max(50000).optional()['describe']('Tail bytes. Default: 8000.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ jobId, tailBytes }) =>
             frameValidationJobOperation(await readValidationJobOutput(jobId, tailBytes)),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'job_cancel',
         title: 'Cancel job',
         description: 'Cancel an attached running validator job.',
         inputSchema: {
             jobId: z.string().min(1)['describe']('Validator job id.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ jobId }) => frameValidationJobOperation(await cancelValidationJob(jobId)),
-    },
+    }),
 ];

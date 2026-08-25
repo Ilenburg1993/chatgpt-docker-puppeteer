@@ -10,7 +10,8 @@ import {
     readClientLatencyEvidence,
     summarizeClientLatencyEvidence,
 } from '#copilot/mcp/public/diagnostics/latency';
-import { boundedWriteAnnotations, errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const labelSchema = z
@@ -19,8 +20,8 @@ const labelSchema = z
     .max(64)
     ['regex'](/^[A-Za-z0-9._:-]+$/u);
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpClientLatencyEvidenceTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpClientLatencyEvidenceTool = defineMcpRawTool({
     name: 'mcp_client_latency_evidence',
     title: 'Client TTFT evidence',
     description:
@@ -80,7 +81,7 @@ export const mcpClientLatencyEvidenceTool = {
             .optional()
             ['describe']('Include raw sanitized evidence rows in summary. Default: false.'),
     },
-    annotations: boundedWriteAnnotations(),
+
     handler: async ({
         action,
         source,
@@ -98,7 +99,7 @@ export const mcpClientLatencyEvidenceTool = {
         historyLimit,
         maxEntries,
         includeEntries,
-    } = {}) => {
+    }) => {
         const effectiveAction = action ?? 'summary';
         let recorded = null;
         if (effectiveAction === 'record') {
@@ -112,21 +113,21 @@ export const mcpClientLatencyEvidenceTool = {
                 {
                     source,
                     ttftMs,
-                    observedAt,
-                    firstToolDispatchMs,
-                    turnCompleteMs,
-                    thinkingMode,
-                    modelLabel,
-                    networkLabel,
-                    conversationLabel,
-                    clientLabel,
-                    vpnLabel,
-                    seriesId,
+                    ...(observedAt === undefined ? {} : { observedAt }),
+                    ...(firstToolDispatchMs === undefined ? {} : { firstToolDispatchMs }),
+                    ...(turnCompleteMs === undefined ? {} : { turnCompleteMs }),
+                    ...(thinkingMode === undefined ? {} : { thinkingMode }),
+                    ...(modelLabel === undefined ? {} : { modelLabel }),
+                    ...(networkLabel === undefined ? {} : { networkLabel }),
+                    ...(conversationLabel === undefined ? {} : { conversationLabel }),
+                    ...(clientLabel === undefined ? {} : { clientLabel }),
+                    ...(vpnLabel === undefined ? {} : { vpnLabel }),
+                    ...(seriesId === undefined ? {} : { seriesId }),
                 },
-                { maxEntries },
+                maxEntries === undefined ? {} : { maxEntries },
             );
         }
-        const history = await readClientLatencyEvidence({ limit: historyLimit });
+        const history = await readClientLatencyEvidence(historyLimit === undefined ? {} : { limit: historyLimit });
         const summary = summarizeClientLatencyEvidence(history.entries);
         return okResult({
             success: history.ok,
@@ -154,4 +155,4 @@ export const mcpClientLatencyEvidenceTool = {
             ...(includeEntries === true ? { entries: history.entries } : {}),
         });
     },
-};
+});

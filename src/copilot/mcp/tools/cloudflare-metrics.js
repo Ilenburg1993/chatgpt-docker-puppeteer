@@ -5,15 +5,16 @@
  * @module copilot/mcp/tools/cloudflare-metrics
  */
 
-import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
+import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/observability';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareConfig } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareMetricsSnapshotTool = {
+export const mcpCloudflareMetricsSnapshotTool = defineMcpRawTool({
     name: 'mcp_cloudflare_metrics_snapshot',
     title: 'Cloudflare metrics snapshot',
     description:
@@ -25,14 +26,17 @@ export const mcpCloudflareMetricsSnapshotTool = {
             .optional()
             ['describe']('Include the full metric name list. Defaults to false for faster, compact responses.'),
     },
-    annotations: readOnlyAnnotations(),
-    handler: async (input = {}) => {
+
+    handler: async (input = {}, operationContext) => {
         const options = /** @type {Record<string, unknown>} */ (input);
         return okResult(
-            await readCloudflaredMetricsSnapshot({
-                ...(typeof options['timeoutMs'] === 'number' ? { timeoutMs: options['timeoutMs'] } : {}),
-                includeMetricNames: options['includeMetricNames'] === true,
-            }),
+            await readCloudflaredMetricsSnapshot(
+                {
+                    ...(typeof options['timeoutMs'] === 'number' ? { timeoutMs: options['timeoutMs'] } : {}),
+                    includeMetricNames: options['includeMetricNames'] === true,
+                },
+                requireMcpToolCloudflareConfig(operationContext),
+            ),
         );
     },
-};
+});

@@ -13,9 +13,38 @@ import {
 } from '#copilot/mcp/public/adapters/http-protocol';
 import { readMcpHttpServerTimingPolicy } from '#copilot/mcp/public/adapters/http1';
 import { readMcpHttp2ServerPolicy } from '#copilot/mcp/public/adapters/http2';
-import { compareToolNames, extractMcpToolNames } from '#copilot/mcp/public/diagnostics/http-smoke';
+import {
+    compareToolNames,
+    extractMcpToolNames,
+    readMcpHttpSmokeRuntimeConfig,
+} from '#copilot/mcp/public/diagnostics/http-smoke';
 
 describe('copilot MCP local HTTP smoke helpers', () => {
+    it('captures observable smoke config separately from bearer secrets', () => {
+        const runtime = readMcpHttpSmokeRuntimeConfig({
+            COPILOT_MCP_SMOKE_URL: 'http://127.0.0.1:4555/mcp',
+            COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'static-secret',
+            COPILOT_MCP_SMOKE_BEARER_TOKEN: ' smoke-secret ',
+        });
+        assert.equal(runtime.config.mcpUrl, 'http://127.0.0.1:4555/mcp');
+        assert.equal(runtime.config.authRequired, true);
+        assert.equal(runtime.secrets.bearerToken, 'smoke-secret');
+        assert.equal(JSON.stringify(runtime.config).includes('smoke-secret'), false);
+        assert.equal(JSON.stringify(runtime.config).includes('static-secret'), false);
+        assert.equal(Object.isFrozen(runtime), true);
+        assert.equal(Object.isFrozen(runtime.config), true);
+        assert.equal(Object.isFrozen(runtime.secrets), true);
+    });
+
+    it('ignores redaction placeholders and falls back to the auth secret projection', () => {
+        const runtime = readMcpHttpSmokeRuntimeConfig({
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'static-secret',
+            COPILOT_MCP_SMOKE_BEARER_TOKEN: '[redacted]',
+        });
+        assert.equal(runtime.secrets.bearerToken, 'static-secret');
+    });
     it('extracts tool names from a JSON-RPC tools/list body', () => {
         const names = extractMcpToolNames({
             jsonrpc: '2.0',
@@ -101,7 +130,7 @@ describe('copilot MCP local HTTP smoke helpers', () => {
             streamResetRate: 33,
             unknownProtocolTimeoutMs: 2000,
             shutdownDestroyAfterMs: 3500,
-            sessionIdleTimeoutMs: 95000,
+            sessionIdleTimeoutMs: 0,
             expectedCertificateHostnames: [],
             allowCertificateHostnameMismatch: false,
             certificateExpiryWarnDays: 14,
@@ -133,7 +162,7 @@ describe('copilot MCP local HTTP smoke helpers', () => {
                 streamResetRate: 33,
                 unknownProtocolTimeoutMs: 2000,
                 shutdownDestroyAfterMs: 3500,
-                sessionIdleTimeoutMs: 95000,
+                sessionIdleTimeoutMs: 0,
                 expectedCertificateHostnames: [],
                 allowCertificateHostnameMismatch: false,
                 certificateExpiryWarnDays: 14,
@@ -141,6 +170,10 @@ describe('copilot MCP local HTTP smoke helpers', () => {
                 allowNonLoopbackClients: false,
                 minVersion: 'TLSv1.2',
             },
+        );
+        assert.equal(
+            readMcpHttp2ServerPolicy({ COPILOT_MCP_HTTP2_SESSION_IDLE_TIMEOUT_MS: '95000' }).sessionIdleTimeoutMs,
+            95_000,
         );
     });
 });

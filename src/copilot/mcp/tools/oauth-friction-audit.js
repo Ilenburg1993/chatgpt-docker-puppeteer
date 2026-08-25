@@ -5,51 +5,44 @@
  * @module copilot/mcp/tools/oauth-friction-audit
  */
 
+import { buildProtectedResourceMetadata, scopesForMcpTool, securitySchemesForMcpTool } from '#copilot/mcp/public/auth';
+import { evaluateMcpCompatibilityRetirementReadiness } from '#copilot/mcp/public/observability';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    buildBuiltInDevOAuthMetadata,
-    buildProtectedResourceMetadata,
-    isBuiltInDevOAuthEnabled,
-    readDevOAuthPersistenceStatus,
-    readDevOAuthTokenLifetimePolicy,
-    readMcpAuthConfig,
-    scopesForMcpTool,
-    securitySchemesForMcpTool,
-} from '#copilot/mcp/public/auth';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
-
-/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
-let toolsProvider = () => [];
+    okResult,
+    requireMcpToolAuditCapability,
+    requireMcpToolAuthConfig,
+    requireMcpToolAuthIssuerConfig,
+    requireMcpToolAuthIssuerRuntime,
+    requireMcpToolSurface,
+} from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
- * @returns {void}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export function bindMcpOAuthFrictionAuditProvider(provider) {
-    toolsProvider = provider;
-}
-
-/**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
- */
-export const mcpOAuthFrictionAuditTool = {
+export const mcpOAuthFrictionAuditTool = defineMcpRawTool({
     name: 'mcp_oauth_friction_audit',
     title: 'MCP OAuth friction audit',
     description:
         'Diagnose OAuth reauthentication risk, metadata alignment, token lifetime policy, and host approval boundaries for this MCP server.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => {
-        const config = readMcpAuthConfig();
+
+    handler: async (_args, operationContext) => {
+        const issuerConfig = requireMcpToolAuthIssuerConfig(operationContext);
+        const issuerRuntime = requireMcpToolAuthIssuerRuntime(operationContext);
+        const config = requireMcpToolAuthConfig(operationContext);
+        const compatibilitySummary = await requireMcpToolAuditCapability(operationContext).readCompatibilitySummary();
+        const compatibilityRetirement = evaluateMcpCompatibilityRetirementReadiness(compatibilitySummary);
         const protectedResource = buildProtectedResourceMetadata(config);
-        const builtInIssuerEnabled = isBuiltInDevOAuthEnabled(config);
-        const issuerMetadata = builtInIssuerEnabled ? buildBuiltInDevOAuthMetadata(config) : null;
+        const builtInIssuerEnabled = issuerRuntime.isEnabled(config, issuerConfig);
+        const issuerMetadata = builtInIssuerEnabled ? issuerRuntime.buildMetadata(config, issuerConfig) : null;
         const protectedMethods = asSortedStringArray(protectedResource['token_endpoint_auth_methods_supported']);
         const issuerMethods = asSortedStringArray(issuerMetadata?.['token_endpoint_auth_methods_supported']);
         const issuerGrants = asSortedStringArray(issuerMetadata?.['grant_types_supported']);
         const issuerScopes = asSortedStringArray(issuerMetadata?.['scopes_supported']);
-        const lifetime = readDevOAuthTokenLifetimePolicy();
-        const persistence = builtInIssuerEnabled ? await readDevOAuthPersistenceStatus() : null;
-        const tools = toolsProvider();
+        const lifetime = issuerRuntime.readTokenLifetimePolicy(issuerConfig);
+        const persistence = builtInIssuerEnabled ? await issuerRuntime.readPersistenceStatus(issuerConfig) : null;
+        const tools = [...requireMcpToolSurface(operationContext).tools];
         const toolScopes = summarizeToolScopes(tools);
         const warnings = [];
         const critical = [];
@@ -160,6 +153,8 @@ export const mcpOAuthFrictionAuditTool = {
                 note: 'Longer token lifetimes reduce OAuth reauthentication, but do not disable ChatGPT host tool-call approvals.',
             },
             toolScopes,
+            compatibilityEvidence: compatibilitySummary,
+            compatibilityRetirement,
             reauthRisk: critical.length > 0 ? 'high' : warnings.length > 0 ? 'medium' : 'low',
             approvalImpact:
                 'OAuth grants scoped repository authority to ChatGPT. Host write/destructive confirmations are controlled by ChatGPT host policy and must be reduced through accurate annotations, plan tools, batched writes, and remembered approvals.',
@@ -168,7 +163,7 @@ export const mcpOAuthFrictionAuditTool = {
             recommendedFixes: buildRecommendedFixes({ warnings, critical }),
         });
     },
-};
+});
 
 /**
  * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
@@ -177,6 +172,8 @@ export const mcpOAuthFrictionAuditTool = {
  *     readOnlyCount: number;
  *     boundedWriteCount: number;
  *     destructiveCount: number;
+ *     externalToolCount: number;
+ *     credentialBoundToolCount: number;
  *     adminScopeTools: string[];
  *     validateScopeTools: string[];
  *     publicDiagnosticTools: string[];
@@ -193,8 +190,10 @@ function summarizeToolScopes(tools) {
             );
             return {
                 name: tool.name,
-                readOnly: tool.annotations.readOnlyHint === true,
-                destructive: tool.annotations.destructiveHint === true,
+                readOnly: tool.contract.effects.mutation === 'none',
+                destructive: tool.contract.effects.mutation === 'destructive',
+                networkAuthority: tool.contract.authority.network,
+                credentials: [...tool.contract.credentials],
                 scopes,
                 securitySchemes,
             };
@@ -204,6 +203,9 @@ function summarizeToolScopes(tools) {
         readOnlyCount: rows.filter((row) => row.readOnly).length,
         boundedWriteCount: rows.filter((row) => !row.readOnly && !row.destructive).length,
         destructiveCount: rows.filter((row) => row.destructive).length,
+        externalToolCount: rows.filter((row) => row.networkAuthority !== 'local').length,
+        credentialBoundToolCount: rows.filter((row) => row.credentials.some((credential) => credential !== 'none'))
+            .length,
         adminScopeTools: rows
             .filter((row) => row.scopes.includes('repo:admin'))
             .map((row) => row.name)

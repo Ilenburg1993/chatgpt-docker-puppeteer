@@ -1,16 +1,10 @@
 // @ts-check
 /** Cached readiness execution for governed Model Gateway / LLM-B live operations. */
 
-import { readModelGatewaySqliteFingerprint } from '#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint';
 import { readByokProviderHealthPersistenceFingerprint } from '#copilot/model-gateway';
+import { buildModelGatewayLiveReadiness } from '#copilot/model-gateway/readiness';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { runModelGatewayLiveCommand } from './runtime.js';
-
-const LIVE_READINESS_MODULE_URL = new URL(
-    '../../../../../../scripts/model-gateway/commands/model-gateway-live-readiness.mjs',
-    import.meta.url,
-).href;
 export const MODEL_GATEWAY_LIVE_READINESS_CACHE_TTL_MS = 30_000;
 const LIVE_READINESS_CACHE_MAX_ENTRIES = 8;
 
@@ -31,26 +25,6 @@ const liveReadinessCache = new Map();
 /** @type {Map<string, Promise<ModelGatewayLiveReadinessExecution>>} */
 const liveReadinessInFlight = new Map();
 
-/** @param {string} text */
-function parseJsonOutput(text) {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    try {
-        return JSON.parse(trimmed);
-    } catch {
-        const start = trimmed.indexOf('{');
-        const end = trimmed.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            try {
-                return JSON.parse(trimmed.slice(start, end + 1));
-            } catch {
-                return null;
-            }
-        }
-        return null;
-    }
-}
-
 /** @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace @param {string} filePath */
 async function readinessFileFingerprint(workspace, filePath) {
     try {
@@ -62,8 +36,12 @@ async function readinessFileFingerprint(workspace, filePath) {
     }
 }
 
-/** @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace @param {boolean} includeSqliteRuntimeHealth */
-async function buildLiveReadinessFingerprint(workspace, includeSqliteRuntimeHealth) {
+/**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {boolean} includeSqliteRuntimeHealth
+ * @param {Readonly<{ read: () => string }> | undefined} sqliteFingerprintCapability
+ */
+async function buildLiveReadinessFingerprint(workspace, includeSqliteRuntimeHealth, sqliteFingerprintCapability) {
     const [catalogFile, byokHealthFile] = await Promise.all([
         readinessFileFingerprint(
             workspace,
@@ -71,27 +49,8 @@ async function buildLiveReadinessFingerprint(workspace, includeSqliteRuntimeHeal
         ),
         readByokProviderHealthPersistenceFingerprint(),
     ]);
-    const sqliteLogical = readModelGatewaySqliteFingerprint();
+    const sqliteLogical = sqliteFingerprintCapability?.read() ?? 'unavailable:no-sqlite-fingerprint-capability';
     return `${workspace.workspaceRoot}:${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;
-}
-
-/** @type {Promise<
- * | ((options?: { includeSqliteRuntimeHealth?: boolean; reuseRedactionWorkers?: boolean }) => Promise<Record<string, any>>)
- * | null
- * > | null} */
-let liveReadinessBuilderPromise = null;
-
-async function loadLiveReadinessBuilder() {
-    if (!liveReadinessBuilderPromise) {
-        liveReadinessBuilderPromise = import(LIVE_READINESS_MODULE_URL)
-            .then((module) =>
-                typeof module.buildModelGatewayLiveReadiness === 'function'
-                    ? module.buildModelGatewayLiveReadiness
-                    : null,
-            )
-            .catch(() => null);
-    }
-    return liveReadinessBuilderPromise;
 }
 
 function pruneLiveReadinessCache() {
@@ -109,11 +68,15 @@ function pruneLiveReadinessCache() {
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {boolean} includeSqliteRuntimeHealth
- * @param {{ signal?: AbortSignal }} [options]
+ * @param {{ signal?: AbortSignal; sqliteFingerprint?: Readonly<{ read: () => string }> }} [options]
  * @returns {Promise<ModelGatewayLiveReadinessExecution>}
  */
 export async function executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth, options = {}) {
-    const fingerprint = await buildLiveReadinessFingerprint(workspace, includeSqliteRuntimeHealth);
+    const fingerprint = await buildLiveReadinessFingerprint(
+        workspace,
+        includeSqliteRuntimeHealth,
+        options.sqliteFingerprint,
+    );
     const key = fingerprint;
     const now = Date.now();
     pruneLiveReadinessCache();
@@ -138,44 +101,38 @@ export async function executeModelGatewayLiveReadiness(workspace, includeSqliteR
 
     const promise = (async () => {
         const startedAt = performance.now();
-        const builder = await loadLiveReadinessBuilder();
         let parsed = null;
-        let stderr = '';
-        let stdout = '';
+        const stderr = '';
+        const stdout = '';
         let error = null;
-        let execution = 'fresh-in-process';
-        if (builder) {
-            if (options.signal?.aborted) throw options.signal.reason ?? new Error('Model Gateway readiness aborted.');
-            try {
-                parsed = await builder({ includeSqliteRuntimeHealth, reuseRedactionWorkers: true });
-            } catch (builderError) {
-                error = builderError instanceof Error ? builderError.message : String(builderError);
-            }
-        } else {
-            execution = 'fallback-subprocess';
-            const args = ['--json'];
-            if (includeSqliteRuntimeHealth) args.push('--sqlite-runtime-health');
-            const result = await runModelGatewayLiveCommand({
-                workspace,
-                command: 'readiness',
-                args,
-                timeoutMs: 120_000,
-                ...(options.signal ? { signal: options.signal } : {}),
+        const execution = 'fresh-domain-service';
+        if (options.signal?.aborted) throw options.signal.reason ?? new Error('Model Gateway readiness aborted.');
+        try {
+            parsed = await buildModelGatewayLiveReadiness({
+                workspaceRoot: workspace.workspaceRoot,
+                liveRunnerPath: join(
+                    workspace.workspaceRoot,
+                    'scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs',
+                ),
+                redactionWorkerPath: join(
+                    workspace.workspaceRoot,
+                    'scripts/model-gateway/commands/model-gateway-live-redaction-worker.mjs',
+                ),
+                includeSqliteRuntimeHealth,
+                reuseRedactionWorkers: true,
             });
-            const parsedValue = parseJsonOutput(result.stdout);
-            parsed =
-                parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
-                    ? /** @type {Record<string, any>} */ (parsedValue)
-                    : null;
-            stderr = result.stderr;
-            stdout = result.stdout;
-            error = result.error;
+        } catch (builderError) {
+            error = builderError instanceof Error ? builderError.message : String(builderError);
         }
         const durationMs = Number((performance.now() - startedAt).toFixed(3));
         const completedAtMs = Date.now();
         const success = parsed !== null && error === null;
         if (success && parsed) {
-            const completedFingerprint = await buildLiveReadinessFingerprint(workspace, includeSqliteRuntimeHealth);
+            const completedFingerprint = await buildLiveReadinessFingerprint(
+                workspace,
+                includeSqliteRuntimeHealth,
+                options.sqliteFingerprint,
+            );
             liveReadinessCache.set(completedFingerprint, { parsed, completedAtMs, durationMs });
             pruneLiveReadinessCache();
         }
@@ -193,5 +150,4 @@ export async function executeModelGatewayLiveReadiness(workspace, includeSqliteR
 export function resetModelGatewayLiveReadinessCacheForTests() {
     liveReadinessCache.clear();
     liveReadinessInFlight.clear();
-    liveReadinessBuilderPromise = null;
 }

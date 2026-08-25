@@ -9,13 +9,9 @@
  */
 
 import { readBoundedResponseBytes } from '#copilot/infra/public/platform/http-response';
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
 import { normalizeMcpUrl } from '#copilot/mcp/public/connection';
 import { connect as connectHttp2, constants as http2Constants } from 'node:http2';
 
-const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
-const DEFAULT_SAMPLES = 10;
-const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /**
@@ -65,35 +61,25 @@ const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
  */
 
 /**
- * @param {{ publicMcpUrl?: string; localMcpUrl?: string; samples?: number; timeoutMs?: number }} [options]
+ * @param {import('../config.js').McpLatencyRuntimeConfig} runtimeConfig
+ * @param {{ publicMcpUrl?: string; localMcpUrl?: string; samples?: number; timeoutMs?: number; warmupSamples?: number }} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runMcpLatencyBenchmark(options = {}) {
-    const tunnelConfig = readCloudflareTunnelConfig();
-    const publicMcpUrl = normalizeMcpUrl(
-        options.publicMcpUrl ??
-            process.env['COPILOT_MCP_LATENCY_PUBLIC_URL'] ??
-            tunnelConfig.publicMcpUrl ??
-            DEFAULT_PUBLIC_MCP_URL,
-    );
-    const localMcpUrl = normalizeMcpUrl(
-        options.localMcpUrl ?? process.env['COPILOT_MCP_LATENCY_LOCAL_URL'] ?? tunnelConfig.localMcpUrl,
-    );
-    const localOriginServerName = tunnelConfig.originServerName ?? tunnelConfig.publicHostname;
+export async function runMcpLatencyBenchmark(runtimeConfig, options = {}) {
+    if (!runtimeConfig) throw new TypeError('Latency benchmark requires an explicit runtime config generation.');
+    const benchmark = runtimeConfig.benchmark;
+    const publicMcpUrl = normalizeMcpUrl(options.publicMcpUrl ?? benchmark.publicMcpUrl);
+    const localMcpUrl = normalizeMcpUrl(options.localMcpUrl ?? benchmark.localMcpUrl);
+    const localOriginServerName = benchmark.localOriginServerName;
     const directOriginH2 = localMcpUrl.startsWith('https://127.0.0.1') || localMcpUrl.startsWith('https://localhost');
-    const samples = readPositiveInteger(
-        options.samples ?? process.env['COPILOT_MCP_LATENCY_SAMPLES'],
-        DEFAULT_SAMPLES,
-        1,
-        100,
+    const samples = readPositiveInteger(options.samples ?? benchmark.samples, benchmark.samples, 1, 100);
+    const timeoutMs = readPositiveInteger(options.timeoutMs ?? benchmark.timeoutMs, benchmark.timeoutMs, 500, 60_000);
+    const warmupSamples = readPositiveInteger(
+        options.warmupSamples ?? benchmark.warmupSamples,
+        benchmark.warmupSamples,
+        0,
+        10,
     );
-    const timeoutMs = readPositiveInteger(
-        options.timeoutMs ?? process.env['COPILOT_MCP_LATENCY_TIMEOUT_MS'],
-        DEFAULT_TIMEOUT_MS,
-        500,
-        60_000,
-    );
-    const warmupSamples = readPositiveInteger(process.env['COPILOT_MCP_LATENCY_WARMUP_SAMPLES'], 1, 0, 10);
     const publicBaseUrl = publicMcpUrl.replace(/\/mcp$/u, '');
     const localBaseUrl = localMcpUrl.replace(/\/mcp$/u, '');
 

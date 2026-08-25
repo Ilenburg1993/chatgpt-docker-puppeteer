@@ -18,7 +18,10 @@ import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tool
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
 import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
-import { resetRepoReadResponseCacheForTest } from '#copilot/testing/mcp/workspace/repository/read-cache';
+import {
+    readMcpRepoReadCacheConfig,
+    resetRepoReadResponseCacheForTest,
+} from '#copilot/testing/mcp/workspace/repository/read-cache';
 
 /** @type {import('better-sqlite3').Database | null} */
 let testInfraDb = null;
@@ -27,6 +30,21 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     backgroundServices: false,
 });
 const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+const TEST_CANONICAL_TOOLS = Object.freeze(
+    getCanonicalMcpTools({
+        registryPolicy: TEST_PROCESS_HOST.processConfig.registry.policy,
+        toolSurfacePolicy: TEST_PROCESS_HOST.processConfig.registry.surfacePolicy,
+        authConfig: TEST_PROCESS_HOST.processConfig.auth.config,
+    }),
+);
+const TEST_TOOL_SURFACE = Object.freeze({
+    tools: TEST_CANONICAL_TOOLS,
+    names: Object.freeze(TEST_CANONICAL_TOOLS.map((tool) => tool.name)),
+});
+const TEST_TOOL_CAPABILITIES = Object.freeze({
+    ...TEST_PROCESS_HOST.toolCapabilities,
+    toolSurface: TEST_TOOL_SURFACE,
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -37,8 +55,34 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_WORKSPACE },
+    {
+        workspace: TEST_WORKSPACE,
+        config: TEST_PROCESS_HOST.processConfig.toolConfig,
+        capabilities: TEST_TOOL_CAPABILITIES,
+    },
 );
+const TEST_REPO_READ_CACHE_CONFIG = TEST_PROCESS_HOST.processConfig.toolConfig.repositoryReadCache;
+
+/** @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} repositoryReadCache */
+function createToolContextWithRepositoryReadCache(repositoryReadCache) {
+    return createMcpToolOperationContext(
+        {
+            mcpReq: {
+                id: `mcp-tools-unit-cache-${repositoryReadCache.policyKey}`,
+                method: 'tools/call',
+                signal: new AbortController().signal,
+                _meta: { caller: 'test_mcp_tools' },
+                envelope: { protocol: '2026' },
+            },
+        },
+        {
+            workspace: TEST_WORKSPACE,
+            config: { ...TEST_PROCESS_HOST.processConfig.toolConfig, repositoryReadCache },
+            capabilities: TEST_TOOL_CAPABILITIES,
+        },
+    );
+}
+
 /** @type {Awaited<ReturnType<typeof TEST_PROCESS_HOST.acquire>> | null} */
 let testProcessHostLease = null;
 
@@ -59,13 +103,13 @@ afterAll(async () => {
     testInfraDb = null;
 });
 
-/** @param {string} name */
-function findTool(name) {
-    const tool = getCanonicalMcpTools().find((candidate) => candidate.name === name);
+/** @param {string} name @param {typeof TOOL_OPERATION_CONTEXT} [operationContext] */
+function findTool(name, operationContext = TOOL_OPERATION_CONTEXT) {
+    const tool = TEST_CANONICAL_TOOLS.find((candidate) => candidate.name === name);
     assert.ok(tool, `missing tool ${name}`);
     return {
         ...tool,
-        handler: /** @type {typeof tool.handler} */ ((input) => tool.handler(input, TOOL_OPERATION_CONTEXT)),
+        handler: /** @type {typeof tool.handler} */ ((input) => tool.handler(input, operationContext)),
     };
 }
 
@@ -134,7 +178,7 @@ describe('copilot MCP tools', () => {
         assert.equal(noHashes.structuredContent?.['sha256'], undefined);
         assert.equal(noHashes.structuredContent?.['returnedSha256'], undefined);
         // Uma única entrada rica por path+range serve variantes menos exigentes sem duplicar o corpo em memória.
-        assert.equal(readRepoReadFileResultCacheStats().size, 1);
+        assert.equal(readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG).size, 1);
     });
 
     it('repo_read_file promove uma variante de hash pobre sem duplicar a entrada de resposta', async () => {
@@ -144,17 +188,17 @@ describe('copilot MCP tools', () => {
 
         const none = await tool.handler({ ...args, hashMode: 'none' });
         assert.equal(none.structuredContent?.['sha256'], undefined);
-        assert.equal(readRepoReadFileResultCacheStats().size, 1);
+        assert.equal(readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG).size, 1);
 
         const full = await tool.handler({ ...args, hashMode: 'full' });
-        const afterUpgrade = readRepoReadFileResultCacheStats();
+        const afterUpgrade = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         assert.equal(typeof full.structuredContent?.['sha256'], 'string');
         assert.equal(typeof full.structuredContent?.['returnedSha256'], 'string');
         assert.equal(afterUpgrade.size, 1);
         assert.equal(afterUpgrade['hashVariantMisses'], 1);
 
         const returned = await tool.handler({ ...args, hashMode: 'returned' });
-        const afterRichHit = readRepoReadFileResultCacheStats();
+        const afterRichHit = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         assert.equal(returned.structuredContent?.['sha256'], undefined);
         assert.equal(typeof returned.structuredContent?.['returnedSha256'], 'string');
         assert.equal(afterRichHit.size, 1);
@@ -287,9 +331,9 @@ describe('copilot MCP tools', () => {
             endLine: 8,
         };
         const first = await tool.handler(args);
-        const afterFirst = readRepoReadFileResultCacheStats();
+        const afterFirst = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         const second = await tool.handler(args);
-        const afterSecond = readRepoReadFileResultCacheStats();
+        const afterSecond = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
 
         assert.deepEqual(second.structuredContent, first.structuredContent);
         assert.deepEqual(second.content, first.content);
@@ -305,19 +349,19 @@ describe('copilot MCP tools', () => {
         const resolved = await TEST_WORKSPACE.resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
-        const afterInvalidation = readRepoReadFileResultCacheStats();
+        const afterInvalidation = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['clears'], 1);
         assert.equal(afterInvalidation.size, 0);
     });
 
     it('repo_read_file usa trust window fixa, sem renová-la em hits sucessivos', async () => {
-        const previousTrustWindow = process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
-        process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = '25';
+        const cacheConfig = readMcpRepoReadCacheConfig({ COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS: '25' });
+        const context = createToolContextWithRepositoryReadCache(cacheConfig);
         vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(1_000);
         resetRepoReadResponseCacheForTest();
-        const tool = findTool('repo_read_file');
+        const tool = findTool('repo_read_file', context);
         const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-read-fixed-window-'));
         const filePath = join(tempDir, 'fixed-window.txt');
         const relativePath = relative(process.cwd(), filePath);
@@ -334,25 +378,24 @@ describe('copilot MCP tools', () => {
             vi.setSystemTime(1_026);
             getApplicationInfraRuntime().coherence.l1.clear();
             const afterFixedWindow = await tool.handler({ path: relativePath });
-            const stats = readRepoReadFileResultCacheStats();
+            const stats = readRepoReadFileResultCacheStats(cacheConfig);
             assert.equal(afterFixedWindow.structuredContent?.['content'], 'omega\n');
+            assert.equal(stats['trustWindowMs'], 25);
             assert.equal(stats['trustWindowHits'], 1);
             assert.equal(stats['fingerprintValidations'], 1);
             assert.equal(stats['stale'], 1);
         } finally {
             vi.useRealTimers();
-            if (previousTrustWindow === undefined) delete process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
-            else process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = previousTrustWindow;
             await rm(tempDir, { recursive: true, force: true });
             resetRepoReadResponseCacheForTest();
         }
     });
 
     it('repo_read_file invalida cache shaped por fingerprint rico mesmo com size+mtime preservados externamente', async () => {
-        const previousTrustWindow = process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
-        process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = '0';
+        const cacheConfig = readMcpRepoReadCacheConfig({ COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS: '0' });
+        const context = createToolContextWithRepositoryReadCache(cacheConfig);
         resetRepoReadResponseCacheForTest();
-        const tool = findTool('repo_read_file');
+        const tool = findTool('repo_read_file', context);
         const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-read-fingerprint-'));
         const filePath = join(tempDir, 'same-size.txt');
         const relativePath = relative(process.cwd(), filePath);
@@ -362,21 +405,17 @@ describe('copilot MCP tools', () => {
             const first = await tool.handler({ path: relativePath });
             assert.equal(first.structuredContent?.['content'], 'alpha\n');
 
-            // Bypass canonical invalidation deliberately, keep size and mtime equal, but let ctime identify the mutation.
             await writeFile(filePath, 'omega\n', 'utf8');
             await utimes(filePath, originalStats.atime, originalStats.mtime);
-            // Clear only the lower process-local L1 so this regression isolates the shaped response cache. No bus event
-            // is published here, therefore the response cache must reject its own stale entry by rich fingerprint.
             getApplicationInfraRuntime().coherence.l1.clear();
 
             const second = await tool.handler({ path: relativePath });
-            const cacheStats = readRepoReadFileResultCacheStats();
+            const cacheStats = readRepoReadFileResultCacheStats(cacheConfig);
             assert.equal(second.structuredContent?.['content'], 'omega\n');
+            assert.equal(cacheStats['trustWindowMs'], 0);
             assert.equal(cacheStats['stale'], 1);
             assert.equal(cacheStats['misses'], 2);
         } finally {
-            if (previousTrustWindow === undefined) delete process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
-            else process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = previousTrustWindow;
             await rm(tempDir, { recursive: true, force: true });
             resetRepoReadResponseCacheForTest();
         }
@@ -391,7 +430,7 @@ describe('copilot MCP tools', () => {
             endLine: 20,
         };
         const [first, second] = await Promise.all([tool.handler(args), tool.handler(args)]);
-        const stats = readRepoReadFileResultCacheStats();
+        const stats = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
 
         assert.equal(first.isError, undefined);
         assert.equal(second.isError, undefined);
@@ -477,7 +516,7 @@ describe('copilot MCP tools', () => {
 
     it('chatgpt_connector_current_url_status returns saved URL status without client URL input', async () => {
         const tool = findTool('chatgpt_connector_current_url_status');
-        const result = await tool.handler({});
+        const result = await tool.handler({}, TOOL_OPERATION_CONTEXT);
         assert.equal(result.isError, undefined);
         assert.ok('currentUrl' in (result.structuredContent ?? {}));
         assert.ok('validation' in (result.structuredContent ?? {}));
@@ -604,9 +643,9 @@ describe('copilot MCP tools', () => {
             endLine: 20,
         };
         const first = await tool.handler(args);
-        const afterFirst = readRepoReadFileResultCacheStats();
+        const afterFirst = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         const second = await tool.handler(args);
-        const afterSecond = readRepoReadFileResultCacheStats();
+        const afterSecond = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         assert.equal(first.isError, undefined);
         assert.deepEqual(second.structuredContent, first.structuredContent);
         assert.deepEqual(second.content, first.content);
@@ -619,7 +658,7 @@ describe('copilot MCP tools', () => {
         const resolved = await TEST_WORKSPACE.resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) getApplicationInfraRuntime().coherence.invalidation.invalidatePath(resolved.resolved);
-        const afterInvalidation = readRepoReadFileResultCacheStats();
+        const afterInvalidation = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['chunkClears'], 1);
         assert.equal(afterInvalidation.chunkSize, 0);
@@ -635,7 +674,7 @@ describe('copilot MCP tools', () => {
         };
         const byStartLine = await tool.handler({ ...base, startLine: 1 });
         const byCursor = await tool.handler({ ...base, cursor: '1' });
-        const stats = readRepoReadFileResultCacheStats();
+        const stats = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
 
         assert.equal(byStartLine.isError, undefined);
         assert.equal(byCursor.isError, undefined);
@@ -660,7 +699,7 @@ describe('copilot MCP tools', () => {
             tool.handler(args),
             tool.handler({ path: args.path, chunkLines: args.chunkLines, cursor: '1', endLine: args.endLine }),
         ]);
-        const stats = readRepoReadFileResultCacheStats();
+        const stats = readRepoReadFileResultCacheStats(TEST_REPO_READ_CACHE_CONFIG);
 
         assert.equal(first.isError, undefined);
         assert.equal(second.isError, undefined);
@@ -995,9 +1034,9 @@ describe('copilot MCP tools', () => {
         );
     });
 
-    it('mcp_tools_status exposes annotation and approval planning metadata', async () => {
+    it('mcp_tools_status exposes semantic contract and approval planning metadata', async () => {
         const tool = findTool('mcp_tools_status');
-        const result = await tool.handler({});
+        const result = await tool.handler({}, TOOL_OPERATION_CONTEXT);
         assert.equal(result.isError, undefined);
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         assert.equal(structured['success'], true);
@@ -1044,16 +1083,17 @@ describe('copilot MCP tools', () => {
         );
         assert.equal('tools' in structured, false);
         const metadataCoverage = /** @type {Record<string, unknown>} */ (structured['metadataCoverage']);
-        assert.equal(metadataCoverage['outputSchemaPolicy'], 'explicit-specific-only');
+        assert.equal(metadataCoverage['outputSchemaPolicy'], 'semantic-specific-or-intentional-untyped');
         const specificOutputSchemaCount = getCanonicalMcpTools().filter(
             (tool) => tool.outputSchema !== undefined,
         ).length;
         assert.equal(metadataCoverage['specificOutputSchemaCount'], specificOutputSchemaCount);
         assert.equal(
-            metadataCoverage['missingSpecificOutputSchemaCount'],
+            metadataCoverage['intentionalUntypedOutputCount'],
             getCanonicalMcpTools().length - specificOutputSchemaCount,
         );
-        assert.equal(metadataCoverage['outputSchemaComplete'], false);
+        assert.equal(metadataCoverage['outputContractCoverageCount'], getCanonicalMcpTools().length);
+        assert.equal(metadataCoverage['outputContractComplete'], true);
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
         assert.equal(metadataCoverage['securityComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
@@ -1368,7 +1408,7 @@ describe('copilot MCP tools', () => {
 
     it('mcp_auth_profile exposes OAuth readiness metadata without requiring enforcement', async () => {
         const tool = findTool('mcp_auth_profile');
-        const result = await tool.handler({ scopes: ['repo:read'] });
+        const result = await tool.handler({ scopes: ['repo:read'] }, TOOL_OPERATION_CONTEXT);
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(typeof result.structuredContent?.['protectedResourceMetadataUrl'], 'string');
@@ -1397,6 +1437,8 @@ describe('copilot MCP tools', () => {
             'repo:validate',
             'repo:admin',
         ]);
+        assert.ok(Number(toolScopes['externalToolCount'] ?? 0) > 0);
+        assert.ok(Number(toolScopes['credentialBoundToolCount'] ?? 0) > 0);
         const oauth = /** @type {Record<string, unknown>} */ (structured['oauth']);
         assert.equal(oauth['initialScopeProfile'], 'max-autonomy');
         assert.equal(oauth['stepUpPreferred'], false);
@@ -1404,7 +1446,7 @@ describe('copilot MCP tools', () => {
 
     it('mcp_oauth_issuer_diagnostics reports missing issuer without network calls', async () => {
         const tool = findTool('mcp_oauth_issuer_diagnostics');
-        const result = await tool.handler({ issuer: 'http://not-https.example.com' });
+        const result = await tool.handler({ issuer: 'http://not-https.example.com' }, TOOL_OPERATION_CONTEXT);
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(result.structuredContent?.['ready'], false);
@@ -1414,7 +1456,7 @@ describe('copilot MCP tools', () => {
 
     it('mcp_autonomy_power_score returns a deterministic connector posture score', async () => {
         const tool = findTool('mcp_autonomy_power_score');
-        const result = await tool.handler({});
+        const result = await tool.handler({}, TOOL_OPERATION_CONTEXT);
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(typeof result.structuredContent?.['score'], 'number');

@@ -27,6 +27,7 @@ import { readMutationSnapshot } from './rollback/index.js';
  *     rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -50,6 +51,7 @@ export async function deleteFileLocked(filePath, options = {}, invalidationBus =
     const captureRollback = options.captureRollback ?? options.rollbackPolicy?.enabled ?? false;
     try {
         const lease = await acquireIoResourceLock(filePath, {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             operation: 'delete',
             target: filePath,
             riskClass: 'high',
@@ -59,6 +61,7 @@ export async function deleteFileLocked(filePath, options = {}, invalidationBus =
                 return await lease.run(async () => {
                     const snapshot = await readMutationSnapshot(filePath, captureRollback, options.rollbackPolicy);
                     assertExpectedSha256Digest(snapshot.contentHash, options.expectedHash);
+                    options.signal?.throwIfAborted();
                     const durability = await deleteFileUnlocked(filePath, {
                         ...(options.durability === undefined ? {} : { durability: options.durability }),
                         ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
@@ -144,6 +147,7 @@ export async function deleteFileLocked(filePath, options = {}, invalidationBus =
  *     traceId?: string;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -160,14 +164,16 @@ export async function removePathLocked(filePath, options = {}, invalidationBus =
     const startedAt = nowIoMs();
     try {
         const lease = await acquireIoResourceLock(filePath, {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             operation: 'delete',
             target: filePath,
             riskClass: 'high',
         });
         let durability;
         try {
-            durability = await lease.run(async () =>
-                removePathUnlocked(filePath, {
+            durability = await lease.run(async () => {
+                options.signal?.throwIfAborted();
+                return removePathUnlocked(filePath, {
                     recursive: Boolean(options.recursive),
                     force: Boolean(options.force),
                     ...(options.recursiveConfirmation === undefined
@@ -175,8 +181,8 @@ export async function removePathLocked(filePath, options = {}, invalidationBus =
                         : { recursiveConfirmation: options.recursiveConfirmation }),
                     ...(options.durability === undefined ? {} : { durability: options.durability }),
                     ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
-                }),
-            );
+                });
+            });
         } finally {
             await lease.releaseAsync();
         }

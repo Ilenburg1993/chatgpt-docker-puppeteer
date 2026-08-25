@@ -19,23 +19,26 @@ import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/pu
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { readIoProcessHealthSnapshot } from '#copilot/infra/public/observability/process';
 import {
-    configurePersistentOAuthReplayStore,
-    createConfiguredOAuthReplayStore,
+    createDevOAuthRuntime,
+    createMcpAuthResourceServerRuntime,
+    createOAuthReplayCapability,
     scheduleMcpAuthJwksWarmup,
     stopMcpAuthJwksWarmup,
 } from '#copilot/mcp/public/auth';
-import { configureMcpInfraHealthReader } from '#copilot/mcp/public/diagnostics/infra-health';
+import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/tunnel';
+import { createMcpProcessConfig } from '#copilot/mcp/public/composition/process-config';
+import { createMcpInfraHealthCapability } from '#copilot/mcp/public/diagnostics/infra-health';
 import {
-    configureMcpRoundTripAnalytics,
+    createMcpRoundTripAnalyticsCapability,
     scheduleMcpRoundTripAnalyticsMonitor,
     scheduleOpenAiEndpointLatencyMonitor,
     stopMcpRoundTripAnalyticsMonitor,
     stopOpenAiEndpointLatencyMonitor,
 } from '#copilot/mcp/public/diagnostics/latency';
 import { maybeStartMcpIndexAutoBuild, readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
-import { configureModelGatewayIntegrationDatabase } from '#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint';
-import { configureAiArtifactsRuntime, createAiArtifactsRuntime } from '#copilot/mcp/public/maintenance';
-import { logMcp } from '#copilot/mcp/public/observability';
+import { createModelGatewaySqliteFingerprintCapability } from '#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint';
+import { createAiArtifactsRuntime } from '#copilot/mcp/public/maintenance';
+import { createMcpAuditCapability, logMcp } from '#copilot/mcp/public/observability';
 import { createMcpProcessHost } from '#copilot/mcp/public/process/host';
 import {
     scheduleMcpStartupMaintenance,
@@ -55,12 +58,47 @@ import path from 'node:path';
  *     startupMaintenance?: boolean;
  *     openAiEndpointMonitor?: boolean;
  *     roundTripAnalyticsMonitor?: boolean;
+ *     env?: NodeJS.ProcessEnv;
+ *     processConfig?: import('#copilot/mcp/public/composition/process-config').McpProcessConfig;
  * }} [options]
  */
 export function createComposedMcpProcessHost(options = {}) {
     const backgroundServices = options.backgroundServices !== false;
+    const processConfig = options.processConfig ?? createMcpProcessConfig(options.env);
     const workspaceInfra = getApplicationWorkspaceInfra(MCP_WORKSPACE_ROOT);
     const workspace = createMcpWorkspaceCapability(workspaceInfra);
+    const infraHealth = createMcpInfraHealthCapability(() => {
+        const host = getApplicationInfraHost();
+        return {
+            runtime: readIoRuntimeHealthSnapshot(host.runtime),
+            process: readIoProcessHealthSnapshot(host.processInfra),
+        };
+    });
+    const audit = createMcpAuditCapability(processConfig.observability.audit);
+    const oauthReplay = createOAuthReplayCapability(readComposedMcpSqliteDatabase, processConfig.auth.replay);
+    const authResourceServer = createMcpAuthResourceServerRuntime(oauthReplay);
+    const authIssuerRuntime = createDevOAuthRuntime({
+        processConfig: processConfig.auth.issuer,
+        replay: oauthReplay,
+        compatibilityObserver: audit.recordCompatibility,
+    });
+    const authRuntime = Object.freeze({
+        ...processConfig.auth,
+        resourceServer: authResourceServer,
+        issuerRuntime: authIssuerRuntime,
+    });
+    const aiArtifacts = createComposedAiArtifactsRuntime(workspace, workspaceInfra);
+    const roundTripAnalytics = createMcpRoundTripAnalyticsCapability(readComposedMcpSqliteDatabase, audit);
+    const modelGatewaySqliteFingerprint = createModelGatewaySqliteFingerprintCapability(readComposedMcpSqliteDatabase);
+    const toolCapabilities = Object.freeze({
+        ...processConfig.toolCapabilities,
+        infraHealth,
+        audit,
+        authIssuerRuntime,
+        aiArtifacts,
+        roundTripAnalytics,
+        modelGatewaySqliteFingerprint,
+    });
     /** @type {import('#copilot/mcp/public/process/host').McpProcessHostService[]} */
     const services = [
         {
@@ -90,21 +128,26 @@ export function createComposedMcpProcessHost(options = {}) {
         services.push({
             name: 'workspace-index-auto-build',
             start: () => {
-                const before = readMcpIndexAutoBuildState();
+                const before = readMcpIndexAutoBuildState(processConfig.indexing.autoBuild);
                 if (before.status === 'completed' || before.status === 'running' || before.status === 'disabled')
                     return;
                 const database = readComposedMcpSqliteDatabase();
+                const controller = new AbortController();
                 const build = maybeStartMcpIndexAutoBuild({
                     workspace,
+                    config: processConfig.indexing.autoBuild,
+                    gitConfig: processConfig.git,
+                    signal: controller.signal,
                     reason: 'mcp-process-host-start',
                     ...(database ? { db: database } : {}),
                 });
                 void build.catch((error) => {
                     logMcp('WARN', 'MCP index auto-build failed in process host.', { error: errorMessage(error) });
                 });
-                // The index builder does not yet expose cancellation. The host therefore owns completion and drains it
-                // during teardown instead of pretending that fire-and-forget work has stopped.
+                // The process host owns this background generation. Teardown first invalidates/cancels it, then drains
+                // the physical work so no Git subprocess or index phase leaks into a later host generation.
                 return async () => {
+                    controller.abort(new Error('MCP process host is stopping index auto-build.'));
                     await build.catch(() => undefined);
                 };
             },
@@ -112,14 +155,33 @@ export function createComposedMcpProcessHost(options = {}) {
     }
 
     if (backgroundServices && options.authJwksWarmup !== false) {
-        services.push(scheduledService('auth-jwks-warmup', scheduleMcpAuthJwksWarmup, stopMcpAuthJwksWarmup));
+        services.push(
+            scheduledService(
+                'auth-jwks-warmup',
+                () =>
+                    scheduleMcpAuthJwksWarmup({
+                        policy: processConfig.auth.jwksWarmup,
+                        authConfig: processConfig.auth.config,
+                        warmupRunner: () => authResourceServer.warmRemoteJwks({ config: processConfig.auth.config }),
+                    }),
+                stopMcpAuthJwksWarmup,
+            ),
+        );
     }
     if (backgroundServices && options.startupMaintenance !== false) {
         services.push({
             name: 'startup-maintenance',
             start() {
                 const scheduled = scheduleMcpStartupMaintenance({
+                    policy: processConfig.runtime.startupMaintenance,
                     workspace,
+                    cloudflareConfig: processConfig.cloudflare,
+                    gitConfig: processConfig.git,
+                    audit,
+                    cleanupRunner: () =>
+                        createCloudflareStateStore(processConfig.cloudflare).cleanupStaleQuickTunnelState({
+                            staleAfterMs: processConfig.cloudflare.staleAfterMs,
+                        }),
                     rollbackCleanupRunner: () => cleanupRollbackStateAtStartup(workspaceInfra),
                 });
                 return scheduled ? stopMcpStartupMaintenance : undefined;
@@ -130,7 +192,10 @@ export function createComposedMcpProcessHost(options = {}) {
         services.push(
             scheduledService(
                 'openai-endpoint-latency-monitor',
-                scheduleOpenAiEndpointLatencyMonitor,
+                () =>
+                    scheduleOpenAiEndpointLatencyMonitor({
+                        policy: processConfig.diagnostics.latency.owner.openAiMonitor,
+                    }),
                 stopOpenAiEndpointLatencyMonitor,
             ),
         );
@@ -139,7 +204,11 @@ export function createComposedMcpProcessHost(options = {}) {
         services.push(
             scheduledService(
                 'round-trip-analytics-monitor',
-                scheduleMcpRoundTripAnalyticsMonitor,
+                () =>
+                    scheduleMcpRoundTripAnalyticsMonitor({
+                        policy: processConfig.diagnostics.latency.owner.roundTripMonitor,
+                        syncFn: () => roundTripAnalytics.sync(),
+                    }),
                 stopMcpRoundTripAnalyticsMonitor,
             ),
         );
@@ -147,24 +216,16 @@ export function createComposedMcpProcessHost(options = {}) {
 
     const processHost = createMcpProcessHost({
         ...(options.hostId ? { hostId: options.hostId } : {}),
-        prepare: () => prepareApplicationInfra(workspace, workspaceInfra),
+        prepare: () => prepareApplicationInfra(processConfig, audit),
         services,
         log: logMcp,
     });
-    return Object.freeze({ ...processHost, workspace });
-}
-
-/**
- * Remove expired rollback sidecars and enforce the process-owned rollback budget. This belongs to composition because
- * it combines application runtime policy with the concrete MCP workspace rollback capability.
- */
-function configureComposedInfraHealthReader() {
-    return configureMcpInfraHealthReader(() => {
-        const host = getApplicationInfraHost();
-        return {
-            runtime: readIoRuntimeHealthSnapshot(host.runtime),
-            process: readIoProcessHealthSnapshot(host.processInfra),
-        };
+    return Object.freeze({
+        ...processHost,
+        workspace,
+        processConfig,
+        toolCapabilities,
+        authRuntime,
     });
 }
 
@@ -172,7 +233,7 @@ function configureComposedInfraHealthReader() {
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {ReturnType<typeof getApplicationWorkspaceInfra>} workspaceInfra
  */
-function configureComposedAiArtifactsRuntime(workspace, workspaceInfra) {
+function createComposedAiArtifactsRuntime(workspace, workspaceInfra) {
     const workspaceRoot = workspace.workspaceRoot;
     const policy = getApplicationInfraRuntime().config.rollback;
     const rollback = workspaceInfra.rollback;
@@ -187,14 +248,12 @@ function configureComposedAiArtifactsRuntime(workspace, workspaceInfra) {
             durability: ['file-and-directory'],
         }),
     );
-    return configureAiArtifactsRuntime(
-        createAiArtifactsRuntime({
-            workspaceRoot,
-            rollbackPolicy: policy,
-            rollbackMaintenance: rollback,
-            io,
-        }),
-    );
+    return createAiArtifactsRuntime({
+        workspaceRoot,
+        rollbackPolicy: policy,
+        rollbackMaintenance: rollback,
+        io,
+    });
 }
 
 /** @param {ReturnType<typeof getApplicationWorkspaceInfra>} workspaceInfra */
@@ -233,31 +292,18 @@ export function readComposedMcpSqliteDatabase() {
 }
 
 /**
- * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
- * @param {ReturnType<typeof getApplicationWorkspaceInfra>} workspaceInfra
+ * @param {import('#copilot/mcp/public/composition/process-config').McpProcessConfig} processConfig
+ * @param {ReturnType<typeof createMcpAuditCapability>} audit
  */
-async function prepareApplicationInfra(workspace, workspaceInfra) {
+async function prepareApplicationInfra(processConfig, audit) {
     /** @type {{ capability: string; dispose: () => void | Promise<void> }[]} */
-    const disposers = [];
-    const configure = (
-        /** @type {string} */ capability,
-        /** @type {() => void | (() => void | Promise<void>)} */ factory,
-    ) => {
-        const dispose = configureOptionalProcessCapability(capability, factory);
-        if (dispose) disposers.push({ capability, dispose });
-    };
+    const disposers = [{ capability: 'audit-runtime', dispose: () => audit.flush() }];
 
-    configure('infra-health', configureComposedInfraHealthReader);
-    configure('ai-artifacts', () => configureComposedAiArtifactsRuntime(workspace, workspaceInfra));
+    await processConfig.toolCapabilities.cloudflare.prepare();
 
     try {
         await bootstrapApplicationInfraSqliteProvider();
-        const database = getApplicationSqliteDatabase();
-        configure('oauth-replay-store', () =>
-            configurePersistentOAuthReplayStore(createConfiguredOAuthReplayStore(database)),
-        );
-        configure('round-trip-analytics', () => configureMcpRoundTripAnalytics(database));
-        configure('model-gateway-sqlite-fingerprint', () => configureModelGatewayIntegrationDatabase(database));
+        getApplicationSqliteDatabase();
     } catch (error) {
         // SQLite is an application capability, not a prerequisite for every MCP endpoint. Preserve degradable startup
         // while keeping non-database capabilities independently configured above.
@@ -284,27 +330,6 @@ async function prepareApplicationInfra(workspace, workspaceInfra) {
             throw new AggregateError(failures, `MCP process capability revocation failed (${failures.length}).`);
         }
     };
-}
-
-/**
- * Optional process capabilities fail independently. One diagnostic/persistence projection must never prevent unrelated
- * capabilities from being composed or turn an otherwise usable MCP process into a false all-or-nothing bootstrap.
- *
- * @param {string} capability
- * @param {() => void | (() => void | Promise<void>)} configure
- * @returns {(() => void | Promise<void>) | null}
- */
-function configureOptionalProcessCapability(capability, configure) {
-    try {
-        const dispose = configure();
-        return typeof dispose === 'function' ? dispose : null;
-    } catch (error) {
-        logMcp('WARN', 'MCP optional process capability configuration failed.', {
-            capability,
-            error: errorMessage(error),
-        });
-        return null;
-    }
 }
 
 /**

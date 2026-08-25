@@ -16,112 +16,46 @@ import {
     writeIndexStartupCheckpoint,
 } from './checkpoint.js';
 
-/**
- * @typedef {object} McpIndexAutoBuildConfig
- * @property {boolean} enabled
- * @property {string} path
- * @property {number} maxFiles
- * @property {number} depth
- * @property {number} concurrency
- * @property {boolean} respectGitignore
- * @property {number} fullReconcileIntervalMs
- * @property {number} journalReplayMaxRows
- */
+/** @typedef {import('./config.js').McpIndexAutoBuildConfig} McpIndexAutoBuildConfig */
 
 /**
  * @typedef {object} McpIndexAutoBuildState
- * @property {'never-started' | 'disabled' | 'running' | 'completed' | 'failed' | 'skipped'} status
+ * @property {'unconfigured' | 'never-started' | 'disabled' | 'running' | 'completed' | 'failed' | 'skipped'} status
  * @property {string | null} startedAt
  * @property {string | null} completedAt
  * @property {string | null} reason
  * @property {Record<string, unknown> | null} result
  * @property {Record<string, unknown> | null} error
- * @property {McpIndexAutoBuildConfig} config
+ * @property {McpIndexAutoBuildConfig | null} config
  * @property {Record<string, unknown>} stats
  */
 
-const DEFAULT_AUTO_BUILD_PATH = 'src/copilot';
-const DEFAULT_AUTO_BUILD_MAX_FILES = 5000;
-const DEFAULT_AUTO_BUILD_DEPTH = 20;
-const DEFAULT_AUTO_BUILD_CONCURRENCY = 4;
-const DEFAULT_FULL_RECONCILE_INTERVAL_MS = 30 * 60 * 1000;
-const DEFAULT_JOURNAL_REPLAY_MAX_ROWS = 2048;
-
-/** @type {McpIndexAutoBuildState | null} */
-let autoBuildState = null;
-/** @type {Promise<McpIndexAutoBuildState> | null} */
-let autoBuildPromise = null;
+const MAX_RETAINED_AUTO_BUILD_GENERATIONS = 8;
+/** @type {Map<string, McpIndexAutoBuildState>} */
+const autoBuildStates = new Map();
+/** @type {Map<string, Promise<McpIndexAutoBuildState>>} */
+const autoBuildPromises = new Map();
 
 /**
- * @param {unknown} value
- * @returns {boolean}
+ * Retain only a small process-local history of completed configuration generations. Running generations are never
+ * evicted; if all retained slots are active, a new generation can still execute but its transient state is not retained
+ * in this diagnostic history map.
+ *
+ * @param {string} generationKey
+ * @param {McpIndexAutoBuildState} state
  */
-function envBool(value) {
-    const normalized = String(value ?? '')
-        .trim()
-        .toLowerCase();
-    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-}
-
-/**
- * @param {unknown} value
- * @param {boolean} fallback
- * @returns {boolean}
- */
-function envBoolWithDefault(value, fallback) {
-    const normalized = String(value ?? '')
-        .trim()
-        .toLowerCase();
-    if (!normalized) return fallback;
-    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
-    return envBool(normalized);
-}
-
-/**
- * @param {unknown} value
- * @param {number} fallback
- * @param {{ min: number; max: number }} range
- * @returns {number}
- */
-function envInt(value, fallback, range) {
-    const normalized = String(value ?? '').trim();
-    if (!normalized) return fallback;
-    const parsed = Number(normalized);
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.min(range.max, Math.max(range.min, Math.round(parsed)));
-}
-
-/**
- * @param {NodeJS.ProcessEnv} [env]
- * @returns {McpIndexAutoBuildConfig}
- */
-export function readMcpIndexAutoBuildConfig(env = process.env) {
-    return {
-        enabled: envBoolWithDefault(env['COPILOT_MCP_INDEX_AUTO_BUILD'], true),
-        path:
-            String(env['COPILOT_MCP_INDEX_AUTO_BUILD_PATH'] ?? DEFAULT_AUTO_BUILD_PATH).trim() ||
-            DEFAULT_AUTO_BUILD_PATH,
-        maxFiles: envInt(env['COPILOT_MCP_INDEX_AUTO_BUILD_MAX_FILES'], DEFAULT_AUTO_BUILD_MAX_FILES, {
-            min: 1,
-            max: 25_000,
-        }),
-        depth: envInt(env['COPILOT_MCP_INDEX_AUTO_BUILD_DEPTH'], DEFAULT_AUTO_BUILD_DEPTH, { min: 1, max: 50 }),
-        concurrency: envInt(env['COPILOT_MCP_INDEX_AUTO_BUILD_CONCURRENCY'], DEFAULT_AUTO_BUILD_CONCURRENCY, {
-            min: 1,
-            max: 32,
-        }),
-        respectGitignore: !envBool(env['COPILOT_MCP_INDEX_AUTO_BUILD_IGNORE_GITIGNORE']),
-        fullReconcileIntervalMs: envInt(
-            env['COPILOT_MCP_INDEX_FULL_RECONCILE_INTERVAL_MS'],
-            DEFAULT_FULL_RECONCILE_INTERVAL_MS,
-            { min: 60_000, max: 24 * 60 * 60 * 1000 },
-        ),
-        journalReplayMaxRows: envInt(
-            env['COPILOT_MCP_INDEX_JOURNAL_REPLAY_MAX_ROWS'],
-            DEFAULT_JOURNAL_REPLAY_MAX_ROWS,
-            { min: 64, max: 10_000 },
-        ),
-    };
+function retainAutoBuildState(generationKey, state) {
+    if (autoBuildStates.has(generationKey)) autoBuildStates.delete(generationKey);
+    while (autoBuildStates.size >= MAX_RETAINED_AUTO_BUILD_GENERATIONS) {
+        const evictable = [...autoBuildStates.entries()].find(
+            ([key, candidate]) =>
+                key !== generationKey && candidate.status !== 'running' && !autoBuildPromises.has(key),
+        );
+        if (!evictable) return false;
+        autoBuildStates.delete(evictable[0]);
+    }
+    autoBuildStates.set(generationKey, state);
+    return true;
 }
 
 /**
@@ -133,10 +67,12 @@ export function readMcpIndexAutoBuildConfig(env = process.env) {
  *     config?: McpIndexAutoBuildConfig;
  *     stats?: Record<string, unknown>;
  * }} input
+ * @param {McpIndexAutoBuildConfig} config
  * @returns {McpIndexAutoBuildState}
  */
-function makeState(input) {
-    const previousStartedAt = autoBuildState?.startedAt ?? null;
+function makeState(input, config) {
+    const previous = autoBuildStates.get(config.generationKey);
+    const previousStartedAt = previous?.startedAt ?? null;
     return {
         status: input.status,
         startedAt: input.status === 'running' ? new Date().toISOString() : previousStartedAt,
@@ -147,36 +83,60 @@ function makeState(input) {
         reason: input.reason ?? null,
         result: input.result ?? null,
         error: input.error ?? null,
-        config: input.config ?? readMcpIndexAutoBuildConfig(),
-        stats: input.stats ??
-            autoBuildState?.stats ?? { available: false, reason: 'workspace-capability-not-observed' },
+        config,
+        stats: input.stats ?? previous?.stats ?? { available: false, reason: 'workspace-capability-not-observed' },
     };
 }
 
 /**
+ * Read state for one exact process-config generation. An omitted config is reported honestly as unconfigured rather
+ * than synthesizing ambient defaults from process.env.
+ *
+ * @param {McpIndexAutoBuildConfig | undefined} config
  * @returns {McpIndexAutoBuildState}
  */
-export function readMcpIndexAutoBuildState() {
-    if (autoBuildState) {
+export function readMcpIndexAutoBuildState(config) {
+    if (!config) {
         return {
-            ...autoBuildState,
-            config: { ...autoBuildState.config },
-            stats: { ...autoBuildState.stats },
-            result: autoBuildState.result ? { ...autoBuildState.result } : null,
-            error: autoBuildState.error ? { ...autoBuildState.error } : null,
+            status: 'unconfigured',
+            startedAt: null,
+            completedAt: null,
+            reason: 'process-config-generation-unavailable',
+            result: null,
+            error: null,
+            config: null,
+            stats: { available: false, reason: 'workspace-capability-not-observed' },
         };
     }
-    const config = readMcpIndexAutoBuildConfig();
-    return makeState({
-        status: config.enabled ? 'never-started' : 'disabled',
-        reason: config.enabled ? 'auto-build-enabled-but-not-started' : 'auto-build-disabled',
+    const state = autoBuildStates.get(config.generationKey);
+    if (state) return cloneState(state);
+    return makeState(
+        {
+            status: config.enabled ? 'never-started' : 'disabled',
+            reason: config.enabled ? 'auto-build-enabled-but-not-started' : 'auto-build-disabled',
+            config,
+        },
         config,
-    });
+    );
+}
+
+/** @param {McpIndexAutoBuildState} state @returns {McpIndexAutoBuildState} */
+function cloneState(state) {
+    return {
+        ...state,
+        config: state.config ? { ...state.config } : null,
+        stats: { ...state.stats },
+        result: state.result ? { ...state.result } : null,
+        error: state.error ? { ...state.error } : null,
+    };
 }
 
 /**
  * @param {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     config: McpIndexAutoBuildConfig;
+ *     gitConfig?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig;
+ *     signal?: AbortSignal;
  *     reason?: string;
  *     db?: import('#copilot/infra/public/database/sqlite').SqliteDatabasePort;
  * }} options
@@ -185,52 +145,97 @@ export function readMcpIndexAutoBuildState() {
 export async function maybeStartMcpIndexAutoBuild(options) {
     if (!options?.workspace) throw new TypeError('MCP index auto-build requires a workspace capability.');
     const workspace = options.workspace;
+    const config = options.config;
+    if (!config) throw new TypeError('MCP index auto-build requires an explicit config generation.');
+    const generationKey = config.generationKey;
     const readStats = () => /** @type {Record<string, unknown>} */ (workspace.indexRegistry.status());
-    const config = readMcpIndexAutoBuildConfig();
     if (!config.enabled) {
-        autoBuildState = makeState({ status: 'disabled', reason: 'auto-build-disabled', config, stats: readStats() });
-        return readMcpIndexAutoBuildState();
+        const disabled = makeState(
+            { status: 'disabled', reason: 'auto-build-disabled', config, stats: readStats() },
+            config,
+        );
+        retainAutoBuildState(generationKey, disabled);
+        return cloneState(disabled);
     }
-    if (autoBuildPromise) return await autoBuildPromise;
-    if (autoBuildState?.status === 'completed' || autoBuildState?.status === 'running') {
-        return readMcpIndexAutoBuildState();
+    if (!options.gitConfig) {
+        const failed = makeState(
+            {
+                status: 'failed',
+                reason: 'git-process-config-unavailable',
+                error: { message: 'MCP index auto-build requires an explicit Git process config generation.' },
+                config,
+                stats: readStats(),
+            },
+            config,
+        );
+        retainAutoBuildState(generationKey, failed);
+        return cloneState(failed);
     }
+    if (options.signal?.aborted) {
+        return cloneState(
+            makeState(
+                {
+                    status: 'failed',
+                    reason: 'aborted',
+                    error: { message: abortMessage(options.signal) },
+                    config,
+                    stats: readStats(),
+                },
+                config,
+            ),
+        );
+    }
+    const activePromise = autoBuildPromises.get(generationKey);
+    if (activePromise) return await activePromise;
+    const existing = autoBuildStates.get(generationKey);
+    if (existing?.status === 'completed' || existing?.status === 'running') return cloneState(existing);
 
     if (!options.db) {
-        autoBuildState = makeState({
-            status: 'failed',
-            reason: 'database-capability-unavailable',
-            error: { message: 'MCP index auto-build requires an injected database capability.' },
+        const failed = makeState(
+            {
+                status: 'failed',
+                reason: 'database-capability-unavailable',
+                error: { message: 'MCP index auto-build requires an injected database capability.' },
+                config,
+                stats: readStats(),
+            },
             config,
-            stats: readStats(),
-        });
-        return readMcpIndexAutoBuildState();
+        );
+        retainAutoBuildState(generationKey, failed);
+        return cloneState(failed);
     }
 
-    autoBuildState = makeState({
-        status: 'running',
-        reason: options.reason ?? 'mcp-http-start',
+    const running = makeState(
+        {
+            status: 'running',
+            reason: options.reason ?? 'mcp-http-start',
+            config,
+            stats: readStats(),
+        },
         config,
-        stats: readStats(),
-    });
-    autoBuildPromise = runIndexAutoBuild(config, options.db, workspace)
+    );
+    retainAutoBuildState(generationKey, running);
+    const buildPromise = runIndexAutoBuild(config, options.db, workspace, options.gitConfig, options.signal)
         .then((state) => {
-            autoBuildState = state;
-            return readMcpIndexAutoBuildState();
+            retainAutoBuildState(generationKey, state);
+            return cloneState(state);
         })
         .finally(() => {
-            autoBuildPromise = null;
+            if (autoBuildPromises.get(generationKey) === buildPromise) autoBuildPromises.delete(generationKey);
         });
-    return await autoBuildPromise;
+    autoBuildPromises.set(generationKey, buildPromise);
+    return await buildPromise;
 }
 
 /**
  * @param {McpIndexAutoBuildConfig} config
  * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig} gitConfig
+ * @param {AbortSignal | undefined} signal
  * @returns {Promise<McpIndexAutoBuildState>}
  */
-async function runIndexAutoBuild(config, db, workspace) {
+async function runIndexAutoBuild(config, db, workspace, gitConfig, signal) {
     const { indexRegistry, workspaceRoot } = workspace;
     const filterIoIndexRefreshDomainPaths = indexRegistry.filterRefreshDomainPaths;
     const reconcileIoIndexAutoRefreshDomain = indexRegistry.reconcileAutoRefreshDomain;
@@ -238,8 +243,9 @@ async function runIndexAutoBuild(config, db, workspace) {
     const readIoIndexStatus = indexRegistry.status;
     /** @param {Parameters<typeof makeState>[0]} input */
     const makeRuntimeState = (input) =>
-        makeState({ ...input, stats: /** @type {Record<string, unknown>} */ (readIoIndexStatus()) });
+        makeState({ ...input, stats: /** @type {Record<string, unknown>} */ (readIoIndexStatus()) }, config);
     try {
+        throwIfAborted(signal);
         const resolved = await workspace.resolveReadPath(config.path);
         if (!resolved.ok) {
             return makeRuntimeState({
@@ -291,7 +297,14 @@ async function runIndexAutoBuild(config, db, workspace) {
             error: journalReplay.error,
         };
         const checkpointJournalSequence = journalReplay.available ? journalReplay.highWatermark : undefined;
-        const gitSnapshot = await readIndexGitSnapshot({ workspaceRoot, scopePath: config.path });
+        throwIfAborted(signal);
+        const gitSnapshot = await readIndexGitSnapshot({
+            workspaceRoot,
+            scopePath: config.path,
+            gitConfig,
+            ...(signal ? { signal } : {}),
+        });
+        throwIfAborted(signal);
         const plan = planIndexStartup({
             checkpoint,
             gitSnapshot,
@@ -302,6 +315,36 @@ async function runIndexAutoBuild(config, db, workspace) {
         });
 
         if (plan.mode === 'skip' && gitSnapshot.head) {
+            throwIfAborted(signal);
+            const hashVerification = await indexRegistry.verifyHashSample(resolved.resolved, {
+                cursor: checkpoint?.hashVerificationCursor ?? '',
+                maxFiles: config.hashVerifySampleFiles,
+                ...(signal ? { signal } : {}),
+            });
+            throwIfAborted(signal);
+            const hashVerificationSummary = summarizeHashVerificationSample(hashVerification);
+            if (hashVerification.available !== true || Number(hashVerification.mismatchCount ?? 0) > 0) {
+                return await runFullReconcile(
+                    config,
+                    resolved.resolved,
+                    gitSnapshot,
+                    schemaVersion,
+                    startupStartedAt,
+                    {
+                        fallbackReason:
+                            hashVerification.available === true
+                                ? 'bounded-hash-verification-mismatch'
+                                : 'bounded-hash-verification-unavailable',
+                        gitSnapshotDurationMs: gitSnapshot.durationMs,
+                        journalReplay: journalSummary,
+                        hashVerification: hashVerificationSummary,
+                    },
+                    checkpointJournalSequence,
+                    db,
+                    workspace,
+                    signal,
+                );
+            }
             writeIndexStartupCheckpoint(
                 {
                     scopePath: config.path,
@@ -309,9 +352,11 @@ async function runIndexAutoBuild(config, db, workspace) {
                     schemaVersion,
                     mode: 'skip',
                     ...(checkpointJournalSequence === undefined ? {} : { journalSequence: checkpointJournalSequence }),
+                    hashVerificationCursor: String(hashVerification.nextCursor ?? ''),
                 },
                 db,
             );
+            const durationMs = Math.max(0, Date.now() - startupStartedAt);
             return makeRuntimeState({
                 status: 'skipped',
                 reason: plan.reason,
@@ -322,10 +367,13 @@ async function runIndexAutoBuild(config, db, workspace) {
                     candidateFiles: 0,
                     indexed: 0,
                     invalidated: 0,
-                    hashVerifications: 0,
+                    hashVerifications: Number(hashVerification.hashVerifications ?? 0),
+                    hashVerification: hashVerificationSummary,
                     journalReplay: journalSummary,
                     gitSnapshotDurationMs: gitSnapshot.durationMs,
-                    durationMs: Math.max(0, Date.now() - startupStartedAt),
+                    noChangeSloMs: config.noChangeSloMs,
+                    noChangeSloMet: durationMs <= config.noChangeSloMs,
+                    durationMs,
                 },
                 config,
             });
@@ -340,7 +388,10 @@ async function runIndexAutoBuild(config, db, workspace) {
                     scopePath: config.path,
                     fromHead: checkpoint.head,
                     toHead: gitSnapshot.head,
+                    gitConfig,
+                    ...(signal ? { signal } : {}),
                 });
+                throwIfAborted(signal);
                 committedDiffDurationMs = committed.durationMs;
                 if (!committed.available || committed.uncertain) {
                     return await runFullReconcile(
@@ -357,18 +408,23 @@ async function runIndexAutoBuild(config, db, workspace) {
                         checkpointJournalSequence,
                         db,
                         workspace,
+                        signal,
                     );
                 }
                 changes = [...changes, ...committed.changes];
             }
             const gitPaths = normalizeGitChangePaths(changes, config.path, workspaceRoot);
             const explicitPaths = [...new Set([...gitPaths, ...journalDomain.paths])];
+            throwIfAborted(signal);
             const incremental = await refreshIoIndexPaths(explicitPaths, {
                 workspaceRoot,
                 scopeRoot: resolved.resolved,
                 respectGitignore: config.respectGitignore,
+                ...(signal ? { signal } : {}),
             });
-            const domainReconcile = await reconcileIoIndexAutoRefreshDomain();
+            throwIfAborted(signal);
+            const domainReconcile = await reconcileIoIndexAutoRefreshDomain(signal ? { signal } : {});
+            throwIfAborted(signal);
             if (incremental.available === false || incremental.failed > 0) {
                 return await runFullReconcile(
                     config,
@@ -385,6 +441,7 @@ async function runIndexAutoBuild(config, db, workspace) {
                     checkpointJournalSequence,
                     db,
                     workspace,
+                    signal,
                 );
             }
             writeIndexStartupCheckpoint(
@@ -434,11 +491,12 @@ async function runIndexAutoBuild(config, db, workspace) {
             checkpointJournalSequence,
             db,
             workspace,
+            signal,
         );
     } catch (error) {
         return makeRuntimeState({
             status: 'failed',
-            reason: 'exception',
+            reason: signal?.aborted ? 'aborted' : 'exception',
             error: { message: error instanceof Error ? error.message : String(error) },
             config,
         });
@@ -455,6 +513,7 @@ async function runIndexAutoBuild(config, db, workspace) {
  * @param {number | undefined} journalSequence
  * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {AbortSignal | undefined} signal
  */
 async function runFullReconcile(
     config,
@@ -466,7 +525,9 @@ async function runFullReconcile(
     journalSequence,
     db,
     workspace,
+    signal,
 ) {
+    throwIfAborted(signal);
     const buildIoIndexForDirectory = workspace.indexRegistry.buildDirectory;
     const reconcileIoIndexAutoRefreshDomain = workspace.indexRegistry.reconcileAutoRefreshDomain;
     const result = await buildIoIndexForDirectory(resolvedPath, {
@@ -477,8 +538,11 @@ async function runFullReconcile(
         maxFiles: config.maxFiles,
         concurrency: config.concurrency,
         adoptAutoRefreshDomain: true,
+        ...(signal ? { signal } : {}),
     });
-    const domainReconcile = await reconcileIoIndexAutoRefreshDomain();
+    throwIfAborted(signal);
+    const domainReconcile = await reconcileIoIndexAutoRefreshDomain(signal ? { signal } : {});
+    throwIfAborted(signal);
     if (result.available !== false && gitSnapshot.head && !gitSnapshot.uncertain) {
         writeIndexStartupCheckpoint(
             {
@@ -491,19 +555,70 @@ async function runFullReconcile(
             db,
         );
     }
-    return makeState({
-        status: result.available === false ? 'failed' : 'completed',
-        reason: result.available === false ? 'index-unavailable' : 'full-reconcile',
-        result: /** @type {Record<string, unknown>} */ ({
-            ...result,
-            domainReconcile,
-            mode: 'full-reconcile',
-            ...evidence,
-            durationMs: Math.max(0, Date.now() - startupStartedAt),
-        }),
+    return makeState(
+        {
+            status: result.available === false ? 'failed' : 'completed',
+            reason: result.available === false ? 'index-unavailable' : 'full-reconcile',
+            result: /** @type {Record<string, unknown>} */ ({
+                ...result,
+                domainReconcile,
+                mode: 'full-reconcile',
+                ...evidence,
+                durationMs: Math.max(0, Date.now() - startupStartedAt),
+            }),
+            config,
+            stats: /** @type {Record<string, unknown>} */ (workspace.indexRegistry.status()),
+        },
         config,
-        stats: /** @type {Record<string, unknown>} */ (workspace.indexRegistry.status()),
-    });
+    );
+}
+
+/**
+ * Keep bounded hash verification diagnostics compact and path-agnostic. Mismatch paths are intentionally not retained
+ * in the process state: the full reconcile is the repair authority, while counts/reasons are enough for health/SLO
+ * diagnostics.
+ *
+ * @param {Awaited<ReturnType<import('#copilot/mcp/public/workspace').McpWorkspaceCapability['indexRegistry']['verifyHashSample']>>} result
+ */
+function summarizeHashVerificationSample(result) {
+    const reasonCounts = new Map();
+    for (const mismatch of Array.isArray(result.mismatches) ? result.mismatches : []) {
+        const reason = String(mismatch?.reason ?? 'unknown');
+        reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    }
+    return {
+        available: result.available === true,
+        maxFiles: Number(result.maxFiles ?? 0),
+        candidateCount: Number(result.candidateCount ?? 0),
+        wrapped: result.wrapped === true,
+        hashVerifications: Number(result.hashVerifications ?? 0),
+        hashVerificationHits: Number(result.hashVerificationHits ?? 0),
+        hashVerificationMisses: Number(result.hashVerificationMisses ?? 0),
+        metadataMismatches: Number(result.metadataMismatches ?? 0),
+        errors: Number(result.errors ?? 0),
+        mismatchCount: Number(result.mismatchCount ?? 0),
+        mismatchReasons: Object.fromEntries(reasonCounts),
+        durationMs: Number(result.durationMs ?? 0),
+    };
+}
+
+/** @param {AbortSignal | undefined} signal */
+function throwIfAborted(signal) {
+    if (!signal?.aborted) return;
+    const reason = signal.reason;
+    throw reason instanceof Error
+        ? reason
+        : new Error(reason === undefined ? 'MCP index auto-build aborted.' : String(reason));
+}
+
+/** @param {AbortSignal} signal */
+function abortMessage(signal) {
+    const reason = signal.reason;
+    return reason instanceof Error
+        ? reason.message
+        : reason === undefined
+          ? 'MCP index auto-build aborted.'
+          : String(reason);
 }
 
 /**
@@ -529,6 +644,6 @@ function normalizeGitChangePaths(changes, scopePath, workspaceRoot) {
  * @returns {void}
  */
 export function resetMcpIndexAutoBuildStateForTests() {
-    autoBuildState = null;
-    autoBuildPromise = null;
+    autoBuildStates.clear();
+    autoBuildPromises.clear();
 }

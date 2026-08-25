@@ -1,4 +1,4 @@
-import { analyzeEdgeRulesets } from '#copilot/mcp/public/cloudflare/edge-audit';
+import { analyzeEdgeRulesets } from '#copilot/mcp/public/cloudflare/edge';
 import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/edge-audit', () => {

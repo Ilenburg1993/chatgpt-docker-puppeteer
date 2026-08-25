@@ -5,12 +5,12 @@
  * @module copilot/mcp/tools/round-trip-analytics
  */
 
-import { readMcpRoundTripAnalytics } from '#copilot/mcp/public/diagnostics/latency';
-import { boundedWriteAnnotations, okResult } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolRoundTripAnalyticsCapability } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpRoundTripAnalyticsTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
     name: 'mcp_round_trip_analytics',
     title: 'MCP round-trip analytics',
     description:
@@ -39,14 +39,14 @@ export const mcpRoundTripAnalyticsTool = {
             .optional()
             ['describe']('Refresh the derived SQLite index from new audit bytes before summarizing. Default: true.'),
     },
-    annotations: boundedWriteAnnotations(),
-    handler: async (input = {}) => {
+
+    handler: async (input = {}, operationContext) => {
         const options = /** @type {Record<string, unknown>} */ (input);
         const windowHours = boundedInteger(options['windowHours'], 24, 1, 24 * 14);
         const top = boundedInteger(options['top'], 20, 1, 100);
         const includeSynthetic = options['includeSynthetic'] === true;
         const sync = options['sync'] !== false;
-        const report = await readMcpRoundTripAnalytics({
+        const report = await requireMcpToolRoundTripAnalyticsCapability(operationContext).summarize({
             windowMs: windowHours * 60 * 60 * 1000,
             top,
             includeSynthetic,
@@ -68,15 +68,17 @@ export const mcpRoundTripAnalyticsTool = {
                 includeSynthetic: report.includeSynthetic,
                 indexedRows: report.indexedRows,
                 topTransitions: report.topTransitions,
+                sequenceEvidence: report.sequenceEvidence,
                 failures: report.failures,
                 recovery: report.recovery,
                 workflowPressure: report.workflowPressure,
+                optimizationEvidence: report.optimizationEvidence,
                 discontinuities: report.discontinuities,
                 toolStarts: report.toolStarts,
             },
         });
     },
-};
+});
 
 /** @param {unknown} value @param {number} fallback @param {number} min @param {number} max */
 function boundedInteger(value, fallback, min, max) {

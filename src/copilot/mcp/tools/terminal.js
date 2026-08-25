@@ -19,12 +19,8 @@ import {
     openTerminalSession,
     readTerminalSession,
 } from '#copilot/mcp/public/process/terminal';
-import {
-    okResult,
-    openWorldDestructiveAnnotations,
-    readOnlyAnnotations,
-    requireMcpToolWorkspace,
-} from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolTerminalConfig, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
 
 const envSchema = z.record(z.string(), z.union([z.string(), z.null()]));
 
@@ -271,6 +267,7 @@ function terminalExecutionRuntime(operationContext) {
     if (!operationContext) throw new TypeError('Terminal tool execution requires an OperationContext.');
     return Object.freeze({
         workspaceRoot: workspace.workspaceRoot,
+        config: requireMcpToolTerminalConfig(operationContext),
         signal: operationContext.signal,
         cancellationSource: operationContext.cancellationSource,
     });
@@ -316,9 +313,9 @@ function terminalResult(payload) {
     return okResult(payload, JSON.stringify(compact, null, 2));
 }
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const terminalTools = [
-    {
+    defineMcpRawTool({
         name: 'terminal_exec',
         title: 'Execute arbitrary terminal commands',
         description:
@@ -360,7 +357,7 @@ export const terminalTools = [
                 .describe('Aggregate retained stdout/stderr budget across a batch. Default: 8MiB.'),
         },
         outputSchema: terminalExecOutputSchema,
-        annotations: openWorldDestructiveAnnotations(),
+
         maxResultBytes: TERMINAL_EXEC_RESULT_LIMIT_BYTES,
         handler: async (input = {}, operationContext) => {
             const runtime = terminalExecutionRuntime(operationContext);
@@ -401,8 +398,8 @@ export const terminalTools = [
                 ),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'terminal_session_control',
         title: 'Control persistent terminal sessions',
         description:
@@ -469,10 +466,10 @@ export const terminalTools = [
                 .describe('Grace period before SIGKILL on close. Default: 1500ms.'),
         },
         outputSchema: terminalSessionControlOutputSchema,
-        annotations: openWorldDestructiveAnnotations(),
-        handler: async (input = {}, operationContext) => {
-            const value = isRecord(input) ? input : {};
-            if (value['action'] === 'open') {
+
+        handler: async (input, operationContext) => {
+            const value = input;
+            if (value.action === 'open') {
                 const runtime = terminalExecutionRuntime(operationContext);
                 return terminalResult(
                     await openTerminalSession(
@@ -481,19 +478,19 @@ export const terminalTools = [
                     ),
                 );
             }
-            if (!value['sessionId']) {
+            if (!value.sessionId) {
                 return okResult({
                     success: false,
                     code: 'ERR_TERMINAL_SESSION_ID_REQUIRED',
-                    action: value['action'] ?? null,
+                    action: value.action,
                 });
             }
             return terminalResult(
                 await controlTerminalSession(/** @type {Parameters<typeof controlTerminalSession>[0]} */ (value)),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'terminal_session_read',
         title: 'Read persistent terminal sessions',
         description:
@@ -518,13 +515,14 @@ export const terminalTools = [
                 .describe('Maximum sessions returned by list. Default: 50.'),
         },
         outputSchema: terminalSessionReadOutputSchema,
-        annotations: readOnlyAnnotations(),
+
         maxResultBytes: TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES,
-        handler: async (input = {}) =>
+        handler: async (input = {}, operationContext) =>
             terminalResult(
                 readTerminalSession(
                     /** @type {Parameters<typeof readTerminalSession>[0]} */ (isRecord(input) ? input : {}),
+                    terminalExecutionRuntime(operationContext),
                 ),
             ),
-    },
+    }),
 ];

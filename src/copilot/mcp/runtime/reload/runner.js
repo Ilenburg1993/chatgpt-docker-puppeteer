@@ -11,10 +11,7 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import {
-    createAttachedChildProcessSupervisor,
-    signalProcessTreeDetailed,
-} from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -82,9 +79,9 @@ function parseArgs(argv) {
  * Cloudflare and persistence settings are declared by the allowlisted npm scripts themselves and therefore do not need
  * ambient inheritance from the calling MCP process.
  *
- * @param {NodeJS.ProcessEnv} [parentEnv]
+ * @param {NodeJS.ProcessEnv} parentEnv
  */
-export function buildControlledReloadRunnerEnvironment(parentEnv = process.env) {
+export function buildControlledReloadRunnerEnvironment(parentEnv) {
     /** @type {Record<string, string | null>} */
     const overrides = {};
     const statefulEnvFile = parentEnv['COPILOT_MCP_STATEFUL_ENV_FILE'];
@@ -94,19 +91,36 @@ export function buildControlledReloadRunnerEnvironment(parentEnv = process.env) 
 
 /**
  * Schedule the detached stable reload launcher after persisting launch intent. The promise resolves only after Node has
- * observed the child `spawn` event; only then is the request accepted by the caller-facing API. Completion is reported
- * asynchronously through the fixed reload state file.
+ * observed the child `spawn` event and caller cancellation has not won that acceptance boundary. Before acceptance,
+ * abort/failure terminates and drains the child tree before failed state is persisted.
  *
  * @param {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
  *     profile: string;
  *     delayMs: number;
  *     reason: string | null;
- *     parentEnv?: NodeJS.ProcessEnv;
+ *     runnerEnvironment: Readonly<NodeJS.ProcessEnv>;
  *     signal?: AbortSignal;
  * }} input
  */
 export async function scheduleControlledMcpReload(input) {
+    return await scheduleControlledMcpReloadWithDependencies(input, {});
+}
+
+/**
+ * White-box seam for acceptance/cancellation lifecycle tests.
+ *
+ * @param {{
+ *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     profile: string;
+ *     delayMs: number;
+ *     reason: string | null;
+ *     runnerEnvironment: Readonly<NodeJS.ProcessEnv>;
+ *     signal?: AbortSignal;
+ * }} input
+ * @param {{ spawnChild?: typeof spawn; createRequestUuid?: () => string }} dependencies
+ */
+export async function scheduleControlledMcpReloadWithDependencies(input, dependencies) {
     if (!input.workspace) throw new TypeError('Controlled reload scheduling requires a workspace capability.');
     if (input.signal?.aborted) {
         throw input.signal.reason ?? new Error('Controlled MCP reload scheduling aborted before acceptance.');
@@ -119,7 +133,7 @@ export async function scheduleControlledMcpReload(input) {
     ) {
         throw new Error('Invalid restart delay.');
     }
-    const requestId = `mcp-reload-${randomUUID()}`;
+    const requestId = `mcp-reload-${dependencies.createRequestUuid?.() ?? randomUUID()}`;
     const requestedAt = Date.now();
     const launchingState = {
         schemaVersion: 1,
@@ -134,17 +148,27 @@ export async function scheduleControlledMcpReload(input) {
     };
     await input.workspace.io.writeFileAtomic(MCP_RELOAD_STATE_FILE, `${JSON.stringify(launchingState, null, 2)}\n`);
 
-    const env = buildControlledReloadRunnerEnvironment(input.parentEnv ?? process.env);
+    if (!input.runnerEnvironment)
+        throw new TypeError('Controlled reload scheduling requires a projected runner environment.');
+    if (input.signal?.aborted) {
+        const error = input.signal.reason ?? new Error('Controlled MCP reload scheduling aborted before spawn.');
+        await input.workspace.io.writeFileAtomic(
+            MCP_RELOAD_STATE_FILE,
+            `${JSON.stringify({ ...launchingState, status: 'failed', completedAt: Date.now(), error: error instanceof Error ? error.message : String(error) }, null, 2)}\n`,
+        );
+        throw error;
+    }
+    const env = { ...input.runnerEnvironment };
+    const spawnChild = dependencies.spawnChild ?? spawn;
     /** @type {import('node:child_process').ChildProcess | undefined} */
     let child;
+    /** @type {ReturnType<typeof createAttachedChildProcessSupervisor> | null} */
+    let supervisor = null;
     let accepted = false;
-    const terminateBeforeAcceptance = () => {
-        if (accepted || !child?.pid) return;
-        signalProcessTreeDetailed(child.pid, 'SIGTERM', { child, processGroup: true });
-    };
-    input.signal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
+    /** @type {(() => void) | null} */
+    let terminateBeforeAcceptance = null;
     try {
-        child = spawn(
+        child = spawnChild(
             process.execPath,
             [
                 RELOAD_RUNNER_LAUNCHER,
@@ -162,6 +186,12 @@ export async function scheduleControlledMcpReload(input) {
                 stdio: 'ignore',
             },
         );
+        supervisor = createAttachedChildProcessSupervisor(child, { processGroup: true });
+        terminateBeforeAcceptance = () => {
+            if (accepted || !supervisor || supervisor.snapshot().state === 'closed') return;
+            supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
+        };
+        input.signal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
         await new Promise((resolvePromise, rejectPromise) => {
             /** @param {Error} error */
             const onError = (error) => rejectPromise(error);
@@ -175,6 +205,7 @@ export async function scheduleControlledMcpReload(input) {
         if (!child.pid) throw new Error('Controlled MCP reload launcher did not expose a child pid.');
         if (input.signal?.aborted) {
             terminateBeforeAcceptance();
+            await supervisor.closed;
             throw input.signal.reason ?? new Error('Controlled MCP reload scheduling aborted before acceptance.');
         }
         const acceptedAt = Date.now();
@@ -182,7 +213,10 @@ export async function scheduleControlledMcpReload(input) {
         child.unref();
         return { requestId, requestedAt, acceptedAt, runnerPid: child.pid, target };
     } catch (error) {
-        terminateBeforeAcceptance();
+        if (supervisor && supervisor.snapshot().state !== 'closed') {
+            terminateBeforeAcceptance?.();
+            if (child?.pid) await supervisor.closed;
+        }
         const message = error instanceof Error ? error.message : String(error);
         await input.workspace.io.writeFileAtomic(
             MCP_RELOAD_STATE_FILE,
@@ -190,16 +224,16 @@ export async function scheduleControlledMcpReload(input) {
         );
         throw error;
     } finally {
-        input.signal?.removeEventListener('abort', terminateBeforeAcceptance);
+        if (terminateBeforeAcceptance) input.signal?.removeEventListener('abort', terminateBeforeAcceptance);
     }
 }
 
 /**
  * @param {string} target
- * @param {NodeJS.ProcessEnv} [parentEnv]
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null }>}
  */
-async function runRestart(target, parentEnv = process.env) {
+async function runRestart(target, parentEnv) {
     const env = buildControlledReloadRunnerEnvironment(parentEnv);
     let child;
     try {
@@ -242,7 +276,7 @@ async function runRestart(target, parentEnv = process.env) {
     };
 }
 
-/** @param {{ requestId: string; profile: string; delayMs: number; target: string }} input */
+/** @param {{ requestId: string; profile: string; delayMs: number; target: string; parentEnv: NodeJS.ProcessEnv }} input */
 async function executeControlledReload(input) {
     const scheduledAt = Date.now();
     await writeState({
@@ -268,7 +302,7 @@ async function executeControlledReload(input) {
         target: input.target,
         runnerPid: process.pid,
     });
-    const result = await runRestart(input.target);
+    const result = await runRestart(input.target, input.parentEnv);
     await writeState({
         schemaVersion: 1,
         status: result.exitCode === 0 ? 'completed' : 'failed',
@@ -292,11 +326,13 @@ async function executeControlledReload(input) {
  * mutating process.exitCode inside the domain runtime.
  *
  * @param {string[]} argv
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<number>}
  */
-export async function runControlledMcpReloadCli(argv) {
+export async function runControlledMcpReloadCli(argv, parentEnv) {
+    if (!parentEnv) throw new TypeError('Controlled reload CLI requires an explicit parent environment projection.');
     try {
-        return await executeControlledReload(parseArgs(argv));
+        return await executeControlledReload({ ...parseArgs(argv), parentEnv });
     } catch (error) {
         try {
             await writeState({

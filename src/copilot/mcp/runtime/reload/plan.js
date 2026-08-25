@@ -2,8 +2,8 @@
 /**
  * Canonical planning policy for controlled MCP/Cloudflare reloads.
  *
- * Environment interpretation and process identity are runtime concerns. Wire adapters consume this plan instead of
- * reading ambient process state or duplicating allowlists/bounds.
+ * Environment interpretation belongs to the reload process configuration parser. This module is pure with respect to
+ * ambient process state: callers must provide the captured generation used to resolve `current`.
  *
  * @module copilot/mcp/runtime/reload/plan
  */
@@ -17,10 +17,7 @@ export const MCP_RELOAD_DEFAULT_DELAY_MS = 2_500;
 export const MCP_RELOAD_EXECUTABLE_PROFILES = /** @type {const} */ (['quic', 'h2', 'auto']);
 export const MCP_RELOAD_REQUEST_PROFILES = /** @type {const} */ (['current', 'quic', 'h2', 'auto']);
 
-/**
- * @param {unknown} value
- * @returns {number}
- */
+/** @param {unknown} value @returns {number} */
 export function normalizeControlledMcpReloadDelay(value) {
     const raw = Number(value ?? MCP_RELOAD_DEFAULT_DELAY_MS);
     return Number.isFinite(raw)
@@ -30,37 +27,33 @@ export function normalizeControlledMcpReloadDelay(value) {
 
 /**
  * @param {string | undefined} requested
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {import('./config.js').McpReloadProcessConfig} config
  * @returns {'quic' | 'h2' | 'auto'}
  */
-export function resolveControlledMcpReloadProfile(requested, env = process.env) {
+export function resolveControlledMcpReloadProfile(requested, config) {
+    if (!config)
+        throw new TypeError('Controlled reload profile resolution requires a process configuration generation.');
     const normalizedRequested = String(requested ?? 'current')
         .trim()
         .toLowerCase();
-    if (normalizedRequested !== 'current') {
-        if (!MCP_RELOAD_EXECUTABLE_PROFILES.some((profile) => profile === normalizedRequested)) {
-            throw new Error(`Unsupported controlled reload profile: ${normalizedRequested || '<empty>'}`);
-        }
-        return /** @type {'quic' | 'h2' | 'auto'} */ (normalizedRequested);
+    if (normalizedRequested === 'current') return config.currentProfile;
+    if (!MCP_RELOAD_EXECUTABLE_PROFILES.some((profile) => profile === normalizedRequested)) {
+        throw new Error(`Unsupported controlled reload profile: ${normalizedRequested || '<empty>'}`);
     }
-    const current = String(env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'quic')
-        .trim()
-        .toLowerCase();
-    return MCP_RELOAD_EXECUTABLE_PROFILES.some((profile) => profile === current)
-        ? /** @type {'quic' | 'h2' | 'auto'} */ (current)
-        : 'quic';
+    return /** @type {'quic' | 'h2' | 'auto'} */ (normalizedRequested);
 }
 
 /**
  * @param {{
+ *     config: import('./config.js').McpReloadProcessConfig;
  *     profile?: string;
  *     delayMs?: unknown;
  *     reason?: string | null;
- *     env?: NodeJS.ProcessEnv;
  *     processId?: number;
- * }} [input]
+ * }} input
  */
-export function buildControlledMcpReloadPlan(input = {}) {
+export function buildControlledMcpReloadPlan(input) {
+    if (!input?.config) throw new TypeError('Controlled reload planning requires a process configuration generation.');
     const requestedProfile = String(input.profile ?? 'current')
         .trim()
         .toLowerCase();
@@ -73,7 +66,7 @@ export function buildControlledMcpReloadPlan(input = {}) {
         executable: true,
         scheduled: false,
         requestedProfile,
-        resolvedProfile: resolveControlledMcpReloadProfile(requestedProfile, input.env ?? process.env),
+        resolvedProfile: resolveControlledMcpReloadProfile(requestedProfile, input.config),
         delayMs,
         stateFile: MCP_RELOAD_STATE_FILE,
         runner: 'runtime/reload',

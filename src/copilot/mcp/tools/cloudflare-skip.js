@@ -5,19 +5,29 @@
  * @module copilot/mcp/tools/cloudflare-skip
  */
 
-import { auditCloudflareSkipPosture } from '#copilot/mcp/public/cloudflare/skip-audit';
+import { auditCloudflareSkipPosture } from '#copilot/mcp/public/cloudflare/posture';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareSkipAuditTool = {
+
+/**
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ */
+export const mcpCloudflareSkipAuditTool = defineMcpRawTool({
     name: 'mcp_cloudflare_skip_audit',
     title: 'Cloudflare MCP skip audit',
     description:
         'Read Cloudflare skip and config posture for MCP/OAuth routes, reporting whether a skip rule is needed or a narrower configuration rule should be preferred.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await auditCloudflareSkipPosture()),
-};
+
+    handler: async (_input, operationContext) =>
+        okResult(
+            await auditCloudflareSkipPosture({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+            }),
+        ),
+});

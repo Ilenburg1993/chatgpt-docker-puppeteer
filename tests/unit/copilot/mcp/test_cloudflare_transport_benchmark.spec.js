@@ -2,27 +2,26 @@
 /** Tests for Cloudflare transport benchmark planning. */
 
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { describe, it } from 'vitest';
 
+import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
 import {
     buildCloudflareTransportBenchmarkPlan,
+    spawnCloudflareTransportBenchmarkWithDependencies,
     summarizePersistedBenchmarkState,
-} from '#copilot/testing/mcp/tools/cloudflare-transport-benchmark';
-
-const previousProtocol = process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'];
-const previousTunnelProtocol = process.env['TUNNEL_TRANSPORT_PROTOCOL'];
-
-afterEach(() => {
-    restoreEnv('COPILOT_MCP_CLOUDFLARE_PROTOCOL', previousProtocol);
-    restoreEnv('TUNNEL_TRANSPORT_PROTOCOL', previousTunnelProtocol);
-});
+} from '#copilot/testing/mcp/cloudflare/transport-benchmark';
 
 describe('Cloudflare transport benchmark plan', () => {
     it('classifies HTTP/2 as rollback and QUIC as current control after strict QUIC promotion', async () => {
-        process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] = 'quic';
-        restoreEnv('TUNNEL_TRANSPORT_PROTOCOL', undefined);
-
-        const plan = await buildCloudflareTransportBenchmarkPlan();
+        const config = readCloudflareTunnelConfig({
+            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'quic',
+            COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
+            COPILOT_MCP_CLOUDFLARE_ZONE: 'example.com',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME: 'mcp.example.com',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: 'https://mcp.example.com/mcp',
+        });
+        const plan = await buildCloudflareTransportBenchmarkPlan({}, config);
         const candidates = /** @type {{ protocol: string; role: string; recommendation: string; risk: string }[]} */ (
             plan['candidates']
         );
@@ -59,6 +58,39 @@ describe('Cloudflare transport benchmark plan', () => {
         assert.ok(nextActions.some((action) => action.includes('Keep QUIC as the current control')));
     });
 
+    it('kills and observes close when caller cancellation wins before detached benchmark acceptance', async () => {
+        class FakeChild extends EventEmitter {
+            pid = 43210;
+            killed = false;
+            unrefCalled = false;
+            unref() {
+                this.unrefCalled = true;
+            }
+            /** @param {NodeJS.Signals} _signal */
+            kill(_signal) {
+                this.killed = true;
+                queueMicrotask(() => this.emit('close', null, 'SIGTERM'));
+                return true;
+            }
+        }
+        const child = new FakeChild();
+        const controller = new AbortController();
+        const pending = spawnCloudflareTransportBenchmarkWithDependencies(
+            {
+                requestId: 'mcp-transport-benchmark-12345678',
+                controlProfile: 'quic',
+                parentEnv: {},
+                signal: controller.signal,
+            },
+            { spawnChild: /** @type {typeof import('node:child_process').spawn} */ (() => /** @type {any} */ (child)) },
+        );
+        controller.abort(new Error('cancel-before-acceptance'));
+        queueMicrotask(() => child.emit('spawn'));
+        await assert.rejects(pending, /cancel-before-acceptance/u);
+        assert.equal(child.killed, true);
+        assert.equal(child.unrefCalled, false);
+    });
+
     it('compacts persisted benchmark evidence without returning individual smoke-run records', () => {
         const summary = summarizePersistedBenchmarkState({
             schemaVersion: 1,
@@ -90,9 +122,3 @@ describe('Cloudflare transport benchmark plan', () => {
         assert.equal('smokeRuns' in (windows[0] ?? {}), false);
     });
 });
-
-/** @param {string} name @param {string | undefined} value */
-function restoreEnv(name, value) {
-    if (value === undefined) Reflect.deleteProperty(process.env, name);
-    else process.env[name] = value;
-}

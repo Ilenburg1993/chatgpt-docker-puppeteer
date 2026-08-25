@@ -10,17 +10,22 @@
 
 import { buildChatGptConnectorProfile } from '#copilot/mcp/public/connection';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult } from '#copilot/mcp/public/protocol/tools';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpSessionProfileTool = {
+
+/**
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ */
+export const mcpSessionProfileTool = defineMcpRawTool({
     name: 'mcp_session_profile',
     title: 'MCP session profile',
     description: 'Return a compact task-first ChatGPT operating profile for this repo MCP session.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
+
     handler: async () => {
         const connector = buildChatGptConnectorProfile();
         return okResult({
@@ -95,4 +100,4 @@ export const mcpSessionProfileTool = {
             },
         });
     },
-};
+});

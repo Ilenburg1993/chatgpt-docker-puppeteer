@@ -6,11 +6,7 @@
  */
 
 import { readBoundedResponseText } from '#copilot/infra/public/platform/http-response';
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
-import { normalizeMcpUrl } from '#copilot/mcp/public/connection';
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
-
-const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
 
 /**
  * @typedef {object} ProbeResult
@@ -24,18 +20,20 @@ const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
  */
 
 /**
- * @param {{ mcpUrl?: string }} [options]
+ * @param {import('./config.js').McpHttpSmokeRuntimeConfig} runtimeConfig
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runMcpHttpSmoke(options = {}) {
-    const mcpUrl = normalizeMcpUrl(options.mcpUrl ?? process.env['COPILOT_MCP_SMOKE_URL'] ?? DEFAULT_LOCAL_MCP_URL);
+export async function runMcpHttpSmoke(runtimeConfig) {
+    if (!runtimeConfig?.config || !runtimeConfig.secrets) {
+        throw new TypeError('MCP HTTP smoke requires explicit process config and secret projections.');
+    }
+    const { mcpUrl, authRequired } = runtimeConfig.config;
+    const bearerToken = runtimeConfig.secrets.bearerToken;
     const originUrl = mcpUrl.replace(/\/mcp$/, '');
-    const authConfig = readMcpAuthConfig();
-    const bearerToken = readSmokeBearerToken();
     const health = await probeJson(`${originUrl}/health`, { method: 'GET' });
     const toolsList = await callJsonRpc(mcpUrl, 1, 'tools/list', {});
     const runtimeHealth =
-        authConfig.enforcement !== 'off' && !bearerToken
+        authRequired && !bearerToken
             ? {
                   ok: true,
                   skipped: true,
@@ -157,15 +155,6 @@ async function callJsonRpc(mcpUrl, id, method, params, bearerToken) {
         },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
     });
-}
-
-/**
- * @returns {string | undefined}
- */
-function readSmokeBearerToken() {
-    const raw = process.env['COPILOT_MCP_SMOKE_BEARER_TOKEN'] ?? process.env['COPILOT_MCP_STATIC_BEARER_TOKEN'];
-    const token = String(raw ?? '').trim();
-    return token || undefined;
 }
 
 /**

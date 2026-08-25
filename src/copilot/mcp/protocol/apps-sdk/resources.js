@@ -8,6 +8,8 @@
  * @module copilot/mcp/protocol/apps-sdk/resources
  */
 
+import { resolveCompanyKnowledgeProcessConfig } from '#copilot/mcp/public/company-knowledge';
+
 export const COMPANY_KNOWLEDGE_WIDGET_URI = 'ui://copilot/company-knowledge/v2.html';
 
 export const RESOURCE_MIME_TYPE = 'text/html;profile=mcp-app';
@@ -15,8 +17,6 @@ export const COMPANY_KNOWLEDGE_WIDGET_RESOURCE_NAME = 'company_knowledge_widget'
 
 const WIDGET_DESCRIPTION =
     'Renders read-only Company Knowledge search and fetch results from the current workspace corpus.';
-const DEFAULT_WIDGET_DOMAIN = 'https://mcp.aurelin.org';
-
 /** @type {Record<string, unknown>} */
 const WIDGET_CSP = Object.freeze({
     connectDomains: [],
@@ -33,61 +33,21 @@ const LEGACY_WIDGET_CSP = Object.freeze({
 });
 
 /**
- * Resolve the dedicated HTTPS origin used by the MCP Apps iframe.
+ * Resolve the dedicated HTTPS origin used by the MCP Apps iframe from one Company Knowledge generation.
  *
- * An explicit COPILOT_MCP_WIDGET_DOMAIN must already be an origin. When no override is present, derive the origin from
- * the configured public MCP URL when possible; the deployed permanent MCP origin remains the final fallback.
- *
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig | NodeJS.ProcessEnv | undefined} [input]
  * @returns {string}
  */
-export function readCompanyKnowledgeWidgetDomain(env = process.env) {
-    const explicit = String(env['COPILOT_MCP_WIDGET_DOMAIN'] ?? '').trim();
-    if (explicit) return normalizeDedicatedHttpsOrigin(explicit, true);
-    for (const candidate of [
-        env['COPILOT_MCP_CLOUDFLARE_PUBLIC_MCP_URL'],
-        env['COPILOT_MCP_PUBLIC_URL'],
-        DEFAULT_WIDGET_DOMAIN,
-    ]) {
-        const normalized = normalizeDedicatedHttpsOrigin(String(candidate ?? '').trim(), false);
-        if (normalized) return normalized;
-    }
-    return DEFAULT_WIDGET_DOMAIN;
+export function readCompanyKnowledgeWidgetDomain(input = undefined) {
+    return resolveCompanyKnowledgeProcessConfig(input).widgetDomain;
 }
 
 /**
- * @param {string} value
- * @param {boolean} strictOrigin
- * @returns {string}
- */
-function normalizeDedicatedHttpsOrigin(value, strictOrigin) {
-    if (!value) return '';
-    try {
-        const parsed = new URL(value);
-        const exactOrigin =
-            parsed.pathname === '/' && !parsed.search && !parsed.hash && !parsed.username && !parsed.password;
-        if (parsed.protocol !== 'https:' || (strictOrigin && !exactOrigin)) {
-            if (strictOrigin)
-                throw new Error('expected a dedicated HTTPS origin without path, query, hash, or userinfo');
-            return '';
-        }
-        return parsed.origin;
-    } catch (error) {
-        if (strictOrigin) {
-            throw new Error(
-                `Invalid COPILOT_MCP_WIDGET_DOMAIN: ${error instanceof Error ? error.message : String(error)}`,
-                { cause: error },
-            );
-        }
-        return '';
-    }
-}
-
-/**
+ * @param {import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig | NodeJS.ProcessEnv | undefined} [input]
  * @returns {{ uri: string; mimeType: string; text: string; _meta: Record<string, unknown> }}
  */
-export function buildCompanyKnowledgeWidgetResource(env = process.env) {
-    const widgetDomain = readCompanyKnowledgeWidgetDomain(env);
+export function buildCompanyKnowledgeWidgetResource(input = undefined) {
+    const widgetDomain = readCompanyKnowledgeWidgetDomain(input);
     return {
         uri: COMPANY_KNOWLEDGE_WIDGET_URI,
         mimeType: RESOURCE_MIME_TYPE,
@@ -108,11 +68,12 @@ export function buildCompanyKnowledgeWidgetResource(env = process.env) {
 
 /**
  * @param {import('@modelcontextprotocol/server').McpServer} server
+ * @param {import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig | undefined} [config]
  * @returns {{ registered: boolean; resourceUri: string; mimeType: string }}
  */
-export function registerCopilotAppsSdkResources(server) {
+export function registerCopilotAppsSdkResources(server, config = undefined) {
     // registerAppResource marker retained for diagnostics: this server uses the MCP SDK's registerResource primitive.
-    const resource = buildCompanyKnowledgeWidgetResource();
+    const resource = buildCompanyKnowledgeWidgetResource(config);
     server.registerResource(
         COMPANY_KNOWLEDGE_WIDGET_RESOURCE_NAME,
         COMPANY_KNOWLEDGE_WIDGET_URI,

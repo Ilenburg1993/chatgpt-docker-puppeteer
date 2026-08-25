@@ -43,9 +43,10 @@ function applyRepositoryReadHashMode(structured, hashMode) {
 /**
  * @param {RepositoryReadWorkspace} workspace
  * @param {{ path?: string | undefined; startLine?: number | undefined; endLine?: number | undefined; hashMode?: 'full' | 'returned' | 'none' | undefined }} input
+ * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig
  * @returns {Promise<RepositoryReadOperationResult>}
  */
-export async function readRepositoryFile(workspace, input) {
+export async function readRepositoryFile(workspace, input, cacheConfig) {
     const resolved = await workspace.resolveValidatedReadPath(input.path ?? '');
     if (!resolved.ok) return failure(resolved.reason, resolved);
     if (input.startLine !== undefined && input.endLine !== undefined && input.endLine < input.startLine) {
@@ -60,6 +61,7 @@ export async function readRepositoryFile(workspace, input) {
         resolved,
         input.startLine,
         input.endLine,
+        cacheConfig,
         effectiveHashMode,
     );
     return success(applyRepositoryReadHashMode(structured, effectiveHashMode), text);
@@ -108,9 +110,10 @@ export async function readRepositoryFileStats(workspace, input) {
 /**
  * @param {RepositoryReadWorkspace} workspace
  * @param {{ path: string; startLine?: number; endLine?: number; chunkLines?: number; cursor?: string; highWaterMark?: number }} input
+ * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig
  * @returns {Promise<RepositoryReadOperationResult>}
  */
-export async function readRepositoryFileChunks(workspace, input) {
+export async function readRepositoryFileChunks(workspace, input, cacheConfig) {
     const resolved = await workspace.resolveValidatedReadPath(input.path);
     if (!resolved.ok) return failure(resolved.reason, resolved);
     const parsedCursorLine = input.cursor !== undefined ? Number.parseInt(input.cursor, 10) : null;
@@ -135,6 +138,7 @@ export async function readRepositoryFileChunks(workspace, input) {
         input.chunkLines ?? 200,
         input.highWaterMark,
         input.cursor,
+        cacheConfig,
     );
     return success(structured, text);
 }

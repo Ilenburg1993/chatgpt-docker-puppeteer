@@ -10,14 +10,15 @@
 
 import { createWorkspaceMutationIo } from '#copilot/infra/public/composition/workspace/mutation-io';
 import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
-import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/metrics';
-import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/observability';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import process from 'node:process';
+import { readCloudflareTunnelConfig } from '../config.js';
+import { resolveCloudflareEnvironment } from '../environment-authority.js';
 import { getTransportBenchmarkStateFile } from './state.js';
 
 const workspaceIo = createWorkspaceMutationIo({ workspaceRoot: MCP_WORKSPACE_ROOT });
@@ -71,9 +72,10 @@ function parseArgs(argv) {
  * Reuse the canonical scheduled reload runner so readiness generation correlation remains correct during the benchmark.
  *
  * @param {string} profile
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null }>}
  */
-function runRestart(profile) {
+function runRestart(profile, parentEnv) {
     const reloadProfile = reloadProfileForProtocol(profile);
     return runFixedNode(
         [
@@ -86,6 +88,7 @@ function runRestart(profile) {
             `mcp-reload-${randomUUID()}`,
         ],
         RESTART_TIMEOUT_MS,
+        buildTransportBenchmarkLaunchEnvironment(parentEnv),
     );
 }
 
@@ -101,28 +104,49 @@ function buildTransportBenchmarkEnvironment(parentEnv, compactSmoke) {
     return buildCloudflareConnectorSmokeEnvironment(parentEnv, { compact: compactSmoke });
 }
 
-/** @param {NodeJS.ProcessEnv} [parentEnv] */
-export function buildTransportBenchmarkLaunchEnvironment(parentEnv = process.env) {
+/** @param {NodeJS.ProcessEnv} parentEnv */
+export function buildTransportBenchmarkLaunchEnvironment(parentEnv) {
+    if (!parentEnv) throw new TypeError('Transport benchmark launch environment requires explicit parentEnv.');
     return buildTransportBenchmarkEnvironment(parentEnv, false);
 }
 
-/** @param {NodeJS.ProcessEnv} [parentEnv] */
-export function buildTransportBenchmarkSmokeEnvironment(parentEnv = process.env) {
+/** @param {NodeJS.ProcessEnv} parentEnv */
+export function buildTransportBenchmarkSmokeEnvironment(parentEnv) {
+    if (!parentEnv) throw new TypeError('Transport benchmark smoke environment requires explicit parentEnv.');
     return buildTransportBenchmarkEnvironment(parentEnv, true);
 }
 
 /**
  * Start the detached stable launcher only after validating the fixed benchmark identity and control profile. Resolving
- * the promise means Node observed the child `spawn` event; it does not mean the benchmark itself has completed.
+ * the promise means Node observed the child `spawn` event and the caller did not cancel before acceptance; it does not
+ * mean the benchmark itself has completed. After acceptance the detached runner intentionally owns its own lifecycle.
  *
- * @param {{ requestId: string; controlProfile: string; parentEnv?: NodeJS.ProcessEnv }} input
+ * @param {{ requestId: string; controlProfile: string; authority?: import('../environment-authority.js').CloudflareEnvironmentAuthority; parentEnv?: NodeJS.ProcessEnv; signal?: AbortSignal }} input
  * @returns {Promise<{ runnerPid: number | null }>}
  */
 export async function spawnCloudflareTransportBenchmark(input) {
+    return spawnCloudflareTransportBenchmarkWithDependencies(input, {});
+}
+
+/**
+ * White-box dependency seam for proving cancellation-before-acceptance without starting the real benchmark runner.
+ *
+ * @param {{ requestId: string; controlProfile: string; authority?: import('../environment-authority.js').CloudflareEnvironmentAuthority; parentEnv?: NodeJS.ProcessEnv; signal?: AbortSignal }} input
+ * @param {{ spawnChild?: typeof spawn }} dependencies
+ * @returns {Promise<{ runnerPid: number | null }>}
+ */
+export async function spawnCloudflareTransportBenchmarkWithDependencies(input, dependencies) {
     if (!REQUEST_ID_RE.test(input.requestId)) throw new Error('Invalid generated benchmark request id.');
     if (!CANDIDATES.includes(input.controlProfile)) throw new Error('Invalid benchmark control profile.');
-    const env = buildTransportBenchmarkLaunchEnvironment(input.parentEnv ?? process.env);
-    const child = spawn(
+    if (input.signal?.aborted) {
+        throw input.signal.reason ?? new Error('Cloudflare transport benchmark scheduling aborted before acceptance.');
+    }
+    const parentEnv = resolveCloudflareEnvironment(
+        input.authority ? { authority: input.authority } : input.parentEnv ? { env: input.parentEnv } : null,
+    );
+    const env = buildTransportBenchmarkLaunchEnvironment(parentEnv);
+    const spawnChild = dependencies.spawnChild ?? spawn;
+    const child = spawnChild(
         process.execPath,
         [TRANSPORT_BENCHMARK_LAUNCHER, '--request-id', input.requestId, '--control-profile', input.controlProfile],
         {
@@ -132,29 +156,49 @@ export async function spawnCloudflareTransportBenchmark(input) {
             stdio: 'ignore',
         },
     );
-    await new Promise((resolvePromise, rejectPromise) => {
-        /** @param {Error} error */
-        const onError = (error) => rejectPromise(error);
-        child.once('error', onError);
-        child.once('spawn', () => {
-            child.off('error', onError);
-            child.on('error', () => {});
-            resolvePromise(undefined);
+    const supervisor = createAttachedChildProcessSupervisor(child, { processGroup: true });
+    let accepted = false;
+    const terminateBeforeAcceptance = () => {
+        if (accepted) return;
+        supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
+    };
+    input.signal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
+    try {
+        await new Promise((resolvePromise, rejectPromise) => {
+            /** @param {Error} error */
+            const onError = (error) => rejectPromise(error);
+            child.once('error', onError);
+            child.once('spawn', () => {
+                child.off('error', onError);
+                child.on('error', () => {});
+                resolvePromise(undefined);
+            });
         });
-    });
-    child.unref();
-    return { runnerPid: child.pid ?? null };
+        if (input.signal?.aborted) {
+            terminateBeforeAcceptance();
+            throw (
+                input.signal.reason ?? new Error('Cloudflare transport benchmark scheduling aborted before acceptance.')
+            );
+        }
+        accepted = true;
+        child.unref();
+        return { runnerPid: child.pid ?? null };
+    } finally {
+        input.signal?.removeEventListener('abort', terminateBeforeAcceptance);
+        if (!accepted) terminateBeforeAcceptance();
+    }
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null; durationMs: number }>}
  */
-async function runSmoke() {
+async function runSmoke(parentEnv) {
     const startedAt = Date.now();
     const result = await runFixedNode(
         ['src/copilot/mcp/cloudflare/cli.js', 'smoke'],
         SMOKE_TIMEOUT_MS,
-        buildTransportBenchmarkSmokeEnvironment(),
+        buildTransportBenchmarkSmokeEnvironment(parentEnv),
     );
     return { ...result, durationMs: Math.max(0, Date.now() - startedAt) };
 }
@@ -162,10 +206,11 @@ async function runSmoke() {
 /**
  * @param {string[]} args
  * @param {number} timeoutMs
- * @param {NodeJS.ProcessEnv} [env]
+ * @param {NodeJS.ProcessEnv} env
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null }>}
  */
-async function runFixedNode(args, timeoutMs, env = buildMcpChildEnvironment().env) {
+async function runFixedNode(args, timeoutMs, env) {
+    if (!env) throw new TypeError('Transport benchmark child execution requires explicit env.');
     let child;
     try {
         child = spawn(process.execPath, args, {
@@ -206,12 +251,12 @@ async function runFixedNode(args, timeoutMs, env = buildMcpChildEnvironment().en
     };
 }
 
-/** @returns {Promise<Record<string, unknown> & { ok: boolean }>} */
-async function readMetricsWithRetry() {
+/** @param {import('../config.js').CloudflareTunnelConfig} config @returns {Promise<Record<string, unknown> & { ok: boolean }>} */
+async function readMetricsWithRetry(config) {
     /** @type {(Record<string, unknown> & { ok: boolean }) | null} */
     let latest = null;
     for (let attempt = 1; attempt <= 5; attempt += 1) {
-        latest = await readCloudflaredMetricsSnapshot({ timeoutMs: METRICS_TIMEOUT_MS });
+        latest = await readCloudflaredMetricsSnapshot({ timeoutMs: METRICS_TIMEOUT_MS }, config);
         if (latest.ok) return latest;
         await sleep(500);
     }
@@ -416,9 +461,11 @@ export function classifyTransportWindow(input) {
     };
 }
 
-/** @param {{ requestId: string; controlProfile: string }} input */
-async function executeTransportBenchmark(input) {
+/** @param {{ requestId: string; controlProfile: string }} input @param {NodeJS.ProcessEnv} parentEnv */
+async function executeTransportBenchmark(input, parentEnv) {
+    if (!parentEnv) throw new TypeError('Transport benchmark execution requires explicit parentEnv.');
     const profileOrder = buildProfileOrder(input.controlProfile);
+    const cloudflareConfig = readCloudflareTunnelConfig(parentEnv);
     const startedAt = Date.now();
     /** @type {Record<string, unknown>[]} */
     const windows = [];
@@ -453,21 +500,21 @@ async function executeTransportBenchmark(input) {
                 windows,
                 autoPromotion: false,
             });
-            const restart = await runRestart(profile);
+            const restart = await runRestart(profile, parentEnv);
             if (restart.exitCode !== 0)
                 throw new Error(
                     `Restart failed for ${profile}: ${restart.error ?? `exit ${String(restart.exitCode)}`}`,
                 );
             await sleep(WARMUP_MS);
-            const before = compactMetrics(await readMetricsWithRetry());
+            const before = compactMetrics(await readMetricsWithRetry(cloudflareConfig));
             const smokeRuns = [];
             for (let sample = 1; sample <= SAMPLE_COUNT; sample += 1) {
-                const smoke = await runSmoke();
+                const smoke = await runSmoke(parentEnv);
                 smokeRuns.push({ sample, ...smoke });
                 if (smoke.exitCode !== 0) break;
                 if (sample < SAMPLE_COUNT) await sleep(BETWEEN_SAMPLES_MS);
             }
-            const after = compactMetrics(await readMetricsWithRetry());
+            const after = compactMetrics(await readMetricsWithRetry(cloudflareConfig));
             const durations = smokeRuns.filter((run) => run.exitCode === 0).map((run) => run.durationMs);
             const metricDelta = buildTransportMetricDelta(before, after);
             const smokeLatency = summarizeDurations(durations);
@@ -542,12 +589,12 @@ async function executeTransportBenchmark(input) {
     } catch {
         // State persistence must never prevent the fixed control restore path.
     }
-    const restore = await runRestart(input.controlProfile);
+    const restore = await runRestart(input.controlProfile, parentEnv);
     /** @type {{ exitCode: number; timedOut: boolean; error: string | null; durationMs: number }} */
     let restoreSmoke = { exitCode: 1, timedOut: false, error: 'Restore restart did not complete.', durationMs: 0 };
     if (restore.exitCode === 0) {
         await sleep(WARMUP_MS);
-        restoreSmoke = await runSmoke();
+        restoreSmoke = await runSmoke(parentEnv);
     }
     const restoredControl = restore.exitCode === 0 && restoreSmoke.exitCode === 0;
     const completedAt = Date.now();
@@ -587,11 +634,13 @@ async function executeTransportBenchmark(input) {
  * domain code never mutates process.exitCode directly.
  *
  * @param {string[]} argv
+ * @param {NodeJS.ProcessEnv} parentEnv
  * @returns {Promise<number>}
  */
-export async function runCloudflareTransportBenchmarkCli(argv) {
+export async function runCloudflareTransportBenchmarkCli(argv, parentEnv) {
+    if (!parentEnv) throw new TypeError('Transport benchmark CLI requires explicit parentEnv.');
     try {
-        return await executeTransportBenchmark(parseArgs(argv));
+        return await executeTransportBenchmark(parseArgs(argv), parentEnv);
     } catch (error) {
         try {
             await writeState({

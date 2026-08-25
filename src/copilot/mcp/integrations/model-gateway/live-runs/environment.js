@@ -124,8 +124,9 @@ function copyKnownProviderSecrets(source, target) {
     copyExplicitSecretReference(source, target, 'COPILOT_BYOK_BEARER_TOKEN_ENV');
 }
 
-/** @param {NodeJS.ProcessEnv} [parentEnv] */
-export function buildModelGatewayReadOnlyChildEnvironment(parentEnv = process.env) {
+/** @param {NodeJS.ProcessEnv} parentEnv */
+export function buildModelGatewayReadOnlyChildEnvironment(parentEnv) {
+    if (!parentEnv) throw new TypeError('Model Gateway read-only environment projection requires parentEnv.');
     /** @type {Record<string, string | null>} */
     const overrides = {
         MODEL_GATEWAY_LOAD_DOTENV: 'false',
@@ -137,9 +138,10 @@ export function buildModelGatewayReadOnlyChildEnvironment(parentEnv = process.en
 
 /**
  * @param {{ invokesModel?: boolean; invokesRealProvider?: boolean }} plan
- * @param {NodeJS.ProcessEnv} [parentEnv]
+ * @param {NodeJS.ProcessEnv} parentEnv
  */
-export function buildModelGatewayLiveRunEnvironment(plan, parentEnv = process.env) {
+export function buildModelGatewayLiveRunEnvironment(plan, parentEnv) {
+    if (!parentEnv) throw new TypeError('Model Gateway live environment projection requires parentEnv.');
     /** @type {Record<string, string | null>} */
     const overrides = {
         MODEL_GATEWAY_LOAD_DOTENV: 'false',
@@ -152,4 +154,61 @@ export function buildModelGatewayLiveRunEnvironment(plan, parentEnv = process.en
         copyKnownProviderSecrets(parentEnv, overrides);
     }
     return buildMcpChildEnvironment({ parentEnv, overrides }).env;
+}
+
+export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 1;
+export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND = 'copilot-mcp-model-gateway-live-environment-authority';
+
+/**
+ * Secret-bearing process capability for Model Gateway live subprocesses.
+ *
+ * Raw process.env is never retained. The authority closes only over bounded, already-projected child environments and
+ * exposes methods rather than secret/config fields, so JSON/string inspection of the capability cannot reveal tokens.
+ *
+ * @typedef {Readonly<{
+ *     schemaVersion: 1;
+ *     kind: 'copilot-mcp-model-gateway-live-environment-authority';
+ *     readOnlyEnvironment: () => Readonly<NodeJS.ProcessEnv>;
+ *     liveRunEnvironment: (plan: { invokesModel?: boolean; invokesRealProvider?: boolean }) => Readonly<NodeJS.ProcessEnv>;
+ * }>} ModelGatewayLiveRunEnvironmentAuthority
+ */
+
+/** @param {NodeJS.ProcessEnv} [parentEnv] @returns {ModelGatewayLiveRunEnvironmentAuthority} */
+export function createModelGatewayLiveRunEnvironmentAuthority(parentEnv = process.env) {
+    const templates = Object.freeze({
+        readOnly: freezeEnvironment(buildModelGatewayReadOnlyChildEnvironment(parentEnv)),
+        control: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: false }, parentEnv),
+        ),
+        model: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: false }, parentEnv),
+        ),
+        provider: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: true }, parentEnv),
+        ),
+        modelAndProvider: freezeEnvironment(
+            buildModelGatewayLiveRunEnvironment({ invokesModel: true, invokesRealProvider: true }, parentEnv),
+        ),
+    });
+    return Object.freeze({
+        schemaVersion: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION,
+        kind: MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND,
+        readOnlyEnvironment: () => freezeEnvironment(templates.readOnly),
+        liveRunEnvironment(plan) {
+            const template =
+                plan.invokesModel === true
+                    ? plan.invokesRealProvider === true
+                        ? templates.modelAndProvider
+                        : templates.model
+                    : plan.invokesRealProvider === true
+                      ? templates.provider
+                      : templates.control;
+            return freezeEnvironment(template);
+        },
+    });
+}
+
+/** @param {Readonly<NodeJS.ProcessEnv>} projectedEnvironment @returns {Readonly<NodeJS.ProcessEnv>} */
+function freezeEnvironment(projectedEnvironment) {
+    return Object.freeze({ ...projectedEnvironment });
 }

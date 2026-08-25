@@ -196,7 +196,7 @@
       "reason": "Binds the finite development OAuth issuer state files from one configuration snapshot so queued persistence cannot retarget in-flight writes."
     },
     {
-      "file": "src/copilot/mcp/cloudflare/cli-process.js",
+      "file": "src/copilot/mcp/cloudflare/process/cli-process.js",
       "classification": "mcp-owner",
       "grants": [
         {
@@ -210,7 +210,7 @@
       "reason": "Owns exact managed MCP/cloudflared PID, metadata, log and rotated-log paths resolved from Cloudflare configuration."
     },
     {
-      "file": "src/copilot/mcp/cloudflare/edge-backup.js",
+      "file": "src/copilot/mcp/cloudflare/edge/edge-backup.js",
       "classification": "mcp-owner",
       "grants": [
         {
@@ -224,21 +224,21 @@
       "reason": "Owns one bootstrap-bound Cloudflare backup root for sanitized snapshot filenames; operational APIs expose no directory override."
     },
     {
-      "file": "src/copilot/mcp/cloudflare/remote-api.js",
+      "file": "src/copilot/mcp/cloudflare/environment-authority.js",
       "classification": "mcp-owner",
       "grants": [
         {
-          "id": "mcp.cloudflare.remote-api",
+          "id": "mcp.cloudflare.environment-authority",
           "pathMode": "exact",
           "operations": ["read"],
           "symlinkPolicy": "deny",
           "durability": ["file-and-directory"]
         }
       ],
-      "reason": "Reads only the exact local Cloudflare environment file used to resolve remote-audit credentials."
+      "reason": "Binds the single .env.local read used to build the opaque process-scoped Cloudflare credential authority; remote consumers receive only the sealed authority projection and cannot mint filesystem access."
     },
     {
-      "file": "src/copilot/mcp/cloudflare/state.js",
+      "file": "src/copilot/mcp/cloudflare/tunnel/state.js",
       "classification": "mcp-owner",
       "grants": [
         {

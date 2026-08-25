@@ -3,6 +3,7 @@
 
 export {
     buildCanonicalMcpRegistryManifest,
+    buildMcpToolWireDescriptorSnapshot,
     classifyMcpToolRisk,
     COPILOT_MCP_REGISTRY_IMPLEMENTATION_NAME,
     COPILOT_MCP_REGISTRY_IMPLEMENTATION_VERSION,
@@ -14,5 +15,11 @@ export {
     registerCanonicalMcpTools,
     validateMcpToolDefinitions,
 } from '../runtime.js';
+export {
+    MCP_TOOL_SURFACE_MODES,
+    createMcpToolSurfacePolicy,
+    readMcpToolSurfacePolicy,
+} from '../surface-policy.js';
 /** @typedef {import('../runtime.js').RegisterCanonicalMcpToolsOptions} RegisterCanonicalMcpToolsOptions */
+/** @typedef {import('../runtime.js').McpRegistryPolicy} McpRegistryPolicy */
 /** @typedef {import('../surface-policy.js').McpToolSurfacePolicy} McpToolSurfacePolicy */

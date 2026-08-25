@@ -2,6 +2,16 @@
 /** Physical public membrane for MCP connector-profile contracts. */
 
 export {
+    MCP_CONNECTION_PROFILE_DEFAULTS,
+    createMcpConnectionRuntimeConfig,
+    readMcpConnectionConfig,
+    requireMcpToolConnectionConfig,
+    resolveMcpConnectionProfileOptions,
+} from '../config.js';
+/** @typedef {import('../config.js').McpConnectionConfig} McpConnectionConfig */
+/** @typedef {import('../config.js').McpConnectionRuntimeConfig} McpConnectionRuntimeConfig */
+
+export {
     buildChatGptConnectorProfile,
     buildClaudeConnectorProfile,
     buildCloudflareTunnelRunbook,
@@ -25,5 +35,9 @@ export {
     readChatGptConnectorProfileReport,
     readClaudeConnectorProfileReport,
     readMcpConnectionReadiness,
+    readMcpPostRestartReadiness,
+    summarizeMcpPostRestartReadiness,
 } from '../readiness.js';
 export { normalizeMcpUrl, validatePublicConnectorUrl } from '../url.js';
+
+export { refreshMcpConnectorSmoke } from '../connector-smoke.js';

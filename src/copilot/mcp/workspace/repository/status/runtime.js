@@ -26,13 +26,25 @@ import { execWorkspaceGit } from '#copilot/mcp/public/workspace/git';
  * }} RepositoryStatus
  */
 
+/** @typedef {(args: string[], options?: { cwd?: string }) => ReturnType<typeof execWorkspaceGit>} RepositoryStatusGitExec */
+
 /**
- * @param {{ workspaceRoot?: string; execGit?: typeof execWorkspaceGit }} [options]
+ * @param {{ workspaceRoot?: string; gitConfig?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig; signal?: AbortSignal; execGit?: RepositoryStatusGitExec }} [options]
  * @returns {Promise<RepositoryStatus>}
  */
 export async function readRepositoryStatus(options = {}) {
     const workspaceRoot = options.workspaceRoot ?? MCP_WORKSPACE_ROOT;
-    const execGit = options.execGit ?? execWorkspaceGit;
+    /** @type {RepositoryStatusGitExec} */
+    const execGit =
+        options.execGit ??
+        ((args, execOptions = {}) => {
+            if (!options.gitConfig) throw new TypeError('Repository status requires an explicit Git process config.');
+            return execWorkspaceGit(args, {
+                cwd: execOptions.cwd ?? workspaceRoot,
+                config: options.gitConfig,
+                ...(options.signal ? { signal: options.signal } : {}),
+            });
+        });
     const [status, head] = await Promise.all([
         execGit(['status', '--short', '--branch'], { cwd: workspaceRoot }),
         execGit(['rev-parse', '--short', 'HEAD'], { cwd: workspaceRoot }),

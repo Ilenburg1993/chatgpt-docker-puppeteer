@@ -3,15 +3,37 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { summarizeCloudflaredOperationalCounters } from '#copilot/mcp/public/cloudflare/metrics-histograms';
+import { summarizeCloudflaredOperationalCounters } from '#copilot/mcp/public/cloudflare/observability';
 import {
     buildComparison,
     buildTransportMetricDelta,
     classifyTransportWindow,
 } from '#copilot/testing/mcp/cloudflare/transport-benchmark';
-import { buildDevcontainerNetworkFindings } from '#copilot/testing/mcp/diagnostics/devcontainer-network';
+import {
+    buildDevcontainerNetworkFindings,
+    readMcpDevcontainerNetworkConfig,
+} from '#copilot/testing/mcp/diagnostics/devcontainer-network';
 
 describe('MCP network resilience semantics', () => {
+    it('captures immutable DevContainer network policy without ambient credentials', () => {
+        const config = readMcpDevcontainerNetworkConfig({
+            PATH: '/usr/bin:/bin',
+            LANG: 'en_US.UTF-8',
+            DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE: 'false',
+            DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:
+                '${containerWorkspaceFolder}/.devcontainer/scripts/network-control-plane-state.sh',
+            DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED: 'v1.2.3',
+            CLOUDFLARE_TUNNEL_TOKEN: 'must-not-cross',
+        });
+        assert.equal(config.enabled, false);
+        assert.equal(config.expectedVersion, 'v1.2.3');
+        assert.match(config.configuredScript, /\.devcontainer\/scripts\/network-control-plane-state\.sh$/u);
+        assert.equal(config.childEnvironment['PATH'], '/usr/bin:/bin');
+        assert.equal(config.childEnvironment['LANG'], 'en_US.UTF-8');
+        assert.equal(config.childEnvironment['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.childEnvironment), true);
+    });
     it('parses cloudflared response_by_code status_code labels and accumulates duplicate samples', () => {
         const operational = summarizeCloudflaredOperationalCounters([
             { name: 'cloudflared_tunnel_total_requests', labels: {}, value: 45 },

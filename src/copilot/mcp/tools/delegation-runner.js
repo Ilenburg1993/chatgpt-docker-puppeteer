@@ -5,18 +5,23 @@
  * @module copilot/mcp/tools/delegation-runner
  */
 
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
 import {
     TRANSPORT_BENCHMARK_STATE_PATH,
     spawnCloudflareTransportBenchmark,
 } from '#copilot/mcp/public/cloudflare/transport-benchmark';
 import { scheduleIoCacheBenchmark } from '#copilot/mcp/public/diagnostics/io-cache';
 import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
-import { appendMcpAuditEvent, readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
     errorResult,
     okResult,
+    requireMcpToolAuditCapability,
+    requireMcpToolCloudflareConfig,
+    requireMcpToolCloudflareEnvironmentAuthority,
+    requireMcpToolGitConfig,
+    requireMcpToolIoCacheConfig,
+    requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import { normalizeFocusedUnitTestFiles, spawnValidatorJob } from '#copilot/mcp/public/validation';
@@ -106,9 +111,9 @@ function buildMissionPlan(mission) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const delegateToRepoAutonomyRunnerTool = {
+export const delegateToRepoAutonomyRunnerTool = defineMcpRawTool({
     name: 'delegate_to_repo_autonomy_runner',
     title: 'Delegate to repo autonomy runner',
     description: 'Run or dry-run a fixed local autonomy mission; no arbitrary shell, paths, or destructive actions.',
@@ -123,7 +128,7 @@ export const delegateToRepoAutonomyRunnerTool = {
         dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
         timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Validator timeout ms.'),
     },
-    annotations: boundedWriteAnnotations(),
+
     handler: async ({ mission, testFile, dryRun, timeoutMs }, operationContext) => {
         const selectedMission = String(mission);
         const isFocused = selectedMission === 'validate-focused';
@@ -171,8 +176,16 @@ export const delegateToRepoAutonomyRunnerTool = {
         const workspace = requireMcpToolWorkspace(operationContext);
 
         if (selectedMission === 'diagnose-mcp') {
-            const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
-            const smoke = await runMcpWorkspaceSmoke(workspace);
+            const gitConfig = requireMcpToolGitConfig(operationContext);
+            const status = await readRepositoryStatus({
+                workspaceRoot: workspace.workspaceRoot,
+                gitConfig,
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+            });
+            const smoke = await runMcpWorkspaceSmoke(workspace, requireMcpToolCloudflareConfig(operationContext), {
+                gitConfig,
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+            });
             return okResult({
                 success: status.success === true && smoke.success === true,
                 mission: selectedMission,
@@ -196,8 +209,10 @@ export const delegateToRepoAutonomyRunnerTool = {
             }
             const job = await spawnValidatorJob('unit-focused', {
                 workspace,
+                config: requireMcpToolValidationConfig(operationContext),
                 testFiles: [focusedTestFile],
                 ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
             });
             return okResult({
                 success: true,
@@ -212,11 +227,13 @@ export const delegateToRepoAutonomyRunnerTool = {
         }
 
         if (selectedMission === 'benchmark-io-cache') {
+            const ioCacheConfig = requireMcpToolIoCacheConfig(operationContext);
             const scheduled = await scheduleIoCacheBenchmark({
                 workspaceRoot: workspace.workspaceRoot,
+                runnerEnvironment: ioCacheConfig.runnerEnvironment,
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
             });
-            await appendMcpAuditEvent({
+            await requireMcpToolAuditCapability(operationContext).append({
                 event: 'mcp_io_cache_benchmark_scheduled',
                 tool: 'delegate_to_repo_autonomy_runner',
                 requestId: scheduled.requestId,
@@ -240,11 +257,16 @@ export const delegateToRepoAutonomyRunnerTool = {
         }
 
         if (selectedMission === 'benchmark-transport') {
-            const config = readCloudflareTunnelConfig();
+            const config = requireMcpToolCloudflareConfig(operationContext);
             const controlProfile = config.transportProtocol;
             const requestId = `mcp-transport-benchmark-${randomUUID()}`;
-            const { runnerPid } = await spawnCloudflareTransportBenchmark({ requestId, controlProfile });
-            await appendMcpAuditEvent({
+            const { runnerPid } = await spawnCloudflareTransportBenchmark({
+                requestId,
+                controlProfile,
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+            });
+            await requireMcpToolAuditCapability(operationContext).append({
                 event: 'mcp_transport_benchmark_scheduled',
                 tool: 'delegate_to_repo_autonomy_runner',
                 requestId,
@@ -272,7 +294,9 @@ export const delegateToRepoAutonomyRunnerTool = {
         if (selectedMission === 'validate-mcp-full') {
             const job = await spawnValidatorJob('suite-mcp-full', {
                 workspace,
+                config: requireMcpToolValidationConfig(operationContext),
                 ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
+                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
             });
             return okResult({
                 success: true,
@@ -286,7 +310,11 @@ export const delegateToRepoAutonomyRunnerTool = {
             });
         }
 
-        const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
+        const status = await readRepositoryStatus({
+            workspaceRoot: workspace.workspaceRoot,
+            gitConfig: requireMcpToolGitConfig(operationContext),
+            ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+        });
         return okResult({
             success: status.success === true,
             mission: selectedMission,
@@ -301,4 +329,4 @@ export const delegateToRepoAutonomyRunnerTool = {
             note: 'maintenance-safe-dry-run intentionally avoids mutation even when dryRun=false.',
         });
     },
-};
+});

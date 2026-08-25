@@ -11,11 +11,14 @@ import { describe, it } from 'vitest';
 
 import {
     hashMcpHttpSessionId,
+    readMcpHttpSessionRuntimeState,
+    readMcpHttpStatefulProcessConfig,
     readMcpHttpStatefulRuntimePolicySnapshot,
     readMcpHttpStatefulSessionPolicy,
 } from '#copilot/mcp/public/transport/http/stateful';
 import {
     createMcpHttpSessionRuntime,
+    createMcpHttpSessionRuntimeForConfig,
     createSqliteMcpHttpSessionStoreForDb,
     previewMcpHttpSessionId,
 } from '#copilot/testing/mcp/transport/http/stateful';
@@ -288,5 +291,62 @@ describe('MCP HTTP stateful session runtime', () => {
             }).sessionIdHashSecretPresent,
             false,
         );
+    });
+
+    it('captures one immutable process generation without ambient drift', () => {
+        const env = {
+            COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true',
+            COPILOT_MCP_HTTP_SESSION_TTL_MS: '20000',
+            COPILOT_MCP_HTTP_MAX_SESSIONS: '3',
+            COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET: 'a'.repeat(32),
+        };
+        const config = readMcpHttpStatefulProcessConfig(env);
+        env.COPILOT_MCP_HTTP_SESSION_TTL_MS = '90000';
+        env.COPILOT_MCP_HTTP_MAX_SESSIONS = '99';
+        env.COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET = 'b'.repeat(32);
+
+        assert.equal(config.policy.ttlMs, 20_000);
+        assert.equal(config.policy.maxSessions, 3);
+        assert.equal(config.sessionIdHashSecret, 'a'.repeat(32));
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.policy), true);
+        assert.equal(Object.isFrozen(config.posture), true);
+        assert.equal(JSON.stringify(config.posture).includes(config.sessionIdHashSecret), false);
+    });
+
+    it('creates independent config-bound runtime generations without module-global rebinding', async () => {
+        const firstConfig = readMcpHttpStatefulProcessConfig({
+            COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true',
+            COPILOT_MCP_HTTP_SESSION_TTL_MS: '20000',
+            COPILOT_MCP_HTTP_MAX_SESSIONS: '3',
+            COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET: 'a'.repeat(32),
+        });
+        const secondConfig = readMcpHttpStatefulProcessConfig({
+            COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true',
+            COPILOT_MCP_HTTP_SESSION_TTL_MS: '30000',
+            COPILOT_MCP_HTTP_MAX_SESSIONS: '5',
+            COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET: 'b'.repeat(32),
+        });
+        const rawDb = new Database(':memory:');
+        const db = adaptBetterSqliteDatabase(rawDb);
+        try {
+            const firstRuntime = createMcpHttpSessionRuntimeForConfig(firstConfig, { database: db });
+            const secondRuntime = createMcpHttpSessionRuntimeForConfig(secondConfig, { store: null });
+            assert.notEqual(firstRuntime, secondRuntime);
+            assert.deepEqual(firstRuntime.snapshot()['policy'], { ttlMs: 20_000, maxSessions: 3 });
+            assert.deepEqual(secondRuntime.snapshot()['policy'], { ttlMs: 30_000, maxSessions: 5 });
+            assert.equal(readMcpHttpSessionRuntimeState(firstRuntime, firstConfig)['ttlMs'], 20_000);
+            assert.equal(readMcpHttpSessionRuntimeState(secondRuntime, secondConfig)['ttlMs'], 30_000);
+            firstRuntime.register({
+                sessionId: 'generation-one',
+                transport: { close() {} },
+                server: { close() {} },
+            });
+            assert.equal(firstRuntime.snapshot()['ownedSessions'], 1);
+            assert.equal(secondRuntime.snapshot()['ownedSessions'], 0);
+            await firstRuntime.terminate('generation-one', 'client_delete');
+        } finally {
+            rawDb.close();
+        }
     });
 });

@@ -11,26 +11,20 @@
 import { buildIoCacheTierPlan } from '#copilot/infra/public/cache/tiering';
 import { getTtlCacheStats } from '#copilot/infra/public/cache/ttl';
 import { readMcpAuthConfigCacheStats, readMcpAuthDecisionCacheStats } from '#copilot/mcp/public/auth';
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
 import {
     createCloudflareStateStore,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-} from '#copilot/mcp/public/cloudflare/state';
-import { readMcpInfraHealthView } from '#copilot/mcp/public/diagnostics/infra-health';
+} from '#copilot/mcp/public/cloudflare/tunnel';
 import { readIoCacheBenchmarkState } from '#copilot/mcp/public/diagnostics/io-cache';
 import { readMcpRoundTripAnalyticsMonitorState } from '#copilot/mcp/public/diagnostics/latency';
 import { readMcpRuntimeSourceDrift } from '#copilot/mcp/public/diagnostics/runtime-source-drift';
 import { readMcpWorkspaceSmokeSummary } from '#copilot/mcp/public/diagnostics/workspace-smoke';
 import { readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
-import { buildAiArtifactsReport, readAiArtifactsPressure } from '#copilot/mcp/public/maintenance';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
 import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
 import { readMcpStartupMaintenanceState } from '#copilot/mcp/public/runtime/startup-maintenance';
-import {
-    readMcpHttpSessionRuntimeState,
-    readMcpHttpStatefulRuntimePolicySnapshot,
-} from '#copilot/mcp/public/transport/http/stateful';
+import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful/config';
 import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
 import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
 
@@ -84,12 +78,15 @@ function summarizeIndexHealth(stats) {
 }
 
 /**
+ * @param {string} workspaceRoot
+ * @param {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig} gitConfig
+ * @param {AbortSignal | undefined} signal
  * @returns {Promise<{ dirty: boolean | null; branch: string | null; head: string | null; error: string | null }>}
  */
-async function summarizeWorkspaceStatus() {
+async function summarizeWorkspaceStatus(workspaceRoot, gitConfig, signal) {
     if (cachedWorkspaceStatus && cachedWorkspaceStatus.expiresAt > Date.now()) return cachedWorkspaceStatus.value;
     try {
-        const result = await readRepositoryStatus();
+        const result = await readRepositoryStatus({ workspaceRoot, gitConfig, ...(signal ? { signal } : {}) });
         if (!result.success) {
             return {
                 dirty: null,
@@ -127,11 +124,26 @@ async function summarizeWorkspaceStatus() {
  * @returns {Record<string, unknown>}
  */
 function summarizeIndexAutoBuild(indexAutoBuild) {
+    const result = recordOrEmpty(indexAutoBuild['result']);
+    const hashVerification = recordOrEmpty(result['hashVerification']);
     return {
         status: indexAutoBuild['status'] ?? null,
         reason: indexAutoBuild['reason'] ?? null,
         startedAt: indexAutoBuild['startedAt'] ?? null,
         completedAt: indexAutoBuild['completedAt'] ?? null,
+        mode: result['mode'] ?? null,
+        durationMs: result['durationMs'] ?? null,
+        noChangeSloMs: result['noChangeSloMs'] ?? null,
+        noChangeSloMet: result['noChangeSloMet'] ?? null,
+        hashVerification:
+            Object.keys(hashVerification).length === 0
+                ? null
+                : {
+                      candidateCount: hashVerification['candidateCount'] ?? null,
+                      hashVerifications: hashVerification['hashVerifications'] ?? null,
+                      mismatchCount: hashVerification['mismatchCount'] ?? null,
+                      durationMs: hashVerification['durationMs'] ?? null,
+                  },
         error: indexAutoBuild['error'] ?? null,
     };
 }
@@ -594,28 +606,52 @@ function buildEvidenceAwareIoCachePlan(ioRuntime, benchmarkState) {
 
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspaceCapability
- * @param {{ includeDetails?: boolean | undefined }} [input]
+ * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} repositoryReadCacheConfig
+ * @param {import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig} indexAutoBuildConfig
+ * @param {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig} gitConfig
+ * @param {import('#copilot/mcp/public/diagnostics/infra-health').McpInfraHealthCapability} infraHealthCapability
+ * @param {Readonly<{ readState: () => Record<string, unknown> }> | undefined} httpSessionRuntimeCapability
+ * @param {ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>} aiArtifactsCapability
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} tunnelConfig
+ * @param {{ includeDetails?: boolean | undefined; signal?: AbortSignal }} [input]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function readMcpRuntimeHealth(workspaceCapability, input = {}) {
+export async function readMcpRuntimeHealth(
+    workspaceCapability,
+    repositoryReadCacheConfig,
+    indexAutoBuildConfig,
+    gitConfig,
+    infraHealthCapability,
+    httpSessionRuntimeCapability,
+    aiArtifactsCapability,
+    tunnelConfig,
+    input = {},
+) {
+    if (!repositoryReadCacheConfig) throw new TypeError('MCP runtime health requires repository read-cache config.');
+    if (!indexAutoBuildConfig) throw new TypeError('MCP runtime health requires index auto-build config.');
+    if (!gitConfig) throw new TypeError('MCP runtime health requires an explicit Git process config.');
+    if (!infraHealthCapability)
+        throw new TypeError('MCP runtime health requires the composed Infra health capability.');
+    if (!aiArtifactsCapability)
+        throw new TypeError('MCP runtime health requires the composed AI-artifacts capability.');
+    if (!tunnelConfig) throw new TypeError('MCP runtime health requires a Cloudflare config projection.');
     const options = /** @type {Record<string, unknown>} */ (input);
     const includeDetails = options['includeDetails'] === true;
     const metrics = readMcpMetricsSnapshot();
     const ttlCaches = getTtlCacheStats();
     const authConfigCache = readMcpAuthConfigCacheStats();
     const authDecisionCache = readMcpAuthDecisionCacheStats();
-    const repoReadFileCache = readRepoReadFileResultCacheStats();
-    const infraHealth = readMcpInfraHealthView();
+    const repoReadFileCache = readRepoReadFileResultCacheStats(repositoryReadCacheConfig);
+    const infraHealth = infraHealthCapability.read();
     const ioRuntime = infraHealth.runtime;
     const ioProcess = infraHealth.process;
     const [ioCacheBenchmarkState, aiArtifacts, runtimeSourceDrift] = await Promise.all([
         readIoCacheBenchmarkState(),
-        includeDetails ? buildAiArtifactsReport() : readAiArtifactsPressure(),
+        includeDetails ? aiArtifactsCapability.buildReport() : aiArtifactsCapability.readPressure(),
         readMcpRuntimeSourceDrift(workspaceCapability),
     ]);
     const ioCacheBenchmark = summarizeIoCacheBenchmark(ioCacheBenchmarkState);
     const ioCachePlanWithBenchmark = buildEvidenceAwareIoCachePlan(ioRuntime, ioCacheBenchmarkState);
-    const tunnelConfig = readCloudflareTunnelConfig();
     const tunnelStateStore = createCloudflareStateStore(tunnelConfig);
     const [tunnelState, connectorSmokeState] = await Promise.all([
         tunnelStateStore.readQuickTunnelState(),
@@ -627,14 +663,17 @@ export async function readMcpRuntimeHealth(workspaceCapability, input = {}) {
         tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl,
     );
     const permanentMode = tunnelConfig.mode === 'named-permanent';
-    const workspace = await summarizeWorkspaceStatus();
+    const workspace = await summarizeWorkspaceStatus(workspaceCapability.workspaceRoot, gitConfig, input.signal);
     const indexStats = workspaceCapability.indexRegistry.status();
     const index = summarizeIndexHealth(indexStats);
-    const indexAutoBuild = readMcpIndexAutoBuildState();
+    const indexAutoBuild = readMcpIndexAutoBuildState(indexAutoBuildConfig);
     const startupMaintenance = readMcpStartupMaintenanceState();
     const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
     const statefulPolicy = readMcpHttpStatefulRuntimePolicySnapshot();
-    const statefulRuntime = readMcpHttpSessionRuntimeState();
+    const statefulRuntime = httpSessionRuntimeCapability?.readState() ?? {
+        available: false,
+        reason: 'http-session-runtime-not-owned-by-current-transport',
+    };
     const schemaConvergence = readMcpSchemaConvergenceState();
     const roundTripAnalyticsMonitor = readMcpRoundTripAnalyticsMonitorState();
     const compileCache = ioProcess.compileCache;
@@ -657,6 +696,12 @@ export async function readMcpRuntimeHealth(workspaceCapability, input = {}) {
     else if (index.empty) warnings.push('Shared IO index is available but empty; refresh it before indexed search.');
     if (indexAutoBuild.status === 'failed') critical.push('MCP index auto-build failed.');
     if (indexAutoBuild.status === 'running') warnings.push('MCP index auto-build is currently running.');
+    const indexAutoBuildResult = recordOrEmpty(indexAutoBuild.result);
+    if (indexAutoBuildResult['mode'] === 'skip' && indexAutoBuildResult['noChangeSloMet'] === false) {
+        warnings.push(
+            `MCP index no-change readiness exceeded its ${String(indexAutoBuildResult['noChangeSloMs'] ?? 'configured')} ms SLO.`,
+        );
+    }
     if (tunnelConfig.mode === 'temporary-quick' && !tunnel.configured) {
         warnings.push('No saved Cloudflare quick tunnel state; start a temporary tunnel for ChatGPT.');
     }

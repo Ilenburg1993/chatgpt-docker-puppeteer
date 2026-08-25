@@ -8,7 +8,10 @@ import {
     buildTransportBenchmarkLaunchEnvironment,
     buildTransportBenchmarkSmokeEnvironment,
 } from '#copilot/testing/mcp/cloudflare/transport-benchmark';
-import { buildControlledReloadRunnerEnvironment } from '#copilot/testing/mcp/runtime/reload';
+import {
+    buildControlledReloadRunnerEnvironment,
+    readMcpReloadProcessConfig,
+} from '#copilot/testing/mcp/runtime/reload';
 
 const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
     PATH: '/usr/local/bin:/usr/bin:/bin',
@@ -71,8 +74,14 @@ describe('MCP child environment authority boundaries', () => {
     });
 
     it('projects reload runner authority without inheriting Cloudflare/OAuth credentials', () => {
-        const env = buildControlledReloadRunnerEnvironment(parentEnv);
+        const config = readMcpReloadProcessConfig(parentEnv);
+        const env = config.runnerEnvironment;
+        const entrypointProjection = buildControlledReloadRunnerEnvironment(parentEnv);
 
+        assert.equal(config.currentProfile, 'quic');
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(env), true);
+        assert.deepEqual(entrypointProjection, env);
         assert.equal(env['PATH'], parentEnv['PATH']);
         assert.equal(env['LANG'], parentEnv['LANG']);
         assert.equal(env['COPILOT_MCP_STATEFUL_ENV_FILE'], 'src/copilot/.ai/mcp/custom-stateful.env');

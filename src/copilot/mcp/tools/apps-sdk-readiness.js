@@ -6,7 +6,12 @@
  */
 
 import { buildCompanyKnowledgeWidgetResource } from '#copilot/mcp/public/protocol/apps-sdk';
-import { okResult, readOnlyAnnotations, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import {
+    okResult,
+    requireMcpToolCompanyKnowledgeConfig,
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 import path from 'node:path';
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
@@ -91,17 +96,18 @@ async function scanMarkers(workspaceIo, workspaceRoot, files) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpAppsSdkReadinessTool = {
+export const mcpAppsSdkReadinessTool = defineMcpRawTool({
     name: 'mcp_apps_sdk_readiness',
     title: 'MCP Apps SDK readiness',
     description:
         'Inspect this MCP server for Apps SDK widget/CSP metadata, Company Knowledge search/fetch readiness, and prompt-friction implications.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
+
     handler: async (_, operationContext) => {
         const workspace = requireMcpToolWorkspace(operationContext);
+        const companyKnowledgeConfig = requireMcpToolCompanyKnowledgeConfig(operationContext);
         const root = workspace.workspaceRoot;
         const mcpDir = path.join(root, 'src/copilot/mcp');
         const files = await listJsFiles(workspace.io, mcpDir);
@@ -117,7 +123,7 @@ export const mcpAppsSdkReadinessTool = {
             (found['csp'] ?? []).length > 0;
         const hasFrameDomains = (found['frameDomains'] ?? []).length > 0;
         const hasWidgetDescription = (found['widgetDescription'] ?? []).length > 0;
-        const resource = buildCompanyKnowledgeWidgetResource();
+        const resource = buildCompanyKnowledgeWidgetResource(companyKnowledgeConfig);
         const resourceMeta = recordOrEmpty(resource._meta);
         const uiMeta = recordOrEmpty(resourceMeta['ui']);
         const widgetDomain = typeof uiMeta['domain'] === 'string' ? uiMeta['domain'] : null;
@@ -191,7 +197,7 @@ export const mcpAppsSdkReadinessTool = {
             ],
         });
     },
-};
+});
 
 /** @param {unknown} value */
 function recordOrEmpty(value) {

@@ -23,20 +23,20 @@ const MODEL_GATEWAY_FINGERPRINT_TABLES = Object.freeze([
     'copilot_model_gateway_eligibility_decisions',
 ]);
 
-/** @type {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} */
-let database = null;
-
-/** @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db */
-export function configureModelGatewayIntegrationDatabase(db) {
-    if (!db) throw new TypeError('Model Gateway integration requires a database capability.');
-    database = db;
-    return () => {
-        if (database === db) database = null;
-    };
+/**
+ * @param {() => import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} readDatabase
+ */
+export function createModelGatewaySqliteFingerprintCapability(readDatabase) {
+    if (typeof readDatabase !== 'function') {
+        throw new TypeError('Model Gateway SQLite fingerprint capability requires a database reader.');
+    }
+    return Object.freeze({ read: () => readModelGatewaySqliteFingerprint(readDatabase()) });
 }
 
-export function readModelGatewaySqliteFingerprint() {
-    const db = database;
+/**
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort | null} db
+ */
+export function readModelGatewaySqliteFingerprint(db) {
     if (!db) return `unavailable:not-configured:${Date.now()}`;
     try {
         const active = /** @type {{ generated_at_ms?: number | null; payload_bytes?: number | null } | undefined} */ (

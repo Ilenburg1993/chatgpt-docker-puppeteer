@@ -17,8 +17,8 @@ export {
     DEFAULT_MCP_HTTP_SESSION_TTL_MS,
     MCP_HTTP_SESSION_RUNTIME_VERSION,
     createMcpHttpSessionRuntime,
+    createMcpHttpSessionRuntimeForConfig,
     previewMcpHttpSessionId,
-    resetDefaultMcpHttpSessionRuntimeForTests,
     validateRawSessionId,
 } from '../session/runtime.js';
 export { createSqliteMcpHttpSessionStoreForDb, ensureMcpHttpSessionStoreSchema } from '../session/store.js';

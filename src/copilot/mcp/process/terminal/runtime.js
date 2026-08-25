@@ -25,7 +25,6 @@ import { performance } from 'node:perf_hooks';
 export const MCP_TERMINAL_CONTROL_VERSION = 3;
 
 const require = createRequire(import.meta.url);
-const DEFAULT_SHELL = process.env['SHELL'] || '/bin/bash';
 const DEFAULT_EXEC_TIMEOUT_MS = 120_000;
 const MAX_EXEC_TIMEOUT_MS = 60 * 60 * 1000;
 const DEFAULT_EXEC_OUTPUT_BYTES = 1024 * 1024;
@@ -48,19 +47,20 @@ let nodePtyModule;
 /**
  * @typedef {{
  *     command: string;
- *     args?: string[];
- *     shell?: boolean;
- *     shellPath?: string;
- *     cwd?: string;
- *     env?: Record<string, string | null>;
- *     inheritEnv?: boolean;
- *     stdin?: string;
- *     timeoutMs?: number;
- *     maxOutputBytes?: number;
+ *     args?: string[] | undefined;
+ *     shell?: boolean | undefined;
+ *     shellPath?: string | undefined;
+ *     cwd?: string | undefined;
+ *     env?: Record<string, string | null> | undefined;
+ *     inheritEnv?: boolean | undefined;
+ *     stdin?: string | undefined;
+ *     timeoutMs?: number | undefined;
+ *     maxOutputBytes?: number | undefined;
  * }} TerminalCommandSpec
  *
  * @typedef {Readonly<{
  *     workspaceRoot: string;
+ *     config: import('./config.js').McpTerminalProcessConfig;
  *     signal?: AbortSignal;
  *     cancellationSource?: () => 'caller' | 'deadline' | 'unknown' | null;
  * }>} TerminalExecutionRuntime
@@ -100,7 +100,7 @@ let nodePtyModule;
 export async function executeTerminalCommand(input, runtime) {
     const executionRuntime = requireTerminalExecutionRuntime(runtime);
     throwIfTerminalRuntimeAborted(executionRuntime);
-    const spec = normalizeTerminalCommandSpec(input, executionRuntime.workspaceRoot);
+    const spec = normalizeTerminalCommandSpec(input, executionRuntime.workspaceRoot, executionRuntime.config);
     const startedAt = performance.now();
     return await new Promise((resolve) => {
         const invocation = resolveCommandInvocation(spec, false);
@@ -270,6 +270,66 @@ export async function executeTerminalCommandBatch(commands, runtime, options = {
 }
 
 /**
+ * Observe physical pipe-child acceptance. Caller cancellation owns the child only until the `spawn` event; if abort
+ * wins that race we terminate and drain the process group before rejecting. After `spawn`, persistent-session
+ * lifecycle is transferred to the explicit terminal session control API.
+ *
+ * @param {import('node:child_process').ChildProcessWithoutNullStreams} child
+ * @param {ReturnType<typeof createAttachedChildProcessSupervisor>} supervisor
+ * @param {TerminalExecutionRuntime} runtime
+ */
+async function awaitPersistentPipeSessionAcceptance(child, supervisor, runtime) {
+    await new Promise((resolvePromise, rejectPromise) => {
+        let settled = false;
+        const cleanup = () => {
+            child.off('spawn', onSpawn);
+            child.off('error', onError);
+            runtime.signal?.removeEventListener('abort', onAbort);
+        };
+        /** @param {unknown} error */
+        const settleReject = (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        };
+        const onSpawn = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolvePromise(undefined);
+        };
+        /** @param {Error} error */
+        const onError = (error) => settleReject(error);
+        const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            const source = runtime.cancellationSource?.() ?? 'caller';
+            const reason = runtime.signal?.reason;
+            const error = Object.assign(
+                new Error(
+                    reason instanceof Error
+                        ? reason.message
+                        : `Terminal persistent session open cancelled before spawn acceptance (${source}).`,
+                    reason instanceof Error ? { cause: reason } : undefined,
+                ),
+                {
+                    code: source === 'deadline' ? 'MCP_TOOL_TIMEOUT' : 'MCP_TOOL_CANCELLED',
+                    cancellationSource: source,
+                },
+            );
+            supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
+            void supervisor.closed.then(() => rejectPromise(error));
+        };
+        child.once('spawn', onSpawn);
+        child.once('error', onError);
+        runtime.signal?.addEventListener('abort', onAbort, { once: true });
+        if (runtime.signal?.aborted) onAbort();
+    });
+}
+
+/**
  * Open an arbitrary persistent terminal/process session.
  *
  * @param {{
@@ -307,11 +367,11 @@ export async function openTerminalSession(input, runtime) {
             success: false,
             code: 'ERR_TERMINAL_PTY_UNAVAILABLE',
             hint: 'Install node-pty in the workspace, then retry backend=pty; backend=auto falls back to pipes.',
-            capabilities: getTerminalCapabilities(),
+            capabilities: getTerminalCapabilities(executionRuntime.config),
         };
     }
     const backend = ptyModule ? 'pty' : 'pipe';
-    const spec = normalizeTerminalSessionSpec(input, executionRuntime.workspaceRoot);
+    const spec = normalizeTerminalSessionSpec(input, executionRuntime.workspaceRoot, executionRuntime.config);
     const invocation = resolveCommandInvocation(spec, true);
     const id = randomUUID();
     /** @type {TerminalSessionRecord} */
@@ -365,25 +425,33 @@ export async function openTerminalSession(input, runtime) {
             });
             record.child = child;
             record.pid = child.pid ?? null;
+            const supervisor = createAttachedChildProcessSupervisor(child, {
+                processGroup: process.platform !== 'win32',
+            });
             child.stdout.on('data', (chunk) => appendSessionEvent(record, 'stdout', String(chunk)));
             child.stderr.on('data', (chunk) => appendSessionEvent(record, 'stderr', String(chunk)));
-            child.once('error', (error) => {
+            child.on('error', (error) => {
                 appendSessionEvent(record, 'system', `spawn error: ${error.message}\n`);
                 markSessionFailed(record);
             });
             child.once('close', (code, signal) => markSessionExited(record, code, signal));
+            await awaitPersistentPipeSessionAcceptance(child, supervisor, executionRuntime);
             if (spec.initialInput) child.stdin.write(spec.initialInput);
         }
         return {
             success: true,
             session: summarizeTerminalSession(record),
-            capabilities: getTerminalCapabilities(),
+            capabilities: getTerminalCapabilities(executionRuntime.config),
         };
     } catch (error) {
         sessions.delete(id);
+        const errorCode =
+            error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+                ? error.code
+                : 'ERR_TERMINAL_SESSION_OPEN';
         return {
             success: false,
-            code: 'ERR_TERMINAL_SESSION_OPEN',
+            code: errorCode,
             error: error instanceof Error ? error.message : String(error),
             backend,
             command: invocation.executable,
@@ -488,12 +556,16 @@ export async function controlTerminalSession(input) {
  *     afterSeq?: number;
  *     maxBytes?: number;
  *     limit?: number;
- * }} [input]
+ * }} input
+ * @param {TerminalExecutionRuntime} runtime
  */
-export function readTerminalSession(input = {}) {
+export function readTerminalSession(input, runtime) {
+    const executionRuntime = requireTerminalExecutionRuntime(runtime);
     pruneTerminalSessions();
     const action = input.action ?? 'read';
-    if (action === 'capabilities') return { success: true, capabilities: getTerminalCapabilities() };
+    if (action === 'capabilities') {
+        return { success: true, capabilities: getTerminalCapabilities(executionRuntime.config) };
+    }
     if (action === 'list') {
         const limit = clampInteger(input.limit, 1, MAX_TERMINAL_SESSIONS, 50);
         return {
@@ -536,8 +608,9 @@ export function readTerminalSession(input = {}) {
     };
 }
 
-/** Return terminal backend/process capabilities. */
-export function getTerminalCapabilities() {
+/** Return terminal backend/process capabilities. @param {import('./config.js').McpTerminalProcessConfig} config */
+export function getTerminalCapabilities(config) {
+    if (!config) throw new TypeError('Terminal capabilities require a terminal process config generation.');
     const pty = getNodePtyModule();
     return {
         terminalControlVersion: MCP_TERMINAL_CONTROL_VERSION,
@@ -556,7 +629,7 @@ export function getTerminalCapabilities() {
         processGroups: process.platform !== 'win32',
         pty: Boolean(pty),
         ptyModule: pty ? 'node-pty' : null,
-        defaultShell: DEFAULT_SHELL,
+        defaultShell: config.defaultShell,
         maxSessions: MAX_TERMINAL_SESSIONS,
         maxBatchCommands: MAX_TERMINAL_BATCH,
         maxBatchConcurrency: MAX_TERMINAL_BATCH_CONCURRENCY,
@@ -568,8 +641,8 @@ export function getTerminalCapabilities() {
     };
 }
 
-/** @param {TerminalCommandSpec} input @param {string} workspaceRoot */
-function normalizeTerminalCommandSpec(input, workspaceRoot) {
+/** @param {TerminalCommandSpec} input @param {string} workspaceRoot @param {import('./config.js').McpTerminalProcessConfig} config */
+function normalizeTerminalCommandSpec(input, workspaceRoot, config) {
     if (!input || typeof input !== 'object') throw new Error('Terminal command input is required.');
     const command = String(input.command ?? '');
     if (!command) throw new Error('command is required.');
@@ -578,17 +651,17 @@ function normalizeTerminalCommandSpec(input, workspaceRoot) {
         command,
         args: normalizeStringArray(input.args),
         shell,
-        shellPath: normalizeShellPath(input.shellPath),
+        shellPath: normalizeShellPath(input.shellPath, config.defaultShell),
         cwd: resolveTerminalCwd(input.cwd, workspaceRoot),
-        ...buildTerminalEnvironmentSpec(input.env, input.inheritEnv !== false),
+        ...buildTerminalEnvironmentSpec(input.env, input.inheritEnv !== false, config),
         stdin: input.stdin === undefined ? undefined : String(input.stdin),
         timeoutMs: normalizeTimeout(input.timeoutMs),
         maxOutputBytes: clampInteger(input.maxOutputBytes, 16 * 1024, MAX_EXEC_OUTPUT_BYTES, DEFAULT_EXEC_OUTPUT_BYTES),
     };
 }
 
-/** @param {Parameters<typeof openTerminalSession>[0]} input @param {string} workspaceRoot */
-function normalizeTerminalSessionSpec(input, workspaceRoot) {
+/** @param {Parameters<typeof openTerminalSession>[0]} input @param {string} workspaceRoot @param {import('./config.js').McpTerminalProcessConfig} config */
+function normalizeTerminalSessionSpec(input, workspaceRoot, config) {
     const shell = input?.shell !== false;
     const command = input?.command === undefined ? '' : String(input.command);
     if (!shell && !command) throw new Error('command is required when shell=false.');
@@ -596,9 +669,9 @@ function normalizeTerminalSessionSpec(input, workspaceRoot) {
         command,
         args: normalizeStringArray(input?.args),
         shell,
-        shellPath: normalizeShellPath(input?.shellPath),
+        shellPath: normalizeShellPath(input?.shellPath, config.defaultShell),
         cwd: resolveTerminalCwd(input?.cwd, workspaceRoot),
-        ...buildTerminalEnvironmentSpec(input?.env, input?.inheritEnv !== false),
+        ...buildTerminalEnvironmentSpec(input?.env, input?.inheritEnv !== false, config),
         timeoutMs: 0,
         maxOutputBytes: DEFAULT_EXEC_OUTPUT_BYTES,
         stdin: undefined,
@@ -635,6 +708,7 @@ function requireTerminalExecutionRuntime(runtime) {
     if (!runtime || typeof runtime.workspaceRoot !== 'string' || !path.isAbsolute(runtime.workspaceRoot)) {
         throw new TypeError('Terminal execution requires an absolute composition-owned workspaceRoot.');
     }
+    if (!runtime.config) throw new TypeError('Terminal execution requires a process config generation.');
     return runtime;
 }
 
@@ -651,10 +725,12 @@ function throwIfTerminalRuntimeAborted(runtime) {
 /**
  * @param {Record<string, string | null> | undefined} override
  * @param {boolean} inheritOperationalEnv
+ * @param {import('./config.js').McpTerminalProcessConfig} config
  * @returns {{ env: NodeJS.ProcessEnv; environmentProjection: import('#copilot/mcp/public/process/environment').McpChildEnvironmentProjection }}
  */
-function buildTerminalEnvironmentSpec(override, inheritOperationalEnv) {
+function buildTerminalEnvironmentSpec(override, inheritOperationalEnv, config) {
     const { env, projection } = buildMcpChildEnvironment({
+        parentEnv: /** @type {NodeJS.ProcessEnv} */ ({ ...config.operationalEnvironment }),
         ...(override ? { overrides: override } : {}),
         inheritOperationalEnv,
     });
@@ -674,10 +750,10 @@ function normalizeStringArray(value) {
     return Array.isArray(value) ? value.map((item) => String(item)) : [];
 }
 
-/** @param {unknown} value */
-function normalizeShellPath(value) {
-    const shell = String(value ?? DEFAULT_SHELL).trim();
-    return shell || DEFAULT_SHELL;
+/** @param {unknown} value @param {string} defaultShell */
+function normalizeShellPath(value, defaultShell) {
+    const shell = String(value ?? defaultShell).trim();
+    return shell || defaultShell;
 }
 
 /** @param {unknown} value */

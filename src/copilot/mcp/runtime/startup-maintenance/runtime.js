@@ -5,13 +5,10 @@
  * @module copilot/mcp/runtime/startup-maintenance/runtime
  */
 
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
-import { createCloudflareStateStore } from '#copilot/mcp/public/cloudflare/state';
 import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
 import { reapCompletedDetachedLiveRuns } from '#copilot/mcp/public/integrations/model-gateway/live-runs';
 import { logMcp } from '#copilot/mcp/public/observability';
-
-const DEFAULT_STARTUP_SMOKE_DELAY_MS = 15_000;
+import { readMcpStartupMaintenanceConfig } from './config.js';
 
 /** @type {NodeJS.Timeout | null} */
 let startupTimer = null;
@@ -34,10 +31,14 @@ let startupState = {
 
 /**
  * @param {{
+ *     policy?: import('./config.js').McpStartupMaintenanceConfig;
  *     delayMs?: number;
  *     enabled?: boolean;
  *     setTimeoutFn?: typeof setTimeout;
  *     workspace?: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     cloudflareConfig?: import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig;
+ *     gitConfig?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig;
+ *     audit?: ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>;
  *     smokeRunner?: () => Promise<Record<string, unknown>>;
  *     cleanupRunner?: () => Promise<{ removed: boolean }>;
  *     rollbackCleanupRunner?: () => Promise<Record<string, unknown> | null>;
@@ -47,24 +48,30 @@ let startupState = {
  */
 export function scheduleMcpStartupMaintenance(options = {}) {
     if (startupState.scheduled || startupState.running || startupState.completed) return false;
-    const defaultEnabled = process.env['NODE_ENV'] !== 'test' && !process.env['VITEST'];
-    const enabled = options.enabled ?? readBooleanEnv('COPILOT_MCP_STARTUP_SMOKE_ENABLED', defaultEnabled);
+    const policy = options.policy ?? readMcpStartupMaintenanceConfig();
+    const enabled = options.enabled ?? policy.enabled;
     if (!enabled) return false;
-    const delayMs = normalizeDelay(options.delayMs ?? Number(process.env['COPILOT_MCP_STARTUP_SMOKE_DELAY_MS']));
+    const delayMs = normalizeDelay(options.delayMs ?? policy.delayMs);
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const smokeRunner =
         options.smokeRunner ??
         (() => {
             if (!options.workspace) throw new TypeError('MCP startup maintenance requires a workspace capability.');
-            return runMcpWorkspaceSmoke(options.workspace);
+            if (!options.cloudflareConfig)
+                throw new TypeError('MCP startup maintenance requires a Cloudflare config projection.');
+            if (!options.gitConfig)
+                throw new TypeError('MCP startup maintenance requires a Git process config projection.');
+            return runMcpWorkspaceSmoke(options.workspace, options.cloudflareConfig, { gitConfig: options.gitConfig });
         });
-    const cleanupRunner = options.cleanupRunner ?? cleanupQuickTunnelStateAtStartup;
+    const cleanupRunner = options.cleanupRunner ?? requireCleanupRunner;
     const rollbackCleanupRunner = options.rollbackCleanupRunner ?? noRollbackCleanup;
     const detachedLiveReaper =
         options.detachedLiveReaper ??
         (() => {
             if (!options.workspace) throw new TypeError('MCP startup maintenance requires a workspace capability.');
-            return reapCompletedDetachedLiveRuns(options.workspace);
+            return reapCompletedDetachedLiveRuns(options.workspace, {
+                ...(options.audit ? { audit: options.audit } : {}),
+            });
         });
 
     const generation = ++startupGeneration;
@@ -216,9 +223,9 @@ async function runStartupMaintenance(
     }
 }
 
-async function cleanupQuickTunnelStateAtStartup() {
-    const config = readCloudflareTunnelConfig();
-    return createCloudflareStateStore(config).cleanupStaleQuickTunnelState({ staleAfterMs: config.staleAfterMs });
+/** @returns {Promise<{ removed: boolean }>} */
+async function requireCleanupRunner() {
+    throw new TypeError('MCP startup maintenance requires a composed quick-tunnel cleanup runner.');
 }
 
 async function noRollbackCleanup() {
@@ -230,18 +237,6 @@ async function noRollbackCleanup() {
  */
 function normalizeDelay(value) {
     const numeric = Number(value);
-    if (!Number.isFinite(numeric) || numeric < 0) return DEFAULT_STARTUP_SMOKE_DELAY_MS;
+    if (!Number.isFinite(numeric) || numeric < 0) return 15_000;
     return Math.min(10 * 60 * 1000, Math.round(numeric));
-}
-
-/**
- * @param {string} name
- * @param {boolean} fallback
- */
-function readBooleanEnv(name, fallback) {
-    const value = String(process.env[name] ?? '')
-        .trim()
-        .toLowerCase();
-    if (!value) return fallback;
-    return ['1', 'true', 'yes', 'on'].includes(value);
 }

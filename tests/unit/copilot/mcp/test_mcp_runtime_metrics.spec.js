@@ -7,7 +7,11 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
-import { readMcpIndexAutoBuildConfig } from '#copilot/mcp/public/indexing/auto-build';
+import {
+    maybeStartMcpIndexAutoBuild,
+    readMcpIndexAutoBuildConfig,
+    readMcpIndexAutoBuildState,
+} from '#copilot/mcp/public/indexing/auto-build';
 import { readMcpMetricsSnapshot, recordMcpToolMetric } from '#copilot/mcp/public/observability';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
 import { resetMcpWorkspaceSmokeSummaryForTests } from '#copilot/testing/mcp/diagnostics/workspace-smoke';
@@ -127,7 +131,11 @@ describe('copilot MCP runtime metrics', () => {
                     envelope: { protocol: '2026' },
                 },
             },
-            { workspace: processHost.workspace },
+            {
+                workspace: processHost.workspace,
+                config: processHost.processConfig.toolConfig,
+                capabilities: processHost.toolCapabilities,
+            },
         );
         try {
             const result = await mcpRuntimeHealthTool.handler({}, operationContext);
@@ -234,6 +242,29 @@ describe('copilot MCP runtime metrics', () => {
             const detailedMetrics = /** @type {Record<string, unknown>} */ (detailed.structuredContent?.['metrics']);
             assert.equal(typeof detailedMetrics['tools'], 'object');
             assert.equal(typeof detailedMetrics['ioCache'], 'object');
+        } finally {
+            await processHost.dispose();
+        }
+    });
+
+    it('isolates index auto-build state by process-config generation', async () => {
+        const disabled = readMcpIndexAutoBuildConfig({ COPILOT_MCP_INDEX_AUTO_BUILD: 'false' });
+        const enabled = readMcpIndexAutoBuildConfig({
+            COPILOT_MCP_INDEX_AUTO_BUILD: 'true',
+            COPILOT_MCP_INDEX_AUTO_BUILD_PATH: 'src/copilot/mcp',
+        });
+        assert.notEqual(disabled.generationKey, enabled.generationKey);
+        const processHost = createComposedMcpProcessHost({ backgroundServices: false });
+        try {
+            const disabledState = await maybeStartMcpIndexAutoBuild({
+                workspace: processHost.workspace,
+                config: disabled,
+            });
+            assert.equal(disabledState.status, 'disabled');
+            assert.equal(readMcpIndexAutoBuildState(disabled).status, 'disabled');
+            const enabledState = readMcpIndexAutoBuildState(enabled);
+            assert.equal(enabledState.status, 'never-started');
+            assert.equal(enabledState.config?.generationKey, enabled.generationKey);
         } finally {
             await processHost.dispose();
         }

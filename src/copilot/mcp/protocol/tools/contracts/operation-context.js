@@ -39,14 +39,57 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
  *     requestEnvelope?: Readonly<Record<string, unknown>>;
  *     authInfo?: import('@modelcontextprotocol/server').AuthInfo;
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     config: McpToolConfigProjection;
+ *     capabilities: McpToolCapabilityProjection;
  *     startedAtMs: number;
  *     deadlineAtMs: number | null;
  *     remainingBudgetMs: () => number | null;
  *     cancellationSource: () => 'caller' | 'deadline' | null;
  * }>} McpToolOperationContext
  *
+ * @typedef {Readonly<{
+ *     connection?: import('#copilot/mcp/public/connection').McpConnectionRuntimeConfig;
+ *     authConfig?: import('#copilot/mcp/public/auth').McpAuthConfig;
+ *     authIssuer?: import('#copilot/mcp/public/auth').DevOAuthProcessConfig;
+ *     cloudflare?: import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig;
+ *     companyKnowledge?: import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig;
+ *     devcontainerNetwork?: import('#copilot/mcp/public/diagnostics/devcontainer-network').McpDevcontainerNetworkConfig;
+ *     ioCache?: import('#copilot/mcp/public/diagnostics/io-cache').McpIoCacheProcessConfig;
+ *     indexAutoBuild?: import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig;
+ *     latencyDashboard?: import('#copilot/mcp/public/diagnostics/latency').McpLatencyDashboardPolicy;
+ *     reload?: import('#copilot/mcp/public/runtime/reload').McpReloadProcessConfig;
+ *     toolPayload?: import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig;
+ *     validation?: import('#copilot/mcp/public/validation').McpValidationProcessConfig;
+ *     git?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig;
+ *     repositoryReadCache?: import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig;
+ *     terminal?: import('#copilot/mcp/public/process/terminal').McpTerminalProcessConfig;
+ * }>} McpToolConfigProjection
+ *
+ * @typedef {Readonly<{
+ *     cloudflare?: import('#copilot/mcp/public/cloudflare/environment-authority').CloudflareEnvironmentAuthority;
+ *     modelGatewayLiveRuns?: import('#copilot/mcp/public/integrations/model-gateway/live-runs').ModelGatewayLiveRunEnvironmentAuthority;
+ *     infraHealth?: import('#copilot/mcp/public/diagnostics/infra-health').McpInfraHealthCapability;
+ *     httpSessionRuntime?: Readonly<{ readState: () => Record<string, unknown> }>;
+ *     audit?: ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>;
+ *     authIssuerRuntime?: ReturnType<typeof import('#copilot/mcp/public/auth').createDevOAuthRuntime>;
+ *     aiArtifacts?: ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>;
+ *     roundTripAnalytics?: ReturnType<typeof import('#copilot/mcp/public/diagnostics/latency').createMcpRoundTripAnalyticsCapability>;
+ *     modelGatewaySqliteFingerprint?: ReturnType<typeof import('#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint').createModelGatewaySqliteFingerprintCapability>;
+ *     toolSurface?: Readonly<{
+ *         tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
+ *         names: readonly string[];
+ *         resolveCanonicalSurfaces?: () => readonly Readonly<{
+ *             mode: string;
+ *             tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
+ *             names: readonly string[];
+ *         }>[];
+ *     }>;
+ * }>} McpToolCapabilityProjection
+ *
  * @typedef {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     config?: McpToolConfigProjection;
+ *     capabilities?: McpToolCapabilityProjection;
  *     timeoutMs?: number;
  *     now?: () => number;
  * }} McpToolOperationContextOptions
@@ -88,6 +131,8 @@ export function createMcpToolOperationContext(serverContext, options) {
         ...(requestEnvelope ? { requestEnvelope } : {}),
         ...(serverContext.http?.authInfo ? { authInfo: serverContext.http.authInfo } : {}),
         workspace: options.workspace,
+        config: freezeToolConfig(options.config),
+        capabilities: freezeToolCapabilities(options.capabilities),
         startedAtMs,
         deadlineAtMs,
         remainingBudgetMs: () => (deadlineAtMs === null ? null : Math.max(0, deadlineAtMs - now())),
@@ -111,6 +156,294 @@ export function createMcpToolOperationContext(serverContext, options) {
 export function requireMcpToolWorkspace(operationContext) {
     if (!operationContext?.workspace) throw new TypeError('MCP tool execution requires a workspace capability.');
     return operationContext.workspace;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/auth').McpAuthConfig}
+ */
+export function requireMcpToolAuthConfig(operationContext) {
+    const config = operationContext?.config.authConfig;
+    if (!config) throw new TypeError('MCP tool execution requires an auth configuration projection.');
+    return config;
+}
+
+/**
+ * Require the composition-owned OAuth issuer configuration projection at a migrated tool boundary.
+ *
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/auth').DevOAuthProcessConfig}
+ */
+export function requireMcpToolAuthIssuerConfig(operationContext) {
+    const issuerConfig = operationContext?.config.authIssuer;
+    if (!issuerConfig) throw new TypeError('MCP tool execution requires an OAuth issuer configuration projection.');
+    return issuerConfig;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig}
+ */
+export function requireMcpToolCloudflareConfig(operationContext) {
+    const config = operationContext?.config.cloudflare;
+    if (!config) throw new TypeError('MCP tool execution requires a Cloudflare config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/cloudflare/environment-authority').CloudflareEnvironmentAuthority}
+ */
+export function requireMcpToolCloudflareEnvironmentAuthority(operationContext) {
+    const authority = operationContext?.capabilities.cloudflare;
+    if (!authority) throw new TypeError('MCP tool execution requires a Cloudflare environment authority.');
+    return authority;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig}
+ */
+export function requireMcpToolCompanyKnowledgeConfig(operationContext) {
+    const config = operationContext?.config.companyKnowledge;
+    if (!config) throw new TypeError('MCP tool execution requires a Company Knowledge configuration projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/diagnostics/devcontainer-network').McpDevcontainerNetworkConfig}
+ */
+export function requireMcpToolDevcontainerNetworkConfig(operationContext) {
+    const config = operationContext?.config.devcontainerNetwork;
+    if (!config) throw new TypeError('MCP tool execution requires a DevContainer network configuration projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/diagnostics/io-cache').McpIoCacheProcessConfig}
+ */
+export function requireMcpToolIoCacheConfig(operationContext) {
+    const config = operationContext?.config.ioCache;
+    if (!config) throw new TypeError('MCP tool execution requires an IO-cache configuration projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/integrations/model-gateway/live-runs').ModelGatewayLiveRunEnvironmentAuthority}
+ */
+export function requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext) {
+    const authority = operationContext?.capabilities.modelGatewayLiveRuns;
+    if (!authority) throw new TypeError('MCP tool execution requires a Model Gateway live-run environment authority.');
+    return authority;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig}
+ */
+export function requireMcpToolIndexAutoBuildConfig(operationContext) {
+    const config = operationContext?.config.indexAutoBuild;
+    if (!config) throw new TypeError('MCP tool execution requires an index auto-build config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/diagnostics/latency').McpLatencyDashboardPolicy}
+ */
+export function requireMcpToolLatencyDashboardConfig(operationContext) {
+    const policy = operationContext?.config.latencyDashboard;
+    if (!policy) throw new TypeError('MCP tool execution requires a latency dashboard configuration projection.');
+    return policy;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig}
+ */
+export function requireMcpToolGitConfig(operationContext) {
+    const config = operationContext?.config.git;
+    if (!config) throw new TypeError('MCP tool execution requires a Git process config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig}
+ */
+export function requireMcpToolRepositoryReadCacheConfig(operationContext) {
+    const config = operationContext?.config.repositoryReadCache;
+    if (!config) throw new TypeError('MCP tool execution requires a repository read-cache config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/process/terminal').McpTerminalProcessConfig}
+ */
+export function requireMcpToolTerminalConfig(operationContext) {
+    const config = operationContext?.config.terminal;
+    if (!config) throw new TypeError('MCP tool execution requires a terminal process config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/validation').McpValidationProcessConfig}
+ */
+export function requireMcpToolValidationConfig(operationContext) {
+    const config = operationContext?.config.validation;
+    if (!config) throw new TypeError('MCP tool execution requires a validation process config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/runtime/reload').McpReloadProcessConfig}
+ */
+export function requireMcpToolReloadConfig(operationContext) {
+    const config = operationContext?.config.reload;
+    if (!config) throw new TypeError('MCP tool execution requires a reload configuration projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig}
+ */
+export function requireMcpToolPayloadAuditConfig(operationContext) {
+    const config = operationContext?.config.toolPayload;
+    if (!config) throw new TypeError('MCP tool execution requires a tool-payload configuration projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['toolSurface']>}
+ */
+export function requireMcpToolSurface(operationContext) {
+    const surface = operationContext?.capabilities.toolSurface;
+    if (!surface) throw new TypeError('MCP tool execution requires the effective tool-surface capability.');
+    return surface;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/diagnostics/infra-health').McpInfraHealthCapability}
+ */
+export function requireMcpToolInfraHealthCapability(operationContext) {
+    const capability = operationContext?.capabilities.infraHealth;
+    if (!capability) throw new TypeError('MCP tool execution requires the composed Infra health capability.');
+    return capability;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['audit']>}
+ */
+export function requireMcpToolAuditCapability(operationContext) {
+    const capability = operationContext?.capabilities.audit;
+    if (!capability) throw new TypeError('MCP tool execution requires the composed audit capability.');
+    return capability;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['authIssuerRuntime']>}
+ */
+export function requireMcpToolAuthIssuerRuntime(operationContext) {
+    const capability = operationContext?.capabilities.authIssuerRuntime;
+    if (!capability) throw new TypeError('MCP tool execution requires the composed OAuth issuer runtime.');
+    return capability;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['aiArtifacts']>}
+ */
+export function requireMcpToolAiArtifactsCapability(operationContext) {
+    const capability = operationContext?.capabilities.aiArtifacts;
+    if (!capability) throw new TypeError('MCP tool execution requires the composed AI-artifacts capability.');
+    return capability;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['roundTripAnalytics']>}
+ */
+export function requireMcpToolRoundTripAnalyticsCapability(operationContext) {
+    const capability = operationContext?.capabilities.roundTripAnalytics;
+    if (!capability) throw new TypeError('MCP tool execution requires the composed round-trip analytics capability.');
+    return capability;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {NonNullable<McpToolCapabilityProjection['modelGatewaySqliteFingerprint']>}
+ */
+export function requireMcpToolModelGatewaySqliteFingerprintCapability(operationContext) {
+    const capability = operationContext?.capabilities.modelGatewaySqliteFingerprint;
+    if (!capability)
+        throw new TypeError('MCP tool execution requires the Model Gateway SQLite fingerprint capability.');
+    return capability;
+}
+
+/**
+ * @param {McpToolCapabilityProjection | undefined} capabilities
+ * @returns {McpToolCapabilityProjection}
+ */
+function freezeToolCapabilities(capabilities) {
+    return Object.freeze({
+        ...(capabilities?.cloudflare ? { cloudflare: capabilities.cloudflare } : {}),
+        ...(capabilities?.modelGatewayLiveRuns ? { modelGatewayLiveRuns: capabilities.modelGatewayLiveRuns } : {}),
+        ...(capabilities?.infraHealth ? { infraHealth: capabilities.infraHealth } : {}),
+        ...(capabilities?.httpSessionRuntime ? { httpSessionRuntime: capabilities.httpSessionRuntime } : {}),
+        ...(capabilities?.audit ? { audit: capabilities.audit } : {}),
+        ...(capabilities?.authIssuerRuntime ? { authIssuerRuntime: capabilities.authIssuerRuntime } : {}),
+        ...(capabilities?.aiArtifacts ? { aiArtifacts: capabilities.aiArtifacts } : {}),
+        ...(capabilities?.roundTripAnalytics ? { roundTripAnalytics: capabilities.roundTripAnalytics } : {}),
+        ...(capabilities?.modelGatewaySqliteFingerprint
+            ? { modelGatewaySqliteFingerprint: capabilities.modelGatewaySqliteFingerprint }
+            : {}),
+        ...(capabilities?.toolSurface
+            ? {
+                  toolSurface: Object.freeze({
+                      tools: Object.freeze([...capabilities.toolSurface.tools]),
+                      names: Object.freeze([...capabilities.toolSurface.names]),
+                      ...(capabilities.toolSurface.resolveCanonicalSurfaces
+                          ? { resolveCanonicalSurfaces: capabilities.toolSurface.resolveCanonicalSurfaces }
+                          : {}),
+                  }),
+              }
+            : {}),
+    });
+}
+
+/**
+ * @param {McpToolConfigProjection | undefined} config
+ * @returns {McpToolConfigProjection}
+ */
+function freezeToolConfig(config) {
+    return Object.freeze({
+        ...(config?.connection ? { connection: config.connection } : {}),
+        ...(config?.authConfig ? { authConfig: config.authConfig } : {}),
+        ...(config?.authIssuer ? { authIssuer: config.authIssuer } : {}),
+        ...(config?.cloudflare ? { cloudflare: config.cloudflare } : {}),
+        ...(config?.companyKnowledge ? { companyKnowledge: config.companyKnowledge } : {}),
+        ...(config?.devcontainerNetwork ? { devcontainerNetwork: config.devcontainerNetwork } : {}),
+        ...(config?.ioCache ? { ioCache: config.ioCache } : {}),
+        ...(config?.indexAutoBuild ? { indexAutoBuild: config.indexAutoBuild } : {}),
+        ...(config?.latencyDashboard ? { latencyDashboard: config.latencyDashboard } : {}),
+        ...(config?.reload ? { reload: config.reload } : {}),
+        ...(config?.toolPayload ? { toolPayload: config.toolPayload } : {}),
+        ...(config?.validation ? { validation: config.validation } : {}),
+        ...(config?.git ? { git: config.git } : {}),
+        ...(config?.repositoryReadCache ? { repositoryReadCache: config.repositoryReadCache } : {}),
+        ...(config?.terminal ? { terminal: config.terminal } : {}),
+    });
 }
 
 /**

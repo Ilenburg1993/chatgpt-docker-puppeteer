@@ -9,15 +9,12 @@
  */
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport, McpServer } from '@modelcontextprotocol/server';
-
-import { MCP_TOOL_EXECUTION_LIMITS } from '#copilot/mcp/public/protocol/tools';
-
-const DEFAULT_TOP = 20;
-const DEFAULT_MAX_ENVELOPE_BYTES = MCP_TOOL_EXECUTION_LIMITS.toolsList.maxEnvelopeBytes;
+import { performance } from 'node:perf_hooks';
 
 /**
  * @param {{
  *     tools: import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
+ *     config: import('./config.js').McpToolPayloadAuditConfig;
  *     top?: number;
  *     maxEnvelopeBytes?: number;
  * }} options
@@ -27,14 +24,18 @@ export async function buildToolPayloadAudit(options) {
     if (!Array.isArray(options?.tools)) {
         throw new TypeError('[mcp/tool-payload-audit] options.tools deve conter a superfície canônica de ferramentas.');
     }
-    const top = readPositiveInteger(options.top ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_TOP'], DEFAULT_TOP, 1, 200);
+    if (!options.config) {
+        throw new TypeError('[mcp/tool-payload-audit] options.config deve conter a geração processual do diagnóstico.');
+    }
+    const top = readPositiveInteger(options.top ?? options.config.top, options.config.top, 1, 200);
     const maxEnvelopeBytes = readPositiveInteger(
-        options.maxEnvelopeBytes ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_MAX_BYTES'],
-        DEFAULT_MAX_ENVELOPE_BYTES,
+        options.maxEnvelopeBytes ?? options.config.maxEnvelopeBytes,
+        options.config.maxEnvelopeBytes,
         1024,
         16 * 1024 * 1024,
     );
-    const tools = await listWireMcpTools(options.tools);
+    const wire = await listWireMcpTools(options.tools);
+    const tools = wire.tools;
     const toolRows = tools
         .map((tool) => {
             const totalBytes = jsonBytes(tool);
@@ -126,6 +127,7 @@ export async function buildToolPayloadAudit(options) {
             toolRows.map((row) => row.totalBytes),
             0.95,
         ),
+        timings: wire.timings,
         topTools: toolRows.slice(0, top),
         recommendations: buildRecommendations(totals, totalEnvelopeBytes),
     };
@@ -136,10 +138,15 @@ export async function buildToolPayloadAudit(options) {
  * stays aligned with the SDK's schema conversion, omitted fields, and execution metadata.
  *
  * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
- * @returns {Promise<Awaited<ReturnType<Client['listTools']>>['tools']>}
+ * @returns {Promise<{
+ *   tools: Awaited<ReturnType<Client['listTools']>>['tools'];
+ *   timings: { registerMs:number; connectMs:number; listMs:number; closeMs:number; totalMs:number };
+ * }>}
  */
 async function listWireMcpTools(tools) {
+    const totalStarted = performance.now();
     const server = new McpServer({ name: 'copilot-mcp-tool-payload-audit', version: '1.0.0' });
+    const registerStarted = performance.now();
     for (const tool of tools) {
         server.registerTool(
             tool.name,
@@ -155,14 +162,171 @@ async function listWireMcpTools(tools) {
             async (args) => tool.handler(args),
         );
     }
+    const registerMs = elapsedMs(registerStarted);
     const client = new Client({ name: 'copilot-mcp-tool-payload-audit-client', version: '1.0.0' });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    /** @type {{ tools: Awaited<ReturnType<Client['listTools']>>['tools']; connectMs:number; listMs:number; closeMs?:number } | undefined} */
+    let measurement;
     try {
+        const connectStarted = performance.now();
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
-        return (await client.listTools()).tools;
+        const connectMs = elapsedMs(connectStarted);
+        const listStarted = performance.now();
+        const listedTools = (await client.listTools()).tools;
+        const listMs = elapsedMs(listStarted);
+        measurement = { tools: listedTools, connectMs, listMs };
     } finally {
+        const closeStarted = performance.now();
         await Promise.allSettled([client.close(), server.close()]);
+        if (measurement) measurement.closeMs = elapsedMs(closeStarted);
     }
+    if (!measurement) throw new Error('[mcp/tool-payload-audit] SDK tools/list did not return a descriptor set.');
+    return {
+        tools: measurement.tools,
+        timings: {
+            registerMs,
+            connectMs: measurement.connectMs,
+            listMs: measurement.listMs,
+            closeMs: measurement.closeMs ?? 0,
+            totalMs: elapsedMs(totalStarted),
+        },
+    };
+}
+
+/**
+ * Compare multiple explicit tool surfaces through the same SDK wire path used by buildToolPayloadAudit.
+ *
+ * @param {{
+ *   surfaces: { mode:string; tools: import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[] }[];
+ *   config: import('./config.js').McpToolPayloadAuditConfig;
+ *   samples?: number;
+ *   usageToolStarts?: { tool:string; count:number }[];
+ * }} options
+ */
+export async function buildToolSurfacePayloadComparison(options) {
+    if (!Array.isArray(options?.surfaces) || options.surfaces.length === 0) {
+        throw new TypeError('[mcp/tool-payload-audit] surface comparison requires explicit surfaces.');
+    }
+    const samples = readPositiveInteger(options.samples, 3, 1, 9);
+    const usageToolStarts = normalizeUsageToolStarts(options.usageToolStarts);
+    const rows = [];
+    for (const surface of options.surfaces) {
+        const audits = [];
+        for (let index = 0; index < samples; index += 1) {
+            audits.push(await buildToolPayloadAudit({ tools: surface.tools, config: options.config, top: 1 }));
+        }
+        const representative = audits.at(-1);
+        if (!representative) continue;
+        const timings = audits.map((audit) => /** @type {Record<string, number>} */ (audit['timings']));
+        rows.push({
+            mode: surface.mode,
+            toolCount: representative['toolCount'],
+            totalEnvelopeBytes: representative['totalEnvelopeBytes'],
+            averageToolBytes: representative['averageToolBytes'],
+            p95ToolBytes: representative['p95ToolBytes'],
+            timingsMs: {
+                listP50: percentile(
+                    timings.map((row) => row['listMs'] ?? 0),
+                    0.5,
+                ),
+                listP95: percentile(
+                    timings.map((row) => row['listMs'] ?? 0),
+                    0.95,
+                ),
+                totalP50: percentile(
+                    timings.map((row) => row['totalMs'] ?? 0),
+                    0.5,
+                ),
+                totalP95: percentile(
+                    timings.map((row) => row['totalMs'] ?? 0),
+                    0.95,
+                ),
+            },
+            usage: measureSurfaceUsageCoverage(surface.tools, usageToolStarts),
+        });
+    }
+    const full = rows.find((row) => row.mode === 'full') ?? rows[0];
+    if (!full) throw new Error('[mcp/tool-payload-audit] surface comparison produced no rows.');
+    const fullBytes = Number(full.totalEnvelopeBytes ?? 0);
+    const fullTools = Number(full.toolCount ?? 0);
+    const ranked = rows.map((row) => {
+        const bytes = Number(row.totalEnvelopeBytes ?? 0);
+        const toolCount = Number(row.toolCount ?? 0);
+        return {
+            ...row,
+            versusFull: {
+                toolReduction: Math.max(0, fullTools - toolCount),
+                toolReductionPercent: ratioPercent(Math.max(0, fullTools - toolCount), fullTools),
+                envelopeSavingsBytes: Math.max(0, fullBytes - bytes),
+                envelopeSavingsPercent: ratioPercent(Math.max(0, fullBytes - bytes), fullBytes),
+            },
+        };
+    });
+    const highCoverage = ranked
+        .filter((row) => Number(row.usage.weightedCoverage ?? 0) >= 0.98 && row.mode !== 'full')
+        .sort(
+            (left, right) =>
+                Number(right.versusFull.envelopeSavingsBytes) - Number(left.versusFull.envelopeSavingsBytes),
+        );
+    return {
+        ok: true,
+        measurement: 'sdk-in-memory-tools/list-surface-matrix',
+        samplesPerSurface: samples,
+        usageSample: {
+            available: usageToolStarts.length > 0,
+            totalObservedCalls: usageToolStarts.reduce((sum, row) => sum + row.count, 0),
+            distinctObservedTools: usageToolStarts.length,
+        },
+        fullReference: { toolCount: fullTools, totalEnvelopeBytes: fullBytes },
+        surfaces: ranked,
+        evidence: {
+            highCoverageReducedModes: highCoverage.map((row) => row.mode),
+            defaultChangeRecommended: false,
+            reason:
+                highCoverage.length > 0
+                    ? 'Reduced surfaces show local SDK/payload benefit with observed-usage coverage; a real host A/B is still required before changing the default surface.'
+                    : 'No reduced surface reaches 98% observed-call coverage; keep full until the surface policy is improved and host A/B evidence exists.',
+        },
+    };
+}
+
+/** @param {number} started */
+function elapsedMs(started) {
+    return Math.round((performance.now() - started) * 1000) / 1000;
+}
+
+/** @param {{ tool:string; count:number }[] | undefined} rows */
+function normalizeUsageToolStarts(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows
+        .map((row) => ({ tool: String(row?.tool ?? '').trim(), count: Number(row?.count ?? 0) }))
+        .filter((row) => row.tool.length > 0 && Number.isSafeInteger(row.count) && row.count > 0)
+        .slice(0, 500);
+}
+
+/**
+ * @param {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} tools
+ * @param {{ tool:string; count:number }[]} usage
+ */
+function measureSurfaceUsageCoverage(tools, usage) {
+    const names = new Set(tools.map((tool) => tool.name));
+    const totalObservedCalls = usage.reduce((sum, row) => sum + row.count, 0);
+    const missing = usage.filter((row) => !names.has(row.tool)).sort((left, right) => right.count - left.count);
+    const missingCalls = missing.reduce((sum, row) => sum + row.count, 0);
+    const coveredCalls = Math.max(0, totalObservedCalls - missingCalls);
+    return {
+        available: usage.length > 0,
+        totalObservedCalls,
+        coveredCalls,
+        weightedCoverage: totalObservedCalls > 0 ? coveredCalls / totalObservedCalls : null,
+        missingObservedToolCount: missing.length,
+        topMissingObservedTools: missing.slice(0, 8),
+    };
+}
+
+/** @param {number} numerator @param {number} denominator */
+function ratioPercent(numerator, denominator) {
+    return denominator > 0 ? Math.round((numerator / denominator) * 10_000) / 100 : 0;
 }
 
 /**

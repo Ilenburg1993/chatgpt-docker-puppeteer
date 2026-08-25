@@ -1,0 +1,566 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "unknownTopLevelMutableState": "reject",
+    "staleEntries": "reject",
+    "migrationTargetRatchet": "exact",
+    "staticLookupCollections": "prefer-immutable-data"
+  },
+  "entries": [
+    {
+      "path": "src/copilot/mcp/transport/http/stateful/router.js",
+      "ownerId": "mcp.transport",
+      "scope": "transport-identity",
+      "lifecycle": "weak-identity-cache",
+      "boundedness": "weak-keyed",
+      "bound": "WeakMap transport identity / GC",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "statefulTransportEventStores",
+          "kind": "const",
+          "collection": "WeakMap"
+        }
+      ],
+      "rationale": "Event stores are attached weakly to stateful transport identities."
+    },
+    {
+      "path": "src/copilot/mcp/auth/resource-server/decision-cache.js",
+      "ownerId": "mcp.auth",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "bounded",
+      "bound": "TTL/max-entry auth decision policy",
+      "resetOrDispose": "resetMcpAuthDecisionCache",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "cache",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Authorization decisions are an explicitly resettable bounded process cache."
+    },
+    {
+      "path": "src/copilot/mcp/auth/runtime/jwks-warmup.js",
+      "ownerId": "mcp.auth",
+      "scope": "process-generation",
+      "lifecycle": "timer-service",
+      "boundedness": "single-value",
+      "bound": "generation token + stop/reset",
+      "resetOrDispose": "stopMcpAuthJwksWarmup",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "warmupTimer",
+          "kind": "let"
+        },
+        {
+          "name": "warmupRunPromise",
+          "kind": "let"
+        },
+        {
+          "name": "warmupGeneration",
+          "kind": "let"
+        },
+        {
+          "name": "warmupState",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Warmup is a single generation-owned timer/promise/state service with explicit stop semantics."
+    },
+    {
+      "path": "src/copilot/mcp/cli.js",
+      "ownerId": "mcp",
+      "scope": "process",
+      "lifecycle": "singleton-runtime",
+      "boundedness": "single-value",
+      "bound": "single lazy logger binding",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "cachedLogMcp",
+          "kind": "let"
+        }
+      ],
+      "rationale": "CLI entrypoint caches one logger import for process lifetime."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/environment-authority.js",
+      "ownerId": "mcp.cloudflare",
+      "scope": "config-identity",
+      "lifecycle": "weak-identity-cache",
+      "boundedness": "weak-keyed",
+      "bound": "WeakMap authority identity / GC",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "authorityStates",
+          "kind": "const",
+          "collection": "WeakMap"
+        }
+      ],
+      "rationale": "Opaque Cloudflare authorities keep private state weakly keyed by authority identity."
+    },
+    {
+      "path": "src/copilot/mcp/cloudflare/remote/remote-api.js",
+      "ownerId": "mcp.cloudflare.remote",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "bounded",
+      "bound": "LRU-style max 4 clients",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "cloudflareClientCache",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Cloudflare API clients are cached with a hard four-entry eviction ceiling."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/latency/openai/monitor.js",
+      "ownerId": "mcp.diagnostics.latency",
+      "scope": "process-generation",
+      "lifecycle": "timer-service",
+      "boundedness": "single-value",
+      "bound": "generation token + stop/reset",
+      "resetOrDispose": "stopOpenAiEndpointLatencyMonitor",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "monitorTimer",
+          "kind": "let"
+        },
+        {
+          "name": "monitorCyclePromise",
+          "kind": "let"
+        },
+        {
+          "name": "monitorGeneration",
+          "kind": "let"
+        },
+        {
+          "name": "monitorState",
+          "kind": "let"
+        }
+      ],
+      "rationale": "OpenAI latency monitor is a single generation-owned service with explicit stop/reset."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/latency/round-trip/monitor.js",
+      "ownerId": "mcp.diagnostics.latency.round-trip",
+      "scope": "process-generation",
+      "lifecycle": "timer-service",
+      "boundedness": "single-value",
+      "bound": "generation token + stop/reset",
+      "resetOrDispose": "stopMcpRoundTripAnalyticsMonitor",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "monitorTimer",
+          "kind": "let"
+        },
+        {
+          "name": "monitorCyclePromise",
+          "kind": "let"
+        },
+        {
+          "name": "monitorGeneration",
+          "kind": "let"
+        },
+        {
+          "name": "monitorState",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Round-trip monitor is a single generation-owned service with explicit stop/reset."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/runtime-health/runtime.js",
+      "ownerId": "mcp.diagnostics.runtime-health",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "single-value",
+      "bound": "single TTL workspace-status snapshot",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "cachedWorkspaceStatus",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Runtime health keeps only the latest bounded workspace status snapshot."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/runtime-source-drift/runtime.js",
+      "ownerId": "mcp.diagnostics",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "single-value",
+      "bound": "single TTL source-drift snapshot",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "cached",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Source-drift diagnostic keeps a single cached snapshot."
+    },
+    {
+      "path": "src/copilot/mcp/diagnostics/workspace-smoke/state.js",
+      "ownerId": "mcp.diagnostics",
+      "scope": "process",
+      "lifecycle": "last-value",
+      "boundedness": "single-value",
+      "bound": "latest smoke summary only",
+      "resetOrDispose": "resetMcpWorkspaceSmokeSummaryForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "lastWorkspaceSmokeSummary",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Only the most recent workspace-smoke summary is retained."
+    },
+    {
+      "path": "src/copilot/mcp/indexing/auto-build/runtime.js",
+      "ownerId": "mcp.indexing.auto-build",
+      "scope": "process-generation",
+      "lifecycle": "registry",
+      "boundedness": "bounded",
+      "bound": "hard max 8 retained generation states; settled in-flight promises are removed",
+      "resetOrDispose": "resetMcpIndexAutoBuildStateForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "autoBuildStates",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "autoBuildPromises",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Auto-build retains at most eight diagnostic generation states; active promises drain on settle and process-host owns cancellation."
+    },
+    {
+      "path": "src/copilot/mcp/indexing/repository/orphan-imports.js",
+      "ownerId": "mcp.indexing.repository",
+      "scope": "workspace",
+      "lifecycle": "bounded-cache",
+      "boundedness": "single-value",
+      "bound": "single workspace-root TTL snapshot",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "packageImportEntriesPromise",
+          "kind": "let"
+        },
+        {
+          "name": "packageImportEntriesExpiresAtMs",
+          "kind": "let"
+        },
+        {
+          "name": "packageImportEntriesWorkspaceRoot",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Package import metadata is one TTL-cached workspace snapshot."
+    },
+    {
+      "path": "src/copilot/mcp/integrations/model-gateway/live-runs/readiness.js",
+      "ownerId": "mcp.integrations.model-gateway.live-runs",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "bounded",
+      "bound": "TTL + max 8 completed entries; inflight removed on settle",
+      "resetOrDispose": "resetModelGatewayLiveReadinessCacheForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "liveReadinessCache",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "liveReadinessInFlight",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Readiness result cache is TTL/size bounded and inflight entries drain on completion."
+    },
+    {
+      "path": "src/copilot/mcp/observability/metrics/runtime.js",
+      "ownerId": "mcp.observability",
+      "scope": "process",
+      "lifecycle": "registry",
+      "boundedness": "externally-bounded",
+      "bound": "bounded by finite registered tool names",
+      "resetOrDispose": "resetMcpMetricsForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "TOOL_METRICS",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Metrics map cardinality is bounded by the governed tool surface."
+    },
+    {
+      "path": "src/copilot/mcp/process/host/runtime.js",
+      "ownerId": "mcp.process",
+      "scope": "process",
+      "lifecycle": "counter",
+      "boundedness": "single-value",
+      "bound": "monotonic process-local host sequence",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "hostSequence",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Sequence only generates distinct process-host identities."
+    },
+    {
+      "path": "src/copilot/mcp/process/terminal/runtime.js",
+      "ownerId": "mcp.process",
+      "scope": "process",
+      "lifecycle": "session-manager",
+      "boundedness": "bounded",
+      "bound": "max 128 sessions + closed-session pruning",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "sessions",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "nodePtyModule",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Terminal session registry is hard-bounded and physically pruned; node-pty is one lazy module binding."
+    },
+    {
+      "path": "src/copilot/mcp/registry/runtime.js",
+      "ownerId": "mcp.registry",
+      "scope": "process",
+      "lifecycle": "registry",
+      "boundedness": "bounded",
+      "bound": "weak runtime context + max 4096 invocation budgets + finite catalog",
+      "resetOrDispose": "resetCanonicalMcpToolsCacheForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "TOOL_RUNTIME_CONTEXT_CACHE",
+          "kind": "const",
+          "collection": "WeakMap"
+        },
+        {
+          "name": "canonicalMcpToolsCache",
+          "kind": "let"
+        },
+        {
+          "name": "canonicalMcpToolsCacheKey",
+          "kind": "let"
+        },
+        {
+          "name": "canonicalMcpToolSurfaceState",
+          "kind": "let"
+        },
+        {
+          "name": "canonicalMcpRegistryState",
+          "kind": "let"
+        },
+        {
+          "name": "toolInvocationBudgets",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Registry state is bounded by tool surface, weak identities and explicit invocation-budget ceiling."
+    },
+    {
+      "path": "src/copilot/mcp/runtime/startup-maintenance/runtime.js",
+      "ownerId": "mcp.runtime",
+      "scope": "process-generation",
+      "lifecycle": "timer-service",
+      "boundedness": "single-value",
+      "bound": "generation token + stop/reset",
+      "resetOrDispose": "stopMcpStartupMaintenance",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "startupTimer",
+          "kind": "let"
+        },
+        {
+          "name": "startupRunPromise",
+          "kind": "let"
+        },
+        {
+          "name": "startupGeneration",
+          "kind": "let"
+        },
+        {
+          "name": "startupState",
+          "kind": "let"
+        }
+      ],
+      "rationale": "Startup maintenance is a single generation-owned timer/promise/state service."
+    },
+    {
+      "path": "src/copilot/mcp/server/runtime.js",
+      "ownerId": "mcp.server",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "bounded",
+      "bound": "hard max 64 logged factory profile keys with oldest-entry eviction",
+      "resetOrDispose": "resetCopilotMcpServerFactoryRuntimeForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "loggedFactoryProfileKeys",
+          "kind": "const",
+          "collection": "Set"
+        }
+      ],
+      "rationale": "Server log-once profile identities are process-local and hard-bounded to 64 entries with deterministic oldest-entry eviction."
+    },
+    {
+      "path": "src/copilot/mcp/company-knowledge/runtime.js",
+      "ownerId": "mcp.company-knowledge",
+      "scope": "workspace",
+      "lifecycle": "weak-identity-cache",
+      "boundedness": "weak-keyed",
+      "bound": "WeakMap workspace identity / GC",
+      "resetOrDispose": "resetCompanyKnowledgeCorpusCacheForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "corpusCacheByWorkspace",
+          "kind": "let",
+          "collection": "WeakMap"
+        }
+      ],
+      "rationale": "Corpus cache is weakly keyed by workspace capability and immutable Company Knowledge config generation identity."
+    },
+    {
+      "path": "src/copilot/mcp/tools/repo-working-set.js",
+      "ownerId": "mcp.tools",
+      "scope": "process",
+      "lifecycle": "session-manager",
+      "boundedness": "bounded",
+      "bound": "max 8 owned working sets + TTL/close eviction",
+      "resetOrDispose": "resetMcpWorkingSetsForTest",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "mcpWorkingSets",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Working-set handles have hard count ceiling and explicit close/reset semantics."
+    },
+    {
+      "path": "src/copilot/mcp/tools/tools-status.js",
+      "ownerId": "mcp.tools",
+      "scope": "config-identity",
+      "lifecycle": "weak-identity-cache",
+      "boundedness": "weak-keyed",
+      "bound": "WeakMap keyed by immutable tool-payload config identity / GC",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "wirePayloadSummaryByConfig",
+          "kind": "const",
+          "collection": "WeakMap"
+        }
+      ],
+      "rationale": "Compact payload summaries are weakly keyed by immutable process-config identity; the normalized tool surface arrives request-locally through OperationContext."
+    },
+    {
+      "path": "src/copilot/mcp/validation/jobs/runtime.js",
+      "ownerId": "mcp.validation",
+      "scope": "process",
+      "lifecycle": "job-manager",
+      "boundedness": "bounded",
+      "bound": "max 200 completed records; one active validator; IO queues removed on settle",
+      "resetOrDispose": null,
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "validatorSpawnReserved",
+          "kind": "let"
+        },
+        {
+          "name": "JOBS",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "JOB_IO_QUEUES",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Validation jobs are explicitly bounded and IO serialization queues are removed when settled."
+    },
+    {
+      "path": "src/copilot/mcp/workspace/repository/read-cache/runtime.js",
+      "ownerId": "mcp.workspace.repository.read-cache",
+      "scope": "process",
+      "lifecycle": "bounded-cache",
+      "boundedness": "bounded",
+      "bound": "max 128 entries + byte budget; inflight removed on settle",
+      "resetOrDispose": "resetRepoReadResponseCacheForTest",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "repoReadFileResultCache",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "repoReadFileChunkCache",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "repoReadFileInflight",
+          "kind": "const",
+          "collection": "Map"
+        },
+        {
+          "name": "repoReadFileChunkInflight",
+          "kind": "const",
+          "collection": "Map"
+        }
+      ],
+      "rationale": "Repository response caches have entry/byte ceilings and inflight deduplication is drained."
+    }
+  ]
+}

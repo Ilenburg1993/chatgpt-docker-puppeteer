@@ -6,20 +6,14 @@
  */
 
 import { runMcpWorkspaceSmoke } from '#copilot/mcp/public/diagnostics/workspace-smoke';
-import {
-    buildAiArtifactsReport,
-    cleanupAiArtifacts,
-    inspectRootDependencyUpdates,
-    upgradeRootDependenciesToLatest,
-} from '#copilot/mcp/public/maintenance';
+import { inspectRootDependencyUpdates, upgradeRootDependenciesToLatest } from '#copilot/mcp/public/maintenance';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
-    boundedWriteAnnotations,
-    destructiveAnnotations,
     okResult,
-    openWorldBoundedWriteAnnotations,
-    openWorldReadOnlyAnnotations,
-    readOnlyAnnotations,
+    requireMcpToolAiArtifactsCapability,
+    requireMcpToolCloudflareConfig,
+    requireMcpToolGitConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
@@ -38,12 +32,13 @@ const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-repo
 
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['indexRegistry']} indexRegistry
+ * @param {ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>} aiArtifacts
  * @returns {Promise<Record<string, unknown>[]>}
  */
-async function buildMaintenancePlanItems(indexRegistry) {
+async function buildMaintenancePlanItems(indexRegistry, aiArtifacts) {
     const indexStats = indexRegistry.status();
     const metrics = readMcpMetricsSnapshot();
-    const aiArtifactsReport = await buildAiArtifactsReport();
+    const aiArtifactsReport = await aiArtifacts.buildReport();
     return [
         {
             fix: 'workspace-status',
@@ -103,10 +98,10 @@ function normalizeFixes(fixes) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const maintenanceTools = [
-    {
+    defineMcpRawTool({
         name: 'mcp_dependency_outdated',
         title: 'Audit root dependency updates',
         description:
@@ -120,17 +115,17 @@ export const maintenanceTools = [
                 .optional()
                 ['describe']('Fixed audit timeout. Default: 180000ms.'),
         },
-        annotations: openWorldReadOnlyAnnotations(),
-        handler: async ({ timeoutMs } = {}, operationContext) =>
+
+        handler: async ({ timeoutMs }, operationContext) =>
             okResult(
                 await inspectRootDependencyUpdates({
                     workspace: requireMcpToolWorkspace(operationContext),
-                    timeoutMs,
+                    ...(timeoutMs === undefined ? {} : { timeoutMs }),
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_dependency_upgrade',
         title: 'Upgrade root dependencies to latest',
         description:
@@ -149,7 +144,7 @@ export const maintenanceTools = [
                 .optional()
                 ['describe']('Per-step timeout. Default: 900000ms.'),
         },
-        annotations: openWorldBoundedWriteAnnotations(),
+
         handler: async ({ confirmUpgrade, install, timeoutMs }, operationContext) => {
             if (confirmUpgrade !== true) {
                 return okResult({
@@ -161,14 +156,14 @@ export const maintenanceTools = [
             return okResult(
                 await upgradeRootDependenciesToLatest({
                     workspace: requireMcpToolWorkspace(operationContext),
-                    install,
-                    timeoutMs,
+                    ...(install === undefined ? {} : { install }),
+                    ...(timeoutMs === undefined ? {} : { timeoutMs }),
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
             );
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_cleanup_ai_artifacts',
         title: 'Cleanup MCP AI artifacts',
         description:
@@ -196,36 +191,39 @@ export const maintenanceTools = [
                     'Purge strict rollback sidecars/pending files only when automatic rollback is disabled. Default: false.',
                 ),
         },
-        annotations: destructiveAnnotations(),
-        handler: async ({ dryRun, retainNewest, maxDeleteCount, purgeDisabledRollback } = {}) =>
+
+        handler: async ({ dryRun, retainNewest, maxDeleteCount, purgeDisabledRollback }, operationContext) =>
             okResult(
-                await cleanupAiArtifacts({
-                    dryRun,
-                    retainNewest,
-                    maxDeleteCount,
-                    purgeDisabledRollback,
+                await requireMcpToolAiArtifactsCapability(operationContext).cleanup({
+                    ...(dryRun === undefined ? {} : { dryRun }),
+                    ...(retainNewest === undefined ? {} : { retainNewest }),
+                    ...(maxDeleteCount === undefined ? {} : { maxDeleteCount }),
+                    ...(purgeDisabledRollback === undefined ? {} : { purgeDisabledRollback }),
                 }),
             ),
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_maintenance_plan',
         title: 'MCP maintenance plan',
         description:
             'Return the safe batched maintenance actions available for this MCP server, with risk and default behavior.',
         inputSchema: {},
-        annotations: readOnlyAnnotations(),
+
         handler: async (_args, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             return okResult({
                 success: true,
                 defaultDryRun: true,
                 defaultFixes: [...DEFAULT_FIXES],
-                items: await buildMaintenancePlanItems(workspace.indexRegistry),
+                items: await buildMaintenancePlanItems(
+                    workspace.indexRegistry,
+                    requireMcpToolAiArtifactsCapability(operationContext),
+                ),
                 note: 'Use mcp_maintenance_apply_safe_fixes with dryRun=true first. No arbitrary shell or arbitrary paths are accepted.',
             });
         },
-    },
-    {
+    }),
+    defineMcpRawTool({
         name: 'mcp_maintenance_apply_safe_fixes',
         title: 'Apply safe MCP maintenance fixes',
         description:
@@ -237,7 +235,7 @@ export const maintenanceTools = [
                 ['describe']('Allowlisted maintenance fixes. Default: safe reads.'),
             dryRun: z.boolean().optional()['describe']('Plan without mutation. Default: true.'),
         },
-        annotations: boundedWriteAnnotations(),
+
         handler: async ({ fixes, dryRun }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const readIoIndexStatus = workspace.indexRegistry.status;
@@ -249,7 +247,11 @@ export const maintenanceTools = [
 
             for (const fix of selectedFixes) {
                 if (fix === 'workspace-status') {
-                    const status = await readRepositoryStatus({ workspaceRoot: workspace.workspaceRoot });
+                    const status = await readRepositoryStatus({
+                        workspaceRoot: workspace.workspaceRoot,
+                        gitConfig: requireMcpToolGitConfig(operationContext),
+                        ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                    });
                     results.push({
                         fix,
                         dryRun: isDryRun,
@@ -275,7 +277,7 @@ export const maintenanceTools = [
                         fix,
                         dryRun: isDryRun,
                         success: true,
-                        report: await buildAiArtifactsReport(),
+                        report: await requireMcpToolAiArtifactsCapability(operationContext).buildReport(),
                     });
                     continue;
                 }
@@ -288,7 +290,14 @@ export const maintenanceTools = [
                             plannedTool: 'mcp_smoke_workspace',
                         });
                     } else {
-                        const smoke = await runMcpWorkspaceSmoke(workspace);
+                        const smoke = await runMcpWorkspaceSmoke(
+                            workspace,
+                            requireMcpToolCloudflareConfig(operationContext),
+                            {
+                                gitConfig: requireMcpToolGitConfig(operationContext),
+                                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                            },
+                        );
                         results.push({
                             fix,
                             dryRun: false,
@@ -346,5 +355,5 @@ export const maintenanceTools = [
                 metrics: readMcpMetricsSnapshot().totals,
             });
         },
-    },
+    }),
 ];

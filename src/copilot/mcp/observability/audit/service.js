@@ -7,50 +7,90 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createJsonlBatchQueue } from '#copilot/infra/public/persistence/jsonl/queue';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { MCP_AUDIT_PROCESS_CONFIG_KIND } from './config.js';
 
-const MCP_AUDIT_DIR = fileURLToPath(new URL('../../../.ai/audit/', import.meta.url));
 const MAX_AUDIT_QUEUE_LINES = 10_000;
 const DEFAULT_AUDIT_HISTORY_TAIL_BYTES = 4 * 1024 * 1024;
 const MAX_AUDIT_HISTORY_TAIL_BYTES = 16 * 1024 * 1024;
 const DEFAULT_AUDIT_HISTORY_EVENTS = 25_000;
 const MAX_AUDIT_HISTORY_EVENTS = 100_000;
+const MCP_COMPATIBILITY_OBSERVATION_EVENT = 'mcp_compat_observation';
+const MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION = 1;
+const COMPATIBILITY_PROTOCOL_ERAS = Object.freeze(['2025', '2026']);
+const COMPATIBILITY_TRANSPORT_MODES = Object.freeze(['modern-2026', 'stateful', 'stateless-fallback']);
+const COMPATIBILITY_RPC_CLASSES = Object.freeze([
+    'server-discover',
+    'subscriptions-listen',
+    'initialize',
+    'tools-list',
+    'tools-call',
+    'other',
+    'none',
+]);
+const COMPATIBILITY_CLIENT_SOURCES = Object.freeze(['cimd', 'dcr', 'unknown']);
+const COMPATIBILITY_HOST_CLASSES = Object.freeze(['chatgpt', 'claude', 'unknown']);
+const COMPATIBILITY_CLIENT_RESOLUTIONS = Object.freeze([
+    'metadata-document',
+    'trusted-fallback',
+    'dynamic-registration',
+]);
+const COMPATIBILITY_GRANT_TYPES = Object.freeze(['authorization_code', 'refresh_token']);
+const COMPATIBILITY_OUTCOMES = Object.freeze(['attempted', 'succeeded', 'rejected']);
+const COMPATIBILITY_CONTINUITY_SIGNALS = Object.freeze(['none', 'stream-open', 'stream-resume']);
 
-let auditBeforeExitHookInstalled = false;
-
-// Audit-file identity is a bootstrap decision. Reads and writes must never retarget themselves because process.env was
-// mutated after the audit subsystem was initialized.
-const MCP_AUDIT_FILE = path.resolve(
-    process.env['COPILOT_MCP_AUDIT_FILE'] ?? path.join(MCP_AUDIT_DIR, 'mcp-tool-calls.jsonl'),
-);
-const MCP_AUDIT_FS = createConfiguredFsIo(
-    createConfiguredFsGrant({
-        id: 'mcp.observability.audit',
-        exactPaths: [MCP_AUDIT_FILE],
-        operations: ['append', 'read'],
-        symlinkPolicy: 'deny',
-        durability: ['file-and-directory', 'none'],
-    }),
-);
-
-/** Testing-visible bootstrap identity; runtime callers should use the audit APIs rather than the file path. */
-export function getMcpAuditFileForTests() {
-    return MCP_AUDIT_FILE;
+/** @param {import('./config.js').McpAuditProcessConfig} config */
+function createMcpAuditRuntime(config) {
+    const auditFs = createConfiguredFsIo(
+        createConfiguredFsGrant({
+            id: 'mcp.observability.audit',
+            exactPaths: [config.filePath],
+            operations: ['append', 'read'],
+            symlinkPolicy: 'deny',
+            durability: ['file-and-directory', 'none'],
+        }),
+    );
+    const writer = createJsonlBatchQueue({
+        persistBatch: async (data) => {
+            await auditFs.appendText(config.filePath, data, { mode: 0o600, durability: 'none' });
+        },
+        maxQueueLines: MAX_AUDIT_QUEUE_LINES,
+        softQueueLines: MAX_AUDIT_QUEUE_LINES - 1,
+        onError: (error) => {
+            logMcp('WARN', 'Failed to append MCP audit event batch.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        },
+    });
+    return Object.freeze({ config, auditFs, writer });
 }
+/** @typedef {ReturnType<typeof createMcpAuditRuntime>} McpAuditRuntime */
 
-const mcpAuditWriter = createJsonlBatchQueue({
-    persistBatch: async (data) => {
-        await MCP_AUDIT_FS.appendText(MCP_AUDIT_FILE, data, { mode: 0o600, durability: 'none' });
-    },
-    maxQueueLines: MAX_AUDIT_QUEUE_LINES,
-    softQueueLines: MAX_AUDIT_QUEUE_LINES - 1,
-    onError: (error) => {
-        logMcp('WARN', 'Failed to append MCP audit event batch.', {
-            error: error instanceof Error ? error.message : String(error),
-        });
-    },
-});
+/**
+ * Create one audit capability bound to one immutable process-config generation. Queue, filesystem authority and writer
+ * lifecycle are private to this capability; process composition owns the capability and flushes it during teardown.
+ *
+ * @param {import('./config.js').McpAuditProcessConfig} config
+ */
+export function createMcpAuditCapability(config) {
+    if (!config || config.kind !== MCP_AUDIT_PROCESS_CONFIG_KIND) {
+        throw new TypeError('MCP audit capability requires a normalized process configuration.');
+    }
+    const runtime = createMcpAuditRuntime(config);
+    return Object.freeze({
+        config,
+        filePath: config.filePath,
+        append: (/** @type {Record<string, unknown>} */ event) => appendMcpAuditEvent(runtime, event),
+        recordCompatibility: (/** @type {Record<string, unknown>} */ observation) =>
+            appendMcpCompatibilityObservation(runtime, observation),
+        readCompatibilitySummary: (/** @type {{ tailBytes?: number; maxEvents?: number }} */ options = {}) =>
+            readMcpCompatibilitySummary(runtime, options),
+        readTail: (/** @type {{ tailBytes?: number; maxEvents?: number }} */ options = {}) =>
+            readMcpAuditEventTail(runtime, options),
+        readSlice: (/** @type {{ offset?: number; maxBytes?: number; maxEvents?: number }} */ options = {}) =>
+            readMcpAuditEventSlice(runtime, options),
+        flush: () => flushMcpAuditEvents(runtime),
+    });
+}
 
 /**
  * @param {'DEBUG' | 'INFO' | 'WARN' | 'ERROR'} level
@@ -70,29 +110,27 @@ export function logMcp(level, message, fields) {
 }
 
 /**
+ * @param {McpAuditRuntime} runtime
  * @param {Record<string, unknown>} event
  * @returns {Promise<void>}
  */
-export async function appendMcpAuditEvent(event) {
-    if (process.env['COPILOT_MCP_AUDIT_DISABLED'] === 'true') return;
+async function appendMcpAuditEvent(runtime, event) {
+    if (runtime.config.disabled) return;
     const payload = {
         ts: new Date().toISOString(),
         component: 'copilot-mcp',
         ...event,
     };
     const line = `${JSON.stringify(payload)}\n`;
-    mcpAuditWriter.enqueueLine(line);
-    installBeforeExitFlushHook();
-    if (process.env['COPILOT_MCP_AUDIT_SYNC'] === 'true') {
-        await mcpAuditWriter.flush();
-        return;
-    }
+    runtime.writer.enqueueLine(line);
+    if (runtime.config.sync) await runtime.writer.flush();
 }
 
 /**
  * Read a bounded tail of persisted MCP audit events for longitudinal diagnostics. This never exposes credentials and
  * never accepts a caller-controlled path.
  *
+ * @param {McpAuditRuntime} runtime
  * @param {{ tailBytes?: number; maxEvents?: number }} [options]
  * @returns {Promise<{
  *     ok: boolean;
@@ -105,7 +143,7 @@ export async function appendMcpAuditEvent(event) {
  *     error: string | null;
  * }>}
  */
-export async function readMcpAuditEventTail(options = {}) {
+async function readMcpAuditEventTail(runtime, options = {}) {
     const tailBytes = boundedInteger(
         options.tailBytes,
         DEFAULT_AUDIT_HISTORY_TAIL_BYTES,
@@ -113,10 +151,10 @@ export async function readMcpAuditEventTail(options = {}) {
         MAX_AUDIT_HISTORY_TAIL_BYTES,
     );
     const maxEvents = boundedInteger(options.maxEvents, DEFAULT_AUDIT_HISTORY_EVENTS, 100, MAX_AUDIT_HISTORY_EVENTS);
-    const auditFile = MCP_AUDIT_FILE;
+    const auditFile = runtime.config.filePath;
     try {
-        await mcpAuditWriter.flush();
-        const snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
+        await runtime.writer.flush();
+        const snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
             maxBytes: tailBytes,
             fromEnd: true,
             rejectSymlink: true,
@@ -198,23 +236,24 @@ export async function readMcpAuditEventTail(options = {}) {
  * immediately after the last complete newline, so callers can checkpoint it without reparsing or skipping a partial
  * JSON line. The file identity lets derived indexes detect rotation/replacement.
  *
+ * @param {McpAuditRuntime} runtime
  * @param {{ offset?: number; maxBytes?: number; maxEvents?: number }} [options]
  */
-export async function readMcpAuditEventSlice(options = {}) {
+async function readMcpAuditEventSlice(runtime, options = {}) {
     const requestedOffset = Math.max(0, Math.floor(Number(options.offset ?? 0) || 0));
     const maxBytes = boundedInteger(options.maxBytes, 4 * 1024 * 1024, 64 * 1024, 16 * 1024 * 1024);
     const maxEvents = boundedInteger(options.maxEvents, 50_000, 100, 200_000);
-    const auditFile = MCP_AUDIT_FILE;
+    const auditFile = runtime.config.filePath;
     try {
-        await mcpAuditWriter.flush();
-        let snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
+        await runtime.writer.flush();
+        let snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
             start: requestedOffset,
             maxBytes,
             rejectSymlink: true,
         });
         const resetRequired = requestedOffset > snapshot.sizeBytes;
         if (resetRequired) {
-            snapshot = await MCP_AUDIT_FS.readBytesRangeFresh(auditFile, {
+            snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
                 start: 0,
                 maxBytes,
                 rejectSymlink: true,
@@ -330,12 +369,211 @@ export async function readMcpAuditEventSlice(options = {}) {
 }
 
 /**
- * Flush all queued MCP audit events and wait for prior persistence.
+ * Persist one privacy-bounded compatibility observation. The caller may pass an object with additional properties, but
+ * only the fixed enum projection below is serialized. Client identifiers, redirect URIs, subjects, IPs, raw headers,
+ * user agents, tokens and free-form errors therefore cannot cross this API by accident.
  *
+ * @param {McpAuditRuntime} runtime
+ * @param {Record<string, unknown>} observation
  * @returns {Promise<void>}
  */
-export async function flushMcpAuditEvents() {
-    await mcpAuditWriter.flush();
+async function appendMcpCompatibilityObservation(runtime, observation) {
+    await appendMcpAuditEvent(runtime, normalizeMcpCompatibilityObservation(observation));
+}
+
+/**
+ * @param {Record<string, unknown>} observation
+ * @returns {Record<string, unknown>}
+ */
+function normalizeMcpCompatibilityObservation(observation) {
+    const kind = String(observation['kind'] ?? '');
+    if (kind === 'protocol-request') {
+        return {
+            event: MCP_COMPATIBILITY_OBSERVATION_EVENT,
+            schemaVersion: MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION,
+            kind,
+            protocolEra: requireCompatibilityEnum(
+                observation['protocolEra'],
+                COMPATIBILITY_PROTOCOL_ERAS,
+                'protocolEra',
+            ),
+            transportMode: requireCompatibilityEnum(
+                observation['transportMode'],
+                COMPATIBILITY_TRANSPORT_MODES,
+                'transportMode',
+            ),
+            rpcClass: requireCompatibilityEnum(observation['rpcClass'], COMPATIBILITY_RPC_CLASSES, 'rpcClass'),
+            continuity: requireCompatibilityEnum(
+                observation['continuity'],
+                COMPATIBILITY_CONTINUITY_SIGNALS,
+                'continuity',
+            ),
+        };
+    }
+    if (kind === 'oauth-client') {
+        return {
+            event: MCP_COMPATIBILITY_OBSERVATION_EVENT,
+            schemaVersion: MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION,
+            kind,
+            clientSource: requireCompatibilityEnum(
+                observation['clientSource'],
+                COMPATIBILITY_CLIENT_SOURCES,
+                'clientSource',
+            ),
+            hostClass: requireCompatibilityEnum(observation['hostClass'], COMPATIBILITY_HOST_CLASSES, 'hostClass'),
+            resolution: requireCompatibilityEnum(
+                observation['resolution'],
+                COMPATIBILITY_CLIENT_RESOLUTIONS,
+                'resolution',
+            ),
+            outcome: requireCompatibilityEnum(observation['outcome'], COMPATIBILITY_OUTCOMES, 'outcome'),
+        };
+    }
+    if (kind === 'oauth-grant') {
+        return {
+            event: MCP_COMPATIBILITY_OBSERVATION_EVENT,
+            schemaVersion: MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION,
+            kind,
+            grantType: requireCompatibilityEnum(observation['grantType'], COMPATIBILITY_GRANT_TYPES, 'grantType'),
+            clientSource: requireCompatibilityEnum(
+                observation['clientSource'],
+                COMPATIBILITY_CLIENT_SOURCES,
+                'clientSource',
+            ),
+            hostClass: requireCompatibilityEnum(observation['hostClass'], COMPATIBILITY_HOST_CLASSES, 'hostClass'),
+            outcome: requireCompatibilityEnum(observation['outcome'], COMPATIBILITY_OUTCOMES, 'outcome'),
+        };
+    }
+    throw new TypeError(`Unsupported MCP compatibility observation kind: ${kind || '<empty>'}.`);
+}
+
+/**
+ * @param {unknown} value
+ * @param {readonly string[]} allowed
+ * @param {string} field
+ * @returns {string}
+ */
+function requireCompatibilityEnum(value, allowed, field) {
+    const normalized = String(value ?? '');
+    if (!allowed.includes(normalized))
+        throw new TypeError(`Invalid MCP compatibility ${field}: ${normalized || '<empty>'}.`);
+    return normalized;
+}
+
+/**
+ * Build a bounded aggregate suitable for compatibility-retirement decisions without returning raw compatibility rows.
+ * The observation window describes only persisted compatibility events present in the selected audit tail.
+ *
+ * @param {McpAuditRuntime} runtime
+ * @param {{ tailBytes?: number; maxEvents?: number }} [options]
+ */
+async function readMcpCompatibilitySummary(runtime, options = {}) {
+    const tail = await readMcpAuditEventTail(runtime, options);
+    const summary = {
+        schemaVersion: MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION,
+        event: MCP_COMPATIBILITY_OBSERVATION_EVENT,
+        source: {
+            ok: tail.ok,
+            fileBytes: tail.fileBytes,
+            tailBytesRead: tail.tailBytesRead,
+            truncatedByBytes: tail.truncatedByBytes,
+            scannedAuditEvents: tail.parsedEvents,
+            invalidLines: tail.invalidLines,
+            error: tail.error,
+        },
+        observations: 0,
+        window: /** @type {{ firstObservedAt: string | null; lastObservedAt: string | null; durationMs: number }} */ ({
+            firstObservedAt: null,
+            lastObservedAt: null,
+            durationMs: 0,
+        }),
+        protocol: {
+            totalRequests: 0,
+            byEra: { 2025: 0, 2026: 0 },
+            byTransportMode: { 'modern-2026': 0, stateful: 0, 'stateless-fallback': 0 },
+            byRpcClass: Object.fromEntries([...COMPATIBILITY_RPC_CLASSES].map((key) => [key, 0])),
+            byContinuity: Object.fromEntries([...COMPATIBILITY_CONTINUITY_SIGNALS].map((key) => [key, 0])),
+        },
+        oauth: {
+            clientActivity: {
+                total: 0,
+                bySource: { cimd: 0, dcr: 0, unknown: 0 },
+                byHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
+                successfulByHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
+                byResolution: Object.fromEntries([...COMPATIBILITY_CLIENT_RESOLUTIONS].map((key) => [key, 0])),
+                byOutcome: { attempted: 0, succeeded: 0, rejected: 0 },
+            },
+            grants: {
+                total: 0,
+                byGrantType: { authorization_code: 0, refresh_token: 0 },
+                byClientSource: { cimd: 0, dcr: 0, unknown: 0 },
+                byHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
+                byOutcome: { attempted: 0, succeeded: 0, rejected: 0 },
+            },
+        },
+    };
+    /** @type {number[]} */
+    const observedTimes = [];
+    for (const event of tail.events) {
+        if (
+            event['event'] !== MCP_COMPATIBILITY_OBSERVATION_EVENT ||
+            event['schemaVersion'] !== MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION
+        ) {
+            continue;
+        }
+        summary.observations += 1;
+        const observedAt = Date.parse(String(event['ts'] ?? ''));
+        if (Number.isFinite(observedAt)) observedTimes.push(observedAt);
+        if (event['kind'] === 'protocol-request') {
+            summary.protocol.totalRequests += 1;
+            incrementSummaryCounter(summary.protocol.byEra, event['protocolEra']);
+            incrementSummaryCounter(summary.protocol.byTransportMode, event['transportMode']);
+            incrementSummaryCounter(summary.protocol.byRpcClass, event['rpcClass']);
+            incrementSummaryCounter(summary.protocol.byContinuity, event['continuity']);
+        } else if (event['kind'] === 'oauth-client') {
+            summary.oauth.clientActivity.total += 1;
+            incrementSummaryCounter(summary.oauth.clientActivity.bySource, event['clientSource']);
+            incrementSummaryCounter(summary.oauth.clientActivity.byHostClass, event['hostClass']);
+            if (event['outcome'] === 'succeeded') {
+                incrementSummaryCounter(summary.oauth.clientActivity.successfulByHostClass, event['hostClass']);
+            }
+            incrementSummaryCounter(summary.oauth.clientActivity.byResolution, event['resolution']);
+            incrementSummaryCounter(summary.oauth.clientActivity.byOutcome, event['outcome']);
+        } else if (event['kind'] === 'oauth-grant') {
+            summary.oauth.grants.total += 1;
+            incrementSummaryCounter(summary.oauth.grants.byGrantType, event['grantType']);
+            incrementSummaryCounter(summary.oauth.grants.byClientSource, event['clientSource']);
+            incrementSummaryCounter(summary.oauth.grants.byHostClass, event['hostClass']);
+            incrementSummaryCounter(summary.oauth.grants.byOutcome, event['outcome']);
+        }
+    }
+    if (observedTimes.length > 0) {
+        const firstObservedAt = Math.min(...observedTimes);
+        const lastObservedAt = Math.max(...observedTimes);
+        summary.window.firstObservedAt = new Date(firstObservedAt).toISOString();
+        summary.window.lastObservedAt = new Date(lastObservedAt).toISOString();
+        summary.window.durationMs = Math.max(0, lastObservedAt - firstObservedAt);
+    }
+    return summary;
+}
+
+/**
+ * @param {Record<string, number>} counters
+ * @param {unknown} key
+ */
+function incrementSummaryCounter(counters, key) {
+    const normalized = String(key ?? '');
+    if (Object.hasOwn(counters, normalized)) counters[normalized] = (counters[normalized] ?? 0) + 1;
+}
+
+/**
+ * Flush all queued MCP audit events and wait for prior persistence.
+ *
+ * @param {McpAuditRuntime} runtime
+ * @returns {Promise<void>}
+ */
+async function flushMcpAuditEvents(runtime) {
+    await runtime.writer.flush();
 }
 
 /** @param {unknown} value @param {number} fallback @param {number} min @param {number} max */
@@ -343,12 +581,4 @@ function boundedInteger(value, fallback, min, max) {
     const parsed = Number(value ?? fallback);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, Math.floor(parsed)));
-}
-
-function installBeforeExitFlushHook() {
-    if (auditBeforeExitHookInstalled) return;
-    auditBeforeExitHookInstalled = true;
-    process.once('beforeExit', () => {
-        void flushMcpAuditEvents().catch(() => undefined);
-    });
 }

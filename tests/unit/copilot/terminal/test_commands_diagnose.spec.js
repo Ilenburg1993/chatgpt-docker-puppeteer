@@ -342,9 +342,10 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('default:gpt-5/processing');
             expect(output).toContain('Gateway');
             expect(output).toContain('1 provedor');
-            expect(output).toContain('3 modelos');
-            expect(output).toContain('3 habilitados');
-            expect(output).toMatch(/ativo\s+[^\n]+ · [^\n]+/u);
+            // The configured active BYOK model is included even when it is outside the preset seed catalog.
+            expect(output).toContain('4 modelos');
+            expect(output).toContain('4 habilitados');
+            expect(output).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
             expect(output).not.toContain('@openrouter');
             expect(output).not.toContain('providers=');
             expect(output).not.toContain('active=');

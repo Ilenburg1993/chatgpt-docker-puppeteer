@@ -9,12 +9,19 @@
  * @module copilot/mcp/tools/repo-working-set
  */
 
-import {
-    errorResult,
-    okResult,
-    readOnlyAnnotations,
-    requireMcpToolWorkspace,
-} from '#copilot/mcp/public/protocol/tools';
+// @ts-check
+/**
+ * Compact MCP working-set surface over the shared LLM-B/session-scope engine.
+ *
+ * One tool deliberately composes open/context/find/refresh/status/close so a reusable working set does not add seven
+ * permanent MCP descriptors. IDs are server-generated and must be present in this MCP-local ownership registry before
+ * they can reach the shared scope engine.
+ *
+ * @module copilot/mcp/tools/repo-working-set
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { errorResult, okResult, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod';
@@ -66,9 +73,9 @@ function toRepoPath(workspaceRoot, absolutePath) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const repoWorkingSetTool = {
+export const repoWorkingSetTool = defineMcpRawTool({
     name: 'repo_working_set',
     title: 'Repository working set',
     description:
@@ -146,7 +153,7 @@ export const repoWorkingSetTool = {
             .optional()
             ['describe']('Maximum symbol matches for action=find. Default: 50.'),
     },
-    annotations: { ...readOnlyAnnotations(), idempotentHint: false },
+
     handler: async (
         {
             action,
@@ -206,10 +213,10 @@ export const repoWorkingSetTool = {
                 indexMode: indexMode ?? 'auto',
                 selectionMode: selectionMode ?? 'coverage',
                 preferredPaths,
-                seedSymbols,
+                ...(seedSymbols === undefined ? {} : { seedSymbols }),
                 concurrency: concurrency ?? DEFAULT_CONCURRENCY,
-                include,
-                exclude,
+                ...(include === undefined ? {} : { include }),
+                ...(exclude === undefined ? {} : { exclude }),
                 recursive: true,
                 silent: true,
             });
@@ -291,7 +298,7 @@ export const repoWorkingSetTool = {
                 return errorResult('action=find requires symbol.', { code: 'ERR_WORKING_SET_SYMBOL_REQUIRED' });
             const limit = maxResults ?? 50;
             const matches = owned.context
-                .findSymbol(owned.handle.sessionId, symbol, { exactMatch })
+                .findSymbol(owned.handle.sessionId, symbol, exactMatch === undefined ? {} : { exactMatch })
                 .slice(0, limit)
                 .map((entry) => ({
                     path: toRepoPath(owned.workspaceRoot, entry.filePath),
@@ -348,7 +355,7 @@ export const repoWorkingSetTool = {
             `Closed working set ${workingSetId}; activeOwnedWorkingSets=${mcpWorkingSets.size}.`,
         );
     },
-};
+});
 
 export function resetMcpWorkingSetsForTest() {
     for (const entry of mcpWorkingSets.values()) entry.handle.close();

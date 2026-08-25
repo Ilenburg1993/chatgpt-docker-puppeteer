@@ -5,15 +5,16 @@
  * @module copilot/mcp/tools/cloudflare-edge-apply
  */
 
-import { applyCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge-apply';
+import { applyCloudflareEdgePolicy } from '#copilot/mcp/public/cloudflare/edge';
 
-import { boundedWriteAnnotations, okResult } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareEdgePolicyApplyTool = {
+export const mcpCloudflareEdgePolicyApplyTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_policy_apply',
     title: 'Cloudflare edge policy apply',
     description:
@@ -33,14 +34,15 @@ export const mcpCloudflareEdgePolicyApplyTool = {
             .optional()
             ['describe']('Optional rule refs to include. Required for targeted rate-limit apply.'),
     },
-    annotations: boundedWriteAnnotations(),
-    handler: async ({ dryRun, confirmApply, phases, ruleRefs }) =>
+
+    handler: async ({ dryRun, confirmApply, phases, ruleRefs }, operationContext) =>
         okResult(
             await applyCloudflareEdgePolicy({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
                 ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
                 ...(typeof confirmApply === 'boolean' ? { confirmApply } : {}),
                 ...(Array.isArray(phases) ? { phases } : {}),
                 ...(Array.isArray(ruleRefs) ? { ruleRefs } : {}),
             }),
         ),
-};
+});

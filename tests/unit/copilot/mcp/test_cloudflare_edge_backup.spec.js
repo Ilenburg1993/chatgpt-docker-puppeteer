@@ -2,7 +2,7 @@ import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/pu
 import {
     buildCloudflareEdgeBackupFileName,
     createCloudflareEdgeBackupStore,
-} from '#copilot/mcp/public/cloudflare/edge-backup';
+} from '#copilot/mcp/public/cloudflare/edge';
 import { mkdtemp, readFile, rm, stat, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

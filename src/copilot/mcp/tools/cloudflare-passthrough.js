@@ -9,35 +9,46 @@ import {
     applyCloudflareMcpPassthroughPlan,
     buildCloudflareMcpPassthroughPlan,
     diffCloudflareMcpPassthroughPlan,
-} from '#copilot/mcp/public/cloudflare/passthrough';
+} from '#copilot/mcp/public/cloudflare/posture';
 
-import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpCloudflareMcpPassthroughPlanTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpCloudflareMcpPassthroughPlanTool = defineMcpRawTool({
     name: 'mcp_cloudflare_mcp_passthrough_plan',
     title: 'Cloudflare MCP passthrough plan',
     description:
         'Return the read-only desired http_config_settings rule for MCP/OAuth passthrough without applying Cloudflare changes.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await buildCloudflareMcpPassthroughPlan()),
-};
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpCloudflareMcpPassthroughDiffTool = {
+    handler: async (_input, operationContext) =>
+        okResult(
+            await buildCloudflareMcpPassthroughPlan({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+            }),
+        ),
+});
+
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpCloudflareMcpPassthroughDiffTool = defineMcpRawTool({
     name: 'mcp_cloudflare_mcp_passthrough_diff',
     title: 'Cloudflare MCP passthrough diff',
     description:
         'Compare the desired MCP passthrough http_config_settings rule with current Cloudflare config audit results without applying changes.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await diffCloudflareMcpPassthroughPlan()),
-};
 
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpCloudflareMcpPassthroughApplyTool = {
+    handler: async (_input, operationContext) =>
+        okResult(
+            await diffCloudflareMcpPassthroughPlan({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+            }),
+        ),
+});
+
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpCloudflareMcpPassthroughApplyTool = defineMcpRawTool({
     name: 'mcp_cloudflare_mcp_passthrough_apply',
     title: 'Cloudflare MCP passthrough apply',
     description:
@@ -49,12 +60,13 @@ export const mcpCloudflareMcpPassthroughApplyTool = {
             .optional()
             ['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
     },
-    annotations: boundedWriteAnnotations(),
-    handler: async ({ dryRun, confirmApply }) =>
+
+    handler: async ({ dryRun, confirmApply }, operationContext) =>
         okResult(
             await applyCloudflareMcpPassthroughPlan({
+                authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
                 ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
                 ...(typeof confirmApply === 'boolean' ? { confirmApply } : {}),
             }),
         ),
-};
+});

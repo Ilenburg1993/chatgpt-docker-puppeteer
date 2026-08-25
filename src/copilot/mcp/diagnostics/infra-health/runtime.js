@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Process-scoped diagnostic projection for Infra health.
+ * Read-only capability contract for process-scoped Infra health diagnostics.
  *
- * The MCP diagnostic owner stores only a reader supplied by composition. It does not know ApplicationInfraHost, boot
- * topology or how process/runtime resources are discovered.
+ * The diagnostic owner no longer stores a process-global reader. Composition creates one opaque capability bound to
+ * the concrete Application Infra host and transports it through OperationContext.
  *
  * @module copilot/mcp/diagnostics/infra-health/runtime
  */
@@ -13,22 +13,15 @@
  *   runtime: ReturnType<typeof import('#copilot/infra/public/observability').readIoRuntimeHealthSnapshot>;
  *   process: ReturnType<typeof import('#copilot/infra/public/observability/process').readIoProcessHealthSnapshot>;
  * }} McpInfraHealthView
+ *
+ * @typedef {Readonly<{ read: () => McpInfraHealthView }>} McpInfraHealthCapability
  */
 
-/** @type {(() => McpInfraHealthView) | null} */
-let reader = null;
-
-/** @param {() => McpInfraHealthView} nextReader */
-export function configureMcpInfraHealthReader(nextReader) {
-    if (typeof nextReader !== 'function') throw new TypeError('MCP Infra health reader must be a function.');
-    reader = nextReader;
-    return () => {
-        if (reader === nextReader) reader = null;
-    };
-}
-
-/** @returns {McpInfraHealthView} */
-export function readMcpInfraHealthView() {
-    if (!reader) throw new Error('MCP Infra health reader has not been configured by process composition.');
-    return reader();
+/**
+ * @param {() => McpInfraHealthView} reader
+ * @returns {McpInfraHealthCapability}
+ */
+export function createMcpInfraHealthCapability(reader) {
+    if (typeof reader !== 'function') throw new TypeError('MCP Infra health capability requires a reader function.');
+    return Object.freeze({ read: reader });
 }

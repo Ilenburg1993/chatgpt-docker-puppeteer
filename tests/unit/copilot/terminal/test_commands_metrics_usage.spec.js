@@ -412,33 +412,55 @@ describe('commands/metrics + usage', () => {
     });
 
     it('cmdUsage now exibe contexto e conexão de sessão sem IDs técnicos', () => {
+        const byokKeys = [
+            'COPILOT_BYOK_ENABLED',
+            'COPILOT_BYOK_PROFILE',
+            'COPILOT_BYOK_PROFILES_JSON',
+            'COPILOT_BYOK_PROVIDER_PRESET',
+            'COPILOT_BYOK_MODEL',
+            'COPILOT_BYOK_API_KEY',
+        ];
+        const previousEnv = Object.fromEntries(byokKeys.map((key) => [key, process.env[key]]));
+        for (const key of byokKeys) delete process.env[key];
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'openrouter';
+        process.env['COPILOT_BYOK_MODEL'] = 'fixture/byok-model';
+        process.env['COPILOT_BYOK_API_KEY'] = 'test-usage-byok-key-that-must-not-render';
         const ctx = mockCtx();
 
-        cmdUsage({ println: ctx.println }, 'now');
+        try {
+            cmdUsage({ println: ctx.println }, 'now');
 
-        expect(ctx.output()).toContain('Janela de contexto');
-        expect(ctx.output()).not.toContain('Context window');
-        expect(ctx.output()).toContain('Conexão');
-        expect(ctx.output()).toContain('sessão conectada');
-        expect(ctx.output()).not.toContain('Vínculo');
-        expect(ctx.output()).not.toContain('ambiente, SDK e hub conectados');
-        expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
-        expect(ctx.output()).not.toContain('runtime-456789…');
-        expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
-        expect(ctx.output()).toContain('/usage now detail');
-        expect(ctx.output()).toContain('Modo');
-        expect(ctx.output()).toContain('SDK interativo');
-        expect(ctx.output()).not.toContain('interactive');
-        expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toMatch(/Telemetria PR|Histórico\s+Copilot/);
-        expect(ctx.output()).not.toContain('Histórico Copilot');
-        expect(ctx.output()).not.toContain('BYOK ativo');
-        expect(ctx.output()).not.toContain('provedor ');
-        expect(ctx.output()).toContain('Rota BYOK');
-        expect(ctx.output()).not.toContain('side-channel');
-        expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
-        expect(ctx.output()).not.toContain('Premium Request');
-        expect(ctx.output()).not.toContain('\x1b[');
+            expect(ctx.output()).toContain('Janela de contexto');
+            expect(ctx.output()).not.toContain('Context window');
+            expect(ctx.output()).toContain('Conexão');
+            expect(ctx.output()).toContain('sessão conectada');
+            expect(ctx.output()).not.toContain('Vínculo');
+            expect(ctx.output()).not.toContain('ambiente, SDK e hub conectados');
+            expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
+            expect(ctx.output()).not.toContain('runtime-456789…');
+            expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
+            expect(ctx.output()).toContain('/usage now detail');
+            expect(ctx.output()).toContain('Modo');
+            expect(ctx.output()).toContain('SDK interativo');
+            expect(ctx.output()).not.toContain('interactive');
+            expect(ctx.output()).toContain('gpt-5-mini');
+            expect(ctx.output()).toMatch(/Telemetria PR|Histórico\s+Copilot/);
+            expect(ctx.output()).not.toContain('Histórico Copilot');
+            expect(ctx.output()).not.toContain('BYOK ativo');
+            expect(ctx.output()).not.toContain('provedor ');
+            expect(ctx.output()).toContain('Rota BYOK');
+            expect(ctx.output()).not.toContain('side-channel');
+            expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
+            expect(ctx.output()).not.toContain('Premium Request');
+            expect(ctx.output()).not.toContain('test-usage-byok-key-that-must-not-render');
+            expect(ctx.output()).not.toContain('\x1b[');
+        } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+                if (value === undefined) delete process.env[key];
+                else process.env[key] = value;
+            }
+        }
     });
 
     it('cmdUsage now humaniza contexto ainda não medido sem esconder limite conhecido do modelo', () => {

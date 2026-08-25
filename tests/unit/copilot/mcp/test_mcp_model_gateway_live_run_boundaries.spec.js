@@ -1,12 +1,15 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { describe, it } from 'vitest';
 
 import {
     buildModelGatewayLiveRunEnvironment,
     buildModelGatewayLiveRunPlan,
     buildModelGatewayReadOnlyChildEnvironment,
+    createModelGatewayLiveRunEnvironmentAuthority,
+    spawnDetachedLiveRunWithDependencies,
 } from '#copilot/testing/mcp/integrations/model-gateway/live-runs';
 
 const PARENT_ENV = Object.freeze({
@@ -38,6 +41,32 @@ function assertPresent(env, keys) {
 }
 
 describe('MCP Model Gateway live-run authority boundaries', () => {
+    it('captures a generation-bound opaque environment authority without serializing secrets', () => {
+        const mutableEnv = { ...PARENT_ENV };
+        const authority = createModelGatewayLiveRunEnvironmentAuthority(mutableEnv);
+        mutableEnv.OPENAI_API_KEY = 'rotated-after-capture';
+        mutableEnv.COPILOT_CONNECTION_TOKEN = 'rotated-copilot-after-capture';
+
+        assert.equal(authority.readOnlyEnvironment()['OPENAI_API_KEY'], undefined);
+        assert.equal(
+            authority.liveRunEnvironment({ invokesModel: false, invokesRealProvider: true })['OPENAI_API_KEY'],
+            'openai-provider-authority',
+        );
+        assert.equal(
+            authority.liveRunEnvironment({ invokesModel: true, invokesRealProvider: false })[
+                'COPILOT_CONNECTION_TOKEN'
+            ],
+            'copilot-connection-token-authority',
+        );
+        assert.equal(JSON.stringify(authority).includes('provider-authority'), false);
+        assert.equal(JSON.stringify(authority).includes('copilot-connection-token-authority'), false);
+        assert.equal(Object.isFrozen(authority), true);
+        assert.equal(Object.isFrozen(authority.readOnlyEnvironment()), true);
+        assert.equal(
+            Object.isFrozen(authority.liveRunEnvironment({ invokesModel: true, invokesRealProvider: true })),
+            true,
+        );
+    });
     it('keeps read-only and control-only children free of all ambient credential classes', () => {
         const readOnly = buildModelGatewayReadOnlyChildEnvironment(PARENT_ENV);
         const control = buildModelGatewayLiveRunEnvironment(
@@ -94,6 +123,144 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
             'COPILOT_MCP_STATIC_BEARER_TOKEN',
             'FUTURE_UNKNOWN_SECRET',
         ]);
+    });
+
+    it('terminates and drains a detached run when cancellation wins during manifest publication', async () => {
+        const controller = new AbortController();
+        const childEmitter = new EventEmitter();
+        let killCalls = 0;
+        let unrefCalled = false;
+        const child = Object.assign(childEmitter, {
+            pid: 515151,
+            kill(signal) {
+                killCalls += 1;
+                queueMicrotask(() => childEmitter.emit('close', null, signal));
+                return true;
+            },
+            unref() {
+                unrefCalled = true;
+            },
+        });
+        const manifestWrites = [];
+        const deleted = [];
+        let logClosed = false;
+        const workspace = {
+            workspaceRoot: '/workspace',
+            io: {
+                mkdirPathLocked: async () => ({}),
+                openDetachedAppendSink: async () => ({
+                    handle: {
+                        fd: 99,
+                        close: async () => {
+                            logClosed = true;
+                        },
+                    },
+                }),
+                writeFileAtomic: async (path, content) => {
+                    manifestWrites.push([path, content]);
+                    controller.abort(new Error('cancel-during-manifest-publication'));
+                    return {};
+                },
+                deleteFileLocked: async (path) => {
+                    deleted.push(path);
+                    return {};
+                },
+            },
+        };
+        const spawnChild = /** @type {typeof import('node:child_process').spawn} */ (
+            /** @type {unknown} */ (
+                () => {
+                    queueMicrotask(() => childEmitter.emit('spawn'));
+                    return child;
+                }
+            )
+        );
+        const authority = createModelGatewayLiveRunEnvironmentAuthority(PARENT_ENV);
+
+        await assert.rejects(
+            spawnDetachedLiveRunWithDependencies(
+                {
+                    workspace: /** @type {any} */ (workspace),
+                    args: ['--control-only'],
+                    plan: { invokesModel: false, invokesRealProvider: false },
+                    timeoutMs: 30_000,
+                    signal: controller.signal,
+                    environmentAuthority: authority,
+                },
+                {
+                    createRunUuid: () => '11111111-1111-4111-8111-111111111111',
+                    spawnChild,
+                },
+            ),
+            /cancel-during-manifest-publication/u,
+        );
+
+        assert.equal(manifestWrites.length, 1);
+        assert.equal(deleted.length, 1);
+        assert.equal(
+            deleted[0],
+            '/workspace/src/copilot/.ai/mcp/llmb-live-runs/mcp-11111111-1111-4111-8111-111111111111.json',
+        );
+        assert.ok(killCalls >= 1);
+        assert.equal(unrefCalled, false);
+        assert.equal(logClosed, true);
+    });
+
+    it('transfers detached lifecycle only after a durable manifest is accepted', async () => {
+        const childEmitter = new EventEmitter();
+        let killCalls = 0;
+        let unrefCalled = false;
+        const child = Object.assign(childEmitter, {
+            pid: 515152,
+            kill() {
+                killCalls += 1;
+                return true;
+            },
+            unref() {
+                unrefCalled = true;
+            },
+        });
+        let manifestWrites = 0;
+        const workspace = {
+            workspaceRoot: '/workspace',
+            io: {
+                mkdirPathLocked: async () => ({}),
+                openDetachedAppendSink: async () => ({ handle: { fd: 99, close: async () => {} } }),
+                writeFileAtomic: async () => {
+                    manifestWrites += 1;
+                    return {};
+                },
+                deleteFileLocked: async () => {
+                    throw new Error('accepted manifest must not be deleted');
+                },
+            },
+        };
+        const spawnChild = /** @type {typeof import('node:child_process').spawn} */ (
+            /** @type {unknown} */ (
+                () => {
+                    queueMicrotask(() => childEmitter.emit('spawn'));
+                    return child;
+                }
+            )
+        );
+        const authority = createModelGatewayLiveRunEnvironmentAuthority(PARENT_ENV);
+        const manifest = await spawnDetachedLiveRunWithDependencies(
+            {
+                workspace: /** @type {any} */ (workspace),
+                args: ['--control-only'],
+                plan: { invokesModel: false, invokesRealProvider: false },
+                timeoutMs: 30_000,
+                environmentAuthority: authority,
+            },
+            {
+                createRunUuid: () => '22222222-2222-4222-8222-222222222222',
+                spawnChild,
+            },
+        );
+        assert.equal(manifestWrites, 1);
+        assert.equal(manifest.pid, 515152);
+        assert.equal(unrefCalled, true);
+        assert.equal(killCalls, 0);
     });
 
     it('derives execution and credential authority truthfully from the semantic plan', () => {

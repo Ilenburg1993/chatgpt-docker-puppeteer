@@ -10,13 +10,11 @@
  */
 
 import { readLinuxProcessArgv } from '#copilot/infra/public/platform/process/introspection';
-import { appendMcpAuditEvent } from '#copilot/mcp/public/observability';
 import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilot/mcp/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { MODEL_GATEWAY_LIVE_COMMANDS, MODEL_GATEWAY_LIVE_RUNNER_SCRIPT } from './contracts.js';
-import { buildModelGatewayLiveRunEnvironment, buildModelGatewayReadOnlyChildEnvironment } from './environment.js';
 
 const DETACHED_LIVE_RUNS_DIR = 'src/copilot/.ai/mcp/llmb-live-runs';
 export const DETACHED_LIVE_RUN_ID_RE = /^mcp-[0-9a-f-]{36}$/u;
@@ -138,7 +136,7 @@ function appendBoundedOutput(current, chunk, maxBytes) {
  *     timeoutMs: number;
  *     plan?: { invokesModel?: boolean; invokesRealProvider?: boolean };
  *     signal?: AbortSignal;
- *     parentEnv?: NodeJS.ProcessEnv;
+ *     environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority;
  *     maxOutputBytes?: number;
  * }} input
  */
@@ -153,11 +151,13 @@ export async function runModelGatewayLiveCommand(input) {
         Math.min(16 * 1024 * 1024, Math.trunc(input.maxOutputBytes ?? DEFAULT_LIVE_COMMAND_MAX_OUTPUT_BYTES)),
     );
     const timeoutMs = Math.max(1_000, Math.min(30 * 60_000, Math.trunc(input.timeoutMs)));
-    const parentEnv = input.parentEnv ?? process.env;
+    if (!input.environmentAuthority) {
+        throw new TypeError('Model Gateway live command requires an explicit environment authority.');
+    }
     const env =
         input.command === 'live-runner'
-            ? buildModelGatewayLiveRunEnvironment(input.plan ?? {}, parentEnv)
-            : buildModelGatewayReadOnlyChildEnvironment(parentEnv);
+            ? input.environmentAuthority.liveRunEnvironment(input.plan ?? {})
+            : input.environmentAuthority.readOnlyEnvironment();
     const startedAt = Date.now();
     const child = spawn(process.execPath, [script, ...input.args], {
         cwd: input.workspace.workspaceRoot,
@@ -267,17 +267,20 @@ function parseJsonOutput(text) {
  *
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {number} limit
- * @param {{ signal?: AbortSignal; parentEnv?: NodeJS.ProcessEnv }} [options]
+ * @param {{ signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} options
  */
-export async function readModelGatewayPersistedLiveRuns(workspace, limit, options = {}) {
+export async function readModelGatewayPersistedLiveRuns(workspace, limit, options) {
+    if (!options?.environmentAuthority) {
+        throw new TypeError('Reading Model Gateway live runs requires an explicit environment authority.');
+    }
     const boundedLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
     const result = await runModelGatewayLiveCommand({
         workspace,
         command: 'runs',
         args: ['--json', '--limit', String(boundedLimit)],
         timeoutMs: 60_000,
+        environmentAuthority: options.environmentAuthority,
         ...(options.signal ? { signal: options.signal } : {}),
-        ...(options.parentEnv ? { parentEnv: options.parentEnv } : {}),
     });
     const parsedValue = parseJsonOutput(result.stdout);
     const parsed =
@@ -297,33 +300,70 @@ export async function readModelGatewayPersistedLiveRuns(workspace, limit, option
 }
 
 /**
- * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; parentEnv?: NodeJS.ProcessEnv }} input
+ * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} input
  * @returns {Promise<DetachedLiveRunManifest>}
  */
 export async function spawnDetachedLiveRun(input) {
+    return await spawnDetachedLiveRunWithDependencies(input, {});
+}
+
+/**
+ * White-box dependency seam for detached acceptance/cancellation lifecycle tests.
+ *
+ * Acceptance is deliberately later than `spawn`: the manifest must be durable and the caller still active. Before
+ * that point any abort or persistence failure terminates and drains the child tree and removes a partial manifest.
+ *
+ * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} input
+ * @param {{ spawnChild?: typeof spawn; createRunUuid?: () => string }} dependencies
+ * @returns {Promise<DetachedLiveRunManifest>}
+ */
+export async function spawnDetachedLiveRunWithDependencies(input, dependencies) {
     const { workspace } = input;
-    const runId = `mcp-${randomUUID()}`;
+    const runId = `mcp-${dependencies.createRunUuid?.() ?? randomUUID()}`;
+    if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) throw new Error('Generated detached LLM-B live run id is invalid.');
     const outDir = `artifacts/terminal-live/${runId}`;
     const absoluteOutDir = join(workspace.workspaceRoot, outDir);
     const logPath = `${outDir}/detached.runner.log`;
     const absoluteLogPath = join(workspace.workspaceRoot, logPath);
     const args = [...input.args, `--out-dir=${outDir}`];
     const stateDir = detachedLiveRunsDirectory(workspace);
+    const manifestPath = detachedLiveRunManifestPath(workspace, runId);
     const workspaceIo = workspace.io;
     if (input.signal?.aborted) throw input.signal.reason ?? new Error('Detached LLM-B live run aborted before spawn.');
     await workspaceIo.mkdirPathLocked(stateDir, { recursive: true });
     await workspaceIo.mkdirPathLocked(absoluteOutDir, { recursive: true });
     const logSink = await workspaceIo.openDetachedAppendSink(absoluteLogPath, { mode: 0o600 });
-    const env = buildModelGatewayLiveRunEnvironment(input.plan, input.parentEnv ?? process.env);
+    if (!input.environmentAuthority) {
+        await logSink.handle.close();
+        throw new TypeError('Detached Model Gateway live run requires an explicit environment authority.');
+    }
+    if (input.signal?.aborted) {
+        await logSink.handle.close();
+        throw input.signal.reason ?? new Error('Detached LLM-B live run aborted before spawn.');
+    }
+    const env = input.environmentAuthority.liveRunEnvironment(input.plan);
+    const spawnChild = dependencies.spawnChild ?? spawn;
     /** @type {import('node:child_process').ChildProcess | undefined} */
     let child;
+    /** @type {ReturnType<typeof createAttachedChildProcessSupervisor> | null} */
+    let supervisor = null;
+    let accepted = false;
+    let manifestPublished = false;
+    /** @type {(() => void) | null} */
+    let terminateBeforeAcceptance = null;
     try {
-        child = spawn(process.execPath, [MODEL_GATEWAY_LIVE_RUNNER_SCRIPT, ...args], {
+        child = spawnChild(process.execPath, [MODEL_GATEWAY_LIVE_RUNNER_SCRIPT, ...args], {
             cwd: workspace.workspaceRoot,
             env,
             detached: true,
             stdio: ['ignore', logSink.handle.fd, logSink.handle.fd],
         });
+        supervisor = createAttachedChildProcessSupervisor(child, { processGroup: true });
+        terminateBeforeAcceptance = () => {
+            if (accepted || !supervisor || supervisor.snapshot().state === 'closed') return;
+            supervisor.requestTermination({ graceMs: 1_000, initialSignal: 'SIGTERM', forceSignal: 'SIGKILL' });
+        };
+        input.signal?.addEventListener('abort', terminateBeforeAcceptance, { once: true });
         await new Promise((resolvePromise, rejectPromise) => {
             /** @param {Error} error */
             const onError = (error) => rejectPromise(error);
@@ -334,42 +374,53 @@ export async function spawnDetachedLiveRun(input) {
                 resolvePromise(undefined);
             });
         });
+        if (!child.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
+        if (input.signal?.aborted) {
+            terminateBeforeAcceptance();
+            await supervisor.closed;
+            throw input.signal.reason ?? new Error('Detached LLM-B live run aborted during spawn.');
+        }
+        /** @type {DetachedLiveRunManifest} */
+        const manifest = {
+            schema: 'llmb-live-detached-run',
+            runId,
+            pid: child.pid,
+            startedAtMs: Date.now(),
+            outDir,
+            logPath,
+            plan: input.plan,
+        };
+        await workspaceIo.writeFileAtomic(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
+            encoding: 'utf8',
+            mode: 0o600,
+            riskClass: 'medium',
+            failIfExists: true,
+            advisoryLimits: { domain: 'llmb-live-detached-manifest' },
+        });
+        manifestPublished = true;
+        if (input.signal?.aborted) {
+            await workspaceIo.deleteFileLocked(manifestPath, { captureRollback: false });
+            manifestPublished = false;
+            terminateBeforeAcceptance();
+            await supervisor.closed;
+            throw input.signal.reason ?? new Error('Detached LLM-B live run aborted before manifest acceptance.');
+        }
+        accepted = true;
+        child.unref();
+        return manifest;
+    } catch (error) {
+        if (manifestPublished) {
+            await workspaceIo.deleteFileLocked(manifestPath, { captureRollback: false }).catch(() => undefined);
+        }
+        if (supervisor && supervisor.snapshot().state !== 'closed') {
+            terminateBeforeAcceptance?.();
+            if (child?.pid) await supervisor.closed;
+        }
+        throw error;
     } finally {
+        if (terminateBeforeAcceptance) input.signal?.removeEventListener('abort', terminateBeforeAcceptance);
         await logSink.handle.close();
     }
-    if (!child?.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
-    if (input.signal?.aborted) {
-        signalProcessTree(child.pid, 'SIGTERM', { child, processGroup: true });
-        throw input.signal.reason ?? new Error('Detached LLM-B live run aborted during spawn.');
-    }
-    child.unref();
-    /** @type {DetachedLiveRunManifest} */
-    const manifest = {
-        schema: 'llmb-live-detached-run',
-        runId,
-        pid: child.pid,
-        startedAtMs: Date.now(),
-        outDir,
-        logPath,
-        plan: input.plan,
-    };
-    try {
-        await workspaceIo.writeFileAtomic(
-            detachedLiveRunManifestPath(workspace, runId),
-            `${JSON.stringify(manifest, null, 2)}\n`,
-            {
-                encoding: 'utf8',
-                mode: 0o600,
-                riskClass: 'medium',
-                failIfExists: true,
-                advisoryLimits: { domain: 'llmb-live-detached-manifest' },
-            },
-        );
-    } catch (error) {
-        signalProcessTree(child.pid, 'SIGTERM', { child, processGroup: true });
-        throw error;
-    }
-    return manifest;
 }
 
 /**
@@ -482,6 +533,7 @@ export async function inspectDetachedLiveRunCompletion(workspace, manifest) {
  * @param {{
  *     nowMs?: number;
  *     graceMs?: number;
+ *     audit?: Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'append'>;
  *     deps?: {
  *         listRuns?: () => Promise<Record<string, any>[]>;
  *         cancelRun?: (runId: string) => Promise<{ cancelled: boolean; alreadyStopped?: boolean }>;
@@ -502,7 +554,7 @@ export async function reapCompletedDetachedLiveRuns(workspace, options = {}) {
             if (!manifest) return { cancelled: false, alreadyStopped: true };
             const result = await cancelDetachedLiveRun(manifest);
             if (result.cancelled) {
-                await appendMcpAuditEvent({
+                await options.audit?.append({
                     event: 'llmb_live_test_completed_process_reaped',
                     tool: 'mcp_startup_maintenance',
                     runId,

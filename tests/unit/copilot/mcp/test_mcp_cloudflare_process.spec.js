@@ -7,10 +7,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it, vi } from 'vitest';
 
+import { createCloudflareManagedProcessController } from '#copilot/testing/mcp/cloudflare/process';
 import {
-    createCloudflareManagedProcessController,
     observeForegroundCloudflared,
-} from '#copilot/testing/mcp/cloudflare';
+    resolveManagedPublicHealthUrl,
+    waitForManagedHealthReady,
+} from '#copilot/testing/mcp/composition/cloudflare-cli';
 
 /** @param {string} dir */
 function processConfig(dir) {
@@ -26,6 +28,64 @@ function processConfig(dir) {
 
 afterEach(() => {
     vi.unstubAllEnvs();
+});
+
+describe('MCP Cloudflare managed readiness gating', () => {
+    it('retries origin health until the listener is actually reachable', async () => {
+        let clockMs = 0;
+        let attempts = 0;
+        const result = await waitForManagedHealthReady('https://127.0.0.1:3333/health', {
+            timeoutMs: 1_000,
+            pollIntervalMs: 100,
+            probeTimeoutMs: 50,
+            probeOptions: { allowInsecureHttps: true, servername: 'mcp.aurelin.org' },
+            now: () => clockMs,
+            sleep: async (delayMs) => {
+                clockMs += delayMs;
+            },
+            probe: async (_url, options) => {
+                attempts += 1;
+                assert.equal(options.allowInsecureHttps, true);
+                assert.equal(options.servername, 'mcp.aurelin.org');
+                assert.ok(Number(options.timeoutMs) <= 50);
+                return attempts < 3 ? { ok: false, error: 'ECONNREFUSED' } : { ok: true, status: 200 };
+            },
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.attempts, 3);
+        assert.equal(result.durationMs, 200);
+        assert.deepEqual(result.lastProbe, { ok: true, status: 200 });
+    });
+
+    it('fails closed after the bounded readiness deadline', async () => {
+        let clockMs = 0;
+        const result = await waitForManagedHealthReady('https://127.0.0.1:3333/health', {
+            timeoutMs: 250,
+            pollIntervalMs: 100,
+            probeTimeoutMs: 50,
+            now: () => clockMs,
+            sleep: async (delayMs) => {
+                clockMs += delayMs;
+            },
+            probe: async () => ({ ok: false, error: 'ECONNREFUSED' }),
+        });
+
+        assert.equal(result.ok, false);
+        assert.equal(result.attempts, 4);
+        assert.equal(result.durationMs, 250);
+        assert.deepEqual(result.lastProbe, { ok: false, error: 'ECONNREFUSED' });
+    });
+
+    it('derives public readiness from the canonical connector origin', () => {
+        const config = /** @type {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} */ (
+            /** @type {unknown} */ ({
+                publicMcpUrl: 'https://mcp.aurelin.org/mcp',
+                publicHostname: 'ignored.example.test',
+            })
+        );
+        assert.equal(resolveManagedPublicHealthUrl(config), 'https://mcp.aurelin.org/health');
+    });
 });
 
 describe('MCP Cloudflare bound process supervision', () => {
@@ -60,6 +120,7 @@ describe('MCP Cloudflare bound process supervision', () => {
                     name: 'rollback-test',
                     command: process.execPath,
                     args: ['-e', 'setInterval(() => {}, 1000)'],
+                    env: {},
                     beforePidPublish: async () => {
                         const metadata = JSON.parse(await fs.readFile(metadataFile, 'utf8'));
                         spawnedPid = Number(metadata.pid);
@@ -99,6 +160,7 @@ describe('MCP Cloudflare bound process supervision', () => {
                     name: 'spawn-error-test',
                     command: `definitely-not-a-command-${Date.now()}`,
                     args: [],
+                    env: {},
                 }),
                 /ENOENT|spawn/u,
             );
@@ -135,7 +197,25 @@ describe('MCP Cloudflare bound process supervision', () => {
         assert.deepEqual(result, { ok: true, exitCode: 0, signal: null, error: null });
     });
 
-    it('does not reintroduce parent credentials when a managed child has no explicit environment', async () => {
+    it('rejects detached managed processes when no environment authority is supplied', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-managed-env-required-'));
+        const config = processConfig(dir);
+        const controller = createCloudflareManagedProcessController(config);
+        try {
+            await assert.rejects(
+                controller.mcpHttp.ensure({
+                    name: 'missing-env-authority-test',
+                    command: process.execPath,
+                    args: ['-e', 'process.exit(0)'],
+                }),
+                /requires an explicit environment/u,
+            );
+        } finally {
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('does not reintroduce parent credentials through an explicitly projected managed-child environment', async () => {
         vi.stubEnv('AURELIN_TEST_AMBIENT_SECRET', 'must-not-cross-managed-process-boundary');
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-managed-env-'));
         const config = processConfig(dir);
@@ -148,6 +228,7 @@ describe('MCP Cloudflare bound process supervision', () => {
                     '-e',
                     'process.stdout.write(JSON.stringify({secret:process.env.AURELIN_TEST_AMBIENT_SECRET??null,path:Boolean(process.env.PATH)}));setInterval(()=>{},1000)',
                 ],
+                env: { PATH: process.env.PATH ?? '/usr/bin:/bin' },
             });
             const deadline = Date.now() + 2_000;
             let output = '';

@@ -6,11 +6,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { readMcpHttpStatefulProcessConfig } from '#copilot/mcp/public/transport/http/stateful/config';
+import { handleStatefulMcpHttpRequest } from '#copilot/mcp/public/transport/http/stateful/router';
+import { readMcpHttpSessionRuntimeState } from '#copilot/testing/mcp/adapters/http';
 import {
-    handleStatefulMcpHttpRequest,
-    readMcpHttpSessionRuntimeState,
-} from '#copilot/mcp/public/adapters/http-stateful';
-import { createMcpHttpSessionRuntime, createMcpHttpStreamRegistry } from '#copilot/testing/mcp/transport/http/stateful';
+    createMcpHttpSessionRuntime,
+    createMcpHttpSessionRuntimeForConfig,
+    createMcpHttpStreamRegistry,
+} from '#copilot/testing/mcp/transport/http/stateful';
 import {
     createMcpTransportErrorCollector,
     fakeMcpTransport,
@@ -21,7 +24,9 @@ import {
 
 describe('MCP HTTP stream registry', () => {
     it('exposes stream registry metrics in the HTTP runtime snapshot', () => {
-        const snapshot = readMcpHttpSessionRuntimeState();
+        const config = readMcpHttpStatefulProcessConfig({});
+        const runtime = createMcpHttpSessionRuntimeForConfig(config, { store: null });
+        const snapshot = readMcpHttpSessionRuntimeState(runtime, config);
         assert.equal(typeof snapshot['streamRegistry'], 'object');
     });
 

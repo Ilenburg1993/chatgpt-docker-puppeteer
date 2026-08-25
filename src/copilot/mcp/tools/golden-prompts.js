@@ -5,7 +5,15 @@
  * @module copilot/mcp/tools/golden-prompts
  */
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+// @ts-check
+/**
+ * Golden prompts and measurement protocol for real ChatGPT MCP testing.
+ *
+ * @module copilot/mcp/tools/golden-prompts
+ */
+
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult } from '#copilot/mcp/public/protocol/tools';
 
 const GOLDEN_PROMPTS_VERSION = 5;
 
@@ -61,15 +69,15 @@ const GOLDEN_PROMPTS = [
 ];
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpGoldenPromptsTool = {
+export const mcpGoldenPromptsTool = defineMcpRawTool({
     name: 'mcp_golden_prompts',
     title: 'MCP golden prompts',
     description:
         'Return the canonical real-ChatGPT prompt set and measurement schema for authorization/blocking experiments.',
     inputSchema: {},
-    annotations: readOnlyAnnotations(),
+
     handler: async () =>
         okResult({
             success: true,
@@ -112,4 +120,4 @@ export const mcpGoldenPromptsTool = {
                     'No OAuth re-linking after account connection; any remaining prompt is classified as ChatGPT host write confirmation, not missing MCP authorization.',
             },
         }),
-};
+});

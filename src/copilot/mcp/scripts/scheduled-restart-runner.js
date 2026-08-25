@@ -3,4 +3,4 @@
 
 import { runControlledMcpReloadCli } from '#copilot/mcp/public/runtime/reload';
 
-process.exitCode = await runControlledMcpReloadCli(process.argv.slice(2));
+process.exitCode = await runControlledMcpReloadCli(process.argv.slice(2), process.env);

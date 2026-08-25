@@ -117,6 +117,17 @@ export function createIoIndexStatements(db) {
         FROM copilot_io_index_files
         ORDER BY file_path ASC
     `);
+    const stmtListHashVerificationCandidates = db.prepare(`
+        SELECT file_path as filePath, size_bytes as sizeBytes, content_hash as contentHash
+        FROM copilot_io_index_files
+        WHERE status = 'fresh'
+            AND content_hash IS NOT NULL
+            AND size_bytes <= ?
+            AND (file_path = ? OR (file_path >= ? AND file_path < ?))
+            AND file_path > ?
+        ORDER BY file_path ASC
+        LIMIT ?
+    `);
     const stmtCountFiles = db.prepare(`
         SELECT
             COUNT(*) as total,
@@ -282,6 +293,7 @@ export function createIoIndexStatements(db) {
         stmtGetFingerprint,
         stmtListIndexedUnderPathFiltered,
         stmtListIndexedFiles,
+        stmtListHashVerificationCandidates,
         stmtCountFiles,
         stmtCountSymbols,
         stmtCountImports,

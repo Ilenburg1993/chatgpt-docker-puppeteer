@@ -23,6 +23,7 @@ import { resolveSafeValidationSuite } from '#copilot/mcp/public/validation/suite
 import { jobTools } from '#copilot/testing/mcp/tools/jobs';
 import {
     pruneCompletedJobRecords,
+    readMcpValidationProcessConfig,
     readValidatorResourceSnapshot,
     resolveJobTimeoutMs,
     resolveValidatorVitestMaxWorkers,
@@ -32,10 +33,11 @@ import {
     validateDevcontainerBashFile,
 } from '#copilot/testing/mcp/validation/devcontainer-shell';
 
-const TEST_WORKSPACE = createComposedMcpProcessHost({
+const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'mcp-jobs-unit-process-host',
     backgroundServices: false,
-}).workspace;
+});
+const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -46,7 +48,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_WORKSPACE },
+    { workspace: TEST_WORKSPACE, config: TEST_PROCESS_HOST.processConfig.toolConfig },
 );
 
 /** @param {string} name */
@@ -140,8 +142,14 @@ describe('copilot MCP jobs', () => {
         ]);
         try {
             const [validResult, invalidResult] = await Promise.all([
-                validateDevcontainerBashFile(valid, { timeoutMs: 2_000 }),
-                validateDevcontainerBashFile(invalid, { timeoutMs: 2_000 }),
+                validateDevcontainerBashFile(valid, {
+                    timeoutMs: 2_000,
+                    childEnvironment: TEST_PROCESS_HOST.processConfig.validation.childEnvironment,
+                }),
+                validateDevcontainerBashFile(invalid, {
+                    timeoutMs: 2_000,
+                    childEnvironment: TEST_PROCESS_HOST.processConfig.validation.childEnvironment,
+                }),
             ]);
             assert.equal(validResult.ok, true);
             assert.equal(validResult.timedOut, false);
@@ -153,11 +161,32 @@ describe('copilot MCP jobs', () => {
         }
     });
 
+    it('observes physical child close before reporting DevContainer caller cancellation', async () => {
+        const controller = new AbortController();
+        const pending = runBoundedDevcontainerValidationProcess(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 1000)'],
+            {
+                timeoutMs: 5_000,
+                cwd: process.cwd(),
+                env: TEST_PROCESS_HOST.processConfig.validation.childEnvironment,
+                signal: controller.signal,
+            },
+        );
+        setTimeout(() => controller.abort(new Error('unit-cancel')), 40).unref();
+        const result = await pending;
+        assert.equal(result.ok, false);
+        assert.equal(result.cancelled, true);
+        assert.equal(result.timedOut, false);
+        assert.equal(result.terminationRequested, true);
+        assert.equal(result.lifecycleState, 'closed');
+    });
+
     it('observes physical child close before reporting a DevContainer validation timeout', async () => {
         const result = await runBoundedDevcontainerValidationProcess(
             process.execPath,
             ['-e', 'setInterval(() => {}, 1000)'],
-            { timeoutMs: 40, cwd: process.cwd() },
+            { timeoutMs: 40, cwd: process.cwd(), env: TEST_PROCESS_HOST.processConfig.validation.childEnvironment },
         );
 
         assert.equal(result.ok, false);
@@ -238,11 +267,24 @@ describe('copilot MCP jobs', () => {
         assert.equal(resolveValidatorVitestMaxWorkers({}), 2);
         assert.equal(resolveValidatorVitestMaxWorkers({ COPILOT_VALIDATOR_VITEST_MAX_WORKERS: '1' }), 1);
         assert.equal(resolveValidatorVitestMaxWorkers({ COPILOT_VALIDATOR_VITEST_MAX_WORKERS: '99' }), 2);
-        const capacity = readCopilotValidatorCapacityState();
+        const config = readMcpValidationProcessConfig({
+            PATH: '/usr/bin:/bin',
+            LANG: 'C.UTF-8',
+            VITEST: 'true',
+            COPILOT_VALIDATOR_VITEST_MAX_WORKERS: '1',
+            OPENAI_API_KEY: 'must-not-cross',
+        });
+        assert.equal(config.inlineAllowed, false);
+        assert.equal(config.vitestMaxWorkers, 1);
+        assert.equal(config.childEnvironment['VITEST_MAX_WORKERS'], '1');
+        assert.equal(config.childEnvironment['OPENAI_API_KEY'], undefined);
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.childEnvironment), true);
+        const capacity = readCopilotValidatorCapacityState(config);
         assert.match(capacity.runtimeEpoch, /^[0-9a-f-]{36}$/iu);
         assert.ok(capacity.ownerPid > 0);
         assert.equal(capacity.maxActive, 1);
-        assert.equal(capacity.vitestMaxWorkers, 2);
+        assert.equal(capacity.vitestMaxWorkers, 1);
         assert.equal(capacity.activeCount, 0);
     });
 

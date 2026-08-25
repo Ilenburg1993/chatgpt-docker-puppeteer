@@ -1,6 +1,8 @@
 // @ts-check
 /** Test-only membrane for index auto-build state and checkpoint policy. */
 
+export { readMcpIndexAutoBuildConfig } from '../config.js';
+
 export {
     classifyIndexJournalReplayRows,
     parseGitNameStatusZ,

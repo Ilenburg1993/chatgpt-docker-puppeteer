@@ -817,8 +817,9 @@ describe('commands/session — sync commands', () => {
             expect(ctx.output()).toContain('SSE');
             expect(ctx.output()).toContain('permissões automáticas');
             expect(ctx.output()).toContain('1 provedor');
-            expect(ctx.output()).toContain('3 modelos');
-            expect(ctx.output()).toContain('ativo kilo-code · kilo-auto/free');
+            // The explicitly configured model is materialized beside the preset seed catalog.
+            expect(ctx.output()).toContain('4 modelos');
+            expect(ctx.output()).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
             expect(ctx.output()).not.toContain('runtime=');
             expect(ctx.output()).not.toContain('gateway=providers');
             expect(ctx.output()).not.toContain('PM:approve_all');

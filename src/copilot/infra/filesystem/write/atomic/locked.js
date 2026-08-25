@@ -126,6 +126,7 @@ export async function writeFileAtomic(filePath, content, options = {}, invalidat
                         }
                     }
                     assertExpectedSha256Digest(previousSnapshot?.contentHash ?? '', options.expectedHash);
+                    options.signal?.throwIfAborted();
 
                     const durability = await writeAtomicOwnedBufferUnlocked(filePath, payload, {
                         ...(options.mode === undefined ? {} : { mode: options.mode }),
@@ -227,6 +228,7 @@ export async function createOrReplaceFileAtomic(filePath, content, options = {},
                 advisoryLimits: {
                     operation: 'createOrReplaceFileAtomic.parentMkdir',
                 },
+                ...(options.signal === undefined ? {} : { signal: options.signal }),
             },
             invalidationBus,
         );

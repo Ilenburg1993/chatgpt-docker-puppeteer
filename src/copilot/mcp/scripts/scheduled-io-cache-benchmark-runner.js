@@ -3,5 +3,5 @@
 
 import { runScheduledIoCacheBenchmark } from '#copilot/mcp/public/diagnostics/io-cache';
 
-const finalState = await runScheduledIoCacheBenchmark(process.argv.slice(2));
+const finalState = await runScheduledIoCacheBenchmark(process.argv.slice(2), process.env);
 process.exitCode = finalState['status'] === 'completed' ? 0 : 1;

@@ -2,45 +2,92 @@
 /**
  * Read-only self-audit of the MCP tools/list wire payload.
  *
- * Dynamic import avoids a static registry cycle: the underlying SDK in-memory audit imports the canonical registry only
- * after registry initialization has completed.
+ * Surface comparison is supplied by a registry-owned operation capability, preserving one-way registry → tool
+ * composition without letting this catalog leaf import the registry that owns it.
  *
  * @module copilot/mcp/tools/tool-payload-audit
  */
 
-import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { buildToolPayloadAudit, buildToolSurfacePayloadComparison } from '#copilot/mcp/public/diagnostics/tool-payload';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import {
+    okResult,
+    requireMcpToolPayloadAuditConfig,
+    requireMcpToolRoundTripAnalyticsCapability,
+    requireMcpToolSurface,
+} from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
-/** @type {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} */
-let toolsProvider = () => [];
-
-/**
- * A registry injeta a superfície já normalizada depois de construí-la; assim o auditor não depende de volta da
- * registry.
- *
- * @param {() => import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]} provider
- * @returns {void}
- */
-export function bindMcpToolPayloadAuditProvider(provider) {
-    toolsProvider = provider;
-}
-
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} */
-export const mcpToolPayloadAuditTool = {
+/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
+export const mcpToolPayloadAuditTool = defineMcpRawTool({
     name: 'mcp_tool_payload_audit',
     title: 'MCP tool payload audit',
     description: 'Measure tools/list wire bytes and rank the largest descriptors without network calls.',
     inputSchema: {
         top: z.number().int().min(1).max(50).optional()['describe']('Largest tool descriptors to return. Default: 20.'),
+        compareSurfaces: z
+            .boolean()
+            .optional()
+            ['describe']('Compare every canonical tool-surface mode through the SDK tools/list wire path.'),
+        samples: z
+            .number()
+            .int()
+            .min(1)
+            .max(9)
+            .optional()
+            ['describe']('Samples per surface for compareSurfaces. Default: 3.'),
+        usageWindowHours: z
+            .number()
+            .int()
+            .min(1)
+            .max(336)
+            .optional()
+            ['describe']('Round-trip tool-usage window for surface coverage. Default: 24h.'),
     },
-    annotations: readOnlyAnnotations(),
-    handler: async ({ top }) => {
-        return okResult(
-            await buildToolPayloadAudit({
-                tools: toolsProvider(),
-                ...(top === undefined ? {} : { top }),
+
+    handler: async ({ top, compareSurfaces, samples, usageWindowHours }, operationContext) => {
+        const config = requireMcpToolPayloadAuditConfig(operationContext);
+        const currentSurface = await buildToolPayloadAudit({
+            tools: [...requireMcpToolSurface(operationContext).tools],
+            config,
+            ...(top === undefined ? {} : { top }),
+        });
+        if (compareSurfaces !== true) return okResult(currentSurface);
+
+        const toolSurface = requireMcpToolSurface(operationContext);
+        if (typeof toolSurface.resolveCanonicalSurfaces !== 'function') {
+            throw new TypeError('MCP tool-surface comparison requires the registry-owned surface resolver capability.');
+        }
+        const surfaces = toolSurface.resolveCanonicalSurfaces().map((surface) => ({
+            mode: surface.mode,
+            tools: [...surface.tools],
+        }));
+        const usageWindowMs = (usageWindowHours ?? 24) * 60 * 60 * 1000;
+        const usageSnapshot = await requireMcpToolRoundTripAnalyticsCapability(operationContext).summarize({
+            windowMs: usageWindowMs,
+            top: 100,
+            includeSynthetic: false,
+            sync: false,
+        });
+        const usageToolStarts = Array.isArray(usageSnapshot.toolStarts)
+            ? usageSnapshot.toolStarts
+                  .map((row) => ({ tool: String(row?.tool ?? ''), count: Number(row?.count ?? 0) }))
+                  .filter((row) => row.tool && Number.isSafeInteger(row.count) && row.count > 0)
+            : [];
+        return okResult({
+            currentSurface,
+            comparison: await buildToolSurfacePayloadComparison({
+                surfaces,
+                config,
+                ...(samples === undefined ? {} : { samples }),
+                usageToolStarts,
             }),
-        );
+            usageAuthority: {
+                source: 'round-trip-derived-index',
+                windowMs: usageWindowMs,
+                sync: false,
+                indexedRows: usageSnapshot.indexedRows,
+            },
+        });
     },
-};
+});

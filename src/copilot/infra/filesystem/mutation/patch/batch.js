@@ -53,6 +53,7 @@ const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
  *     validateUpdatedContent?: (content: string) => void;
  *     durability?: import('#copilot/infra/internal/platform/node/filesystem').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
  * }} options
  * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
@@ -69,6 +70,7 @@ export async function patchTextBatchLocked(filePath, options, invalidationBus = 
     const captureRollback = (options.captureRollback ?? options.rollbackPolicy?.enabled ?? false) && !options.dryRun;
     try {
         const lease = await acquireIoResourceLock(filePath, {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             operation: 'patch',
             target: filePath,
             riskClass,
@@ -93,6 +95,7 @@ export async function patchTextBatchLocked(filePath, options, invalidationBus = 
                     const operations = [];
 
                     for (const [index, operation] of options.operations.entries()) {
+                        options.signal?.throwIfAborted();
                         try {
                             const operationPreviousHash = currentHash;
                             assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
@@ -193,6 +196,7 @@ export async function patchTextBatchLocked(filePath, options, invalidationBus = 
                               });
                     let durability = null;
                     if (!options.dryRun && !finalNoop) {
+                        options.signal?.throwIfAborted();
                         try {
                             durability = await writeAtomicFileUnlocked(filePath, currentContent, {
                                 expectedHash: previousHash,

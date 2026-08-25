@@ -5,33 +5,40 @@
  * @module copilot/mcp/connection/readiness
  */
 
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
-import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '#copilot/mcp/public/cloudflare/config';
+import { validateConfiguredPublicUrl } from '#copilot/mcp/public/cloudflare/config';
+import { probeHealth } from '#copilot/mcp/public/cloudflare/observability';
 import {
+    createCloudflareManagedProcessController,
+    readCloudflaredOriginDiagnostics,
+} from '#copilot/mcp/public/cloudflare/process';
+import {
+    CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
     createCloudflareStateStore,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-} from '#copilot/mcp/public/cloudflare/state';
+} from '#copilot/mcp/public/cloudflare/tunnel';
+import { readMcpReloadState, summarizeMcpReloadState } from '#copilot/mcp/public/runtime/reload';
+import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful/config';
 import { buildConnectionAuthReadiness } from './oauth-diagnostics.js';
 import {
     buildChatGptConnectorProfile,
     buildClaudeConnectorProfile,
     buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
+    formatChatGptConnectorAuthentication,
 } from './profile.js';
 import { normalizeMcpUrl, validatePublicConnectorUrl } from './url.js';
 
 /**
- * @param {ReturnType<typeof readCloudflareTunnelConfig>} cloudflareConfig
- * @param {ReturnType<typeof readMcpAuthConfig>} authConfig
+ * @param {import('./config.js').McpConnectionRuntimeConfig} runtimeConfig
  * @param {string | null | undefined} connectorUrl
  * @returns {Record<string, unknown>}
  */
-function buildHttp2PlusPosture(cloudflareConfig, authConfig, connectorUrl) {
-    const originTransport = String(process.env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '')
-        .trim()
-        .toLowerCase();
-    const h2OriginRequested = readBooleanEnv(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false);
+function buildHttp2PlusPosture(runtimeConfig, connectorUrl) {
+    const cloudflareConfig = runtimeConfig.cloudflare;
+    const authConfig = runtimeConfig.owner.auth;
+    const originTransport = runtimeConfig.owner.profile.originTransport;
+    const h2OriginRequested = runtimeConfig.owner.profile.cloudflareHttp2OriginRequested;
     const publicValidation = connectorUrl
         ? validatePublicConnectorUrl(connectorUrl)
         : { ok: false, reason: 'No connector URL.' };
@@ -55,7 +62,7 @@ function buildHttp2PlusPosture(cloudflareConfig, authConfig, connectorUrl) {
 }
 
 /**
- * @param {ReturnType<typeof readCloudflareTunnelConfig>} cloudflareConfig
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} cloudflareConfig
  * @param {string} originTransport
  * @param {boolean} h2OriginRequested
  * @returns {string[]}
@@ -86,22 +93,7 @@ function buildHttp2PlusRecommendations(cloudflareConfig, originTransport, h2Orig
 }
 
 /**
- * @param {string | undefined} value
- * @param {boolean} fallback
- * @returns {boolean}
- */
-function readBooleanEnv(value, fallback) {
-    const raw = String(value ?? '')
-        .trim()
-        .toLowerCase();
-    if (!raw) return fallback;
-    if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
-    if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
-    return fallback;
-}
-
-/**
- * @param {ReturnType<typeof readCloudflareTunnelConfig>} cloudflareConfig
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} cloudflareConfig
  * @returns {Promise<any>}
  */
 async function buildConnectorStateSummary(cloudflareConfig) {
@@ -149,6 +141,15 @@ function buildCanonicalSmokePrompts() {
 }
 
 /**
+ * @param {import('./config.js').McpConnectionRuntimeConfig | undefined} runtimeConfig
+ * @returns {import('./config.js').McpConnectionRuntimeConfig}
+ */
+function requireConnectionRuntimeConfig(runtimeConfig) {
+    if (!runtimeConfig) throw new TypeError('MCP connection readiness requires a process-scoped runtime config.');
+    return runtimeConfig;
+}
+
+/**
  * @param {string} value
  * @returns {URL | null}
  */
@@ -160,33 +161,39 @@ function safeParseUrl(value) {
     }
 }
 
-/** @param {{ publicMcpUrl?: string | undefined }} [input] */
-export function readChatGptConnectorProfileReport(input = {}) {
+/**
+ * @param {{ publicMcpUrl?: string | undefined }} [input]
+ * @param {import('./config.js').McpConnectionRuntimeConfig | undefined} [runtimeConfig]
+ */
+export function readChatGptConnectorProfileReport(input = {}, runtimeConfig) {
     const profileOptions = input.publicMcpUrl === undefined ? {} : { publicMcpUrl: input.publicMcpUrl };
-    const profile = buildChatGptConnectorProfile(profileOptions);
-    const authConfig = readMcpAuthConfig();
-    const cloudflareConfig = readCloudflareTunnelConfig();
+    const config = requireConnectionRuntimeConfig(runtimeConfig);
+    const profile = buildChatGptConnectorProfile(profileOptions, config.owner);
+    const authConfig = config.owner.auth;
     return {
         success: true,
         profile: { ...profile, smokePrompts: buildCanonicalSmokePrompts() },
         auth: buildConnectionAuthReadiness(authConfig),
-        http2Plus: buildHttp2PlusPosture(cloudflareConfig, authConfig, profile.connectorUrl),
-        runbook: buildSecureTunnelRunbook(profileOptions),
-        cloudflareRunbook: buildCloudflareTunnelRunbook(profileOptions),
+        http2Plus: buildHttp2PlusPosture(config, profile.connectorUrl),
+        runbook: buildSecureTunnelRunbook(profileOptions, config.owner),
+        cloudflareRunbook: buildCloudflareTunnelRunbook(profileOptions, config.owner),
     };
 }
 
-/** @param {{ publicMcpUrl?: string | undefined }} [input] */
-export function readClaudeConnectorProfileReport(input = {}) {
+/**
+ * @param {{ publicMcpUrl?: string | undefined }} [input]
+ * @param {import('./config.js').McpConnectionRuntimeConfig | undefined} [runtimeConfig]
+ */
+export function readClaudeConnectorProfileReport(input = {}, runtimeConfig) {
     const profileOptions = input.publicMcpUrl === undefined ? {} : { publicMcpUrl: input.publicMcpUrl };
-    const profile = buildClaudeConnectorProfile(profileOptions);
-    const authConfig = readMcpAuthConfig();
-    const cloudflareConfig = readCloudflareTunnelConfig();
+    const config = requireConnectionRuntimeConfig(runtimeConfig);
+    const profile = buildClaudeConnectorProfile(profileOptions, config.owner);
+    const authConfig = config.owner.auth;
     return {
         success: true,
         profile,
         auth: buildConnectionAuthReadiness(authConfig),
-        http2Plus: buildHttp2PlusPosture(cloudflareConfig, authConfig, profile.connectorUrl),
+        http2Plus: buildHttp2PlusPosture(config, profile.connectorUrl),
         cloudflareChecklist: [
             'Run npm run copilot:mcp:cloudflare:remote-audit and require ok=true.',
             'Run npm run copilot:mcp:cloudflare:h2-remote-audit before enabling/restarting HTTP/2 origin mode.',
@@ -221,9 +228,11 @@ export function checkChatGptConnectorUrl(publicMcpUrl) {
     };
 }
 
-export async function readChatGptConnectorCurrentUrlStatus() {
-    const cloudflareConfig = readCloudflareTunnelConfig();
-    const authConfig = readMcpAuthConfig();
+/** @param {import('./config.js').McpConnectionRuntimeConfig} runtimeConfig */
+export async function readChatGptConnectorCurrentUrlStatus(runtimeConfig) {
+    const config = requireConnectionRuntimeConfig(runtimeConfig);
+    const cloudflareConfig = config.cloudflare;
+    const authConfig = config.owner.auth;
     const state = await buildConnectorStateSummary(cloudflareConfig);
     return {
         success: state.validation.ok === true,
@@ -238,7 +247,7 @@ export async function readChatGptConnectorCurrentUrlStatus() {
                 authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'No authentication',
         },
         auth: buildConnectionAuthReadiness(authConfig),
-        http2Plus: buildHttp2PlusPosture(cloudflareConfig, authConfig, state.currentUrl),
+        http2Plus: buildHttp2PlusPosture(config, state.currentUrl),
         temporaryTunnel: { ...state.temporaryTunnel, ignoredForOperationalReadiness: state.permanentReady },
         permanentTunnel: {
             mode: cloudflareConfig.mode,
@@ -257,17 +266,21 @@ export async function readChatGptConnectorCurrentUrlStatus() {
     };
 }
 
-/** @param {{ publicMcpUrl?: string | undefined }} [input] */
-export async function readMcpConnectionReadiness(input = {}) {
-    const cloudflareConfig = readCloudflareTunnelConfig();
-    const authConfig = readMcpAuthConfig();
+/**
+ * @param {{ publicMcpUrl?: string | undefined }} [input]
+ * @param {import('./config.js').McpConnectionRuntimeConfig | undefined} [runtimeConfig]
+ */
+export async function readMcpConnectionReadiness(input = {}, runtimeConfig) {
+    const config = requireConnectionRuntimeConfig(runtimeConfig);
+    const cloudflareConfig = config.cloudflare;
+    const authConfig = config.owner.auth;
     const state = await buildConnectorStateSummary(cloudflareConfig);
     const candidateUrl = input.publicMcpUrl ? normalizeMcpUrl(input.publicMcpUrl) : state.currentUrl;
     const candidateValidation = candidateUrl
         ? validatePublicConnectorUrl(candidateUrl)
         : { ok: false, reason: 'No public MCP URL is configured.' };
     const auth = buildConnectionAuthReadiness(authConfig);
-    const http2Plus = buildHttp2PlusPosture(cloudflareConfig, authConfig, candidateUrl);
+    const http2Plus = buildHttp2PlusPosture(config, candidateUrl);
     const blockers = [];
     if (candidateValidation.ok !== true)
         blockers.push(
@@ -310,4 +323,152 @@ export async function readMcpConnectionReadiness(input = {}) {
             'Remote smoke and OAuth smoke pass before reconnecting in ChatGPT.',
         ],
     };
+}
+
+/**
+ * Compact one post-restart readiness snapshot for result surfaces that do not need every diagnostic field.
+ *
+ * @param {Record<string, unknown>} snapshot
+ * @returns {Record<string, unknown>}
+ */
+export function summarizeMcpPostRestartReadiness(snapshot) {
+    const processes = recordOrEmpty(snapshot['processes']);
+    const mcpHttp = recordOrEmpty(processes['mcpHttp']);
+    const cloudflared = recordOrEmpty(processes['cloudflared']);
+    const reload = recordOrEmpty(snapshot['reload']);
+    const connectorSmoke = recordOrEmpty(snapshot['connectorSmoke']);
+    return {
+        ready: snapshot['ready'] === true,
+        mode: snapshot['mode'] ?? null,
+        connectorUrl: snapshot['connectorUrl'] ?? null,
+        healthReady: snapshot['healthReady'] === true,
+        processes: {
+            mcpHttpAlive: mcpHttp['alive'] === true,
+            cloudflaredAlive: cloudflared['alive'] === true,
+        },
+        reload: {
+            status: reload['status'] ?? null,
+            completedSuccessfully: reload['completedSuccessfully'] === true,
+            failed: reload['failed'] === true,
+            inFlight: reload['inFlight'] === true,
+            smokeAfterReload: reload['smokeAfterReload'] === true,
+            reconciledWithConnectorSmoke: reload['reconciledWithConnectorSmoke'] === true,
+        },
+        connectorSmoke: {
+            ok: connectorSmoke['ok'] === true,
+            fresh: connectorSmoke['fresh'] === true,
+            checkedAt: connectorSmoke['checkedAt'] ?? null,
+            ageMinutes: connectorSmoke['ageMinutes'] ?? null,
+        },
+        nextActions: Array.isArray(snapshot['nextActions']) ? snapshot['nextActions'] : [],
+    };
+}
+
+/**
+ * Process/tunnel generation readiness after an MCP restart. This is a connector-composition concern rather than a
+ * Cloudflare wire concern: it joins process liveness, local/public health, reload reconciliation and persisted smoke.
+ *
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} cloudflareConfig
+ * @param {import('#copilot/mcp/public/auth').McpAuthConfig} authConfig
+ * @param {{ includeDiagnostics?: boolean }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function readMcpPostRestartReadiness(workspace, cloudflareConfig, authConfig, options = {}) {
+    const publicUrlValidation = validateConfiguredPublicUrl(cloudflareConfig) ?? null;
+    const connectorSmoke = summarizeConnectorSmokeState(
+        await createCloudflareStateStore(cloudflareConfig).readConnectorSmokeState(),
+        cloudflareConfig.publicMcpUrl ?? null,
+    );
+    const processes = createCloudflareManagedProcessController(cloudflareConfig);
+    const reload = summarizeMcpReloadState(await readMcpReloadState(workspace), connectorSmoke.checkedAt);
+    const connectorSmokeAgeFresh =
+        connectorSmoke.ok === true &&
+        typeof connectorSmoke.ageMinutes === 'number' &&
+        connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
+    const connectorSmokeFresh = connectorSmokeAgeFresh && reload.reconciledWithConnectorSmoke === true;
+    const publicHealthUrl = cloudflareConfig.publicMcpUrl
+        ? new URL('/health', cloudflareConfig.publicMcpUrl).toString()
+        : null;
+    const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
+        processes.mcpHttp.status(),
+        processes.cloudflared.status(),
+        probeHealth(cloudflareConfig.healthUrl, {
+            allowInsecureHttps: cloudflareConfig.healthUrl.startsWith('https://'),
+            ...(cloudflareConfig.originServerName ? { servername: cloudflareConfig.originServerName } : {}),
+            timeoutMs: 3000,
+        }),
+        publicHealthUrl
+            ? probeHealth(publicHealthUrl, { timeoutMs: 3000 })
+            : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
+    ]);
+    const originDiagnostics =
+        options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics(cloudflareConfig);
+    const statefulPolicy = readMcpHttpStatefulRuntimePolicySnapshot();
+    const permanentUrlReady =
+        cloudflareConfig.mode === 'named-permanent' &&
+        Boolean(cloudflareConfig.publicMcpUrl) &&
+        publicUrlValidation?.ok === true;
+    const healthReady = localHealth.ok || publicHealth.ok;
+    const ready =
+        permanentUrlReady && mcpHttpProcess.alive && cloudflaredProcess.alive && healthReady && connectorSmokeFresh;
+    /** @type {string[]} */
+    const nextActions = [];
+    if (!permanentUrlReady) nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
+    if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !healthReady) {
+        nextActions.push('Run make copilot-mcp-restart.');
+    } else if (!localHealth.ok && publicHealth.ok) {
+        nextActions.push(
+            'Local HTTPS health probe failed, but public connector health is OK; inspect SNI/local TLS only if origin debugging is needed.',
+        );
+    }
+    if (reload.inFlight) {
+        nextActions.push(
+            'Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.',
+        );
+    } else if (reload.failed) {
+        nextActions.push('Inspect mcp_reload_status: the latest controlled MCP reload did not complete successfully.');
+    }
+    if (!connectorSmokeFresh) {
+        nextActions.push(
+            reload.completedSuccessfully && reload.smokeAfterReload !== true
+                ? 'Run mcp_connector_smoke_refresh after the latest completed reload to reconcile the new process/tunnel generation.'
+                : 'Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.',
+        );
+    }
+    if (ready) nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
+    return {
+        success: true,
+        ready,
+        mode: cloudflareConfig.mode,
+        connectorUrl: cloudflareConfig.publicMcpUrl ?? null,
+        publicUrlValidation,
+        processes: { mcpHttp: mcpHttpProcess, cloudflared: cloudflaredProcess },
+        localHealth,
+        publicHealth,
+        healthReady,
+        ...(originDiagnostics === null ? {} : { originDiagnostics }),
+        statefulPolicy,
+        reload,
+        connectorSmoke: {
+            ...connectorSmoke,
+            ageFresh: connectorSmokeAgeFresh,
+            fresh: connectorSmokeFresh,
+            staleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
+        },
+        chatgpt: {
+            authentication: formatChatGptConnectorAuthentication(authConfig),
+            recommendedFirstCalls: ready
+                ? ['mcp_session_profile', 'mcp_validation_dashboard', 'repo_status']
+                : ['mcp_tunnel_status', 'mcp_connector_smoke_refresh'],
+        },
+        nextActions,
+    };
+}
+
+/** @param {unknown} value @returns {Record<string, unknown>} */
+function recordOrEmpty(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }

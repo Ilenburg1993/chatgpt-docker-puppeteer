@@ -9,8 +9,7 @@
  * @module copilot/mcp/diagnostics/workspace-smoke/runtime
  */
 
-import { readCloudflareTunnelConfig } from '#copilot/mcp/public/cloudflare/config';
-import { createCloudflareStateStore, summarizeQuickTunnelState } from '#copilot/mcp/public/cloudflare/state';
+import { createCloudflareStateStore, summarizeQuickTunnelState } from '#copilot/mcp/public/cloudflare/tunnel';
 import { readMcpProjectDoctor } from '#copilot/mcp/public/diagnostics/project-doctor';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
 import { readRepositoryStatus } from '#copilot/mcp/public/workspace/repository/status';
@@ -26,9 +25,13 @@ import { recordMcpWorkspaceSmokeSummary } from './state.js';
  *     critical: string[];
  * }>}
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} tunnelConfig
+ * @param {{ gitConfig: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig; signal?: AbortSignal }} options
  */
-export async function runMcpWorkspaceSmoke(workspace) {
+export async function runMcpWorkspaceSmoke(workspace, tunnelConfig, options) {
     if (!workspace) throw new TypeError('Workspace smoke requires a workspace capability.');
+    if (!tunnelConfig) throw new TypeError('Workspace smoke requires a Cloudflare config projection.');
+    if (!options?.gitConfig) throw new TypeError('Workspace smoke requires an explicit Git process config.');
     const workspaceRoot = workspace.workspaceRoot;
     const readIoIndexStatus = workspace.indexRegistry.status;
     const { readTextValidated, statPathValidated } = workspace.io;
@@ -41,7 +44,11 @@ export async function runMcpWorkspaceSmoke(workspace) {
     const startedAt = Date.now();
 
     await runCheck(checks, 'repo_status', async () => {
-        const result = await readRepositoryStatus({ workspaceRoot });
+        const result = await readRepositoryStatus({
+            workspaceRoot,
+            gitConfig: options.gitConfig,
+            ...(options.signal ? { signal: options.signal } : {}),
+        });
         if (!result.success) throw new Error(result.error);
         if (result.dirty) warnings.push('WORKSPACE_DIRTY: repository has uncommitted or untracked changes.');
         return { dirty: result.dirty };
@@ -130,11 +137,16 @@ export async function runMcpWorkspaceSmoke(workspace) {
         };
     });
     await runCheck(checks, 'project_doctor', async () => ({
-        success: (await readMcpProjectDoctor(workspace, { includeScripts: false })).success,
+        success: (
+            await readMcpProjectDoctor(workspace, {
+                includeScripts: false,
+                gitConfig: options.gitConfig,
+                ...(options.signal ? { signal: options.signal } : {}),
+            })
+        ).success,
     }));
     await runCheck(checks, 'mcp_runtime_health', async () => {
         const metrics = readMcpMetricsSnapshot();
-        const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await createCloudflareStateStore(tunnelConfig).readQuickTunnelState();
         const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
         if (tunnelConfig.mode === 'temporary-quick' && tunnel.stale)

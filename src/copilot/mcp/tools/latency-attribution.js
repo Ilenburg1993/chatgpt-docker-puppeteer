@@ -10,7 +10,13 @@
 
 import { runMcpLatencyAttributionDiagnostic } from '#copilot/mcp/public/diagnostics/latency/attribution';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
-import { okResult, openWorldReadOnlyAnnotations, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import {
+    okResult,
+    requireMcpToolAuditCapability,
+    requireMcpToolCloudflareConfig,
+    requireMcpToolCloudflareEnvironmentAuthority,
+} from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /** @param {string} description */
@@ -24,7 +30,7 @@ function pulseExperimentLabelSchema(description) {
         .describe(description);
 }
 
-export const mcpLatencyPulseTool = {
+export const mcpLatencyPulseTool = defineMcpRawTool({
     name: 'mcp_latency_pulse',
     title: 'MCP latency pulse',
     description:
@@ -48,7 +54,7 @@ export const mcpLatencyPulseTool = {
         clientLabel: pulseExperimentLabelSchema('Optional sanitized client label, for example desktop-app or browser.'),
         vpnLabel: pulseExperimentLabelSchema('Optional sanitized VPN condition, for example off or provider-a.'),
     },
-    annotations: readOnlyAnnotations(),
+
     handler: async (input = {}) => {
         const { seriesId, step, networkLabel, modelLabel, conversationLabel, clientLabel, vpnLabel } =
             /** @type {{ seriesId?: string; step?: number; networkLabel?: string; modelLabel?: string; conversationLabel?: string; clientLabel?: string; vpnLabel?: string }} */ (
@@ -72,9 +78,9 @@ export const mcpLatencyPulseTool = {
             activeRequests: boundary.activeRequests,
         });
     },
-};
+});
 
-export const mcpLatencyAttributionTool = {
+export const mcpLatencyAttributionTool = defineMcpRawTool({
     name: 'mcp_latency_attribution',
     title: 'MCP latency attribution',
     description:
@@ -104,13 +110,20 @@ export const mcpLatencyAttributionTool = {
             .optional()
             ['describe']('Include per-endpoint and per-source evidence. Defaults false to minimize context pressure.'),
     },
-    annotations: openWorldReadOnlyAnnotations(),
-    handler: async (input = {}) =>
+
+    handler: async (
+        input = {},
+        /** @type {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} */ operationContext,
+    ) =>
         okResult(
             await runMcpLatencyAttributionDiagnostic(
                 /** @type {{ reportedSlow?: boolean; clientSchemaProjectionStale?: boolean; timeoutMs?: number; includeDetails?: boolean }} */ (
                     input
                 ),
+                requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+                requireMcpToolCloudflareConfig(operationContext),
+                operationContext?.capabilities.httpSessionRuntime?.readState(),
+                requireMcpToolAuditCapability(operationContext),
             ),
         ),
-};
+});

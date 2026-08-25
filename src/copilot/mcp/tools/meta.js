@@ -6,11 +6,11 @@
  */
 
 import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
-    readOnlyAnnotations,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
@@ -350,10 +350,10 @@ export function buildMcpCapabilitiesSummary(options = {}) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[]}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const metaTools = [
-    {
+    defineMcpRawTool({
         name: 'mcp_capabilities_summary',
         title: 'MCP capabilities summary',
         description:
@@ -364,8 +364,8 @@ export const metaTools = [
                 .optional()
                 ['describe']('Include full grouped tool names and complete IO guidance. Default: false.'),
         },
-        annotations: readOnlyAnnotations(),
+
         handler: async ({ includeDetails }) =>
             okResult(buildMcpCapabilitiesSummary({ includeDetails: includeDetails === true })),
-    },
+    }),
 ];

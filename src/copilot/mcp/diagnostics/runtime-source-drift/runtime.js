@@ -16,7 +16,7 @@ export const MCP_RUNTIME_SOURCE_DRIFT_CACHE_TTL_MS = 2_000;
 export const MCP_RUNTIME_SOURCE_DRIFT_PATHS = Object.freeze([
     'src/copilot/mcp/registry/runtime.js',
     'src/copilot/mcp/server/runtime.js',
-    'src/copilot/mcp/adapters/http-shared.js',
+    'src/copilot/mcp/adapters/http/handler.js',
     'src/copilot/mcp/tools/repo-write.js',
     'src/copilot/mcp/protocol/tools/contracts/operation-context.js',
     'src/copilot/mcp/runtime/reload/runner.js',

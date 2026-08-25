@@ -6,25 +6,35 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
+import { readCompanyKnowledgeProcessConfig } from '#copilot/mcp/public/company-knowledge';
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import {
     buildCompanyKnowledgeWidgetResource,
     COMPANY_KNOWLEDGE_WIDGET_URI,
 } from '#copilot/mcp/public/protocol/apps-sdk';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import {
+    decodeCompanyKnowledgeDocumentId,
+    encodeCompanyKnowledgeDocumentId,
+    resetCompanyKnowledgeCorpusCacheForTests,
+} from '#copilot/testing/mcp/company-knowledge';
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
     COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME,
-    companyKnowledgeTestHarness,
     companyKnowledgeTools,
 } from '#copilot/testing/mcp/tools/company-knowledge';
 
-const COMPANY_KNOWLEDGE_WORKSPACE = createComposedMcpProcessHost({
+const COMPANY_KNOWLEDGE_HOST = createComposedMcpProcessHost({
     hostId: 'company-knowledge-test-host',
     backgroundServices: false,
-}).workspace;
+});
+const COMPANY_KNOWLEDGE_WORKSPACE = COMPANY_KNOWLEDGE_HOST.workspace;
 
-function createCompanyKnowledgeOperationContext() {
+/** @param {import('#copilot/mcp/public/company-knowledge').CompanyKnowledgeProcessConfig} [companyKnowledgeConfig] */
+function createCompanyKnowledgeOperationContext(
+    companyKnowledgeConfig = COMPANY_KNOWLEDGE_HOST.processConfig.companyKnowledge,
+) {
     return createMcpToolOperationContext(
         {
             mcpReq: {
@@ -34,13 +44,16 @@ function createCompanyKnowledgeOperationContext() {
                 _meta: { caller: 'unit-test' },
             },
         },
-        { workspace: COMPANY_KNOWLEDGE_WORKSPACE },
+        {
+            workspace: COMPANY_KNOWLEDGE_WORKSPACE,
+            config: { companyKnowledge: companyKnowledgeConfig },
+        },
     );
 }
 
 describe('MCP Company Knowledge tools', () => {
     beforeEach(() => {
-        companyKnowledgeTestHarness.resetCompanyKnowledgeCorpusCacheForTests();
+        resetCompanyKnowledgeCorpusCacheForTests();
     });
 
     it('exposes exact read-only search/fetch tools required by Company Knowledge', () => {
@@ -49,10 +62,20 @@ describe('MCP Company Knowledge tools', () => {
 
         assert.ok(search);
         assert.ok(fetch);
-        assert.equal(search.annotations.readOnlyHint, true);
-        assert.equal(fetch.annotations.readOnlyHint, true);
-        assert.equal(search.annotations.openWorldHint, false);
-        assert.equal(fetch.annotations.openWorldHint, false);
+        assert.equal('annotations' in search, false);
+        assert.equal('annotations' in fetch, false);
+        const canonicalSearch = getCanonicalMcpTools().find((tool) => tool.name === COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME);
+        const canonicalFetch = getCanonicalMcpTools().find((tool) => tool.name === COMPANY_KNOWLEDGE_FETCH_TOOL_NAME);
+        assert.ok(canonicalSearch);
+        assert.ok(canonicalFetch);
+        assert.equal(canonicalSearch.annotations.readOnlyHint, true);
+        assert.equal(canonicalFetch.annotations.readOnlyHint, true);
+        assert.equal(canonicalSearch.annotations.openWorldHint, false);
+        assert.equal(canonicalFetch.annotations.openWorldHint, false);
+        assert.equal(canonicalSearch.contract.effects.mutation, 'none');
+        assert.equal(canonicalFetch.contract.effects.mutation, 'none');
+        assert.equal(canonicalSearch.contract.authority.network, 'local');
+        assert.equal(canonicalFetch.contract.authority.network, 'local');
         const searchUi = /** @type {Record<string, unknown>} */ (search._meta?.['ui'] ?? {});
         const fetchUi = /** @type {Record<string, unknown>} */ (fetch._meta?.['ui'] ?? {});
         assert.equal(searchUi['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
@@ -107,12 +130,59 @@ describe('MCP Company Knowledge tools', () => {
         assert.equal(result.structuredContent['code'], 'COMPANY_KNOWLEDGE_DOCUMENT_NOT_FOUND');
     });
 
+    it('keeps Company Knowledge process generations immutable and independent from source env mutation', () => {
+        const env = {
+            COPILOT_MCP_COMPANY_KNOWLEDGE_ROOTS: 'README.md,src/copilot/mcp/README.md',
+            COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE: 'https://example.test/repo',
+            COPILOT_MCP_COMPANY_KNOWLEDGE_CACHE_TTL_MS: '12345',
+            COPILOT_MCP_COMPANY_KNOWLEDGE_MAX_DOCUMENTS: '7',
+            COPILOT_MCP_WIDGET_DOMAIN: 'https://widget.example.test',
+        };
+        const config = readCompanyKnowledgeProcessConfig(env);
+        env.COPILOT_MCP_COMPANY_KNOWLEDGE_ROOTS = 'CHANGELOG.md';
+        env.COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE = 'https://mutated.example.test';
+
+        assert.deepEqual(config.corpusRoots, ['README.md', 'src/copilot/mcp/README.md']);
+        assert.equal(config.repositoryWebBase, 'https://example.test/repo');
+        assert.equal(config.cacheTtlMs, 12_345);
+        assert.equal(config.maxDocuments, 7);
+        assert.equal(config.widgetDomain, 'https://widget.example.test');
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.corpusRoots), true);
+    });
+
+    it('isolates corpus cache entries by immutable configuration generation', async () => {
+        const search = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME);
+        assert.ok(search);
+        const baseEnv = {
+            COPILOT_MCP_COMPANY_KNOWLEDGE_ROOTS: 'README.md',
+            COPILOT_MCP_COMPANY_KNOWLEDGE_CACHE_TTL_MS: '600000',
+        };
+        const firstConfig = readCompanyKnowledgeProcessConfig({
+            ...baseEnv,
+            COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE: 'https://first.example.test/repo',
+        });
+        const secondConfig = readCompanyKnowledgeProcessConfig({
+            ...baseEnv,
+            COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE: 'https://second.example.test/repo',
+        });
+
+        const first = await search.handler({ query: 'MCP' }, createCompanyKnowledgeOperationContext(firstConfig));
+        const second = await search.handler({ query: 'MCP' }, createCompanyKnowledgeOperationContext(secondConfig));
+        const firstResults = /** @type {{ url: string }[]} */ (first.structuredContent['results']);
+        const secondResults = /** @type {{ url: string }[]} */ (second.structuredContent['results']);
+        assert.ok(firstResults.length > 0);
+        assert.ok(secondResults.length > 0);
+        assert.ok(firstResults.every((entry) => entry.url.startsWith('https://first.example.test/repo/')));
+        assert.ok(secondResults.every((entry) => entry.url.startsWith('https://second.example.test/repo/')));
+    });
+
     it('uses deterministic repo document ids without leaking absolute paths', () => {
-        const id = companyKnowledgeTestHarness.encodeCompanyKnowledgeDocumentId('src/copilot/mcp/README.md');
+        const id = encodeCompanyKnowledgeDocumentId('src/copilot/mcp/README.md');
 
         assert.equal(id.startsWith('repo:'), true);
         assert.equal(id.includes('/workspaces/'), false);
-        assert.equal(companyKnowledgeTestHarness.decodeCompanyKnowledgeDocumentId(id), 'src/copilot/mcp/README.md');
+        assert.equal(decodeCompanyKnowledgeDocumentId(id), 'src/copilot/mcp/README.md');
     });
 
     it('registers a versioned MCP Apps widget with dedicated domain, standard CSP and bridge rendering', () => {

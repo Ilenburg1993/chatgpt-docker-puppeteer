@@ -417,8 +417,7 @@ function buildActualOriginRequest(originRequest) {
     return actual;
 }
 
-/** @type {ReadonlySet<string>} */
-const CLOUDFLARE_DURATION_KEYS = new Set(['connectTimeout', 'keepAliveTimeout', 'tcpKeepAlive', 'tlsTimeout']);
+const CLOUDFLARE_DURATION_KEYS = Object.freeze(['connectTimeout', 'keepAliveTimeout', 'tcpKeepAlive', 'tlsTimeout']);
 
 /**
  * @param {unknown} left
@@ -430,7 +429,7 @@ function sameConfigValue(left, right, key = '') {
     if (left === right) return true;
     if ((left === null || left === undefined || left === '') && (right === null || right === undefined || right === ''))
         return true;
-    if (CLOUDFLARE_DURATION_KEYS.has(key)) {
+    if (CLOUDFLARE_DURATION_KEYS.includes(key)) {
         const leftDuration = normalizeCloudflareDurationNanos(left);
         const rightDuration = normalizeCloudflareDurationNanos(right);
         if (leftDuration !== null && rightDuration !== null) return leftDuration === rightDuration;

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { runDependencyNativeSmoke } from '#copilot/mcp/public/maintenance/dependencies/native-smoke';
+import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import {
     readDeclaredNpmVersionFromPackageText,
     runFixedDependencyMaintenanceCommandForTests,
@@ -56,7 +57,10 @@ describe('MCP dependency maintenance', () => {
     });
 
     it('proves currently declared native/runtime-sensitive dependencies are loadable', async () => {
-        const result = await runDependencyNativeSmoke();
+        const result = await runDependencyNativeSmoke({
+            workspaceRoot: process.cwd(),
+            childEnvironment: buildMcpChildEnvironment({ parentEnv: process.env }).env,
+        });
         assert.equal(result.success, true, JSON.stringify(result, null, 2));
         assert.ok(result.checkedCount >= 3);
         const names = new Set(result.checks.map((check) => String(check['name'])));

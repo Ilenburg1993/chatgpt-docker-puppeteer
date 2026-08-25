@@ -21,11 +21,16 @@ const MAX_REPOSITORY_PATCH_TARGETS = 64;
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} RepositoryPatchWorkspace */
 /** @typedef {RepositoryPatchWorkspace['io']} RepositoryPatchIo */
-/** @typedef {Readonly<{workspace: RepositoryPatchWorkspace; io: RepositoryPatchIo}>} RepositoryPatchRuntime */
+/** @typedef {Readonly<{workspace: RepositoryPatchWorkspace; io: RepositoryPatchIo; signal?: AbortSignal}>} RepositoryPatchRuntime */
 
-/** @param {RepositoryPatchWorkspace} workspace @returns {RepositoryPatchRuntime} */
-function createRepositoryPatchRuntime(workspace) {
-    return Object.freeze({ workspace, io: workspace.io });
+/** @param {RepositoryPatchWorkspace} workspace @param {AbortSignal | undefined} signal @returns {RepositoryPatchRuntime} */
+function createRepositoryPatchRuntime(workspace, signal) {
+    return Object.freeze({ workspace, io: workspace.io, ...(signal ? { signal } : {}) });
+}
+
+/** @param {RepositoryPatchRuntime} runtime */
+function throwIfRepositoryPatchAborted(runtime) {
+    runtime.signal?.throwIfAborted();
 }
 
 /** @param {number | undefined} requested */
@@ -42,9 +47,10 @@ function resolveRepositoryPatchTargetLimit(requested) {
  * @param {Parameters<RepositoryPatchIo['patchTextLocked']>[1]} options
  */
 function patchResolvedTarget(/** @type {RepositoryPatchRuntime} */ runtime, resolved, options) {
+    const executionOptions = { ...options, ...(runtime.signal ? { signal: runtime.signal } : {}) };
     return resolved.validatedWritePath
-        ? runtime.io.patchTextLockedValidated(resolved.validatedWritePath, options)
-        : runtime.io.patchTextLocked(resolved.resolved, options);
+        ? runtime.io.patchTextLockedValidated(resolved.validatedWritePath, executionOptions)
+        : runtime.io.patchTextLocked(resolved.resolved, executionOptions);
 }
 
 /**
@@ -52,9 +58,10 @@ function patchResolvedTarget(/** @type {RepositoryPatchRuntime} */ runtime, reso
  * @param {Parameters<RepositoryPatchIo['patchTextBatchLocked']>[1]} options
  */
 function patchResolvedTargetBatch(/** @type {RepositoryPatchRuntime} */ runtime, resolved, options) {
+    const executionOptions = { ...options, ...(runtime.signal ? { signal: runtime.signal } : {}) };
     return resolved.validatedWritePath
-        ? runtime.io.patchTextBatchLockedValidated(resolved.validatedWritePath, options)
-        : runtime.io.patchTextBatchLocked(resolved.resolved, options);
+        ? runtime.io.patchTextBatchLockedValidated(resolved.validatedWritePath, executionOptions)
+        : runtime.io.patchTextBatchLocked(resolved.resolved, executionOptions);
 }
 
 /** @param {unknown} value @returns {{ durability: import('#copilot/infra/public/policy').IoDurabilityMode } | {}} */
@@ -130,7 +137,7 @@ async function planPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ run
             computeDiff: operation['includeDiffPreview'] === true,
             ...createRepositoryPatchResultValidationOption(resolved.relative),
             advisoryLimits: {
-                tool: 'repo_patch_batch_plan',
+                tool: typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_patch_batch_plan',
                 index,
                 oldStringChars: String(operation['old_string'] ?? '').length,
                 newStringChars: String(operation['new_string'] ?? '').length,
@@ -157,6 +164,14 @@ async function planPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ run
             previousHash: patch.previousHash,
             projectedHash: patch.contentHash,
             noop: patch.noop,
+            io: {
+                operation: patch.io.operation,
+                targetKind: patch.io.targetKind,
+                bytesWritten: patch.io.bytesWritten,
+                durationMs: patch.io.durationMs,
+                engine: patch.io.engine,
+                traceId: patch.io.traceId ?? null,
+            },
             ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
                 diff: patch.diffPreview,
                 truncated: patch.diffPreviewTruncated,
@@ -216,7 +231,7 @@ async function applyPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ ru
             ...createRepositoryPatchResultValidationOption(resolved.relative),
             ...durabilityOption(operation['durability']),
             advisoryLimits: {
-                tool: 'repo_apply_patch_batch',
+                tool: typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_apply_patch_batch',
                 index,
                 oldStringChars: String(operation['old_string'] ?? '').length,
                 newStringChars: String(operation['new_string'] ?? '').length,
@@ -246,6 +261,14 @@ async function applyPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ ru
             contentHash: patch.contentHash,
             noop: patch.noop,
             traceId: patch.io.traceId ?? null,
+            io: {
+                operation: patch.io.operation,
+                targetKind: patch.io.targetKind,
+                bytesWritten: patch.io.bytesWritten,
+                durationMs: patch.io.durationMs,
+                engine: patch.io.engine,
+                traceId: patch.io.traceId ?? null,
+            },
             ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
                 diff: patch.diffPreview,
                 truncated: patch.diffPreviewTruncated,
@@ -345,6 +368,7 @@ async function runPatchBatchOperations(/** @type {RepositoryPatchRuntime} */ run
     /** @type {Record<string, unknown>[]} */
     const results = [];
     for (const group of groups.values()) {
+        throwIfRepositoryPatchAborted(runtime);
         if (group.length === 1) {
             const entry = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
             results.push(
@@ -507,7 +531,7 @@ async function runPatchBatchOperations(/** @type {RepositoryPatchRuntime} */ run
  *
  * @param {Record<string, unknown>[]} operations
  * @param {boolean} dryRun
- * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number }} [options]
+ * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number; signal?: AbortSignal }} [options]
  */
 async function runPatchBatchTargetGroups(
     /** @type {RepositoryPatchRuntime} */ runtime,
@@ -533,6 +557,7 @@ async function runPatchBatchTargetGroups(
     const execution = await runBoundedOperationBatch(
         groups,
         async (group) => {
+            throwIfRepositoryPatchAborted(runtime);
             const local = await runPatchBatchOperations(
                 runtime,
                 group.entries.map((entry) => entry.operation),
@@ -601,10 +626,15 @@ async function runPatchBatchTargetGroups(
  * @param {RepositoryPatchWorkspace} workspace
  * @param {Record<string, unknown>[]} operations
  * @param {boolean} dryRun
- * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number }} [options]
+ * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number; signal?: AbortSignal }} [options]
  */
 export function runRepositoryPatchTargetGroups(workspace, operations, dryRun, options = {}) {
     if (!workspace) throw new TypeError('Repository patch execution requires a workspace capability.');
     resolveRepositoryPatchTargetLimit(options.maxTargets);
-    return runPatchBatchTargetGroups(createRepositoryPatchRuntime(workspace), operations, dryRun, options);
+    return runPatchBatchTargetGroups(
+        createRepositoryPatchRuntime(workspace, options.signal),
+        operations,
+        dryRun,
+        options,
+    );
 }

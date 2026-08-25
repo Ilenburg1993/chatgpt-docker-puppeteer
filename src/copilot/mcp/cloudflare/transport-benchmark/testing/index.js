@@ -7,4 +7,7 @@ export {
     buildTransportBenchmarkSmokeEnvironment,
     buildTransportMetricDelta,
     classifyTransportWindow,
+    spawnCloudflareTransportBenchmarkWithDependencies,
 } from '../runtime.js';
+
+export { buildCloudflareTransportBenchmarkPlan, summarizePersistedBenchmarkState } from '../plan.js';

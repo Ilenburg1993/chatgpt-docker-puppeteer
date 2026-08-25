@@ -12,9 +12,6 @@
 import path from 'node:path';
 
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
-const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
-const HARD_REPO_READ_FILE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
-const DEFAULT_REPO_READ_TRUST_WINDOW_MS = 250;
 
 /**
  * @typedef {{
@@ -84,15 +81,17 @@ const repoReadFileChunkInflight = new Map();
  *     trustWindowMs: number;
  * }}
  */
-export function readRepoReadFileResultCacheStats() {
+/** @param {import('./config.js').McpRepoReadCacheConfig} config */
+export function readRepoReadFileResultCacheStats(config) {
+    if (!config) throw new TypeError('Repository read-cache stats require an explicit cache config generation.');
     return {
         ...repoReadCacheStats,
         size: repoReadFileResultCache.size,
         chunkSize: repoReadFileChunkCache.size,
         bytes: sumRepoReadCacheWeightBytes(repoReadFileResultCache),
         chunkBytes: sumRepoReadCacheWeightBytes(repoReadFileChunkCache),
-        maxBytes: readRepoReadCacheMaxBytes(),
-        trustWindowMs: readRepoReadTrustWindowMs(),
+        maxBytes: config.maxBytes,
+        trustWindowMs: config.trustWindowMs,
     };
 }
 
@@ -132,6 +131,7 @@ export function clearRepoReadFileResultCacheForResolvedSubtree(resolvedPath) {
  * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/composition/workspace/authority').ValidatedReadWorkspacePath }} resolved
  * @param {number | undefined} startLine
  * @param {number | undefined} endLine
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
  * @param {'full' | 'returned' | 'none'} [hashMode]
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
@@ -140,9 +140,11 @@ export async function readRepoFileWithValidatedResultCache(
     resolved,
     startLine,
     endLine,
+    config,
     hashMode = 'full',
 ) {
-    const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
+    if (!config) throw new TypeError('Repository read-cache operation requires an explicit cache config generation.');
+    const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine, config);
     const cached = await getValidatedRepoReadCacheEntry(
         workspaceIo,
         repoReadFileResultCache,
@@ -154,6 +156,7 @@ export async function readRepoFileWithValidatedResultCache(
             staleStat: 'stale',
             hashMode,
         },
+        config,
     );
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
@@ -191,17 +194,21 @@ export async function readRepoFileWithValidatedResultCache(
             const dev = Number(snapshot.dev);
             const ino = Number(snapshot.ino);
             if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
-                rememberRepoReadFileCacheEntry(key, {
-                    sizeBytes,
-                    mtimeMs,
-                    ctimeMs,
-                    dev,
-                    ino,
-                    validatedAtMs: Date.now(),
-                    structured,
-                    text: snapshot.content,
-                    weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, snapshot.content),
-                });
+                rememberRepoReadFileCacheEntry(
+                    key,
+                    {
+                        sizeBytes,
+                        mtimeMs,
+                        ctimeMs,
+                        dev,
+                        ino,
+                        validatedAtMs: Date.now(),
+                        structured,
+                        text: snapshot.content,
+                        weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, snapshot.content),
+                    },
+                    config,
+                );
             }
             return { structured, text: snapshot.content };
         },
@@ -218,6 +225,7 @@ export async function readRepoFileWithValidatedResultCache(
  * @param {number} chunkLines
  * @param {number | undefined} highWaterMark
  * @param {string | undefined} cursor
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
 export async function readRepoFileChunksWithValidatedResultCache(
@@ -228,13 +236,16 @@ export async function readRepoFileChunksWithValidatedResultCache(
     chunkLines,
     highWaterMark,
     cursor,
+    config,
 ) {
+    if (!config) throw new TypeError('Repository read-cache operation requires an explicit cache config generation.');
     const key = buildRepoReadFileChunkCacheKey(
         resolved.resolved,
         effectiveStartLine,
         endLine,
         chunkLines,
         highWaterMark,
+        config,
     );
     const cached = await getValidatedRepoReadCacheEntry(
         workspaceIo,
@@ -246,6 +257,7 @@ export async function readRepoFileChunksWithValidatedResultCache(
             trustWindowHitStat: 'chunkTrustWindowHits',
             staleStat: 'chunkStale',
         },
+        config,
     );
     if (cached) return shapeChunkResultForCaller(cached, cursor);
 
@@ -302,17 +314,21 @@ export async function readRepoFileChunksWithValidatedResultCache(
             const dev = Number(snapshot.dev);
             const ino = Number(snapshot.ino);
             if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
-                rememberRepoReadFileChunkCacheEntry(key, {
-                    sizeBytes,
-                    mtimeMs,
-                    ctimeMs,
-                    dev,
-                    ino,
-                    validatedAtMs: Date.now(),
-                    structured,
-                    text,
-                    weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, text),
-                });
+                rememberRepoReadFileChunkCacheEntry(
+                    key,
+                    {
+                        sizeBytes,
+                        mtimeMs,
+                        ctimeMs,
+                        dev,
+                        ino,
+                        validatedAtMs: Date.now(),
+                        structured,
+                        text,
+                        weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, text),
+                    },
+                    config,
+                );
             }
             return { structured, text };
         },
@@ -397,16 +413,17 @@ function clearRepoReadCacheEntriesByPrefix(prefix) {
  *     staleStat: 'stale' | 'chunkStale';
  *     hashMode?: 'full' | 'returned' | 'none';
  * }} stats
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
  * @returns {Promise<RepoReadCacheEntry | null>}
  */
-async function getValidatedRepoReadCacheEntry(workspaceIo, cache, key, validatedReadPath, stats) {
+async function getValidatedRepoReadCacheEntry(workspaceIo, cache, key, validatedReadPath, stats, config) {
     const cached = cache.get(key);
     if (!cached) return null;
     if (stats.hashMode && !repoReadCacheEntrySupportsHashMode(cached, stats.hashMode)) {
         repoReadCacheStats.hashVariantMisses += 1;
         return null;
     }
-    const trustWindowMs = readRepoReadTrustWindowMs();
+    const trustWindowMs = config.trustWindowMs;
     if (trustWindowMs > 0 && Date.now() - cached.validatedAtMs <= trustWindowMs) {
         repoReadCacheStats[stats.hitStat] += 1;
         repoReadCacheStats[stats.trustWindowHitStat] += 1;
@@ -443,8 +460,14 @@ async function getValidatedRepoReadCacheEntry(workspaceIo, cache, key, validated
  * @param {number | undefined} endLine
  * @returns {string}
  */
-function buildRepoReadFileCacheKey(absolutePath, startLine, endLine) {
-    return `${absolutePath}\u0000${startLine ?? ''}\u0000${endLine ?? ''}`;
+/**
+ * @param {string} absolutePath
+ * @param {number | undefined} startLine
+ * @param {number | undefined} endLine
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
+ */
+function buildRepoReadFileCacheKey(absolutePath, startLine, endLine, config) {
+    return `${absolutePath}\u0000policy:${config.policyKey}\u0000${startLine ?? ''}\u0000${endLine ?? ''}`;
 }
 
 /** @param {RepoReadCacheEntry} cached @param {'full' | 'returned' | 'none'} hashMode */
@@ -463,27 +486,16 @@ function repoReadCacheEntrySupportsHashMode(cached, hashMode) {
  * @param {number | undefined} highWaterMark
  * @returns {string}
  */
-function buildRepoReadFileChunkCacheKey(absolutePath, startLine, endLine, chunkLines, highWaterMark) {
-    return `${absolutePath}\u0000chunks\u0000${startLine}\u0000${endLine ?? ''}\u0000${chunkLines}\u0000${highWaterMark ?? ''}`;
-}
-
 /**
- * @returns {number}
+ * @param {string} absolutePath
+ * @param {number} startLine
+ * @param {number | undefined} endLine
+ * @param {number} chunkLines
+ * @param {number | undefined} highWaterMark
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
  */
-function readRepoReadTrustWindowMs() {
-    const value = Number(process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] ?? DEFAULT_REPO_READ_TRUST_WINDOW_MS);
-    return Number.isFinite(value) && value > 0 ? Math.min(5000, Math.floor(value)) : 0;
-}
-
-/**
- * @returns {number}
- */
-function readRepoReadCacheMaxBytes() {
-    const value = Number(
-        process.env['COPILOT_MCP_REPO_READ_CACHE_MAX_BYTES'] ?? DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES,
-    );
-    if (!Number.isFinite(value) || value <= 0) return DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES;
-    return Math.min(HARD_REPO_READ_FILE_CACHE_MAX_BYTES, Math.floor(value));
+function buildRepoReadFileChunkCacheKey(absolutePath, startLine, endLine, chunkLines, highWaterMark, config) {
+    return `${absolutePath}\u0000policy:${config.policyKey}\u0000chunks\u0000${startLine}\u0000${endLine ?? ''}\u0000${chunkLines}\u0000${highWaterMark ?? ''}`;
 }
 
 /**
@@ -568,11 +580,16 @@ function sumRepoReadCacheWeightBytes(cache) {
  * @param {RepoReadCacheEntry} entry
  * @returns {void}
  */
-function rememberRepoReadFileCacheEntry(key, entry) {
+/**
+ * @param {string} key
+ * @param {RepoReadCacheEntry} entry
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
+ */
+function rememberRepoReadFileCacheEntry(key, entry, config) {
     if (repoReadFileResultCache.has(key)) repoReadFileResultCache.delete(key);
     repoReadFileResultCache.set(key, entry);
     repoReadCacheStats.sets += 1;
-    trimRepoReadCache(repoReadFileResultCache, 'evictions');
+    trimRepoReadCache(repoReadFileResultCache, 'evictions', config);
 }
 
 /**
@@ -580,19 +597,29 @@ function rememberRepoReadFileCacheEntry(key, entry) {
  * @param {RepoReadCacheEntry} entry
  * @returns {void}
  */
-function rememberRepoReadFileChunkCacheEntry(key, entry) {
+/**
+ * @param {string} key
+ * @param {RepoReadCacheEntry} entry
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
+ */
+function rememberRepoReadFileChunkCacheEntry(key, entry, config) {
     if (repoReadFileChunkCache.has(key)) repoReadFileChunkCache.delete(key);
     repoReadFileChunkCache.set(key, entry);
     repoReadCacheStats.chunkSets += 1;
-    trimRepoReadCache(repoReadFileChunkCache, 'chunkEvictions');
+    trimRepoReadCache(repoReadFileChunkCache, 'chunkEvictions', config);
 }
 
 /**
  * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {'evictions' | 'chunkEvictions'} statName
  */
-function trimRepoReadCache(cache, statName) {
-    const maxBytes = readRepoReadCacheMaxBytes();
+/**
+ * @param {Map<string, RepoReadCacheEntry>} cache
+ * @param {'evictions' | 'chunkEvictions'} statName
+ * @param {import('./config.js').McpRepoReadCacheConfig} config
+ */
+function trimRepoReadCache(cache, statName, config) {
+    const maxBytes = config.maxBytes;
     while (cache.size > REPO_READ_FILE_CACHE_MAX_ENTRIES || sumRepoReadCacheWeightBytes(cache) > maxBytes) {
         const oldest = cache.keys().next().value;
         if (typeof oldest !== 'string') break;

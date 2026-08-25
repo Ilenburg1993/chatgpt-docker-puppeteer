@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
@@ -13,15 +14,13 @@ import { describe, it } from 'vitest';
 import { startHttpMcpServer } from '#copilot/mcp/public/adapters/http1';
 import {
     authorizeMcpToolCall,
-    buildBuiltInDevOAuthClientMetadata,
-    buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
-    isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
+    createDevOAuthRuntime,
     normalizeMcpAuthEnforcement,
     normalizeMcpAuthMode,
     parseBearerToken,
-    readDevOAuthPersistenceStatus,
+    readDevOAuthProcessConfig,
     readMcpAuthConfig,
     scopesForMcpTool,
     securitySchemesForMcpTool,
@@ -32,15 +31,22 @@ import {
     buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     normalizeMcpUrl,
+    readMcpConnectionConfig,
     validatePublicConnectorUrl,
 } from '#copilot/mcp/public/connection';
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
-import { resetDevOAuthRuntimeForTests } from '#copilot/testing/mcp/auth';
-
-const CONNECTION_PROFILE_WORKSPACE = createComposedMcpProcessHost({
-    hostId: 'mcp-connection-profile-workspace',
-    backgroundServices: false,
-}).workspace;
+async function allocateLoopbackPort() {
+    const probe = createNetServer();
+    await new Promise((resolve, reject) => {
+        probe.once('error', reject);
+        probe.listen(0, '127.0.0.1', () => resolve(undefined));
+    });
+    const address = probe.address();
+    assert.ok(address && typeof address === 'object');
+    const port = address.port;
+    await new Promise((resolve, reject) => probe.close((error) => (error ? reject(error) : resolve(undefined))));
+    return port;
+}
 
 describe('copilot MCP ChatGPT connection profile', () => {
     it('normalizes connector URLs to /mcp', () => {
@@ -55,6 +61,28 @@ describe('copilot MCP ChatGPT connection profile', () => {
             resource: 'https://example.com',
         });
         assert.equal(validatePublicConnectorUrl('http://127.0.0.1:3333/mcp').ok, false);
+    });
+
+    it('captures connector configuration once and ignores later environment mutation', () => {
+        const env = {
+            COPILOT_MCP_AUTH_MODE: 'none-dev',
+            COPILOT_MCP_CHATGPT_AUTH_MODE: 'none-dev',
+            COPILOT_MCP_PUBLIC_URL: 'https://snapshot.example.com/mcp',
+            COPILOT_MCP_LOCAL_URL: 'http://127.0.0.1:4444/mcp',
+            COPILOT_MCP_ORIGIN_TRANSPORT: 'http',
+            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'http://127.0.0.1:4444',
+        };
+        const config = readMcpConnectionConfig(env);
+        env.COPILOT_MCP_PUBLIC_URL = 'https://mutated.example.com/mcp';
+        env.COPILOT_MCP_CHATGPT_AUTH_MODE = 'oauth';
+
+        const profile = buildChatGptConnectorProfile({}, config);
+        assert.equal(profile.connectorUrl, 'https://snapshot.example.com/mcp');
+        assert.equal(profile.localMcpUrl, 'http://127.0.0.1:4444/mcp');
+        assert.equal(profile.authMode, 'none-dev');
+        assert.equal(Object.isFrozen(config), true);
+        assert.equal(Object.isFrozen(config.profile), true);
+        assert.equal('secrets' in config.auth, false);
     });
 
     it('builds canonical ChatGPT form fields and smoke prompts', () => {
@@ -115,8 +143,9 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(config.expectedIssuer, 'https://mcp.aurelin.org');
         assert.equal(config.expectedAudience, 'https://mcp.aurelin.org');
         assert.equal(config.jwksUri, 'https://mcp.aurelin.org/oauth/jwks.json');
-        assert.equal(isDevOAuthServerEnabled(config), true);
-        const metadata = buildDevOAuthServerMetadata(config);
+        const issuerRuntime = createDevOAuthRuntime({ processConfig: readDevOAuthProcessConfig({}) });
+        assert.equal(issuerRuntime.isEnabled(config), true);
+        const metadata = issuerRuntime.buildMetadata(config);
         assert.equal(metadata['issuer'], 'https://mcp.aurelin.org');
         assert.equal(metadata['authorization_endpoint'], 'https://mcp.aurelin.org/oauth/authorize');
         assert.equal(metadata['token_endpoint'], 'https://mcp.aurelin.org/oauth/token');
@@ -133,7 +162,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
             'repo:validate',
             'repo:admin',
         ]);
-        const clientMetadata = buildBuiltInDevOAuthClientMetadata(config);
+        const clientMetadata = issuerRuntime.buildClientMetadata(config);
         assert.equal(clientMetadata['client_id'], 'https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json');
         assert.deepEqual(clientMetadata['redirect_uris'], ['https://chatgpt.com/connector/oauth/codex-smoke']);
         assert.ok(/** @type {string[]} */ (clientMetadata['grant_types']).includes('refresh_token'));
@@ -221,28 +250,43 @@ describe('copilot MCP ChatGPT connection profile', () => {
             'COPILOT_MCP_AUTH_MODE',
             'COPILOT_MCP_AUTH_ENFORCEMENT',
             'COPILOT_MCP_PUBLIC_URL',
+            'COPILOT_MCP_CLOUDFLARE_PUBLIC_URL',
             'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
             'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
             'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
+            'COPILOT_MCP_AUDIT_FILE',
             'COPILOT_MCP_ALLOWED_ORIGINS',
         ]);
-        const server = await startHttpMcpServer({
-            host: '127.0.0.1',
-            port: 0,
-            workspace: CONNECTION_PROFILE_WORKSPACE,
-        });
+        /** @type {import('node:http').Server | null} */
+        let server = null;
+        /** @type {ReturnType<typeof createComposedMcpProcessHost> | null} */
+        let processHost = null;
         try {
-            const address = server.address();
-            assert.ok(address && typeof address === 'object');
-            const resource = `http://127.0.0.1:${address.port}`;
+            const port = await allocateLoopbackPort();
+            const resource = `http://127.0.0.1:${port}`;
             process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
             process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] = 'all';
             process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
+            process.env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] = 'https://mcp.aurelin.org/mcp';
             process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
             process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
             process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] = path.join(tempDir, 'oauth-clients.json');
+            process.env['COPILOT_MCP_AUDIT_FILE'] = path.join(tempDir, 'audit.jsonl');
             process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://chatgpt.com,http://127.0.0.1';
-            resetDevOAuthRuntimeForTests();
+            processHost = createComposedMcpProcessHost({
+                hostId: `mcp-connection-profile-oauth-${randomBytes(6).toString('hex')}`,
+                env: process.env,
+                backgroundServices: false,
+            });
+            server = await startHttpMcpServer({
+                host: '127.0.0.1',
+                port,
+                processHost,
+                processConfig: processHost.processConfig,
+            });
+            const address = server.address();
+            assert.ok(address && typeof address === 'object');
+            assert.equal(address.port, port);
 
             const preflight = await fetch(`${resource}/.well-known/oauth-authorization-server`, {
                 method: 'OPTIONS',
@@ -263,7 +307,20 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.match(clientId, /^mcp_dev_/u);
             const clientStoreText = await readFile(process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'], 'utf8');
             assert.ok(clientStoreText.includes(clientId));
-            resetDevOAuthRuntimeForTests();
+            await closeHttpMcpServer(server);
+            server = null;
+            await processHost.dispose();
+            processHost = createComposedMcpProcessHost({
+                hostId: `mcp-connection-profile-oauth-restart-${randomBytes(6).toString('hex')}`,
+                env: process.env,
+                backgroundServices: false,
+            });
+            server = await startHttpMcpServer({
+                host: '127.0.0.1',
+                port,
+                processHost,
+                processConfig: processHost.processConfig,
+            });
 
             const codeVerifier = base64Url(randomBytes(32));
             const codeChallenge = base64Url(createHash('sha256').update(codeVerifier).digest());
@@ -296,10 +353,23 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.equal(storeText.includes(refreshToken), false);
             assert.ok(storeText.includes(hashRefreshTokenForTest(refreshToken)));
 
-            resetDevOAuthRuntimeForTests();
-            const persistenceAfterReset = await readDevOAuthPersistenceStatus();
-            assert.equal(persistenceAfterReset.loadedFromFile, true);
-            assert.equal(persistenceAfterReset.tokenCount, 1);
+            await closeHttpMcpServer(server);
+            server = null;
+            await processHost.dispose();
+            processHost = createComposedMcpProcessHost({
+                hostId: `mcp-connection-profile-refresh-restart-${randomBytes(6).toString('hex')}`,
+                env: process.env,
+                backgroundServices: false,
+            });
+            const persistenceAfterRestart = await processHost.authRuntime.issuerRuntime.readPersistenceStatus();
+            assert.equal(persistenceAfterRestart.loadedFromFile, true);
+            assert.equal(persistenceAfterRestart.tokenCount, 1);
+            server = await startHttpMcpServer({
+                host: '127.0.0.1',
+                port,
+                processHost,
+                processConfig: processHost.processConfig,
+            });
 
             const refreshed = await postForm(`${resource}/oauth/token`, {
                 grant_type: 'refresh_token',
@@ -310,46 +380,75 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.equal(typeof refreshed['access_token'], 'string');
             assert.match(String(refreshed['refresh_token']), /^rt_/u);
             assert.notEqual(refreshed['refresh_token'], refreshToken);
+
+            const compatibility = await processHost.toolCapabilities.audit.readCompatibilitySummary({
+                tailBytes: 512 * 1024,
+                maxEvents: 5000,
+            });
+            assert.ok(compatibility.oauth.clientActivity.bySource.dcr > 0);
+            assert.ok(compatibility.oauth.clientActivity.byResolution['dynamic-registration'] > 0);
+            assert.ok(compatibility.oauth.grants.byGrantType.authorization_code > 0);
+            assert.ok(compatibility.oauth.grants.byGrantType.refresh_token > 0);
+            assert.ok(compatibility.oauth.grants.byClientSource.dcr > 0);
+            assert.ok(compatibility.oauth.grants.byOutcome.succeeded >= 2);
+            const auditText = await readFile(process.env['COPILOT_MCP_AUDIT_FILE'], 'utf8');
+            assert.equal(auditText.includes(clientId), false);
+            assert.equal(auditText.includes(refreshToken), false);
         } finally {
-            server.close();
-            resetDevOAuthRuntimeForTests();
+            if (server) await closeHttpMcpServer(server);
+            await processHost?.dispose();
             restoreEnv(oldEnv);
             await rm(tempDir, { recursive: true, force: true });
         }
     });
 
-    it('authorizes the exact Claude CIMD client through the trusted fast-path', async () => {
+    it('authorizes exact trusted CIMD clients and persists only aggregate host-class evidence', async () => {
         const tempDir = await mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-claude-oauth-'));
         const oldEnv = snapshotEnv([
             'COPILOT_MCP_AUTH_MODE',
             'COPILOT_MCP_AUTH_ENFORCEMENT',
             'COPILOT_MCP_PUBLIC_URL',
+            'COPILOT_MCP_CLOUDFLARE_PUBLIC_URL',
             'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
             'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
             'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
+            'COPILOT_MCP_AUDIT_FILE',
             'COPILOT_MCP_DEV_OAUTH_DIAGNOSTICS_ENABLED',
             'COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK',
             'COPILOT_MCP_ALLOWED_ORIGINS',
         ]);
-        const server = await startHttpMcpServer({
-            host: '127.0.0.1',
-            port: 0,
-            workspace: CONNECTION_PROFILE_WORKSPACE,
-        });
+        /** @type {import('node:http').Server | null} */
+        let server = null;
+        /** @type {ReturnType<typeof createComposedMcpProcessHost> | null} */
+        let processHost = null;
         try {
-            const address = server.address();
-            assert.ok(address && typeof address === 'object');
-            const resource = `http://127.0.0.1:${address.port}`;
+            const port = await allocateLoopbackPort();
+            const resource = `http://127.0.0.1:${port}`;
             process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
             process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] = 'all';
             process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
+            process.env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] = 'https://mcp.aurelin.org/mcp';
             process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
             process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
             process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] = path.join(tempDir, 'oauth-clients.json');
+            process.env['COPILOT_MCP_AUDIT_FILE'] = path.join(tempDir, 'audit.jsonl');
             process.env['COPILOT_MCP_DEV_OAUTH_DIAGNOSTICS_ENABLED'] = 'true';
             process.env['COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK'] = 'true';
             process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://claude.ai,http://127.0.0.1';
-            resetDevOAuthRuntimeForTests();
+            processHost = createComposedMcpProcessHost({
+                hostId: `mcp-connection-profile-claude-${randomBytes(6).toString('hex')}`,
+                env: process.env,
+                backgroundServices: false,
+            });
+            server = await startHttpMcpServer({
+                host: '127.0.0.1',
+                port,
+                processHost,
+                processConfig: processHost.processConfig,
+            });
+            const address = server.address();
+            assert.ok(address && typeof address === 'object');
+            assert.equal(address.port, port);
 
             const codeVerifier = base64Url(randomBytes(32));
             const codeChallenge = base64Url(createHash('sha256').update(codeVerifier).digest());
@@ -375,14 +474,48 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.equal(statusResponse.status, 200);
             const status = /** @type {Record<string, unknown>} */ (await statusResponse.json());
             assert.equal(status['trustedClaudeCimdFallbackEnabled'], true);
+
+            const chatGptVerifier = base64Url(randomBytes(32));
+            const chatGptChallenge = base64Url(createHash('sha256').update(chatGptVerifier).digest());
+            const chatGptAuthorize = new URL(`${resource}/oauth/authorize`);
+            chatGptAuthorize.searchParams.set('response_type', 'code');
+            chatGptAuthorize.searchParams.set('client_id', 'https://chatgpt.com/oauth/unit_test/client.json');
+            chatGptAuthorize.searchParams.set('redirect_uri', 'https://chatgpt.com/connector/oauth/unit_test');
+            chatGptAuthorize.searchParams.set('scope', 'repo:read');
+            chatGptAuthorize.searchParams.set('resource', resource);
+            chatGptAuthorize.searchParams.set('code_challenge', chatGptChallenge);
+            chatGptAuthorize.searchParams.set('code_challenge_method', 'S256');
+            const chatGptAuthorizationResponse = await fetch(chatGptAuthorize, { redirect: 'manual' });
+            assert.equal(chatGptAuthorizationResponse.status, 302);
+            const chatGptLocation = chatGptAuthorizationResponse.headers.get('location');
+            assert.ok(chatGptLocation);
+            assert.equal(new URL(chatGptLocation).origin, 'https://chatgpt.com');
+
+            const compatibility = await processHost.toolCapabilities.audit.readCompatibilitySummary({
+                tailBytes: 256 * 1024,
+                maxEvents: 2000,
+            });
+            assert.ok(compatibility.oauth.clientActivity.bySource.cimd >= 2);
+            assert.ok(compatibility.oauth.clientActivity.byHostClass.claude > 0);
+            assert.ok(compatibility.oauth.clientActivity.byHostClass.chatgpt > 0);
+            assert.ok(compatibility.oauth.clientActivity.byResolution['trusted-fallback'] >= 2);
+            const auditText = await readFile(process.env['COPILOT_MCP_AUDIT_FILE'], 'utf8');
+            assert.equal(auditText.includes('https://claude.ai/oauth/mcp-oauth-client-metadata'), false);
+            assert.equal(auditText.includes('https://chatgpt.com/oauth/unit_test/client.json'), false);
         } finally {
-            server.close();
-            resetDevOAuthRuntimeForTests();
+            if (server) await closeHttpMcpServer(server);
+            await processHost?.dispose();
             restoreEnv(oldEnv);
             await rm(tempDir, { recursive: true, force: true });
         }
     });
 });
+
+/** @param {import('node:http').Server} server */
+async function closeHttpMcpServer(server) {
+    if (!server.listening) return;
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve(undefined))));
+}
 
 /**
  * @param {string[]} keys

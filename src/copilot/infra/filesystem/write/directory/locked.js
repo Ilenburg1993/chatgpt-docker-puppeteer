@@ -25,6 +25,7 @@ import {
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncDirectory?: typeof import('#copilot/infra/internal/platform/node/filesystem').syncParentDirectoryBestEffort;
  *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -43,15 +44,22 @@ export async function mkdirPathLocked(dirPath, options = {}, invalidationBus = u
     try {
         const { value: mkdirResult, waitMs } = await withIoResourceLock(
             dirPath,
-            async () =>
-                mkdirPathUnlocked(dirPath, {
+            async () => {
+                options.signal?.throwIfAborted();
+                return mkdirPathUnlocked(dirPath, {
                     recursive: Boolean(options.recursive),
                     ...(options.mode === undefined ? {} : { mode: options.mode }),
                     ...(options.durability === undefined ? {} : { durability: options.durability }),
                     ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                     ...(options.syncDirectory === undefined ? {} : { syncDirectory: options.syncDirectory }),
-                }),
-            { operation: 'mkdir', target: dirPath, riskClass: 'medium' },
+                });
+            },
+            {
+                ...(options.signal === undefined ? {} : { signal: options.signal }),
+                operation: 'mkdir',
+                target: dirPath,
+                riskClass: 'medium',
+            },
         );
         if (mkdirResult.created) {
             const invalidationTargets = new Set([

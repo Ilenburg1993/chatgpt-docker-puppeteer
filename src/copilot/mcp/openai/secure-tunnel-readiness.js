@@ -15,11 +15,12 @@ const RUNTIME_KEY_ENV_KEYS = ['CONTROL_PLANE_API_KEY', 'OPENAI_CONTROL_PLANE_API
 const MCP_URL_ENV_KEYS = ['OPENAI_SECURE_MCP_LOCAL_URL', 'MCP_SERVER_URL', 'COPILOT_MCP_LOCAL_URL'];
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; pathEnv?: string; binaryName?: string }} [options]
+ * @param {{ env: NodeJS.ProcessEnv; pathEnv?: string; binaryName?: string }} options
  * @returns {Record<string, unknown> & { ok: boolean; success: boolean }}
  */
-export function auditOpenAiSecureMcpTunnelReadiness(options = {}) {
-    const env = options.env ?? process.env;
+export function auditOpenAiSecureMcpTunnelReadiness(options) {
+    if (!options?.env) throw new TypeError('Secure MCP Tunnel readiness requires an explicit environment.');
+    const env = options.env;
     const binaryName = options.binaryName ?? 'tunnel-client';
     const tunnelIdPresent = hasAnyEnv(env, TUNNEL_ID_ENV_KEYS);
     const runtimeKeyPresent = hasAnyEnv(env, RUNTIME_KEY_ENV_KEYS);

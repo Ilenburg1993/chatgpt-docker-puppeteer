@@ -2,8 +2,8 @@
 /**
  * Canonical composition of MCP wire-tool definitions.
  *
- * This module is deliberately not a barrel: callers receive the ordered catalog as one semantic value and may bind
- * the three registry-dependent read providers without gaining direct access to every tool module export.
+ * This module is deliberately not a barrel: callers receive the ordered catalog as one semantic value. Runtime
+ * views of the normalized/surfaced registry are supplied later through OperationContext capabilities, never globals.
  *
  * @module copilot/mcp/tools/catalog/runtime
  */
@@ -45,7 +45,7 @@ import { mcpLatencyDashboardTool } from '../latency-dashboard.js';
 import { llmBLiveTools } from '../llm-b-live.js';
 import { maintenanceTools } from '../maintenance.js';
 import { metaTools } from '../meta.js';
-import { bindMcpOAuthFrictionAuditProvider, mcpOAuthFrictionAuditTool } from '../oauth-friction-audit.js';
+import { mcpOAuthFrictionAuditTool } from '../oauth-friction-audit.js';
 import { mcpOpenAiEndpointLatencyTool } from '../openai-endpoint-latency.js';
 import { projectDoctorTool } from '../project-doctor.js';
 import { repoIndexTools } from '../repo-index.js';
@@ -59,10 +59,12 @@ import { mcpRuntimeHealthTool } from '../runtime-health.js';
 import { mcpSessionProfileTool } from '../session-profile.js';
 import { mcpSmokeWorkspaceTool } from '../smoke-workspace.js';
 import { terminalTools } from '../terminal.js';
-import { bindMcpToolPayloadAuditProvider, mcpToolPayloadAuditTool } from '../tool-payload-audit.js';
-import { bindMcpToolsStatusProvider, mcpAutonomyPowerScoreTool, mcpToolsStatusTool } from '../tools-status.js';
+import { mcpToolPayloadAuditTool } from '../tool-payload-audit.js';
+import { mcpAutonomyPowerScoreTool, mcpToolsStatusTool } from '../tools-status.js';
 import { mcpConnectorSmokeRefreshTool, mcpPostRestartReadinessTool, mcpTunnelStatusTool } from '../tunnel-status.js';
+import { attachMcpToolSemanticContracts } from './semantic-contracts.js';
 
+/** @typedef {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} McpRawToolDefinition */
 /** @typedef {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition} McpToolDefinition */
 
 const devcontainerNetworkTools = [
@@ -71,21 +73,11 @@ const devcontainerNetworkTools = [
 ];
 
 /**
- * Bind the read-only tools that need the post-normalization registry view.
- *
- * @param {() => McpToolDefinition[]} provider
- */
-export function bindMcpWireToolProviders(provider) {
-    bindMcpToolsStatusProvider(provider);
-    bindMcpToolPayloadAuditProvider(provider);
-    bindMcpOAuthFrictionAuditProvider(provider);
-}
-
-/**
  * @returns {McpToolDefinition[]}
  */
 export function buildMcpWireToolCatalog() {
-    return [
+    /** @type {McpRawToolDefinition[]} */
+    const tools = [
         ...repoReadTools,
         ...repoPlanTools,
         ...repoIndexTools,
@@ -142,4 +134,5 @@ export function buildMcpWireToolCatalog() {
         ...mcpReloadTools,
         mcpRuntimeHealthTool,
     ];
+    return attachMcpToolSemanticContracts(tools);
 }

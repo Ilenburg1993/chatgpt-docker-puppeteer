@@ -5,15 +5,16 @@
  * @module copilot/mcp/tools/cloudflare-edge
  */
 
-import { auditCloudflareEdgeRulesets } from '#copilot/mcp/public/cloudflare/edge-audit';
+import { auditCloudflareEdgeRulesets } from '#copilot/mcp/public/cloudflare/edge';
 
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/public/protocol/tools';
+import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
+import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpToolDefinition}
+ * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
  */
-export const mcpCloudflareEdgeAuditTool = {
+export const mcpCloudflareEdgeAuditTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_audit',
     title: 'Cloudflare edge audit',
     description:
@@ -28,11 +29,14 @@ export const mcpCloudflareEdgeAuditTool = {
             .optional()
             ['describe']('Override the short cache TTL in milliseconds. Default: 5000.'),
     },
-    annotations: readOnlyAnnotations(),
-    handler: async (input = {}) => {
-        /** @type {{ forceRefresh: boolean; cacheTtlMs?: number }} */
-        const options = { forceRefresh: input['forceRefresh'] === true };
+
+    handler: async (input = {}, operationContext) => {
+        /** @type {{ forceRefresh: boolean; cacheTtlMs?: number; authority: import('#copilot/mcp/public/cloudflare/environment-authority').CloudflareEnvironmentAuthority }} */
+        const options = {
+            forceRefresh: input['forceRefresh'] === true,
+            authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
+        };
         if (typeof input['cacheTtlMs'] === 'number') options['cacheTtlMs'] = input['cacheTtlMs'];
         return okResult(await auditCloudflareEdgeRulesets(options));
     },
-};
+});

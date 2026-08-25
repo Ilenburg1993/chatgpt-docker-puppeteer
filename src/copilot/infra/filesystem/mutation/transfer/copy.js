@@ -19,7 +19,7 @@ import { assertDestinationWritable, readMutationSnapshot, readOptionalMutationSn
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>; capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean; rollbackPolicy?: ReturnType<typeof import('#copilot/infra/internal/filesystem/transaction').readIoRollbackPolicy>; capacityPreflight?: typeof import('#copilot/infra/internal/filesystem/transaction').preflightIoCapacity; signal?: AbortSignal }} [options]
  * @param {ReturnType<typeof import('#copilot/infra/internal/filesystem/invalidation/bus').createIoInvalidationBusRuntime>} [invalidationBus]
  */
 export async function copyFileLocked(source, destination, options = {}, invalidationBus = undefined) {
@@ -32,6 +32,7 @@ export async function copyFileLocked(source, destination, options = {}, invalida
         options.overwrite === true && (options.captureRollback ?? options.rollbackPolicy?.enabled ?? false);
     try {
         const lease = await acquireIoResourceLocks([source, destination], {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             operation: 'copy',
             target: destination,
             riskClass,
@@ -59,12 +60,14 @@ export async function copyFileLocked(source, destination, options = {}, invalida
                         await assertDestinationWritable(destination, options.overwrite);
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
+                    options.signal?.throwIfAborted();
                     if (options.expectedSourceHash && sourceSnapshot.contentHash !== options.expectedSourceHash) {
                         const error = new Error(`Hash SHA-256 da origem diverge do esperado: ${source}`);
                         /** @type {{ code?: string }} */ (error).code = 'EEXPECTEDHASH';
                         throw error;
                     }
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
+                    options.signal?.throwIfAborted();
                     const copyResult = await copyFileUnlocked(source, destination, {
                         exclusive: !options.overwrite,
                         expectedSourceHash: sourceSnapshot.contentHash,
