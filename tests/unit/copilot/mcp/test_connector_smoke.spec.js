@@ -43,6 +43,8 @@ function healthyOauthSmoke() {
         failedChecks: [],
         runtimeFlow: {
             identity: 'cimd',
+            protocolEra: '2026',
+            protocolVersion: '2026-07-28',
             runtimeHealth: { ok: true, status: 200 },
             authenticatedToolsList: {
                 ok: true,
@@ -149,6 +151,9 @@ describe('canonical connector smoke', () => {
         });
 
         assert.equal(report['ok'], true);
+        assert.equal(report['protocolEra'], '2026');
+        assert.equal(report['protocolVersion'], '2026-07-28');
+        assert.equal(report['unauthenticatedProtocolVersion'], '2025-06-18');
         assert.equal(report.authenticatedOAuthSmoke.authenticatedToolsList?.tools, 116);
         assert.equal(persisted.length, 1);
         assert.deepEqual(requireFixtureIndex(persisted, 0, 'persisted smoke').state.toolsList, {

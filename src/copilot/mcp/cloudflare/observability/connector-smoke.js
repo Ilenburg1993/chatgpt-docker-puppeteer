@@ -10,6 +10,7 @@
  * @module copilot/mcp/cloudflare/connector-smoke
  */
 
+import { MCP_PROTOCOL_MODERN_VERSION } from '#copilot/mcp/public/protocol/version';
 import { resolveCloudflareEnvironment } from '../environment-authority.js';
 import { runCloudflareSmoke } from './cli-smoke.js';
 
@@ -49,6 +50,9 @@ function asRecord(value) {
  *
  * @typedef {Record<string, unknown> & {
  *     ok: boolean;
+ *     protocolEra: '2026';
+ *     protocolVersion: string;
+ *     unauthenticatedProtocolVersion: string | null;
  *     orchestrationTimings: {
  *         strategy: 'parallel-unauthenticated-and-oauth';
  *         totalMs: number;
@@ -148,6 +152,13 @@ export async function runCanonicalConnectorSmoke({
     const report = {
         ...unauthenticated,
         ok: combinedOk,
+        protocolEra: /** @type {const} */ ('2026'),
+        protocolVersion:
+            typeof runtimeFlow['protocolVersion'] === 'string'
+                ? runtimeFlow['protocolVersion']
+                : MCP_PROTOCOL_MODERN_VERSION,
+        unauthenticatedProtocolVersion:
+            typeof unauthenticated['protocolVersion'] === 'string' ? unauthenticated['protocolVersion'] : null,
         orchestrationTimings: {
             strategy: 'parallel-unauthenticated-and-oauth',
             totalMs: Date.now() - startedAt,
