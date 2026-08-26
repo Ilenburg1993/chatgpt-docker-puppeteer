@@ -81,15 +81,27 @@ export const mcpReloadScheduleTool = defineMcpRawTool({
     name: 'mcp_reload_schedule',
     title: 'Schedule controlled MCP reload',
     description:
-        'Schedule an allowlisted detached MCP/tunnel restart after this tool response is returned. No arbitrary command, path or environment override is accepted.',
+        'Schedule an allowlisted detached MCP/tunnel restart only when the exact previously certified source manifest still verifies. No arbitrary command or environment override is accepted.',
     inputSchema: {
         profile: restartProfileSchema.optional(),
         delayMs: z.number().int().min(MCP_RELOAD_MIN_DELAY_MS).max(MCP_RELOAD_MAX_DELAY_MS).optional(),
         reason: z.string().max(240).optional(),
+        sourceBarrierManifest: z
+            .string()
+            .min(1)
+            .max(1024)
+            ['describe']('Workspace-relative persisted source-barrier manifest produced by the prior validation gate.'),
+        expectedSourceFingerprint: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/u)
+            ['describe']('Exact SHA-256 source fingerprint returned by the prior validation gate.'),
         confirmRestart: z.literal(true),
     },
 
-    handler: async ({ profile, delayMs, reason }, operationContext) => {
+    handler: async (
+        { profile, delayMs, reason, sourceBarrierManifest, expectedSourceFingerprint },
+        operationContext,
+    ) => {
         const workspace = requireMcpToolWorkspace(operationContext);
         const reloadConfig = requireMcpToolReloadConfig(operationContext);
         const plan = buildControlledMcpReloadPlan({
@@ -99,24 +111,38 @@ export const mcpReloadScheduleTool = defineMcpRawTool({
             reason: reason ?? null,
         });
         const resolvedProfile = plan.resolvedProfile;
+        const audit = requireMcpToolAuditCapability(operationContext);
         const scheduled = await scheduleControlledMcpReload({
             workspace,
             profile: resolvedProfile,
             delayMs: plan.delayMs,
             reason: plan.reason,
             runnerEnvironment: reloadConfig.runnerEnvironment,
+            sourceBarrierManifestPath: sourceBarrierManifest,
+            expectedSourceFingerprint,
+            audit,
             ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
         });
         const { requestId, acceptedAt, runnerPid } = scheduled;
-        await requireMcpToolAuditCapability(operationContext).append({
+        await audit.append({
             event: 'mcp_reload_scheduled',
             tool: 'mcp_reload_schedule',
             requestId,
             profile: resolvedProfile,
             delayMs: plan.delayMs,
             currentPid: plan.currentPid,
+            sourceBarrierManifestPath: scheduled.sourceBarrierManifestPath,
+            sourceBarrierFingerprint: scheduled.sourceBarrierFingerprint,
         });
-        const result = { ...plan, scheduled: true, requestId, acceptedAt, runnerPid };
+        const result = {
+            ...plan,
+            scheduled: true,
+            requestId,
+            acceptedAt,
+            runnerPid,
+            sourceBarrierManifestPath: scheduled.sourceBarrierManifestPath,
+            sourceBarrierFingerprint: scheduled.sourceBarrierFingerprint,
+        };
         return okResult(
             result,
             `MCP reload ${requestId} scheduled in ${String(plan.delayMs)}ms using ${resolvedProfile}; this response returns before restart.`,

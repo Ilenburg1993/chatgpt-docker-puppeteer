@@ -4,8 +4,6 @@
 import { performance } from 'node:perf_hooks';
 
 const serviceStartedAt = performance.now();
-/** @type {Map<string, Promise<Record<string, any>>>} */
-const modeContexts = new Map();
 
 /** @param {unknown} value @param {number} fallback */
 function readPositiveInteger(value, fallback) {
@@ -20,6 +18,10 @@ function readPositiveInteger(value, fallback) {
  *     scannedStringCount?: unknown;
  *     sampleCount?: unknown;
  *     tableCount?: unknown;
+ *     rowCount?: unknown;
+ *     payloadBytes?: unknown;
+ *     maxRowsPerTable?: unknown;
+ *     fingerprint?: unknown;
  * }} audit
  */
 function compactAudit(audit) {
@@ -29,36 +31,29 @@ function compactAudit(audit) {
         scannedStringCount: Number(audit.scannedStringCount ?? 0),
         sampleCount: Number(audit.sampleCount ?? 0),
         ...('tableCount' in audit ? { tableCount: Number(audit.tableCount ?? 0) } : {}),
+        ...('rowCount' in audit ? { rowCount: Number(audit.rowCount ?? 0) } : {}),
+        ...('payloadBytes' in audit ? { payloadBytes: Number(audit.payloadBytes ?? 0) } : {}),
+        ...('maxRowsPerTable' in audit ? { maxRowsPerTable: Number(audit.maxRowsPerTable ?? 0) } : {}),
+        ...(typeof audit.fingerprint === 'string' ? { fingerprint: audit.fingerprint } : {}),
     };
 }
 
-/** @param {'catalog' | 'sqlite'} mode */
+/** @param {'catalog' | 'sqlite'} mode @returns {Promise<Record<string, any>>} */
 async function loadModeContext(mode) {
-    let contextPromise = modeContexts.get(mode);
-    if (contextPromise) return contextPromise;
-    contextPromise = (async () => {
-        const redactionModule = await import('../secrets/redaction-audit.js');
-        if (mode === 'catalog') {
-            const { DEFAULT_MODEL_GATEWAY_CATALOG_PATH, JsonModelGatewayCatalogStore } =
-                await import('../catalog/json-catalog-store.js');
-            return {
-                redactionModule,
-                store: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
-            };
-        }
-        const { SqliteModelGatewayCatalogStore } = await import('../catalog/sqlite-catalog-store.js');
+    const redactionModule = await import('../secrets/redaction-audit.js');
+    if (mode === 'catalog') {
+        const { DEFAULT_MODEL_GATEWAY_CATALOG_PATH, JsonModelGatewayCatalogStore } =
+            await import('../catalog/json-catalog-store.js');
         return {
             redactionModule,
-            store: new SqliteModelGatewayCatalogStore(),
+            store: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
         };
-    })();
-    modeContexts.set(mode, contextPromise);
-    try {
-        return await contextPromise;
-    } catch (error) {
-        modeContexts.delete(mode);
-        throw error;
     }
+    const { SqliteModelGatewayCatalogStore } = await import('../catalog/sqlite-catalog-store.js');
+    return {
+        redactionModule,
+        store: new SqliteModelGatewayCatalogStore(),
+    };
 }
 
 /**
@@ -79,13 +74,18 @@ export async function runModelGatewayReadinessRedactionAudit(input) {
     let audit;
     let sourceSnapshotId = null;
     if (mode === 'catalog') {
-        const snapshot = await context['store'].readSnapshot();
+        const catalogSource = await context['store'].readSnapshotWithContentFingerprint();
+        const snapshot = catalogSource.snapshot;
         sourceSnapshotId = snapshot.snapshotId ?? null;
-        audit = context['redactionModule'].auditModelGatewayValueRedaction(snapshot, {
-            surface: 'json:catalog',
-            rootPath: 'catalog',
-            additionalSecrets,
-        });
+        audit = {
+            ...context['redactionModule'].auditModelGatewayValueRedaction(snapshot, {
+                surface: 'json:catalog',
+                rootPath: 'catalog',
+                additionalSecrets,
+            }),
+            fingerprint: catalogSource.contentFingerprint,
+            payloadBytes: catalogSource.payloadBytes,
+        };
     } else {
         audit = await context['store'].auditStoredPayloadRedaction({
             additionalSecrets,

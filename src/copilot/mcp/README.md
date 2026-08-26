@@ -204,7 +204,7 @@ aliases exatos `#copilot/mcp/public/...`; white-box tests usam `#copilot/testing
 apontando para uma membrane física `testing/`. Não existe aggregate root público implícito e a mera
 existência de um `index.js` não cria surface de package.
 
-Snapshot arquitetural atual: **75 public aliases** e **44 testing aliases**. O valor não é uma meta
+Snapshot arquitetural atual: **76 public aliases** e **45 testing aliases**. O valor não é uma meta
 a ser preservada: `copilot:mcp:surface-governance:check` exige, em uma única varredura, target na
 membrane correta, consumer real, owner MCP concreto, consumer operacional para public e ausência de
 testing leakage para runtime. `copilot:mcp:owner-governance:check` deriva e ratcheta ainda
@@ -275,7 +275,12 @@ offline. `copilot_sessions_list` continua descrevendo apenas sessões SDK regist
 MCP atual**; o terminal externo é outro processo. Para evidência operacional desse runtime separado,
 use o control plane allowlisted:
 
-- `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn;
+- `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn. Fresh calls
+  usam subprocesso supervisionado call-scoped; cancellation/timeout encerram o process group e
+  aguardam `close`, inclusive quando o child está dentro de trabalho nativo `better-sqlite3`.
+  Operational cache é bounded a 30 s e só aceita snapshot estável; a security redaction proof tem
+  identity/lifetime independente, context/fingerprint-bound. O wire default é task-first e compacto;
+  use `includeDetails=true` apenas quando precisar da árvore diagnóstica completa;
 - `llmb_live_runs`: lê o histórico live persistido no SQLite;
 - `llmb_live_test_cancel`: cancela somente um run detached pelo `runId` estrito depois de verificar
   em `/proc` que o PID ainda pertence ao harness e ao `out-dir` registrados, evitando o risco de PID
@@ -288,6 +293,15 @@ use o control plane allowlisted:
 
 O contrato canônico do harness é `--control-only`. `--no-pr` existe apenas como alias deprecated
 para automações anteriores ao billing usage-based de 2026.
+
+A autoridade especializada vigente para essa fronteira é
+`src/copilot/docs/WORKSPACE_LLMB_MCP_TASKGROUP_READINESS_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md`.
+Ela registra os fault tests de cancellation, environment authority, proof reuse, SQLite v14/latest,
+retention e o rebaseline hash-bound. No conjunto final local de publicação de 26/08, fresh
+operational proof-reuse ficou em p50 ~6,382 s, p95 ~6,552 s e max ~6,569 s em N=20, com lifecycle 27
+created/27 terminated/current=0; o SLO local de acceptance permanece p95 <=7,0 s. O barrier pré/pós
+benchmark cobriu os 79 arquivos modificados/untracked e permaneceu byte-identical. Esses números não
+substituem a acceptance host-real depois de publish/reload.
 
 ### Git governado
 

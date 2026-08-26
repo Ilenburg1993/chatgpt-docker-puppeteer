@@ -41,6 +41,16 @@ export function getApplicationSqliteDatabase() {
     return APPLICATION_INFRA_HOST.runtime.database.get();
 }
 
+/**
+ * Execute path-bound SQLite maintenance through the application-owned Infra resource.
+ * Domain callers retain no dbPath/native-driver authority; the concrete runtime performs the work off the event loop.
+ *
+ * @param {{mode?:'PASSIVE';timeoutMs?:number;busyTimeoutMs?:number}} [options]
+ */
+export function checkpointApplicationSqlite(options = {}) {
+    return APPLICATION_INFRA_HOST.checkpointSqlite(options);
+}
+
 /** @param {string} [workspaceRoot=WORKSPACE_ROOT] */
 export function getApplicationWorkspaceInfra(workspaceRoot = WORKSPACE_ROOT) {
     return APPLICATION_INFRA_HOST.workspace(workspaceRoot);

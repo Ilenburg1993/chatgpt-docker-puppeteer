@@ -10,9 +10,8 @@
 
 import { createHash } from 'node:crypto';
 
-import { getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
+import { checkpointApplicationSqlite, getApplicationSqliteDatabase } from '#copilot/boot/application-infra';
 import {
-    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
     MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
     MODEL_GATEWAY_SQLITE_TABLES,
 } from '#copilot/infra/public/database/sqlite/model-gateway-schema';
@@ -27,6 +26,8 @@ import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { parseModelGatewayRefreshLogText, summarizeModelGatewayRefreshLogEvents } from './refresh-logs.js';
+import { applyModelGatewayOperationalRetention } from './sqlite-operational-retention.js';
+import { initializeModelGatewaySqliteSchema, readModelGatewaySqliteUserVersion } from './sqlite-schema-migration.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
 const DEFAULT_ROUTE_PROFILE = 'default';
@@ -44,6 +45,18 @@ let _standbyPlanSequence = 0;
 let _liveScenarioRunSequence = 0;
 /** @typedef {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} SqliteDatabasePort */
 /** @typedef {SqliteDatabasePort & { transaction: (operation: () => unknown) => () => unknown }} SqliteCatalogDatabase */
+/**
+ * @typedef {(options?:{mode?:'PASSIVE';timeoutMs?:number;busyTimeoutMs?:number}) => Promise<Readonly<{
+ *   attempted:boolean;
+ *   mode:'PASSIVE';
+ *   busy:number;
+ *   walPages:number;
+ *   checkpointedPages:number;
+ *   durationMs:number;
+ *   workerDurationMs?:number;
+ *   reason?:string;
+ * }>>} SqliteCheckpointPort
+ */
 /** @type {WeakSet<SqliteCatalogDatabase>} */
 const initializedSqliteCatalogDatabases = new WeakSet();
 
@@ -54,27 +67,6 @@ function requireCatalogDatabase(db) {
     }
     return /** @type {SqliteCatalogDatabase} */ (db);
 }
-
-export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
-    accountHistoryMaxRowsPerTable: 10_000,
-    accountQuotaSnapshotMaxRows: 20_000,
-    accountRateLimitSnapshotMaxRows: 50_000,
-    accountSpendingSnapshotMaxRows: 20_000,
-    routeDecisionMaxRows: 50_000,
-    automationDecisionMaxRows: 50_000,
-    automationPolicySnapshotMaxRows: 50_000,
-    automationEffectApplicationMaxRows: 50_000,
-    recoveryAttemptMaxRows: 50_000,
-    sdkSessionHandoffMaxRows: 50_000,
-    sdkSessionHandoffTransitionMaxRows: 200000,
-    sdkSessionConfirmationMaxRows: 50_000,
-    standbyPlanMaxRows: 50_000,
-    liveScenarioRunMaxRows: 50_000,
-    refreshLogMaxRows: 200_000,
-    runtimeProbeRunMaxRows: 10_000,
-    runtimeProbeResultMaxRows: 100_000,
-    healthObservationMaxRows: 100_000,
-});
 
 const DELETE_TABLES_IN_ORDER = Object.freeze([
     'copilot_model_gateway_eligibility_decisions',
@@ -118,38 +110,6 @@ function optionalInteger(value) {
 }
 
 /**
- * @param {unknown} value
- * @param {number} fallback
- * @returns {number}
- */
-function retentionLimit(value, fallback) {
-    const limit = optionalInteger(value);
-    return limit === null ? fallback : Math.max(0, limit);
-}
-
-/**
- * @param {SqliteCatalogDatabase} db
- * @returns {number}
- */
-function sqliteUserVersion(db) {
-    const row = /** @type {Record<string, unknown> | undefined} */ (db.prepare('PRAGMA user_version').get());
-    return optionalInteger(row?.['user_version']) ?? 0;
-}
-
-/**
- * @param {SqliteCatalogDatabase} db
- * @returns {void}
- */
-function ensureCompatibleSqliteSchemaVersion(db) {
-    const userVersion = sqliteUserVersion(db);
-    if (userVersion > MODEL_GATEWAY_SQLITE_SCHEMA_VERSION) {
-        throw new Error(
-            `[model-gateway/sqlite] database schema version ${userVersion} is newer than supported version ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`,
-        );
-    }
-}
-
-/**
  * @param {SqliteCatalogDatabase} db
  * @param {string} table
  * @param {string} column
@@ -158,130 +118,6 @@ function ensureCompatibleSqliteSchemaVersion(db) {
 function sqliteTableHasColumn(db, table, column) {
     const rows = db.prepare(`PRAGMA table_info(${table})`).all();
     return rows.some((row) => isRecord(row) && optionalString(row['name']) === column);
-}
-
-/**
- * @param {SqliteCatalogDatabase} db
- * @returns {void}
- */
-function migrateModelGatewaySqliteSchema(db) {
-    const handoffColumns = /** @type {[string, string][]} */ ([
-        ['operation_kind', "TEXT NOT NULL DEFAULT 'unknown'"],
-        ['idempotency_key', 'TEXT'],
-        ['provider_id', 'TEXT'],
-        ['provider_model', 'TEXT'],
-        ['defer_reason', 'TEXT'],
-        ['promotion_policy', "TEXT NOT NULL DEFAULT 'manual_review'"],
-        ['promotion_authorized', 'INTEGER NOT NULL DEFAULT 0'],
-        ['expires_at_ms', 'INTEGER'],
-    ]);
-    for (const [column, definition] of handoffColumns) {
-        if (sqliteTableHasColumn(db, 'copilot_model_gateway_sdk_session_handoffs', column)) continue;
-        db.exec(`ALTER TABLE copilot_model_gateway_sdk_session_handoffs ADD COLUMN ${column} ${definition};`);
-    }
-    const confirmationColumns = /** @type {[string, string][]} */ ([
-        ['previous_provider_id', 'TEXT'],
-        ['provider_id', 'TEXT'],
-        ['binding_strategy', "TEXT NOT NULL DEFAULT 'unknown'"],
-        ['wire_api', 'TEXT'],
-        ['selected_route_key', 'TEXT'],
-        ['operation_state', 'TEXT'],
-    ]);
-    for (const [column, definition] of confirmationColumns) {
-        if (sqliteTableHasColumn(db, 'copilot_model_gateway_sdk_session_confirmations', column)) continue;
-        db.exec(`ALTER TABLE copilot_model_gateway_sdk_session_confirmations ADD COLUMN ${column} ${definition};`);
-    }
-    db.exec(`
-        UPDATE copilot_model_gateway_sdk_session_handoffs
-        SET operation_kind = COALESCE(NULLIF(json_extract(payload_json, '$.operation.schemaVersion'), ''), operation_kind),
-            idempotency_key = COALESCE(NULLIF(json_extract(payload_json, '$.operation.idempotencyKey'), ''), idempotency_key),
-            provider_id = COALESCE(NULLIF(json_extract(payload_json, '$.operation.targetRoute.providerId'), ''), provider_id),
-            provider_model = COALESCE(
-                NULLIF(json_extract(payload_json, '$.operation.targetRoute.providerModel'), ''),
-                NULLIF(json_extract(payload_json, '$.operation.targetRoute.selectorSyntax'), ''),
-                provider_model
-            ),
-            defer_reason = COALESCE(NULLIF(json_extract(payload_json, '$.operation.deferReason'), ''), defer_reason),
-            promotion_policy = COALESCE(
-                NULLIF(json_extract(payload_json, '$.operation.promotionAuthorization.policy'), ''),
-                NULLIF(json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.policy'), ''),
-                promotion_policy
-            ),
-            promotion_authorized = CASE
-                WHEN json_extract(payload_json, '$.operation.promotionAuthorization.authorized') = 1
-                  OR json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.authorized') = 1
-                THEN 1 ELSE promotion_authorized
-            END,
-            expires_at_ms = COALESCE(
-                CAST(strftime('%s', json_extract(payload_json, '$.operation.promotionAuthorization.expiresAt')) AS INTEGER) * 1000,
-                CAST(strftime('%s', json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.expiresAt')) AS INTEGER) * 1000,
-                expires_at_ms
-            );
-        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_deferred_session
-            ON copilot_model_gateway_sdk_session_handoffs(session_id, status, requested_at_ms DESC);
-        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_idempotency
-            ON copilot_model_gateway_sdk_session_handoffs(idempotency_key, requested_at_ms DESC);
-        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_provider_route
-            ON copilot_model_gateway_sdk_session_handoffs(provider_id, provider_model, selected_route_key, requested_at_ms DESC);
-
-        UPDATE copilot_model_gateway_sdk_session_confirmations
-        SET previous_provider_id = COALESCE(
-                NULLIF(json_extract(payload_json, '$.previousProviderId'), ''),
-                previous_provider_id
-            ),
-            provider_id = COALESCE(
-                NULLIF(json_extract(payload_json, '$.providerId'), ''),
-                NULLIF(json_extract(payload_json, '$.targetProviderId'), ''),
-                NULLIF(json_extract(payload_json, '$.confirmedProviderId'), ''),
-                provider_id
-            ),
-            binding_strategy = COALESCE(
-                NULLIF(json_extract(payload_json, '$.bindingStrategy'), ''),
-                binding_strategy
-            ),
-            wire_api = COALESCE(
-                NULLIF(json_extract(payload_json, '$.wireApi'), ''),
-                wire_api
-            ),
-            selected_route_key = COALESCE(
-                NULLIF(json_extract(payload_json, '$.selectedRouteKey'), ''),
-                selected_route_key
-            ),
-            operation_state = COALESCE(
-                NULLIF(json_extract(payload_json, '$.operationState'), ''),
-                operation_state
-            );
-        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_binding
-            ON copilot_model_gateway_sdk_session_confirmations(
-                previous_provider_id,
-                provider_id,
-                binding_strategy,
-                wire_api,
-                observed_at_ms DESC
-            );
-        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_route
-            ON copilot_model_gateway_sdk_session_confirmations(
-                provider_id,
-                selected_route_key,
-                binding_strategy,
-                wire_api,
-                observed_at_ms DESC
-            );
-    `);
-    if (!sqliteTableHasColumn(db, 'copilot_model_gateway_eligibility_decisions', 'selector_syntax')) {
-        db.exec(`
-            ALTER TABLE copilot_model_gateway_eligibility_decisions
-                ADD COLUMN selector_syntax TEXT NOT NULL DEFAULT '';
-        `);
-    }
-    db.exec(`
-        DROP INDEX IF EXISTS idx_mg_eligibility_decisions_model;
-        UPDATE copilot_model_gateway_eligibility_decisions
-        SET selector_syntax = COALESCE(NULLIF(json_extract(payload_json, '$.selectorSyntax'), ''), provider_model)
-        WHERE selector_syntax = '';
-        CREATE INDEX IF NOT EXISTS idx_mg_eligibility_decisions_model
-            ON copilot_model_gateway_eligibility_decisions(provider_id, provider_model, route_profile, selector_kind, selector_syntax);
-    `);
 }
 
 /**
@@ -924,43 +760,27 @@ function refreshLogRunId(events, fallback) {
     return `model-gateway-refresh:${optionalString(first?.['ts']) ?? optionalString(last?.['ts']) ?? Date.now()}`;
 }
 
-/**
- * @param {SqliteCatalogDatabase} db
- * @param {object} input
- * @param {string} input.table
- * @param {string} input.keyColumn
- * @param {string} input.orderColumn
- * @param {number} input.maxRows
- * @returns {number}
- */
-function deleteRowsKeepingLatest(db, input) {
-    const statement = db.prepare(`
-        DELETE FROM ${input.table}
-        WHERE ${input.keyColumn} IN (
-            SELECT ${input.keyColumn}
-            FROM ${input.table}
-            ORDER BY ${input.orderColumn} DESC, ${input.keyColumn} DESC
-            LIMIT -1 OFFSET ?
-        )
-    `);
-    return Number(statement.run(input.maxRows).changes ?? 0);
-}
-
 export class SqliteModelGatewayCatalogStore {
     /** @type {SqliteCatalogDatabase} */
     #db;
+    /** @type {SqliteCheckpointPort | null} */
+    #checkpoint;
 
     /**
-     * @param {{ db?: SqliteDatabasePort }} [options]
+     * @param {{ db?: SqliteDatabasePort; checkpoint?: SqliteCheckpointPort | null }} [options]
      */
     constructor(options = {}) {
+        const usesApplicationDatabase = options.db === undefined;
         this.#db = requireCatalogDatabase(options.db ?? getApplicationSqliteDatabase());
+        this.#checkpoint =
+            options.checkpoint !== undefined
+                ? options.checkpoint
+                : usesApplicationDatabase
+                  ? checkpointApplicationSqlite
+                  : null;
         if (initializedSqliteCatalogDatabases.has(this.#db)) return;
         this.#db.exec('PRAGMA foreign_keys = ON');
-        ensureCompatibleSqliteSchemaVersion(this.#db);
-        this.#db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
-        migrateModelGatewaySqliteSchema(this.#db);
-        this.#db.exec(`PRAGMA user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
+        initializeModelGatewaySqliteSchema(this.#db);
         initializedSqliteCatalogDatabases.add(this.#db);
     }
 
@@ -1046,6 +866,84 @@ export class SqliteModelGatewayCatalogStore {
                 'decision_key',
             ),
         });
+    }
+
+    /**
+     * Read the exact structural projection consumed by JSON↔SQLite catalog parity checks without parsing relational
+     * payload_json rows. Content/security identity is intentionally owned by the separate redaction fingerprints.
+     *
+     * @returns {Promise<{
+     *   snapshotId:string;
+     *   counts:{
+     *     sources:number;
+     *     providerEvidences:number;
+     *     evidences:number;
+     *     routeOptions:number;
+     *     accountOverlays:number;
+     *     providerProjections:number;
+     *     projections:number;
+     *     importRuns:number;
+     *     rawPayloadRefs:number;
+     *     conflicts:number;
+     *     modelEligibilityRuns:number;
+     *     modelEligibilityDecisions:number;
+     *   };
+     *   keys:Record<string,string[]>;
+     * }>}
+     */
+    async readCatalogStructuralParityProjection() {
+        const meta = /** @type {{ snapshot_id?: string | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `SELECT json_extract(payload_json, '$.snapshotId') AS snapshot_id
+                     FROM copilot_model_gateway_snapshots
+                     WHERE snapshot_id = ?
+                     LIMIT 1`,
+                )
+                .get(ACTIVE_SNAPSHOT_ID)
+        );
+        const specs = /** @type {const} */ ({
+            sources: ['copilot_model_gateway_catalog_sources', 'source_id'],
+            providerEvidences: ['copilot_model_gateway_provider_evidence', 'evidence_id'],
+            evidences: ['copilot_model_gateway_model_evidence', 'evidence_id'],
+            routeOptions: [
+                'copilot_model_gateway_route_options',
+                "provider_id || ':' || provider_model || ':' || route_profile || ':' || selector_kind || ':' || selector_syntax",
+            ],
+            accountOverlays: ['copilot_model_gateway_account_overlays', 'account_overlay_id'],
+            providerProjections: [
+                'copilot_model_gateway_provider_projections',
+                "provider_id || ':' || subject_provider_id",
+            ],
+            projections: [
+                'copilot_model_gateway_model_projections',
+                "provider_id || ':' || provider_model || ':' || route_profile",
+            ],
+            importRuns: ['copilot_model_gateway_import_runs', 'run_id'],
+            rawPayloadRefs: ['copilot_model_gateway_raw_payload_refs', 'raw_payload_ref'],
+            conflicts: ['copilot_model_gateway_conflicts', 'conflict_key'],
+            modelEligibilityRuns: ['copilot_model_gateway_eligibility_runs', 'run_id'],
+            modelEligibilityDecisions: [
+                'copilot_model_gateway_eligibility_decisions',
+                "policy_profile || ':' || task_profile || ':' || account_scope || ':' || provider_id || ':' || provider_model || ':' || route_profile || ':' || selector_kind || ':' || selector_syntax",
+            ],
+        });
+        /** @type {Record<string,string[]>} */
+        const keys = {};
+        /** @type {Record<string,number>} */
+        const counts = {};
+        for (const [field, [table, keyExpression]] of Object.entries(specs)) {
+            const rows = /** @type {{ parity_key:string }[]} */ (
+                this.#db.prepare(`SELECT ${keyExpression} AS parity_key FROM ${table}`).all()
+            );
+            keys[field] = rows.map((row) => String(row.parity_key));
+            counts[field] = rows.length;
+        }
+        return {
+            snapshotId: optionalString(meta?.snapshot_id) ?? 'missing-snapshot-id',
+            counts: /** @type {any} */ (counts),
+            keys,
+        };
     }
 
     /**
@@ -1476,7 +1374,7 @@ export class SqliteModelGatewayCatalogStore {
         const sum = (tables) => tables.reduce((total, table) => total + (tableCounts[table] ?? 0), 0);
         return {
             schemaVersion: MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
-            userVersion: sqliteUserVersion(this.#db),
+            userVersion: readModelGatewaySqliteUserVersion(this.#db),
             tableCounts,
             activeSnapshot: {
                 exists: Boolean(active),
@@ -1620,11 +1518,55 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * Content-aware identity for exactly the bounded SQLite payload surface used by redaction proof. This hashes raw
+     * payload bytes and row identities without JSON parsing/traversal, so proof freshness can be checked cheaply.
+     *
+     * @param {{ maxRowsPerTable?: number }} [options]
+     */
+    async readStoredPayloadRedactionFingerprint(options = {}) {
+        const maxRowsPerTable = Math.max(1, Math.min(optionalInteger(options.maxRowsPerTable) ?? 100_000, 1_000_000));
+        const hash = createHash('sha256').update('model-gateway-sqlite-redaction-surface-v1\0');
+        let tableCount = 0;
+        let rowCount = 0;
+        let payloadBytes = 0;
+        for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
+            if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
+            tableCount += 1;
+            hash.update(table).update('\0');
+            const rows = /** @type {{ rowid: number; payload_json: string }[]} */ (
+                this.#db
+                    .prepare(`SELECT rowid, payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
+                    .all(maxRowsPerTable)
+            );
+            for (const row of rows) {
+                const payload = String(row.payload_json ?? '');
+                rowCount += 1;
+                payloadBytes += Buffer.byteLength(payload, 'utf8');
+                hash.update(String(row.rowid)).update('\0').update(payload).update('\0');
+            }
+        }
+        return {
+            schema: 'model-gateway-sqlite-redaction-fingerprint',
+            algorithm: 'sha256',
+            mode: 'bounded',
+            maxRowsPerTable,
+            tableCount,
+            rowCount,
+            payloadBytes,
+            fingerprint: hash.digest('hex'),
+        };
+    }
+
+    /**
      * @param {{ additionalSecrets?: readonly string[]; maxSamples?: number; maxRowsPerTable?: number }} [options]
      * @returns {Promise<{
      *     schema: 'model-gateway-sqlite-redaction-audit';
      *     ok: boolean;
      *     tableCount: number;
+     *     rowCount: number;
+     *     payloadBytes: number;
+     *     maxRowsPerTable: number;
+     *     fingerprint: string;
      *     leakCount: number;
      *     scannedStringCount: number;
      *     sampleCount: number;
@@ -1657,11 +1599,23 @@ export class SqliteModelGatewayCatalogStore {
         const tables = {};
         /** @type {{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }[]} */
         const audits = [];
+        const surfaceHash = createHash('sha256').update('model-gateway-sqlite-redaction-surface-v1\0');
+        let rowCount = 0;
+        let payloadBytes = 0;
         for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
             if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
-            const rows = /** @type {{ payload_json: string }[]} */ (
-                this.#db.prepare(`SELECT payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`).all(maxRowsPerTable)
+            const rows = /** @type {{ rowid: number; payload_json: string }[]} */ (
+                this.#db
+                    .prepare(`SELECT rowid, payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
+                    .all(maxRowsPerTable)
             );
+            surfaceHash.update(table).update('\0');
+            for (const row of rows) {
+                const payload = String(row.payload_json ?? '');
+                rowCount += 1;
+                payloadBytes += Buffer.byteLength(payload, 'utf8');
+                surfaceHash.update(String(row.rowid)).update('\0').update(payload).update('\0');
+            }
             const audit = auditModelGatewayValueRedaction(
                 rows.map((row) => parsePayload(row.payload_json)),
                 {
@@ -1688,6 +1642,10 @@ export class SqliteModelGatewayCatalogStore {
             schema: 'model-gateway-sqlite-redaction-audit',
             ok: summary.ok,
             tableCount: Object.keys(tables).length,
+            rowCount,
+            payloadBytes,
+            maxRowsPerTable,
+            fingerprint: surfaceHash.digest('hex'),
             leakCount: summary.leakCount,
             scannedStringCount: summary.scannedStringCount,
             sampleCount: summary.sampleCount,
@@ -1856,251 +1814,73 @@ export class SqliteModelGatewayCatalogStore {
      *     sdkSessionConfirmationMaxRows?: number;
      *     standbyPlanMaxRows?: number;
      *     liveScenarioRunMaxRows?: number;
+     *     batchDeleteRows?: number;
+     *     checkpointEveryBatches?: number;
+     *     busyRetryMax?: number;
+     *     busyRetryDelayMs?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
      *     deletedRows: number;
-     *     tables: Record<string, { deletedRows: number; maxRows: number }>;
+     *     tables: Record<string, {
+     *         deletedRows: number;
+     *         maxRows: number;
+     *         remainingRows?: number;
+     *         protectedLatestRows?: number;
+     *         budgetSatisfied?: boolean;
+     *         batches?: number;
+     *         batchRows?: { min: number; avg: number; max: number };
+     *         orphanDeletedRows?: number;
+     *         orphanBatches?: number;
+     *     }>;
+     *     maintenance: {
+     *         batchDeleteRows: number;
+     *         checkpointEveryBatches: number;
+     *         transactionCount: number;
+     *         busyRetryCount: number;
+     *         totalDurationMs: number;
+     *         transactionDurationMs: { p50: number; p95: number; max: number };
+     *         deletedRowsPerBatch: { min: number; p50: number; p95: number; max: number };
+     *         freelistPagesBefore: number;
+     *         freelistPagesAfter: number;
+     *         pageCountBefore: number;
+     *         pageCountAfter: number;
+     *         autoCheckpoint: { pagesBefore: number; pagesDuringMaintenance: 0; restored: true };
+     *         checkpoint: {
+     *             mode: 'PASSIVE';
+     *             requestCount: number;
+     *             completedCount: number;
+     *             skippedCount: number;
+     *             failureCount: number;
+     *             periodicRequestCount: number;
+     *             busyCount: number;
+     *             totalCheckpointedPages: number;
+     *             peakWalPages: number;
+     *             peakWalBytes: number;
+     *             totalDurationMs: number;
+     *             durationMs: { p50: number; p95: number; max: number };
+     *             final: {
+     *                 status: 'completed'|'skipped'|'failed';
+     *                 attempted: boolean;
+     *                 busy: number;
+     *                 walPages: number;
+     *                 walBytes: number;
+     *                 checkpointedPages: number;
+     *                 durationMs: number;
+     *                 workerDurationMs: number;
+     *                 reason?: string;
+     *                 error?: string;
+     *             };
+     *         };
+     *     };
      * }>}
      */
     async applyOperationalRetention(policy = {}) {
-        const accountHistoryMaxRowsPerTable = retentionLimit(
-            policy.accountHistoryMaxRowsPerTable,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountHistoryMaxRowsPerTable,
-        );
-        const accountHistoryFallback =
-            policy.accountHistoryMaxRowsPerTable === undefined ? null : accountHistoryMaxRowsPerTable;
-        const accountQuotaSnapshotMaxRows = retentionLimit(
-            policy.accountQuotaSnapshotMaxRows,
-            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountQuotaSnapshotMaxRows,
-        );
-        const accountRateLimitSnapshotMaxRows = retentionLimit(
-            policy.accountRateLimitSnapshotMaxRows,
-            accountHistoryFallback ??
-                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
-        );
-        const accountSpendingSnapshotMaxRows = retentionLimit(
-            policy.accountSpendingSnapshotMaxRows,
-            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountSpendingSnapshotMaxRows,
-        );
-        const routeDecisionMaxRows = retentionLimit(
-            policy.routeDecisionMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.routeDecisionMaxRows,
-        );
-        const refreshLogMaxRows = retentionLimit(
-            policy.refreshLogMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows,
-        );
-        const runtimeProbeRunMaxRows = retentionLimit(
-            policy.runtimeProbeRunMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeRunMaxRows,
-        );
-        const runtimeProbeResultMaxRows = retentionLimit(
-            policy.runtimeProbeResultMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeResultMaxRows,
-        );
-        const healthObservationMaxRows = retentionLimit(
-            policy.healthObservationMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows,
-        );
-        const automationDecisionMaxRows = retentionLimit(
-            policy.automationDecisionMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationDecisionMaxRows,
-        );
-        const automationPolicySnapshotMaxRows = retentionLimit(
-            policy.automationPolicySnapshotMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationPolicySnapshotMaxRows,
-        );
-        const automationEffectApplicationMaxRows = retentionLimit(
-            policy.automationEffectApplicationMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationEffectApplicationMaxRows,
-        );
-        const recoveryAttemptMaxRows = retentionLimit(
-            policy.recoveryAttemptMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.recoveryAttemptMaxRows,
-        );
-        const sdkSessionHandoffMaxRows = retentionLimit(
-            policy.sdkSessionHandoffMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionHandoffMaxRows,
-        );
-        const sdkSessionConfirmationMaxRows = retentionLimit(
-            policy.sdkSessionConfirmationMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionConfirmationMaxRows,
-        );
-        const standbyPlanMaxRows = retentionLimit(
-            policy.standbyPlanMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.standbyPlanMaxRows,
-        );
-        const liveScenarioRunMaxRows = retentionLimit(
-            policy.liveScenarioRunMaxRows,
-            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.liveScenarioRunMaxRows,
-        );
-        /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
-        const tables = {};
-        const tx = this.#db.transaction(() => {
-            const accountRetentionTables = /** @type {[string, number][]} */ ([
-                ['copilot_model_gateway_account_quota_snapshots', accountQuotaSnapshotMaxRows],
-                ['copilot_model_gateway_account_rate_limit_snapshots', accountRateLimitSnapshotMaxRows],
-                ['copilot_model_gateway_account_spending_snapshots', accountSpendingSnapshotMaxRows],
-            ]);
-            for (const [table, maxRows] of accountRetentionTables) {
-                const deletedRows = deleteRowsKeepingLatest(this.#db, {
-                    table,
-                    keyColumn: 'snapshot_key',
-                    orderColumn: 'observed_at_ms',
-                    maxRows,
-                });
-                tables[table] = { deletedRows, maxRows };
-            }
-            tables['copilot_model_gateway_route_decisions'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_route_decisions',
-                    keyColumn: 'decision_id',
-                    orderColumn: 'decided_at_ms',
-                    maxRows: routeDecisionMaxRows,
-                }),
-                maxRows: routeDecisionMaxRows,
-            };
-            tables['copilot_model_gateway_refresh_log_events'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_refresh_log_events',
-                    keyColumn: 'event_key',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: refreshLogMaxRows,
-                }),
-                maxRows: refreshLogMaxRows,
-            };
-            tables['copilot_model_gateway_automation_decisions'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_automation_decisions',
-                    keyColumn: 'decision_id',
-                    orderColumn: 'decided_at_ms',
-                    maxRows: automationDecisionMaxRows,
-                }),
-                maxRows: automationDecisionMaxRows,
-            };
-            tables['copilot_model_gateway_automation_policy_snapshots'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_automation_policy_snapshots',
-                    keyColumn: 'policy_snapshot_id',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: automationPolicySnapshotMaxRows,
-                }),
-                maxRows: automationPolicySnapshotMaxRows,
-            };
-            tables['copilot_model_gateway_automation_effect_applications'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_automation_effect_applications',
-                    keyColumn: 'effect_id',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: automationEffectApplicationMaxRows,
-                }),
-                maxRows: automationEffectApplicationMaxRows,
-            };
-            tables['copilot_model_gateway_recovery_attempts'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_recovery_attempts',
-                    keyColumn: 'recovery_attempt_id',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: recoveryAttemptMaxRows,
-                }),
-                maxRows: recoveryAttemptMaxRows,
-            };
-            tables['copilot_model_gateway_sdk_session_handoffs'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_sdk_session_handoffs',
-                    keyColumn: 'handoff_id',
-                    orderColumn: 'requested_at_ms',
-                    maxRows: sdkSessionHandoffMaxRows,
-                }),
-                maxRows: sdkSessionHandoffMaxRows,
-            };
-            const sdkSessionHandoffTransitionMaxRows = Math.max(1, sdkSessionHandoffMaxRows * 5);
-            const orphanTransitionRows = Number(
-                this.#db
-                    .prepare(
-                        `
-                    DELETE FROM copilot_model_gateway_sdk_session_handoff_transitions
-                    WHERE handoff_id NOT IN (
-                        SELECT handoff_id FROM copilot_model_gateway_sdk_session_handoffs
-                    )
-                `,
-                    )
-                    .run().changes ?? 0,
-            );
-            tables['copilot_model_gateway_sdk_session_handoff_transitions'] = {
-                deletedRows:
-                    orphanTransitionRows +
-                    deleteRowsKeepingLatest(this.#db, {
-                        table: 'copilot_model_gateway_sdk_session_handoff_transitions',
-                        keyColumn: 'transition_id',
-                        orderColumn: 'occurred_at_ms',
-                        maxRows: sdkSessionHandoffTransitionMaxRows,
-                    }),
-                maxRows: sdkSessionHandoffTransitionMaxRows,
-            };
-            tables['copilot_model_gateway_sdk_session_confirmations'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_sdk_session_confirmations',
-                    keyColumn: 'confirmation_id',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: sdkSessionConfirmationMaxRows,
-                }),
-                maxRows: sdkSessionConfirmationMaxRows,
-            };
-            tables['copilot_model_gateway_standby_plans'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_standby_plans',
-                    keyColumn: 'standby_plan_id',
-                    orderColumn: 'generated_at_ms',
-                    maxRows: standbyPlanMaxRows,
-                }),
-                maxRows: standbyPlanMaxRows,
-            };
-            tables['copilot_model_gateway_live_scenario_runs'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_live_scenario_runs',
-                    keyColumn: 'run_id',
-                    orderColumn: 'completed_at_ms',
-                    maxRows: liveScenarioRunMaxRows,
-                }),
-                maxRows: liveScenarioRunMaxRows,
-            };
-            tables['copilot_model_gateway_runtime_probe_results'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_runtime_probe_results',
-                    keyColumn: 'result_key',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: runtimeProbeResultMaxRows,
-                }),
-                maxRows: runtimeProbeResultMaxRows,
-            };
-            tables['copilot_model_gateway_runtime_probe_runs'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_runtime_probe_runs',
-                    keyColumn: 'run_id',
-                    orderColumn: 'completed_at_ms',
-                    maxRows: runtimeProbeRunMaxRows,
-                }),
-                maxRows: runtimeProbeRunMaxRows,
-            };
-            tables['copilot_model_gateway_health_observations'] = {
-                deletedRows: deleteRowsKeepingLatest(this.#db, {
-                    table: 'copilot_model_gateway_health_observations',
-                    keyColumn: 'observation_key',
-                    orderColumn: 'observed_at_ms',
-                    maxRows: healthObservationMaxRows,
-                }),
-                maxRows: healthObservationMaxRows,
-            };
+        return applyModelGatewayOperationalRetention({
+            db: this.#db,
+            checkpoint: this.#checkpoint,
+            policy,
         });
-        tx();
-        const deletedRows = Object.values(tables).reduce((total, table) => total + table.deletedRows, 0);
-        return {
-            schema: 'model-gateway-sqlite-operational-retention',
-            deletedRows,
-            tables,
-        };
     }
 
     /**
@@ -2168,6 +1948,32 @@ export class SqliteModelGatewayCatalogStore {
                     expires_at_ms = excluded.expires_at_ms,
                     payload_json = excluded.payload_json
             `);
+            const upsertHealthLatest = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_health_latest
+                    (provider_id, provider_model, route_profile, observation_key, observed_at_ms)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(provider_id, provider_model, route_profile) DO UPDATE SET
+                    observation_key = excluded.observation_key,
+                    observed_at_ms = excluded.observed_at_ms
+                WHERE excluded.observed_at_ms > copilot_model_gateway_runtime_health_latest.observed_at_ms
+                   OR (
+                       excluded.observed_at_ms = copilot_model_gateway_runtime_health_latest.observed_at_ms
+                       AND excluded.observation_key > copilot_model_gateway_runtime_health_latest.observation_key
+                   )
+            `);
+            const upsertProbeLatest = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_latest
+                    (provider_id, provider_model, route_profile, probe_kind, result_key, observed_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(provider_id, provider_model, route_profile, probe_kind) DO UPDATE SET
+                    result_key = excluded.result_key,
+                    observed_at_ms = excluded.observed_at_ms
+                WHERE excluded.observed_at_ms > copilot_model_gateway_runtime_probe_latest.observed_at_ms
+                   OR (
+                       excluded.observed_at_ms = copilot_model_gateway_runtime_probe_latest.observed_at_ms
+                       AND excluded.result_key > copilot_model_gateway_runtime_probe_latest.result_key
+                   )
+            `);
             let probeSuccessCount = 0;
             let probeFailureCount = 0;
             insertRun.run(
@@ -2190,14 +1996,16 @@ export class SqliteModelGatewayCatalogStore {
             for (const record of writableRecords) {
                 const observed = latestRuntimeAt(record) || observedAtMs;
                 const status = runtimeHealthStatus(record);
-                const healthKey =
-                    optionalString(record['key']) ??
-                    `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
+                const provider = providerId(record);
+                const model = providerModel(record);
+                const route = routeProfile(record);
+                const healthKey = optionalString(record['key']) ?? `${route}|${provider}|${model}`;
+                const observationKey = runtimeObservationKey(runId, healthKey);
                 insertHealth.run(
-                    runtimeObservationKey(runId, healthKey),
-                    providerId(record),
-                    providerModel(record),
-                    routeProfile(record),
+                    observationKey,
+                    provider,
+                    model,
+                    route,
                     'runtime',
                     status,
                     runtimeFailureContext(record),
@@ -2205,6 +2013,7 @@ export class SqliteModelGatewayCatalogStore {
                     null,
                     operationalPayloadJson(record),
                 );
+                upsertHealthLatest.run(provider, model, route, observationKey, observed);
                 healthObservations += 1;
                 const probes = isRecord(record['probes']) ? record['probes'] : {};
                 for (const [probeKind, probeValue] of Object.entries(probes)) {
@@ -2212,25 +2021,28 @@ export class SqliteModelGatewayCatalogStore {
                     const ok = probeValue['ok'] === true;
                     if (ok) probeSuccessCount += 1;
                     else probeFailureCount += 1;
+                    const resultKey = runtimeProbeResultKey(runId, healthKey, probeKind);
+                    const probeObservedAt = dateMs(probeValue['lastAt']) ?? observed;
                     insertProbe.run(
-                        runtimeProbeResultKey(runId, healthKey, probeKind),
+                        resultKey,
                         runId,
-                        providerId(record),
-                        providerModel(record),
-                        routeProfile(record),
+                        provider,
+                        model,
+                        route,
                         probeKind,
                         optionalString(probeValue['wireApi']),
                         ok ? 1 : 0,
                         optionalString(probeValue['status']) ?? 'unknown',
-                        dateMs(probeValue['lastAt']) ?? observed,
+                        probeObservedAt,
                         null,
                         operationalPayloadJson({
                             ...probeValue,
-                            providerId: providerId(record),
-                            providerModel: providerModel(record),
-                            routeProfile: routeProfile(record),
+                            providerId: provider,
+                            providerModel: model,
+                            routeProfile: route,
                         }),
                     );
+                    upsertProbeLatest.run(provider, model, route, probeKind, resultKey, probeObservedAt);
                     probeResults += 1;
                 }
             }
@@ -2301,6 +2113,8 @@ export class SqliteModelGatewayCatalogStore {
         /** @type {{ healthObservations: number; probeResults: number }} */
         const deleted = { healthObservations: 0, probeResults: 0 };
         const tx = this.#db.transaction(() => {
+            this.#db.prepare(`DELETE FROM copilot_model_gateway_runtime_health_latest WHERE ${where}`).run(...params);
+            this.#db.prepare(`DELETE FROM copilot_model_gateway_runtime_probe_latest WHERE ${where}`).run(...params);
             deleted.healthObservations =
                 optionalInteger(
                     this.#db
@@ -2390,6 +2204,19 @@ export class SqliteModelGatewayCatalogStore {
                     expires_at_ms = excluded.expires_at_ms,
                     payload_json = excluded.payload_json
             `);
+            const upsertProbeLatest = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_latest
+                    (provider_id, provider_model, route_profile, probe_kind, result_key, observed_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(provider_id, provider_model, route_profile, probe_kind) DO UPDATE SET
+                    result_key = excluded.result_key,
+                    observed_at_ms = excluded.observed_at_ms
+                WHERE excluded.observed_at_ms > copilot_model_gateway_runtime_probe_latest.observed_at_ms
+                   OR (
+                       excluded.observed_at_ms = copilot_model_gateway_runtime_probe_latest.observed_at_ms
+                       AND excluded.result_key > copilot_model_gateway_runtime_probe_latest.result_key
+                   )
+            `);
             insertRun.run(
                 runId,
                 optionalString(input.probeProfile) ?? DEFAULT_TASK_PROFILE,
@@ -2419,9 +2246,11 @@ export class SqliteModelGatewayCatalogStore {
                 if (ok) successCount += 1;
                 else failureCount += 1;
                 modelKeys.add(`${provider}:${model}:${route}`);
-                insertProbe.run(
+                const resultKey =
                     optionalString(result['resultKey']) ??
-                        runtimeProbeResultKey(runId, `${route}|${provider}|${model}|${probeKind}|${index}`, probeKind),
+                    runtimeProbeResultKey(runId, `${route}|${provider}|${model}|${probeKind}|${index}`, probeKind);
+                insertProbe.run(
+                    resultKey,
                     runId,
                     provider,
                     model,
@@ -2440,6 +2269,7 @@ export class SqliteModelGatewayCatalogStore {
                         kind: probeKind,
                     }),
                 );
+                upsertProbeLatest.run(provider, model, route, probeKind, resultKey, observedAtMs);
             });
             insertRun.run(
                 runId,
@@ -2631,19 +2461,12 @@ export class SqliteModelGatewayCatalogStore {
         const healthRecords = this.#db
             .prepare(
                 `
-                    SELECT provider_id, provider_model, route_profile, status, classified_failure,
-                           observed_at_ms, expires_at_ms, payload_json
-                    FROM (
-                        SELECT provider_id, provider_model, route_profile, status, classified_failure,
-                               observed_at_ms, expires_at_ms, payload_json, observation_key,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY provider_id, provider_model, route_profile
-                                   ORDER BY observed_at_ms DESC, observation_key DESC
-                               ) AS row_number
-                        FROM copilot_model_gateway_health_observations
-                    )
-                    WHERE row_number = 1
-                    ORDER BY observed_at_ms DESC, observation_key ASC
+                    SELECT h.provider_id, h.provider_model, h.route_profile, h.status, h.classified_failure,
+                           h.observed_at_ms, h.expires_at_ms, h.payload_json
+                    FROM copilot_model_gateway_runtime_health_latest AS latest
+                    INNER JOIN copilot_model_gateway_health_observations AS h
+                        ON h.observation_key = latest.observation_key
+                    ORDER BY latest.observed_at_ms DESC, latest.observation_key ASC
                     LIMIT ?
                 `,
             )
@@ -2666,19 +2489,12 @@ export class SqliteModelGatewayCatalogStore {
         const latestProbes = this.#db
             .prepare(
                 `
-                    SELECT provider_id, provider_model, route_profile, probe_kind, wire_api, ok,
-                           status, observed_at_ms, expires_at_ms, payload_json
-                    FROM (
-                        SELECT provider_id, provider_model, route_profile, probe_kind, wire_api, ok,
-                               status, observed_at_ms, expires_at_ms, payload_json, result_key,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY provider_id, provider_model, route_profile, probe_kind
-                                   ORDER BY observed_at_ms DESC, result_key DESC
-                               ) AS row_number
-                        FROM copilot_model_gateway_runtime_probe_results
-                    )
-                    WHERE row_number = 1
-                    ORDER BY observed_at_ms DESC, result_key ASC
+                    SELECT p.provider_id, p.provider_model, p.route_profile, p.probe_kind, p.wire_api, p.ok,
+                           p.status, p.observed_at_ms, p.expires_at_ms, p.payload_json
+                    FROM copilot_model_gateway_runtime_probe_latest AS latest
+                    INNER JOIN copilot_model_gateway_runtime_probe_results AS p
+                        ON p.result_key = latest.result_key
+                    ORDER BY latest.observed_at_ms DESC, latest.result_key ASC
                     LIMIT ?
                 `,
             )

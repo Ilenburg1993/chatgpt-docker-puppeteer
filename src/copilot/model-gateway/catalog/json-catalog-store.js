@@ -218,6 +218,8 @@ export class JsonModelGatewayCatalogStore {
     #filePath;
     /** @type {ReturnType<typeof createBoundJsonStore>} */
     #storage;
+    /** @type {ReturnType<typeof createConfiguredFsIo>} */
+    #io;
 
     /**
      * Alternate paths require an already-authorized IO capability; the store never mints authority from caller input.
@@ -234,6 +236,7 @@ export class JsonModelGatewayCatalogStore {
             throw new TypeError('Alternate model-gateway catalog paths require already-authorized IO.');
         }
         this.#filePath = filePath;
+        this.#io = io;
         this.#storage = createBoundJsonStore({
             filePath,
             io,
@@ -252,6 +255,32 @@ export class JsonModelGatewayCatalogStore {
     async readSnapshot() {
         const raw = await this.#storage.read(null);
         return normalizeStoredCatalogSnapshot(raw);
+    }
+
+    /**
+     * Read and normalize the catalog from one physically consistent authorized byte snapshot. Infra computes SHA-256
+     * over those exact bytes before they are decoded, binding readiness/security proof to the content that was parsed.
+     */
+    async readSnapshotWithContentFingerprint() {
+        const source = await this.#io.readBytesFresh(this.#filePath, { includeHash: true });
+        if (typeof source.contentHash !== 'string')
+            throw new Error('Catalog byte snapshot returned no SHA-256 identity.');
+        return {
+            snapshot: normalizeStoredCatalogSnapshot(JSON.parse(source.content.toString('utf8'))),
+            contentFingerprint: source.contentHash,
+            payloadBytes: source.bytesRead,
+        };
+    }
+
+    /** Re-read only the physically consistent bytes + SHA-256 identity for end-of-build race detection. */
+    async readContentFingerprint() {
+        const source = await this.#io.readBytesFresh(this.#filePath, { includeHash: true });
+        if (typeof source.contentHash !== 'string')
+            throw new Error('Catalog byte snapshot returned no SHA-256 identity.');
+        return {
+            contentFingerprint: source.contentHash,
+            payloadBytes: source.bytesRead,
+        };
     }
 
     /**

@@ -424,6 +424,17 @@ describe('copilot MCP registry', () => {
         }
     });
 
+    it('assigns the readiness-specific drain rationale only to llmb_live_readiness', () => {
+        const tools = getCanonicalMcpTools();
+        const repoStatus = tools.find((tool) => tool.name === 'repo_status');
+        const readiness = tools.find((tool) => tool.name === 'llmb_live_readiness');
+        assert.ok(repoStatus?.execution);
+        assert.ok(readiness?.execution);
+        assert.equal(repoStatus.execution.rationale.includes('Fresh readiness'), false);
+        assert.match(readiness.execution.rationale, /call-scoped subprocess/u);
+        assert.match(readiness.execution.rationale, /settles only after child close/u);
+    });
+
     it('does not invoke a handler when cancellation already happened', async () => {
         const controller = new AbortController();
         controller.abort(new Error('pre-abort'));

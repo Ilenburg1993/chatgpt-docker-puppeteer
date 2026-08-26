@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -154,6 +154,10 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent['success'], true);
         assert.equal(result.structuredContent['bytesWritten'], 6);
+        const beforeHash = createHash('sha256').update('before\n').digest('hex');
+        assert.equal(result.structuredContent['sourceSnapshotHash'], beforeHash);
+        assert.equal(result.structuredContent['previousHash'], beforeHash);
+        assert.equal(result.structuredContent['expectedHashMode'], 'source-snapshot');
         assert.match(String(result.structuredContent['diffPreview']), /-before/);
         assert.match(String(result.structuredContent['diffPreview']), /\+after/);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'after\n');
@@ -888,6 +892,34 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(failure['mutationState'], 'none');
         assert.equal(failure['recoveryRequired'], false);
         assert.equal(await fs.readFile(filePath, 'utf8'), initial);
+    });
+
+    it('accepts JSONC syntax for tsconfig-style JSON while still validating the final result', async () => {
+        assert.ok(applyPatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'tsconfig.guard.json');
+        const initial = '{\n  // workspace compiler policy\n  "compilerOptions": {\n    "strict": false,\n  },\n}\n';
+        await fs.writeFile(filePath, initial, 'utf8');
+
+        const accepted = await applyPatchTool.handler({
+            path: filePath,
+            old_string: '"strict": false',
+            new_string: '"strict": true',
+        });
+        assert.equal(accepted.isError, undefined);
+        assert.match(await fs.readFile(filePath, 'utf8'), /"strict": true/u);
+
+        const rejected = await applyPatchTool.handler({
+            path: filePath,
+            old_string: '"strict": true',
+            new_string: '"strict":',
+        });
+        assert.equal(rejected.isError, true);
+        assert.equal(rejected.structuredContent['code'], 'ERR_PATCH_INVALID_JSON_RESULT');
+        const failure = /** @type {Record<string, unknown>} */ (rejected.structuredContent['details']);
+        const details = /** @type {Record<string, unknown>} */ (failure['details']);
+        assert.equal(details['validation'], 'jsonc-parse');
+        assert.match(await fs.readFile(filePath, 'utf8'), /"strict": true/u);
     });
 
     it('validates the final JSON state of an atomic same-file patch batch, not transient virtual states', async () => {

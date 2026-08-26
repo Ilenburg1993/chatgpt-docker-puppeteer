@@ -84,7 +84,14 @@ export async function executeRepositoryWriteFile(runtime, input) {
     });
     if (!resolved.ok) return failure(resolved.reason, /** @type {Record<string, unknown>} */ (resolved));
     try {
-        const previous = await runtime.io.readText(resolved.resolved);
+        const previous = await runtime.io.readText(resolved.resolved, { hashMode: 'full' });
+        if (!previous.contentHash) {
+            return failure('Unable to bind repo_write_file to a source snapshot hash.', {
+                path: resolved.relative,
+                code: 'ERR_WRITE_SOURCE_HASH_UNAVAILABLE',
+            });
+        }
+        const sourceSnapshotHash = previous.contentHash;
         const diff = buildInlineDiffPreview(previous.content, input.content, {
             contextLines: input.diffContextLines ?? 3,
             maxLines: input.maxDiffLines ?? 2_000,
@@ -98,6 +105,7 @@ export async function executeRepositoryWriteFile(runtime, input) {
                     dryRun: true,
                     bytesWritten: 0,
                     previousBytes: previous.bytesRead,
+                    sourceSnapshotHash,
                 },
                 diff,
                 text: 'Write dry run complete; diff preview suppressed.',
@@ -109,15 +117,18 @@ export async function executeRepositoryWriteFile(runtime, input) {
                 },
             };
         }
+        const effectiveExpectedHash = input.expectedHash ?? sourceSnapshotHash;
         const write = await writeResolvedTarget(runtime, resolved, input.content, {
             requireExists: true,
-            ...(input.expectedHash ? { expectedHash: input.expectedHash } : {}),
+            expectedHash: effectiveExpectedHash,
             ...(input.durability ? { durability: input.durability } : {}),
             riskClass: 'high',
             advisoryLimits: {
                 tool: 'repo_write_file',
                 contentChars: input.content.length,
-                expectedHash: input.expectedHash ?? null,
+                expectedHash: effectiveExpectedHash,
+                expectedHashMode: input.expectedHash ? 'caller' : 'source-snapshot',
+                sourceSnapshotHash,
             },
         });
         clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
@@ -129,6 +140,8 @@ export async function executeRepositoryWriteFile(runtime, input) {
                 dryRun: false,
                 bytesWritten: write.bytesWritten,
                 previousBytes: previous.bytesRead,
+                sourceSnapshotHash,
+                expectedHashMode: input.expectedHash ? 'caller' : 'source-snapshot',
                 previousHash: write.previousHash,
                 contentHash: write.contentHash,
                 io: {

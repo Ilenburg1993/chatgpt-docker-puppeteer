@@ -7,4 +7,8 @@ export {
     normalizeControlledMcpReloadDelay,
     resolveControlledMcpReloadProfile,
 } from '../plan.js';
-export { buildControlledReloadRunnerEnvironment, scheduleControlledMcpReloadWithDependencies } from '../runner.js';
+export {
+    buildControlledReloadRestartInvocation,
+    buildControlledReloadRunnerEnvironment,
+    scheduleControlledMcpReloadWithDependencies,
+} from '../runner.js';

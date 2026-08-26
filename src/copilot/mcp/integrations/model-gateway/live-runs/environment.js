@@ -15,6 +15,8 @@ const MODEL_GATEWAY_ENVIRONMENT_AUTHORITY_IO = createConfiguredFsIo(
     }),
 );
 
+const PROCESS_COMPOSITION_CONFIG_KEYS = Object.freeze(['COPILOT_DB_PATH']);
+
 const READ_ONLY_CONFIG_KEYS = Object.freeze([
     'MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS',
     'MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DISABLED',
@@ -161,6 +163,7 @@ function captureModelGatewayAuthoritySource(parentEnv) {
     /** @type {Record<string, string | null | undefined>} */
     const captured = { ...operational };
     copyConfigured(parentEnv, captured, [
+        ...PROCESS_COMPOSITION_CONFIG_KEYS,
         ...READ_ONLY_CONFIG_KEYS,
         ...LIVE_COMMON_CONFIG_KEYS,
         ...REAL_PROVIDER_CONFIG_KEYS,
@@ -178,7 +181,29 @@ export function buildModelGatewayReadOnlyChildEnvironment(parentEnv) {
         MODEL_GATEWAY_LOAD_DOTENV: 'false',
         COPILOT_TERMINAL_LOAD_DOTENV_LOCAL: 'false',
     };
+    copyConfigured(parentEnv, overrides, PROCESS_COMPOSITION_CONFIG_KEYS);
     copyConfigured(parentEnv, overrides, READ_ONLY_CONFIG_KEYS);
+    return buildMcpChildEnvironment({ parentEnv, overrides }).env;
+}
+
+/**
+ * Build the authority projection for read-only readiness. Readiness may inspect provider configuration and use provider
+ * secret values only as local redaction/leak detectors, but it never receives Copilot-model or MCP/OAuth credentials
+ * and never gains network authority from this environment alone.
+ *
+ * @param {NodeJS.ProcessEnv} parentEnv
+ */
+export function buildModelGatewayReadinessChildEnvironment(parentEnv) {
+    if (!parentEnv) throw new TypeError('Model Gateway readiness environment projection requires parentEnv.');
+    /** @type {Record<string, string | null>} */
+    const overrides = {
+        MODEL_GATEWAY_LOAD_DOTENV: 'false',
+        COPILOT_TERMINAL_LOAD_DOTENV_LOCAL: 'false',
+    };
+    copyConfigured(parentEnv, overrides, PROCESS_COMPOSITION_CONFIG_KEYS);
+    copyConfigured(parentEnv, overrides, LIVE_COMMON_CONFIG_KEYS);
+    copyConfigured(parentEnv, overrides, REAL_PROVIDER_CONFIG_KEYS);
+    copyKnownProviderSecrets(parentEnv, overrides);
     return buildMcpChildEnvironment({ parentEnv, overrides }).env;
 }
 
@@ -193,6 +218,7 @@ export function buildModelGatewayLiveRunEnvironment(plan, parentEnv) {
         MODEL_GATEWAY_LOAD_DOTENV: 'false',
         COPILOT_TERMINAL_LOAD_DOTENV_LOCAL: 'false',
     };
+    copyConfigured(parentEnv, overrides, PROCESS_COMPOSITION_CONFIG_KEYS);
     copyConfigured(parentEnv, overrides, LIVE_COMMON_CONFIG_KEYS);
     if (plan.invokesModel === true) copyConfigured(parentEnv, overrides, COPILOT_MODEL_CREDENTIAL_KEYS);
     if (plan.invokesRealProvider === true) {
@@ -202,7 +228,7 @@ export function buildModelGatewayLiveRunEnvironment(plan, parentEnv) {
     return buildMcpChildEnvironment({ parentEnv, overrides }).env;
 }
 
-export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 2;
+export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_SCHEMA_VERSION = 3;
 export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND = 'copilot-mcp-model-gateway-live-environment-authority';
 
 /**
@@ -213,10 +239,11 @@ export const MODEL_GATEWAY_LIVE_ENVIRONMENT_AUTHORITY_KIND = 'copilot-mcp-model-
  * override file values. Methods expose fresh frozen copies and serialization exposes metadata only.
  *
  * @typedef {Readonly<{
- *     schemaVersion: 2;
+ *     schemaVersion: 3;
  *     kind: 'copilot-mcp-model-gateway-live-environment-authority';
  *     prepare: () => Promise<void>;
  *     readOnlyEnvironment: () => Readonly<NodeJS.ProcessEnv>;
+ *     readinessEnvironment: () => Readonly<NodeJS.ProcessEnv>;
  *     liveRunEnvironment: (plan: { invokesModel?: boolean; invokesRealProvider?: boolean }) => Readonly<NodeJS.ProcessEnv>;
  *     toJSON: () => Record<string, unknown>;
  * }>} ModelGatewayLiveRunEnvironmentAuthority
@@ -269,6 +296,7 @@ export function createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(pa
             await preparePromise;
         },
         readOnlyEnvironment: () => freezeEnvironment(templates.readOnly),
+        readinessEnvironment: () => freezeEnvironment(templates.readiness),
         liveRunEnvironment(plan) {
             const template =
                 plan.invokesModel === true
@@ -296,6 +324,7 @@ export function createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(pa
 function buildAuthorityTemplates(source) {
     return Object.freeze({
         readOnly: freezeEnvironment(buildModelGatewayReadOnlyChildEnvironment(source)),
+        readiness: freezeEnvironment(buildModelGatewayReadinessChildEnvironment(source)),
         control: freezeEnvironment(
             buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: false }, source),
         ),

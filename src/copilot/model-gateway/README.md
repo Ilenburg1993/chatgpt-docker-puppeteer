@@ -8,6 +8,11 @@ The current canonical audit, target architecture and continuously updated implem
 Read and update it in the same increment before changing catalog authority, provider bindings,
 runtime switching, LLM-B tools, automation or readiness.
 
+The current specialized authority for MCP/LLM-B live-readiness cancellation, security proof, cache,
+SQLite runtime-health/retention, source barriers and the recurring host `TaskGroup` incident is
+[`../docs/WORKSPACE_LLMB_MCP_TASKGROUP_READINESS_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md`](../docs/WORKSPACE_LLMB_MCP_TASKGROUP_READINESS_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md).
+It governs this boundary when more specific than the general Model Gateway roadmap.
+
 The previous operational and code reference remains available as historical context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md).
 
@@ -68,6 +73,42 @@ gateway model id: openrouter:deepseek/deepseek-v4-flash:free
 
 Provider secrets never appear in model gateway records. Only redacted `secretRefs` and
 configured/not-configured facts are stored.
+
+## Live readiness safety and performance
+
+`llmb_live_readiness` is an operational inspection path, not a model/provider turn. Its current
+architecture deliberately separates four concerns:
+
+- the MCP boundary starts one **call-scoped supervised subprocess** for fresh readiness. Caller
+  abort, timeout or output pressure terminates the process group and settles only after physical
+  close;
+- catalog/SQLite redaction is a separate **security proof**. Redaction Workers are one-shot,
+  resource-bounded and receive only the explicit readiness environment. A valid proof is reused only
+  for the same environment context, coverage and content fingerprints; it is not governed by the
+  short operational cache TTL;
+- the operational result cache is bounded to 30 seconds and is populated only when initial and final
+  state fingerprints are identical. SQLite change detection is O(1), using the application-owned
+  connection capability rather than historical `COUNT(*)` scans;
+- the default MCP result is task-first and compact (`<16 KiB` in the regression fixture). Full phase
+  trees are opt-in through `includeDetails=true`.
+
+Runtime health v14 uses pointer-only latest tables backed by historical ledgers. Latest reads were
+benchmarked with 100k/250k/500k rows per health/probe ledger and remained in the low-millisecond
+range with covering latest indexes plus primary-key lookups; no historical window sort is required.
+Operational retention is latest-preserving and chunked. Heavy PASSIVE checkpoint I/O is delegated to
+a path-bound Infra Worker so `better-sqlite3` checkpoint work does not block the application event
+loop.
+
+The current local acceptance SLO for a **fresh operational readiness with an already-valid security
+proof** is p95 <= 7.0 s. In the final publication-set 1/5/20 certification, N=20 measured p50 ~6.382
+s, p95 ~6.552 s and max ~6.569 s, with 27 created/27 terminated subprocesses and current=0. This is
+distinct from both the first security-proof build and sub-millisecond memory-cache hits. The 79-file
+publication set was hash-bound before/after execution; see the specialized 2026-08-26 audit for
+exact phases and memory HWM.
+
+Do not perform intentional retention against `data/copilot.sqlite` as a side effect of readiness or
+benchmarking. Real retention requires the documented backup/integrity, publication/reload and
+host-acceptance gates first.
 
 ## Runtime Automation
 

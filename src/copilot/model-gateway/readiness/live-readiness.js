@@ -1,8 +1,8 @@
 // @ts-check
 /** Canonical Model Gateway live-readiness application service. */
 
-import { createHash } from 'node:crypto';
-import { access, stat } from 'node:fs/promises';
+import { resolveApplicationSqlitePath } from '#copilot/infra/public/composition/database/sqlite/path';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -12,11 +12,11 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
-    auditModelGatewayPostRuntimeSelection,
-    auditModelGatewayPreRuntimeSelection,
+    auditPreparedModelGatewayPostRuntimeSelection,
+    auditPreparedModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
     collectModelGatewaySecretAuditEnvValues,
-    compareModelGatewayCatalogSnapshotParity,
+    compareModelGatewayCatalogSnapshotToStructuralParityProjection,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
     createGatewayRuntimeHealthIndex,
@@ -25,6 +25,7 @@ import {
     filterModelGatewayRuntimeEligibilityOverlayDecisions,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    prepareModelGatewayCatalogRoutingSnapshot,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayRuntimeAccountOverlays,
@@ -42,71 +43,18 @@ const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 // MCP adapter can request SQLite-backed health without turning a readiness probe into a long-running analytics job.
 const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 500;
 const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
+const REDACTION_WORKER_RESOURCE_LIMITS = Object.freeze({
+    maxOldGenerationSizeMb: 768,
+    maxYoungGenerationSizeMb: 128,
+    stackSizeMb: 8,
+});
 
-/** @type {{ sourceStore: JsonModelGatewayCatalogStore; sqliteStore: SqliteModelGatewayCatalogStore } | null} */
-let readinessStoreContext = null;
-/**
- * @type {{
- *     identity: string;
- *     sourceSnapshot: Awaited<ReturnType<JsonModelGatewayCatalogStore['readSnapshot']>>;
- *     integrity: ReturnType<typeof auditModelGatewayCatalogSnapshotIntegrity>;
- *     selectionEnvironmentIdentity?: string;
- *     allowProbeSelection?: ReturnType<typeof auditModelGatewayPreRuntimeSelection>;
- *     strictAccessSelection?: ReturnType<typeof auditModelGatewayPreRuntimeSelection>;
- * } | null}
- */
-let catalogStaticReadinessCache = null;
-
-function getReadinessStores() {
-    if (readinessStoreContext) return readinessStoreContext;
-    readinessStoreContext = {
-        sourceStore: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
-        sqliteStore: new SqliteModelGatewayCatalogStore(),
-    };
-    return readinessStoreContext;
+/** @param {'catalog' | 'sqlite'} mode @param {string} code @param {string} message @param {unknown} [cause] */
+function redactionWorkerError(mode, code, message, cause) {
+    const error = new Error(`redaction worker ${mode} ${message}`, cause === undefined ? undefined : { cause });
+    /** @type {Error & { code?: string }} */ (error).code = code;
+    return error;
 }
-
-async function catalogFileIdentity(/** @type {string} */ filePath) {
-    try {
-        const info = await stat(filePath);
-        return `${info.size}:${Math.trunc(info.mtimeMs)}:${Math.trunc(info.ctimeMs)}`;
-    } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
-        return `unavailable:${code}:${Date.now()}`;
-    }
-}
-
-/** @param {NodeJS.ProcessEnv} env */
-function readinessEnvironmentIdentity(env) {
-    const hash = createHash('sha256');
-    for (const [key, value] of Object.entries(env).sort(([left], [right]) => left.localeCompare(right))) {
-        hash.update(key)
-            .update('\0')
-            .update(String(value ?? ''))
-            .update('\0');
-    }
-    return hash.digest('hex');
-}
-
-let persistentRedactionRequestSequence = 0;
-/**
- * @type {Map<
- *     string,
- *     {
- *         worker: Worker;
- *         pending: Map<
- *             string,
- *             {
- *                 startedAt: number;
- *                 timer: NodeJS.Timeout;
- *                 resolve: (value: unknown) => void;
- *                 reject: (reason?: unknown) => void;
- *             }
- *         >;
- *     }
- * >}
- */
-const persistentRedactionWorkers = new Map();
 
 function normalizeRedactionWorkerResult(
     /** @type {'catalog' | 'sqlite'} */ mode,
@@ -119,6 +67,7 @@ function normalizeRedactionWorkerResult(
      *     durationMs?: number;
      *     sourceSnapshotId?: string;
      *     requestId?: string;
+     *     heapStatistics?: Record<string, number>;
      * }}
      */ result,
 ) {
@@ -130,112 +79,40 @@ function normalizeRedactionWorkerResult(
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
         workerDurationMs: Number(result.durationMs ?? 0),
         sourceSnapshotId: typeof result.sourceSnapshotId === 'string' ? result.sourceSnapshotId : null,
+        heapStatistics:
+            result.heapStatistics && typeof result.heapStatistics === 'object' ? { ...result.heapStatistics } : null,
     };
 }
 
-function destroyPersistentRedactionWorker(
-    /**
-     * @type {{
-     *     worker: Worker;
-     *     pending: Map<
-     *         string,
-     *         {
-     *             startedAt: number;
-     *             timer: NodeJS.Timeout;
-     *             resolve: (value: unknown) => void;
-     *             reject: (reason?: unknown) => void;
-     *         }
-     *     >;
-     * }}
-     */ state,
-    /** @type {unknown} */ error,
-) {
-    for (const [workerKey, workerState] of persistentRedactionWorkers.entries()) {
-        if (workerState === state) persistentRedactionWorkers.delete(workerKey);
-    }
-    for (const pending of state.pending.values()) {
-        clearTimeout(pending.timer);
-        pending.reject(error);
-    }
-    state.pending.clear();
-    void state.worker.terminate();
-}
-
-function getPersistentRedactionWorker(
-    /** @type {'catalog' | 'sqlite'} */ mode,
-    /** @type {string} */ redactionWorkerPath,
-) {
-    const workerKey = `${redactionWorkerPath}:${mode}`;
-    const existing = persistentRedactionWorkers.get(workerKey);
-    if (existing) return existing;
-    const worker = new Worker(redactionWorkerPath, { workerData: { mode, persistent: true } });
-    const state = { worker, pending: new Map() };
-    worker.on('message', (result) => {
-        const requestId = typeof result?.requestId === 'string' ? result.requestId : '';
-        const pending = state.pending.get(requestId);
-        if (!pending) return;
-        state.pending.delete(requestId);
-        clearTimeout(pending.timer);
-        try {
-            pending.resolve(normalizeRedactionWorkerResult(mode, pending.startedAt, result));
-        } catch (error) {
-            pending.reject(error);
-        }
-    });
-    worker.on('error', (error) => destroyPersistentRedactionWorker(state, error));
-    worker.on('exit', (code) => {
-        if (![...persistentRedactionWorkers.values()].includes(state)) return;
-        destroyPersistentRedactionWorker(
-            state,
-            new Error(`persistent redaction worker ${mode} exited with ${String(code)}`),
-        );
-    });
-    persistentRedactionWorkers.set(workerKey, state);
-    return state;
-}
-
-function runPersistentRedactionWorker(
-    /** @type {'catalog' | 'sqlite'} */ mode,
-    /** @type {number} */ maxRowsPerTable,
-    /** @type {string} */ redactionWorkerPath,
-) {
-    const state = getPersistentRedactionWorker(mode, redactionWorkerPath);
-    const requestId = `redaction-${mode}-${Date.now()}-${++persistentRedactionRequestSequence}`;
-    return new Promise((resolvePromise, rejectPromise) => {
-        const startedAt = performance.now();
-        const timer = setTimeout(() => {
-            const pending = state.pending.get(requestId);
-            if (!pending) return;
-            state.pending.delete(requestId);
-            pending.reject(new Error(`persistent redaction worker ${mode} timed out`));
-            destroyPersistentRedactionWorker(state, new Error(`persistent redaction worker ${mode} timed out`));
-        }, 30_000);
-        timer.unref?.();
-        state.pending.set(requestId, { startedAt, timer, resolve: resolvePromise, reject: rejectPromise });
-        state.worker.postMessage({ requestId, maxRowsPerTable });
-    });
-}
-
 /**
- * Run one fixed redaction audit in an isolated worker thread. MCP calls may reuse persistent workers; CLI calls remain
- * one-shot so the command exits naturally.
+ * Run one fixed redaction audit in an isolated one-shot worker thread. Every readiness owns a finite child lifecycle;
+ * no worker or pending-request map survives the call.
  *
  * @param {'catalog' | 'sqlite'} mode
  * @param {number} maxRowsPerTable
- * @param {boolean} reuseWorker
  * @param {string} redactionWorkerPath
+ * @param {NodeJS.ProcessEnv} env
+ * @param {boolean} diagnostics
  */
-function runRedactionWorker(mode, maxRowsPerTable, reuseWorker, redactionWorkerPath) {
-    if (reuseWorker) return runPersistentRedactionWorker(mode, maxRowsPerTable, redactionWorkerPath);
+function runRedactionWorker(mode, maxRowsPerTable, redactionWorkerPath, env, diagnostics) {
     return new Promise((resolvePromise, rejectPromise) => {
         const startedAt = performance.now();
         let settled = false;
-        const worker = new Worker(redactionWorkerPath, { workerData: { mode, maxRowsPerTable } });
+        const worker = new Worker(redactionWorkerPath, {
+            workerData: { mode, maxRowsPerTable, env, diagnostics },
+            name: mode === 'catalog' ? 'mg-redact-cat' : 'mg-redact-sql',
+            // Do not inherit outer/MCP ambient authority. The redaction worker receives exactly the readiness projection.
+            env: { ...env },
+            execArgv: [],
+            resourceLimits: REDACTION_WORKER_RESOURCE_LIMITS,
+        });
         const timer = setTimeout(() => {
             if (settled) return;
             settled = true;
             void worker.terminate();
-            rejectPromise(new Error(`redaction worker ${mode} timed out`));
+            rejectPromise(
+                redactionWorkerError(mode, 'ERR_MODEL_GATEWAY_REDACTION_WORKER_TIMEOUT', 'timed out after 30000ms'),
+            );
         }, 30_000);
         timer.unref?.();
         const finish = (
@@ -246,6 +123,7 @@ function runRedactionWorker(mode, maxRowsPerTable, reuseWorker, redactionWorkerP
              *     error?: string;
              *     durationMs?: number;
              *     sourceSnapshotId?: string;
+             *     heapStatistics?: Record<string, number>;
              * } | null}
              */ result,
             /** @type {unknown} */ error = null,
@@ -253,8 +131,25 @@ function runRedactionWorker(mode, maxRowsPerTable, reuseWorker, redactionWorkerP
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            if (error) return rejectPromise(error instanceof Error ? error : new Error(String(error)));
-            if (!result) return rejectPromise(new Error(`redaction worker ${mode} returned no result`));
+            if (error) {
+                const failure = error instanceof Error ? error : new Error(String(error));
+                const workerCode = /** @type {Error & { code?: string }} */ (failure).code;
+                return rejectPromise(
+                    redactionWorkerError(
+                        mode,
+                        workerCode === 'ERR_WORKER_OUT_OF_MEMORY'
+                            ? 'ERR_MODEL_GATEWAY_REDACTION_WORKER_OOM'
+                            : 'ERR_MODEL_GATEWAY_REDACTION_WORKER_FAILURE',
+                        `failed: ${failure.message}`,
+                        failure,
+                    ),
+                );
+            }
+            if (!result) {
+                return rejectPromise(
+                    redactionWorkerError(mode, 'ERR_MODEL_GATEWAY_REDACTION_WORKER_NO_RESULT', 'returned no result'),
+                );
+            }
             try {
                 resolvePromise(normalizeRedactionWorkerResult(mode, startedAt, result));
             } catch (normalizeError) {
@@ -264,7 +159,16 @@ function runRedactionWorker(mode, maxRowsPerTable, reuseWorker, redactionWorkerP
         worker.once('message', (result) => finish(result));
         worker.once('error', (error) => finish(null, error));
         worker.once('exit', (code) => {
-            if (!settled && code !== 0) finish(null, new Error(`redaction worker ${mode} exited with ${String(code)}`));
+            if (!settled && code !== 0) {
+                finish(
+                    null,
+                    redactionWorkerError(
+                        mode,
+                        'ERR_MODEL_GATEWAY_REDACTION_WORKER_EXIT',
+                        `exited abnormally with code ${String(code)}`,
+                    ),
+                );
+            }
         });
     });
 }
@@ -288,6 +192,26 @@ function optionalRecord(value) {
 }
 
 /**
+ * @param {unknown} input
+ * @param {string | null} proofContextId
+ * @param {string} catalogFingerprint
+ * @param {{ fingerprint:string; maxRowsPerTable:number }} sqliteFingerprint
+ */
+function reusableRedactionProof(input, proofContextId, catalogFingerprint, sqliteFingerprint) {
+    const proof = optionalRecord(input);
+    const catalog = optionalRecord(proof?.['catalog']);
+    const sqlite = optionalRecord(proof?.['sqlite']);
+    if (!proofContextId) return null;
+    if (!proof || proof['schema'] !== 'model-gateway-readiness-redaction-proof' || proof['version'] !== 1) return null;
+    if (proof['contextId'] !== proofContextId) return null;
+    if (!catalog || !sqlite) return null;
+    if (catalog['fingerprint'] !== catalogFingerprint || catalog['mode'] !== 'exhaustive') return null;
+    if (sqlite['fingerprint'] !== sqliteFingerprint.fingerprint || sqlite['mode'] !== 'bounded') return null;
+    if (Number(sqlite['maxRowsPerTable']) !== sqliteFingerprint.maxRowsPerTable) return null;
+    return { proof, catalog, sqlite };
+}
+
+/**
  * @param {unknown} value
  * @returns {number}
  */
@@ -306,7 +230,7 @@ async function fileExists(/** @type {string} */ filePath) {
 }
 
 /**
- * @param {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} audit
+ * @param {ReturnType<typeof auditPreparedModelGatewayPreRuntimeSelection>} audit
  * @returns {string[]}
  */
 function selectedDispositions(audit) {
@@ -321,7 +245,7 @@ function selectedDispositions(audit) {
 }
 
 /**
- * @param {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} audit
+ * @param {ReturnType<typeof auditPreparedModelGatewayPreRuntimeSelection>} audit
  * @returns {{ total: number; byProfile: Record<string, number> }}
  */
 function supplyWarningSummary(audit) {
@@ -413,11 +337,13 @@ function summarizeTerminalLiveRoute(route) {
  *     includeSqliteRuntimeHealth?: boolean;
  *     failOnSupplyWarning?: boolean;
  *     sqliteRedactionMaxRowsPerTable?: number;
- *     reuseRedactionWorkers?: boolean;
  *     workspaceRoot?: string;
  *     liveRunnerPath?: string;
  *     redactionWorkerPath?: string;
  *     env?: NodeJS.ProcessEnv;
+ *     redactionProof?: Record<string, unknown> | null;
+ *     redactionProofContextId?: string | null;
+ *     diagnostics?: boolean;
  * }} [options]
  */
 export async function buildModelGatewayLiveReadiness(options = {}) {
@@ -425,14 +351,13 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     /** @type {Record<string, number>} */
     const phaseTimingsMs = {};
     const workspaceRoot = path.resolve(options.workspaceRoot ?? process.cwd());
+    const env = options.env ?? process.env;
     const liveRunnerPath = options.liveRunnerPath ?? path.join(workspaceRoot, DEFAULT_LIVE_RUNNER_RELATIVE_PATH);
     const redactionWorkerPath =
         options.redactionWorkerPath ?? path.join(workspaceRoot, DEFAULT_REDACTION_WORKER_RELATIVE_PATH);
-    const sqlitePath = path.join(workspaceRoot, 'data/copilot.sqlite');
-    const env = options.env ?? process.env;
+    const sqlitePath = resolveApplicationSqlitePath(env, workspaceRoot);
     const includeSqliteRuntimeHealth = options.includeSqliteRuntimeHealth === true;
     const failOnSupplyWarning = options.failOnSupplyWarning === true;
-    const reuseRedactionWorkers = options.reuseRedactionWorkers === true;
     const sqliteRedactionMaxRowsPerTable = Math.max(
         1,
         Math.min(options.sqliteRedactionMaxRowsPerTable ?? DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE, 1_000_000),
@@ -458,46 +383,53 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
         }
     }
 
-    const redactionWorkersPromise = Promise.all([
-        runRedactionWorker('catalog', sqliteRedactionMaxRowsPerTable, reuseRedactionWorkers, redactionWorkerPath),
-        runRedactionWorker('sqlite', sqliteRedactionMaxRowsPerTable, reuseRedactionWorkers, redactionWorkerPath),
-    ]).then(
-        (results) => ({ results, error: null }),
-        (error) => ({ results: null, error: error instanceof Error ? error : new Error(String(error)) }),
-    );
-    const { sourceStore, sqliteStore } = getReadinessStores();
-    const sourceCatalogIdentity = await timedAsync('sourceCatalogIdentityRead', () =>
-        catalogFileIdentity(sourceStore.filePath),
-    );
-    const cachedSourceCatalog =
-        catalogStaticReadinessCache && catalogStaticReadinessCache.identity === sourceCatalogIdentity
-            ? catalogStaticReadinessCache
-            : null;
-    const sourceSnapshotPromise = cachedSourceCatalog
-        ? Promise.resolve(cachedSourceCatalog.sourceSnapshot)
-        : timedAsync('sourceSnapshotRead', () => sourceStore.readSnapshot());
-    if (cachedSourceCatalog) phaseTimingsMs['sourceSnapshotRead'] = 0;
-    const [sourceSnapshot, sqliteSnapshot, sqliteDiagnostics] = await Promise.all([
-        sourceSnapshotPromise,
-        timedAsync('sqliteSnapshotRead', () => sqliteStore.readSnapshot()),
-        timedAsync('sqliteStorageDiagnostics', () => sqliteStore.readStorageDiagnostics()),
+    const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const sqliteStore = new SqliteModelGatewayCatalogStore();
+    const [catalogSource, sqliteStructuralParity, sqliteRedactionFingerprint] = await Promise.all([
+        timedAsync('sourceSnapshotRead', () => sourceStore.readSnapshotWithContentFingerprint()),
+        timedAsync('sqliteStructuralParityRead', () => sqliteStore.readCatalogStructuralParityProjection()),
+        timedAsync('sqliteRedactionFingerprint', () =>
+            sqliteStore.readStoredPayloadRedactionFingerprint({ maxRowsPerTable: sqliteRedactionMaxRowsPerTable }),
+        ),
     ]);
-    const integrity = cachedSourceCatalog
-        ? cachedSourceCatalog.integrity
-        : timedSync('catalogIntegrityAudit', () => auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot));
-    if (cachedSourceCatalog) phaseTimingsMs['catalogIntegrityAudit'] = 0;
-    if (!cachedSourceCatalog) {
-        catalogStaticReadinessCache = { identity: sourceCatalogIdentity, sourceSnapshot, integrity };
-    }
-    const sourceCatalogStaticCacheHit = cachedSourceCatalog !== null;
+    const sourceSnapshot = catalogSource.snapshot;
+    const catalogFingerprint = catalogSource.contentFingerprint;
+    const redactionProofContextId = optionalString(options.redactionProofContextId);
+    const reusableProof = reusableRedactionProof(
+        options.redactionProof,
+        redactionProofContextId,
+        catalogFingerprint,
+        sqliteRedactionFingerprint,
+    );
+    const redactionWorkersPromise = reusableProof
+        ? Promise.resolve({ results: null, error: null })
+        : Promise.all([
+              runRedactionWorker(
+                  'catalog',
+                  sqliteRedactionMaxRowsPerTable,
+                  redactionWorkerPath,
+                  env,
+                  options.diagnostics === true,
+              ),
+              runRedactionWorker(
+                  'sqlite',
+                  sqliteRedactionMaxRowsPerTable,
+                  redactionWorkerPath,
+                  env,
+                  options.diagnostics === true,
+              ),
+          ]).then(
+              (results) => ({ results, error: null }),
+              (error) => ({ results: null, error: error instanceof Error ? error : new Error(String(error)) }),
+          );
+    const integrity = timedSync('catalogIntegrityAudit', () =>
+        auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot),
+    );
     const parity = timedSync('catalogSqliteParity', () =>
-        compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot),
+        compareModelGatewayCatalogSnapshotToStructuralParityProjection(sourceSnapshot, sqliteStructuralParity),
     );
     const secretAuditValues = timedSync('secretAuditEnvCollection', () => collectModelGatewaySecretAuditEnvValues(env));
     const secretRegistry = createEnvSecretRegistry();
-    const selectionEnvironmentIdentity = timedSync('selectionEnvironmentIdentity', () =>
-        readinessEnvironmentIdentity(env),
-    );
     const fileHealthRecords = timedSync('fileRuntimeHealthRead', () => listByokProviderModelHealth());
     /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
     let sqliteHealthRecords = [];
@@ -565,45 +497,32 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     };
     phaseTimingsMs['eligibilityEvaluation'] = Number((performance.now() - eligibilityStartedAt).toFixed(3));
     const selectionStartedAt = performance.now();
-    const cachedStaticSelections =
-        catalogStaticReadinessCache?.selectionEnvironmentIdentity === selectionEnvironmentIdentity &&
-        catalogStaticReadinessCache?.allowProbeSelection &&
-        catalogStaticReadinessCache?.strictAccessSelection
-            ? catalogStaticReadinessCache
-            : null;
-    const allowProbeSelection =
-        cachedStaticSelections?.allowProbeSelection ??
-        timedSync('selectionAllowProbeAudit', () =>
-            auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-                strict: false,
-                secretRegistry,
-            }),
-        );
-    const strictAccessSelection =
-        cachedStaticSelections?.strictAccessSelection ??
-        timedSync('selectionStrictAccessAudit', () =>
-            auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-                strict: true,
-                secretRegistry,
-            }),
-        );
-    if (cachedStaticSelections) {
-        phaseTimingsMs['selectionAllowProbeAudit'] = 0;
-        phaseTimingsMs['selectionStrictAccessAudit'] = 0;
-    } else if (catalogStaticReadinessCache) {
-        catalogStaticReadinessCache.selectionEnvironmentIdentity = selectionEnvironmentIdentity;
-        catalogStaticReadinessCache.allowProbeSelection = allowProbeSelection;
-        catalogStaticReadinessCache.strictAccessSelection = strictAccessSelection;
-    }
-    const sourceSelectionStaticCacheHit = cachedStaticSelections !== null;
+    const sourcePreparedRouting = timedSync('selectionSourceRoutingPrepare', () =>
+        prepareModelGatewayCatalogRoutingSnapshot(sourceSnapshot),
+    );
+    const effectivePreparedRouting = timedSync('selectionEffectiveRoutingPrepare', () =>
+        prepareModelGatewayCatalogRoutingSnapshot(effectiveSnapshot),
+    );
+    const allowProbeSelection = timedSync('selectionAllowProbeAudit', () =>
+        auditPreparedModelGatewayPreRuntimeSelection(sourcePreparedRouting, {
+            strict: false,
+            secretRegistry,
+        }),
+    );
+    const strictAccessSelection = timedSync('selectionStrictAccessAudit', () =>
+        auditPreparedModelGatewayPreRuntimeSelection(sourcePreparedRouting, {
+            strict: true,
+            secretRegistry,
+        }),
+    );
     const effectiveStrictSelection = timedSync('selectionEffectiveStrictAudit', () =>
-        auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+        auditPreparedModelGatewayPreRuntimeSelection(effectivePreparedRouting, {
             strict: true,
             secretRegistry,
         }),
     );
     const postRuntimeEffectiveSelection = timedSync('selectionPostRuntimeAudit', () =>
-        auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+        auditPreparedModelGatewayPostRuntimeSelection(effectivePreparedRouting, {
             strict: true,
             secretRegistry,
             runtimeHealthRecords: healthRecords,
@@ -625,7 +544,7 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     );
     phaseTimingsMs['terminalLiveBaseSelectionAudit'] = 0;
     const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit', () =>
-        auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+        auditPreparedModelGatewayPostRuntimeSelection(effectivePreparedRouting, {
             strict: true,
             secretRegistry,
             profiles: [...TERMINAL_LIVE_ROUTE_PROFILES],
@@ -659,22 +578,83 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     );
     phaseTimingsMs['selectionAndSelectorPlans'] = Number((performance.now() - selectionStartedAt).toFixed(3));
     const runnerExists = await timedAsync('liveRunnerPresenceCheck', () => fileExists(liveRunnerPath));
-    const redactionWorkers = await redactionWorkersPromise;
-    if (redactionWorkers.error || !redactionWorkers.results) {
-        throw redactionWorkers.error ?? new Error('redaction workers returned no results');
+    /** @type {Record<string, any>} */
+    let catalogRedaction;
+    /** @type {Record<string, any>} */
+    let sqliteRedaction;
+    let redactionProofReused = false;
+    let redactionProofGeneratedAt = new Date().toISOString();
+    /** @type {{ catalog: Record<string, number> | null; sqlite: Record<string, number> | null } | null} */
+    let redactionWorkerDiagnostics = null;
+    if (reusableProof) {
+        catalogRedaction = reusableProof.catalog;
+        sqliteRedaction = reusableProof.sqlite;
+        redactionProofReused = true;
+        redactionProofGeneratedAt = optionalString(reusableProof.proof['generatedAt']) ?? redactionProofGeneratedAt;
+        phaseTimingsMs['catalogRedactionAudit'] = 0;
+        phaseTimingsMs['sqliteRedactionAudit'] = 0;
+        phaseTimingsMs['catalogRedactionWorkerCore'] = 0;
+        phaseTimingsMs['sqliteRedactionWorkerCore'] = 0;
+    } else {
+        const redactionWorkers = await redactionWorkersPromise;
+        if (redactionWorkers.error || !redactionWorkers.results) {
+            throw redactionWorkers.error ?? new Error('redaction workers returned no results');
+        }
+        const [catalogRedactionWorker, sqliteRedactionWorker] = redactionWorkers.results;
+        if (!catalogRedactionWorker || !sqliteRedactionWorker)
+            throw new Error('redaction worker result pair is incomplete');
+        if (catalogRedactionWorker.sourceSnapshotId !== sourceSnapshot.snapshotId) {
+            throw new Error(
+                `catalog redaction worker snapshot mismatch: expected ${sourceSnapshot.snapshotId}, got ${String(catalogRedactionWorker.sourceSnapshotId)}`,
+            );
+        }
+        catalogRedaction = /** @type {Record<string, any>} */ (catalogRedactionWorker.audit);
+        sqliteRedaction = /** @type {Record<string, any>} */ (sqliteRedactionWorker.audit);
+        if (catalogRedaction['fingerprint'] !== catalogFingerprint) {
+            throw new Error('catalog redaction proof surface changed during audit');
+        }
+        if (sqliteRedaction['fingerprint'] !== sqliteRedactionFingerprint.fingerprint) {
+            throw new Error('SQLite redaction proof surface changed during audit');
+        }
+        phaseTimingsMs['catalogRedactionAudit'] = catalogRedactionWorker.durationMs;
+        phaseTimingsMs['sqliteRedactionAudit'] = sqliteRedactionWorker.durationMs;
+        phaseTimingsMs['catalogRedactionWorkerCore'] = catalogRedactionWorker.workerDurationMs;
+        phaseTimingsMs['sqliteRedactionWorkerCore'] = sqliteRedactionWorker.workerDurationMs;
+        if (options.diagnostics === true) {
+            redactionWorkerDiagnostics = {
+                catalog: catalogRedactionWorker.heapStatistics,
+                sqlite: sqliteRedactionWorker.heapStatistics,
+            };
+        }
     }
-    const [catalogRedactionWorker, sqliteRedactionWorker] = redactionWorkers.results;
-    if (catalogRedactionWorker.sourceSnapshotId !== sourceSnapshot.snapshotId) {
-        throw new Error(
-            `catalog redaction worker snapshot mismatch: expected ${sourceSnapshot.snapshotId}, got ${String(catalogRedactionWorker.sourceSnapshotId)}`,
-        );
-    }
-    const catalogRedaction = catalogRedactionWorker.audit;
-    const sqliteRedaction = sqliteRedactionWorker.audit;
-    phaseTimingsMs['catalogRedactionAudit'] = catalogRedactionWorker.durationMs;
-    phaseTimingsMs['sqliteRedactionAudit'] = sqliteRedactionWorker.durationMs;
-    phaseTimingsMs['catalogRedactionWorkerCore'] = catalogRedactionWorker.workerDurationMs;
-    phaseTimingsMs['sqliteRedactionWorkerCore'] = sqliteRedactionWorker.workerDurationMs;
+    const redactionProof = {
+        schema: 'model-gateway-readiness-redaction-proof',
+        version: 1,
+        contextId: redactionProofContextId,
+        generatedAt: redactionProofGeneratedAt,
+        ok: catalogRedaction['ok'] === true && sqliteRedaction['ok'] === true,
+        catalog: {
+            surface: 'json:catalog',
+            mode: 'exhaustive',
+            fingerprint: catalogFingerprint,
+            payloadBytes: Number(catalogRedaction['payloadBytes'] ?? catalogSource.payloadBytes),
+            ok: catalogRedaction['ok'] === true,
+            leakCount: Number(catalogRedaction['leakCount'] ?? 0),
+            scannedStringCount: Number(catalogRedaction['scannedStringCount'] ?? 0),
+        },
+        sqlite: {
+            surface: 'sqlite:payload_json',
+            mode: 'bounded',
+            fingerprint: sqliteRedactionFingerprint.fingerprint,
+            ok: sqliteRedaction['ok'] === true,
+            leakCount: Number(sqliteRedaction['leakCount'] ?? 0),
+            scannedStringCount: Number(sqliteRedaction['scannedStringCount'] ?? 0),
+            tableCount: sqliteRedactionFingerprint.tableCount,
+            rowCount: sqliteRedactionFingerprint.rowCount,
+            payloadBytes: sqliteRedactionFingerprint.payloadBytes,
+            maxRowsPerTable: sqliteRedactionFingerprint.maxRowsPerTable,
+        },
+    };
     const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
     const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
     const postRuntimeSelectedDispositions = selectedDispositions(postRuntimeEffectiveSelection);
@@ -713,8 +693,8 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
         },
         {
             id: 'redaction_audit',
-            ok: catalogRedaction.ok && sqliteRedaction.ok,
-            detail: `catalogLeaks=${catalogRedaction.leakCount}, sqliteLeaks=${sqliteRedaction.leakCount}, sqliteRowsPerTable=${sqliteRedactionMaxRowsPerTable}`,
+            ok: redactionProof.ok,
+            detail: `proof=${redactionProofReused ? 'reused' : 'fresh'}, catalogMode=exhaustive, catalogLeaks=${redactionProof.catalog.leakCount}, sqliteMode=bounded, sqliteLeaks=${redactionProof.sqlite.leakCount}, sqliteRowsPerTable=${redactionProof.sqlite.maxRowsPerTable}`,
         },
         {
             id: 'selection_allow_probe',
@@ -766,7 +746,7 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
         {
             id: 'runtime_sqlite_observability',
             ok: true,
-            detail: `runtimeRows=${sqliteDiagnostics.runtimeRows}, healthObservations=${sqliteDiagnostics.tableCounts['copilot_model_gateway_health_observations']}, probeResults=${sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_results']}`,
+            detail: `runtimeHealthSource=${includeSqliteRuntimeHealth ? 'sqlite+file' : 'file'}, loadedSqliteHealthRecords=${sqliteHealthRecords.length}`,
         },
         {
             id: 'runtime_sqlite_probe_source',
@@ -779,6 +759,22 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
             detail: path.relative(workspaceRoot, liveRunnerPath),
         },
     ];
+    const [completedCatalogSource, completedSqliteRedactionFingerprint] = await Promise.all([
+        timedAsync('catalogContentFingerprintCompleted', () => sourceStore.readContentFingerprint()),
+        timedAsync('sqliteRedactionFingerprintCompleted', () =>
+            sqliteStore.readStoredPayloadRedactionFingerprint({ maxRowsPerTable: sqliteRedactionMaxRowsPerTable }),
+        ),
+    ]);
+    if (completedCatalogSource.contentFingerprint !== catalogFingerprint) {
+        throw new Error('catalog redaction source changed during readiness build');
+    }
+    if (
+        completedSqliteRedactionFingerprint.fingerprint !== sqliteRedactionFingerprint.fingerprint ||
+        completedSqliteRedactionFingerprint.maxRowsPerTable !== sqliteRedactionFingerprint.maxRowsPerTable
+    ) {
+        throw new Error('SQLite redaction proof surface changed during readiness build');
+    }
+
     const commands = [
         'npm run model-gateway:selection:effective -- --strict --fail',
         'npm run model-gateway:runtime-selector -- --fail',
@@ -806,10 +802,13 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
             phasesMs: phaseTimingsMs,
             slowestPhase,
         },
-        cache: {
-            sourceCatalogStaticHit: sourceCatalogStaticCacheHit,
-            sourceSelectionStaticHit: sourceSelectionStaticCacheHit,
-        },
+        ...(options.diagnostics === true
+            ? {
+                  diagnostics: {
+                      redactionWorkers: redactionWorkerDiagnostics,
+                  },
+              }
+            : {}),
         checks,
         integrity: {
             ok: integrity.ok,
@@ -819,28 +818,36 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
             parityOk: parity.ok,
             countMismatches: parity.countMismatches,
             keyMismatches: parity.keyMismatches,
-            runtimeRows: sqliteDiagnostics.runtimeRows,
             runtimeHealthReadLimit: SQLITE_RUNTIME_HEALTH_READ_LIMIT,
-            healthObservations: sqliteDiagnostics.tableCounts['copilot_model_gateway_health_observations'],
-            runtimeProbeRuns: sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_runs'],
-            runtimeProbeResults: sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_results'],
+            runtimeHealthSource: includeSqliteRuntimeHealth ? 'sqlite+file' : 'file',
+            loadedSqliteHealthRecords: sqliteHealthRecords.length,
             runtimeProbeOnlyRecords: sqliteProbeOnlyRecords.length,
             runtimeProbeProofRecords: sqliteRuntimeProbeProofRecords.length,
         },
         redaction: {
-            ok: catalogRedaction.ok && sqliteRedaction.ok,
+            ok: redactionProof.ok,
+            proofReused: redactionProofReused,
+            proof: redactionProof,
             envSecretCandidateCount: secretAuditValues.length,
             catalog: {
-                ok: catalogRedaction.ok,
-                leakCount: catalogRedaction.leakCount,
-                scannedStringCount: catalogRedaction.scannedStringCount,
+                surface: redactionProof.catalog.surface,
+                mode: redactionProof.catalog.mode,
+                fingerprint: redactionProof.catalog.fingerprint,
+                ok: redactionProof.catalog.ok,
+                leakCount: redactionProof.catalog.leakCount,
+                scannedStringCount: redactionProof.catalog.scannedStringCount,
             },
             sqlite: {
-                ok: sqliteRedaction.ok,
-                leakCount: sqliteRedaction.leakCount,
-                scannedStringCount: sqliteRedaction.scannedStringCount,
-                tableCount: sqliteRedaction.tableCount,
-                maxRowsPerTable: sqliteRedactionMaxRowsPerTable,
+                surface: redactionProof.sqlite.surface,
+                mode: redactionProof.sqlite.mode,
+                fingerprint: redactionProof.sqlite.fingerprint,
+                ok: redactionProof.sqlite.ok,
+                leakCount: redactionProof.sqlite.leakCount,
+                scannedStringCount: redactionProof.sqlite.scannedStringCount,
+                tableCount: redactionProof.sqlite.tableCount,
+                rowCount: redactionProof.sqlite.rowCount,
+                payloadBytes: redactionProof.sqlite.payloadBytes,
+                maxRowsPerTable: redactionProof.sqlite.maxRowsPerTable,
             },
         },
         selection: {

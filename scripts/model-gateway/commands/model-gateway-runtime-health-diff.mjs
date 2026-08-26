@@ -8,8 +8,8 @@ import {
     SqliteModelGatewayCatalogStore,
     comparableModelGatewayRuntimeHealthRecord,
     diffModelGatewayRuntimeHealthSnapshots,
-    listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    readHydratedByokProviderHealthSnapshot,
     summarizeModelGatewayRuntimeHealthRecords,
 } from '../../../src/copilot/model-gateway/index.js';
 import { createArgReader } from '../cli-args.mjs';
@@ -43,7 +43,7 @@ async function readBaseline(filePath) {
 }
 
 async function readCurrentHealth() {
-    const fileRecords = listByokProviderModelHealth();
+    const { records: fileRecords } = await readHydratedByokProviderHealthSnapshot();
     /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
     let sqliteRecords = [];
     let sqliteRuntimeError = null;

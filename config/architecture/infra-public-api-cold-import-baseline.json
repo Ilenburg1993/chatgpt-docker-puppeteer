@@ -52,6 +52,17 @@
       }
     },
     {
+      "alias": "#copilot/infra/public/composition/database/sqlite/path",
+      "audience": "composition",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.271,
+        "wallMs": 28.847,
+        "rssMiB": 45.152,
+        "rssDeltaMiB": 3.25
+      }
+    },
+    {
       "alias": "#copilot/infra/public/composition/filesystem/configured",
       "audience": "composition",
       "costTier": "heavy",

@@ -22,6 +22,7 @@ export {
     readByokProviderHealthPersistenceFingerprint,
     readByokProviderHealthState,
     readByokProviderModelHealth,
+    readHydratedByokProviderHealthSnapshot,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
@@ -41,4 +42,5 @@ export {
     flushAndMirrorByokProviderHealthToSqlite,
     installByokProviderHealthSqliteMirror,
     mirrorByokProviderHealthToSqlite,
+    reconcileByokProviderHealthToSqlite,
 } from './sqlite-health-mirror.js';

@@ -56,6 +56,12 @@ describe('model-gateway JSON store authority', () => {
         await registry.writeSnapshot({ source: 'authority-test', providers: [], models: [] });
 
         await expect(catalog.readSnapshot()).resolves.toMatchObject({ source: 'authority-test' });
+        const catalogSource = await catalog.readSnapshotWithContentFingerprint();
+        const catalogFingerprint = await catalog.readContentFingerprint();
+        expect(catalogSource.snapshot).toMatchObject({ source: 'authority-test' });
+        expect(catalogSource.contentFingerprint).toMatch(/^[0-9a-f]{64}$/u);
+        expect(catalogSource.contentFingerprint).toBe(catalogFingerprint.contentFingerprint);
+        expect(catalogSource.payloadBytes).toBe(catalogFingerprint.payloadBytes);
         const loadedRegistry = await registry.loadRegistry();
         expect(loadedRegistry.listProviders()).toEqual([]);
         expect(loadedRegistry.listModels()).toEqual([]);

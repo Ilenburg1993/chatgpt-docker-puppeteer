@@ -630,6 +630,49 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  * @property {Record<string, unknown>} [eligibilityPolicy]
  */
 
+/** @type {WeakMap<object, ReturnType<typeof buildGatewayModelScoringContext>>} */
+const MODEL_GATEWAY_SCORING_CONTEXTS = new WeakMap();
+
+/**
+ * Hoist route/profile invariants out of the per-candidate scoring loop. The context is attached only to the ephemeral
+ * options object created by `routeGatewayModels`; direct public scoring calls still derive a fresh context.
+ * @param {Record<string, unknown>} profile
+ * @param {ModelGatewayRouteScoringOptions} options
+ */
+function buildGatewayModelScoringContext(profile, options) {
+    const requires = stringArray(profile['requires']);
+    const softRequires = stringArray(profile['softRequires']);
+    const prefers = stringArray(profile['prefers']);
+    return Object.freeze({
+        allowProviders: stringSet(options.allowProviders),
+        blockProviders: stringSet(options.blockProviders),
+        preferredRouteLayers: stringSet(options.preferredRouteLayers),
+        blockRouteLayers: stringSet(options.blockRouteLayers),
+        preferredWireApis: stringSet(options.preferredWireApis),
+        blockWireApis: stringSet(options.blockWireApis),
+        allowUpstreamProviders: stringSet(options.allowUpstreamProviders),
+        blockUpstreamProviders: stringSet(options.blockUpstreamProviders),
+        preferredUpstreamProviders: stringSet(options.preferredUpstreamProviders),
+        preferredSelectorKinds: stringSet(options.preferredSelectorKinds),
+        allowSelectorKinds: stringSet(options.allowSelectorKinds),
+        blockSelectorKinds: stringSet(options.blockSelectorKinds),
+        preferredProbeKinds: new Set([...profileProbeKinds(profile), ...stringSet(options.preferredProbeKinds)]),
+        requiredProbeKinds: stringSet(options.requiredProbeKinds),
+        blockFailedProbeKinds: stringSet(options.blockFailedProbeKinds),
+        requires,
+        softRequires,
+        prefers,
+        conversationalRouteRequired: profileRequiresConversationalRoute(profile),
+        minContext: finiteNumber(profile['minContextWindowTokens']),
+        minimumConfidence: String(options.minimumConfidence ?? '').trim(),
+        maxPrice: optionNumber(options.maxPricePerMillion) ?? optionNumber(options.maxEstimatedCostPerMillion),
+        preferredMaxPrice: optionNumber(options.preferredMaxPricePerMillion),
+        pricePenaltyWeight: Math.max(0, Math.min(4, optionNumber(options.pricePenaltyWeight) ?? 1)),
+        latencyPenaltyWeight: Math.max(0, Math.min(4, optionNumber(options.latencyPenaltyWeight) ?? 1)),
+        runtimeProofWeights: resolveRuntimeProofWeights(options.runtimeProofWeights),
+    });
+}
+
 /**
  * @template {Record<string, unknown>} TModel
  * @param {TModel} model
@@ -652,21 +695,36 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const reasons = [];
     const rejectedReasons = [];
     const providerId = typeof model['providerId'] === 'string' ? model['providerId'] : '';
-    const allowProviders = stringSet(options.allowProviders);
-    const blockProviders = stringSet(options.blockProviders);
-    const preferredRouteLayers = stringSet(options.preferredRouteLayers);
-    const blockRouteLayers = stringSet(options.blockRouteLayers);
-    const preferredWireApis = stringSet(options.preferredWireApis);
-    const blockWireApis = stringSet(options.blockWireApis);
-    const allowUpstreamProviders = stringSet(options.allowUpstreamProviders);
-    const blockUpstreamProviders = stringSet(options.blockUpstreamProviders);
-    const preferredUpstreamProviders = stringSet(options.preferredUpstreamProviders);
-    const preferredSelectorKinds = stringSet(options.preferredSelectorKinds);
-    const allowSelectorKinds = stringSet(options.allowSelectorKinds);
-    const blockSelectorKinds = stringSet(options.blockSelectorKinds);
-    const preferredProbeKinds = new Set([...profileProbeKinds(profile), ...stringSet(options.preferredProbeKinds)]);
-    const requiredProbeKinds = stringSet(options.requiredProbeKinds);
-    const blockFailedProbeKinds = stringSet(options.blockFailedProbeKinds);
+    const scoringContext =
+        MODEL_GATEWAY_SCORING_CONTEXTS.get(options) ?? buildGatewayModelScoringContext(profile, options);
+    const {
+        allowProviders,
+        blockProviders,
+        preferredRouteLayers,
+        blockRouteLayers,
+        preferredWireApis,
+        blockWireApis,
+        allowUpstreamProviders,
+        blockUpstreamProviders,
+        preferredUpstreamProviders,
+        preferredSelectorKinds,
+        allowSelectorKinds,
+        blockSelectorKinds,
+        preferredProbeKinds,
+        requiredProbeKinds,
+        blockFailedProbeKinds,
+        requires,
+        softRequires,
+        prefers,
+        conversationalRouteRequired,
+        minContext,
+        minimumConfidence,
+        maxPrice,
+        preferredMaxPrice,
+        pricePenaltyWeight,
+        latencyPenaltyWeight,
+        runtimeProofWeights,
+    } = scoringContext;
     const eligibility = resolveCandidateEligibility(model, profile, options);
     let score = 100;
 
@@ -757,17 +815,15 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
 
-    const nonConversationalFamily = profileRequiresConversationalRoute(profile)
-        ? inferNonConversationalModelFamily(model)
-        : null;
+    const nonConversationalFamily = conversationalRouteRequired ? inferNonConversationalModelFamily(model) : null;
     if (nonConversationalFamily) rejectedReasons.push(`non_chat_model_family:${nonConversationalFamily}`);
 
-    for (const capability of stringArray(profile['requires'])) {
+    for (const capability of requires) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);
         else score += 50;
     }
 
-    for (const capability of stringArray(profile['softRequires'])) {
+    for (const capability of softRequires) {
         if (hasCapability(model, capability)) {
             score += 25;
             reasons.push(`soft_capability:${capability}`);
@@ -777,7 +833,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
 
-    const minContext = finiteNumber(profile['minContextWindowTokens']);
     const context = contextWindow(model);
     if (minContext !== null) {
         if (context !== null && context < minContext)
@@ -835,7 +890,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
     const runtimeProof = healthDecision.runtimeProof;
     if (healthDecision.health) {
-        const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
         const requestedRouteProfile = optionalString(options.routeProfile);
         const healthRouteProfile = runtimeHealthRouteProfile(healthDecision.health);
         if (runtimeProof?.hasFreshProof && requestedRouteProfile && healthRouteProfile === requestedRouteProfile) {
@@ -913,7 +967,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         rejectedReasons.push(runtimeProof?.hasHistoricalProof ? 'runtime_proof_stale' : 'runtime_proof_missing');
     }
 
-    for (const preference of stringArray(profile['prefers'])) {
+    for (const preference of prefers) {
         if (hasCapability(model, preference)) {
             score += 10;
             reasons.push(`preferred:${preference}`);
@@ -923,7 +977,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             reasons.push('preferred:large_context');
         }
         if (preference === 'runtime_proved' && runtimeProof?.hasFreshProof === true) {
-            const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
             score += runtimeProofWeights.runtimeProvedPreference;
             reasons.push('preferred:runtime_proved');
         }
@@ -937,7 +990,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const confidence = typeof verification['confidence'] === 'string' ? verification['confidence'] : 'unknown';
     score += CONFIDENCE_SCORE[/** @type {keyof typeof CONFIDENCE_SCORE} */ (confidence)] ?? 0;
     reasons.push(`confidence:${confidence}`);
-    const minimumConfidence = String(options.minimumConfidence ?? '').trim();
     if (minimumConfidence) {
         const currentRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (confidence)] ?? 0;
         const requiredRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (minimumConfidence)] ?? 0;
@@ -946,8 +998,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
 
     const price = pricePerMillion(model);
-    const maxPrice = optionNumber(options.maxPricePerMillion) ?? optionNumber(options.maxEstimatedCostPerMillion);
-    const preferredMaxPrice = optionNumber(options.preferredMaxPricePerMillion);
     if (price !== null) {
         if (options.noPaidModels === true && price > 0) rejectedReasons.push(`paid_model_blocked:${price}`);
         if (maxPrice !== null && price > maxPrice) rejectedReasons.push(`price_above_limit:${price}>${maxPrice}`);
@@ -955,7 +1005,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             score += 20;
             reasons.push(`price_within_preference:${price}<=${preferredMaxPrice}`);
         }
-        const pricePenaltyWeight = Math.max(0, Math.min(4, optionNumber(options.pricePenaltyWeight) ?? 1));
         const pricePenalty = Math.round(Math.min(60, Math.floor(price)) * pricePenaltyWeight);
         score -= pricePenalty;
         reasons.push(`price_per_million:${price}`);
@@ -969,7 +1018,6 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
 
     const latency = finiteNumber(options.latencyMsByModelId?.[String(model['id'] ?? '')]);
     if (latency !== null) {
-        const latencyPenaltyWeight = Math.max(0, Math.min(4, optionNumber(options.latencyPenaltyWeight) ?? 1));
         const latencyPenalty = Math.round(Math.min(50, Math.floor(latency / 1_000)) * latencyPenaltyWeight);
         score -= latencyPenalty;
         reasons.push(`latency_ms:${latency}`);
@@ -1662,6 +1710,8 @@ export function routeGatewayModels(models, profileInput, options = {}) {
             );
         }
     }
+    scoringOptions = { ...scoringOptions };
+    MODEL_GATEWAY_SCORING_CONTEXTS.set(scoringOptions, buildGatewayModelScoringContext(profile, scoringOptions));
     const runtimeOnlyCandidates = buildRuntimeOnlyRouteCandidates(models, scoringOptions);
     const scored = [...models, ...runtimeOnlyCandidates].map((model) =>
         scoreGatewayModelCandidate(model, profile, scoringOptions),
@@ -1730,6 +1780,46 @@ export function prepareModelGatewayCatalogRoutingSnapshot(snapshot, options = {}
     };
 }
 
+/** @type {WeakMap<object, Map<string, ModelGatewayEligibilityDecisionIndex>>} */
+const PREPARED_ELIGIBILITY_INDEX_CACHE = new WeakMap();
+
+/**
+ * Eligibility decision scope depends on account/policy/task profile, not on strict-vs-allow-probe semantics. Cache the
+ * derived lookup maps only inside the lifetime of one prepared snapshot so repeated audits reuse indexing work without
+ * crossing snapshot or scope boundaries.
+ * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} prepared
+ * @param {string | Record<string, unknown>} profileInput
+ * @param {Parameters<typeof routeGatewayModels>[2]} options
+ */
+function preparedEligibilityDecisionIndex(prepared, profileInput, options) {
+    options = options ?? {};
+    if (options.eligibilityDecisionIndex || prepared.eligibilityDecisions.length === 0) {
+        return options.eligibilityDecisionIndex ?? null;
+    }
+    const profile =
+        typeof profileInput === 'string'
+            ? resolveModelGatewayTaskProfile(profileInput)
+            : isRecord(profileInput)
+              ? profileInput
+              : null;
+    if (!profile) return null;
+    const policy = isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {};
+    const accountScope = String(policy['accountScope'] ?? 'default');
+    const policyProfile = String(policy['policyProfile'] ?? 'default');
+    const taskProfile = String(policy['taskProfile'] ?? profile['id'] ?? 'default');
+    const cacheKey = JSON.stringify([accountScope, policyProfile, taskProfile]);
+    let cache = PREPARED_ELIGIBILITY_INDEX_CACHE.get(prepared);
+    if (!cache) {
+        cache = new Map();
+        PREPARED_ELIGIBILITY_INDEX_CACHE.set(prepared, cache);
+    }
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+    const created = createEligibilityDecisionIndex(prepared.eligibilityDecisions, profile, options);
+    cache.set(cacheKey, created);
+    return created;
+}
+
 /**
  * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} prepared
  * @param {string | Record<string, unknown>} profileInput
@@ -1737,11 +1827,13 @@ export function prepareModelGatewayCatalogRoutingSnapshot(snapshot, options = {}
  * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
  */
 export function routePreparedModelGatewayCatalogSnapshot(prepared, profileInput, options = {}) {
+    const eligibilityDecisionIndex = preparedEligibilityDecisionIndex(prepared, profileInput, options);
     const route = routeGatewayModels(prepared.candidates, profileInput, {
         ...options,
         routeOptions: prepared.routeOptions,
         accountOverlays: prepared.accountOverlays,
         eligibilityDecisions: prepared.eligibilityDecisions,
+        ...(eligibilityDecisionIndex ? { eligibilityDecisionIndex } : {}),
     });
     return {
         ...route,

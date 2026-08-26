@@ -15,8 +15,8 @@ import {
     createModelGatewaySelectionTraceStore,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
-    listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    readHydratedByokProviderHealthSnapshot,
     renderModelGatewayLocalProviderOptInGuidance,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayLocalProviderOptInBlocks,
@@ -124,7 +124,7 @@ const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY
 const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
 const secretRegistry = createEnvSecretRegistry();
-const fileHealthRecords = listByokProviderModelHealth();
+const { records: fileHealthRecords } = await readHydratedByokProviderHealthSnapshot();
 /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;

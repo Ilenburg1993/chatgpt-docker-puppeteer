@@ -194,12 +194,12 @@ export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
 export { applyModelGatewayCatalogRetention } from './retention.js';
 export { searchModelGatewayCatalogEntries } from './search.js';
-export {
-    DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
-    SqliteModelGatewayCatalogStore,
-} from './sqlite-catalog-store.js';
+export { SqliteModelGatewayCatalogStore } from './sqlite-catalog-store.js';
 export {
     compareModelGatewayCatalogSnapshotParity,
+    compareModelGatewayCatalogSnapshotToStructuralParityProjection,
     mirrorModelGatewayCatalogSnapshotToSqlite,
+    projectModelGatewayCatalogStructuralParity,
     summarizeModelGatewayCatalogSnapshot,
 } from './sqlite-migration.js';
+export { DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION } from './sqlite-operational-retention.js';

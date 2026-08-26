@@ -184,6 +184,54 @@ describe('ApplicationInfraHost', () => {
         expect(rebound.revision).toBeGreaterThan(firstRevision);
     });
 
+    it('delegates path-bound checkpoint maintenance and revokes that authority on structural provider rebind', async () => {
+        const root = await createTempRoot();
+        const database = new Database(':memory:');
+        databases.push(database);
+        let checkpointCalls = 0;
+        const host = createApplicationInfraHost({
+            hostId: 'sqlite-checkpoint-host',
+            defaultWorkspaceRoot: root,
+            registerProcessShutdown: false,
+            loadSqliteProvider: async () => ({
+                ensureDirectory: async () => undefined,
+                getDatabase: createBetterSqliteProvider(() => database),
+                checkpoint: async () => {
+                    checkpointCalls += 1;
+                    return {
+                        attempted: true,
+                        mode: /** @type {const} */ ('PASSIVE'),
+                        busy: 0,
+                        walPages: 7,
+                        checkpointedPages: 7,
+                        durationMs: 2,
+                        workerDurationMs: 1,
+                    };
+                },
+            }),
+        });
+        hosts.push(host);
+
+        await host.bootstrapSqliteProvider();
+        expect(host.snapshot().sqliteCheckpointConfigured).toBe(true);
+        await expect(host.checkpointSqlite()).resolves.toMatchObject({
+            attempted: true,
+            mode: 'PASSIVE',
+            walPages: 7,
+        });
+        expect(checkpointCalls).toBe(1);
+
+        host.runtime.database.reset();
+        host.configureSqliteProvider(createBetterSqliteProvider(() => database));
+        expect(host.snapshot().sqliteCheckpointConfigured).toBe(false);
+        await expect(host.checkpointSqlite()).resolves.toMatchObject({
+            attempted: false,
+            mode: 'PASSIVE',
+            reason: 'application_sqlite_checkpoint_unavailable',
+        });
+        expect(checkpointCalls).toBe(1);
+    });
+
     it('blocks late SQLite activation when dispose wins the race against an in-flight bootstrap', async () => {
         const root = await createTempRoot();
         const database = new Database(':memory:');

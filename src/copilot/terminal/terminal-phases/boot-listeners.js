@@ -75,6 +75,10 @@ function ensureModelGatewayRuntimeHealthMirror() {
                       probeResults: 0,
                       skippedRecords: 0,
                   }),
+                  deleteRuntimeHealthRecords: async () => ({
+                      healthObservations: 0,
+                      probeResults: 0,
+                  }),
               },
         ...(debounceMs === undefined ? {} : { debounceMs }),
         enabled,
@@ -150,6 +154,18 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
         printStandaloneBanner({ serverUrl: ctx.bootConfig.server.url, bootPreflight: ctx.bootPreflight }),
     );
     const modelGatewayRuntimeHealthMirror = ensureModelGatewayRuntimeHealthMirror();
+    if (modelGatewayRuntimeHealthMirror?.enabled) {
+        try {
+            const reconciliation = await modelGatewayRuntimeHealthMirror.reconcile();
+            log(
+                'INFO',
+                `[model-gateway] runtime health SQLite reconciliation: source=${reconciliation?.sourceRecords ?? 0} candidates=${reconciliation?.candidateRecords ?? 0} written=${reconciliation?.reconciledRecords ?? 0}.`,
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            log('WARN', `[model-gateway] runtime health SQLite reconciliation ignorada: ${message}`);
+        }
+    }
     startReflectionLoop();
 
     ctx.terminalActivityChangedHandler = (activity) => {

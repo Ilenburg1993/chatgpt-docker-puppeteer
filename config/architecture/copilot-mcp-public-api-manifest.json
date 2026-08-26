@@ -437,6 +437,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/workspace/repository/integrity",
+      "target": "./src/copilot/mcp/workspace/repository/integrity/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/workspace/repository/patch",
       "target": "./src/copilot/mcp/workspace/repository/patch/public/index.js",
       "costTier": "micro",

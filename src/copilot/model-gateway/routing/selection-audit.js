@@ -187,10 +187,16 @@ function selectedSummary(selected) {
  * @returns {Array<NonNullable<ReturnType<typeof selectedSummary>>>}
  */
 function candidateSummaries(candidates, limit = 96) {
-    return candidates
-        .map(selectedSummary)
-        .filter((summary) => summary !== null)
-        .slice(0, Math.max(0, Math.floor(limit)));
+    const boundedLimit = Math.max(0, Math.floor(limit));
+    if (boundedLimit === 0) return [];
+    /** @type {Array<NonNullable<ReturnType<typeof selectedSummary>>>} */
+    const summaries = [];
+    for (const candidate of candidates) {
+        const summary = selectedSummary(candidate);
+        if (summary) summaries.push(summary);
+        if (summaries.length >= boundedLimit) break;
+    }
+    return summaries;
 }
 
 /**
@@ -323,7 +329,7 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
 }
 
 /**
- * @param {Record<string, unknown>} snapshot
+ * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} preparedSnapshot
  * @param {{
  *     profiles?: string[];
  *     strict?: boolean;
@@ -395,15 +401,12 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *     }>;
  * }}
  */
-function auditModelGatewaySelection(snapshot, options, auditOptions) {
+function auditPreparedModelGatewaySelection(preparedSnapshot, options, auditOptions) {
     options = isRecord(options) ? options : {};
     const strict = options.strict === true;
     const requestedProfiles = new Set(stringList(options.profiles));
     const profileIds = resolveProfileIds(options);
     const runtimeRouteProfile = optionalString(options.runtimeRouteProfile);
-    const preparedSnapshot = prepareModelGatewayCatalogRoutingSnapshot(snapshot, {
-        includeProjectionOnly: options.includeProjectionOnly !== false,
-    });
     const profileAudits = profileIds.map((profileId) => {
         const effectiveRouteProfile = runtimeRouteProfile ?? (auditOptions.ignoreRuntimeHealth ? null : profileId);
         /** @type {Parameters<typeof routePreparedModelGatewayCatalogSnapshot>[2]} */
@@ -532,6 +535,20 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
 }
 
 /**
+ * @param {Record<string, unknown>} snapshot
+ * @param {Parameters<typeof auditPreparedModelGatewaySelection>[1]} options
+ * @param {Parameters<typeof auditPreparedModelGatewaySelection>[2]} auditOptions
+ * @returns {ReturnType<typeof auditPreparedModelGatewaySelection>}
+ */
+function auditModelGatewaySelection(snapshot, options, auditOptions) {
+    const normalizedOptions = isRecord(options) ? options : {};
+    const preparedSnapshot = prepareModelGatewayCatalogRoutingSnapshot(snapshot, {
+        includeProjectionOnly: normalizedOptions.includeProjectionOnly !== false,
+    });
+    return auditPreparedModelGatewaySelection(preparedSnapshot, normalizedOptions, auditOptions);
+}
+
+/**
  * @param {Parameters<typeof auditModelGatewaySelection>[0]} snapshot
  * @param {Parameters<typeof auditModelGatewaySelection>[1]} [options]
  * @returns {ReturnType<typeof auditModelGatewaySelection>}
@@ -556,6 +573,32 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
  */
 export function auditModelGatewayPostRuntimeSelection(snapshot, options = {}) {
     return auditModelGatewaySelection(snapshot, options, {
+        schema: 'model-gateway-post-runtime-selection-audit',
+        ignoreRuntimeHealth: false,
+        runtimeMode: 'observed_runtime_health',
+    });
+}
+
+/**
+ * Audit an already-prepared routing snapshot without rebuilding its candidate universe.
+ * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} preparedSnapshot
+ * @param {Parameters<typeof auditPreparedModelGatewaySelection>[1]} [options]
+ */
+export function auditPreparedModelGatewayPreRuntimeSelection(preparedSnapshot, options = {}) {
+    return auditPreparedModelGatewaySelection(preparedSnapshot, options, {
+        schema: 'model-gateway-pre-runtime-selection-audit',
+        ignoreRuntimeHealth: true,
+        runtimeMode: 'metadata_only',
+    });
+}
+
+/**
+ * Audit observed runtime health against an already-prepared routing snapshot.
+ * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} preparedSnapshot
+ * @param {Parameters<typeof auditPreparedModelGatewaySelection>[1]} [options]
+ */
+export function auditPreparedModelGatewayPostRuntimeSelection(preparedSnapshot, options = {}) {
+    return auditPreparedModelGatewaySelection(preparedSnapshot, options, {
         schema: 'model-gateway-post-runtime-selection-audit',
         ignoreRuntimeHealth: false,
         runtimeMode: 'observed_runtime_health',

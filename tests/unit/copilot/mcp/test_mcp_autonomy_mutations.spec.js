@@ -1,6 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { describe, it } from 'vitest';
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
@@ -127,12 +128,52 @@ describe('MCP governed autonomy mutations', () => {
         assert.deepEqual(Object.keys(scheduleTool.inputSchema).sort(), [
             'confirmRestart',
             'delayMs',
+            'expectedSourceFingerprint',
             'profile',
             'reason',
+            'sourceBarrierManifest',
         ]);
         assert.equal('command' in scheduleTool.inputSchema, false);
         assert.equal('path' in scheduleTool.inputSchema, false);
         assert.equal('env' in scheduleTool.inputSchema, false);
+
+        const publish = tool(gitWriteTools, 'git_publish_changes');
+        assert.ok('sourceBarrierManifest' in publish.inputSchema);
+        assert.ok('expectedSourceFingerprint' in publish.inputSchema);
+    });
+
+    it('blocks git_publish_changes on an invalid source barrier before staging or committing anything', async () => {
+        const publish = tool(gitWriteTools, 'git_publish_changes');
+        const beforeHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+            cwd: process.cwd(),
+            encoding: 'utf8',
+        }).trim();
+        const beforeIndex = execFileSync('git', ['diff', '--cached', '--name-only'], {
+            cwd: process.cwd(),
+            encoding: 'utf8',
+        });
+
+        const result = await publish.handler(
+            {
+                paths: ['src/copilot/mcp/tools/git-write.js'],
+                message: 'must-not-commit',
+                sourceBarrierManifest: 'src/copilot/.ai/jobs/source-barrier-does-not-exist.json',
+                expectedSourceFingerprint: 'a'.repeat(64),
+                push: false,
+                confirmPublish: true,
+            },
+            createAutonomyOperationContext(),
+        );
+
+        assert.equal(result.isError, true);
+        assert.equal(
+            execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8' }).trim(),
+            beforeHead,
+        );
+        assert.equal(
+            execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: process.cwd(), encoding: 'utf8' }),
+            beforeIndex,
+        );
     });
 
     it('defaults LLM-B live testing to control-only and requires usage confirmation for real turns', async () => {

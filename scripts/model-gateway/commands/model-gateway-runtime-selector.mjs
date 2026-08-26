@@ -20,6 +20,7 @@ import {
     flushAndMirrorByokProviderHealthToSqlite,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    readHydratedByokProviderHealthSnapshot,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../../../src/copilot/model-gateway/index.js';
@@ -208,7 +209,11 @@ async function buildRuntimeSelectorContext(
         auditModelGatewayCatalogSnapshotIntegrity(snapshot),
     );
     const secretRegistry = measuredSync(timings, 'env.secret_registry', () => createEnvSecretRegistry());
-    const fileHealthRecords = measuredSync(timings, 'health.read_file_store', () => listByokProviderModelHealth());
+    const fileHealthRecords = await measured(
+        timings,
+        'health.read_file_store',
+        async () => (await readHydratedByokProviderHealthSnapshot()).records,
+    );
     /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
     let sqliteHealthRecords = [];
     let sqliteRuntimeError = null;

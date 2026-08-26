@@ -3161,6 +3161,18 @@ em ~**8,0 s**, com **7/7 runtime routes** e **3/3 terminal routes** selecionadas
 blockers, além de paridade/redaction/integrity verdes. N.3 LLM-B está encerrado; nenhum smoke geral
 adicional foi executado porque a prova causal era suficiente.
 
+**Checkpoint supersedente de hardening local — 2026-08-26:** uma nova auditoria especializada foi
+aberta após recorrência do erro host `TaskGroup` e passou a ser autoridade da fronteira em
+`WORKSPACE_LLMB_MCP_TASKGROUP_READINESS_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md`.
+O source local posterior ao checkpoint de 25/08 substituiu o outer Worker por subprocesso
+supervisionado para hard-cancellation durante native SQLite, separou operational cache de security
+proof, tornou env/DB authority explícitas, introduziu latest projections v14 + retention chunked,
+checkpoint PASSIVE assíncrono no owner Infra, wire compacto e source barriers hash-bound. O
+rebaseline final 1/5/20 sob fingerprint pré/pós idêntico obteve fresh proof-reuse p50 ~6,62 s e p95
+~6,76 s em N=20, lifecycle 27/27/current=0 e HWM sem tendência crescente. Esse delta **ainda não é
+considerado promovido por este checkpoint**: publish/reload e acceptance host-real pertencem à Faixa
+I do documento especializado e devem atualizar este roadmap novamente após a promoção.
+
 ### N.4 Git
 
 **Incidente ChatGPT OAuth/CIMD pós-publicação — 2026-08-25:** após restart manual do MCP/Cloudflare
@@ -3552,3 +3564,36 @@ O próximo ciclo deve começar pela confiabilidade dos testes e pelos pontos ceg
 para manifests declarativos e somente então atacar os grandes owners. Assim, a Arquitetura 2.4 deixa
 de ser apenas uma arquitetura bem construída no `HEAD` atual e passa a ser uma arquitetura capaz de
 **preservar a si mesma** durante as próximas grandes transformações.
+
+---
+
+# 17. Checkpoint supersedente — hardening LLM-B/MCP de 2026-08-26
+
+A campanha especializada de 26/08 é governada em detalhe por
+`WORKSPACE_LLMB_MCP_TASKGROUP_READINESS_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md`.
+Este checkpoint não reabre as faixas históricas 2.4; registra apenas os efeitos arquiteturais que
+passaram a integrar seus invariants.
+
+- source-integrity ganhou barrier SHA-256 sobre conjuntos explícitos, CAS de mutações e provenance
+  diagnóstica fail-closed; publicação/reload não podem reutilizar validação após source drift;
+- `llmb_live_readiness` fresh usa subprocesso supervisionado call-scoped, não Worker como hard-kill
+  boundary para `better-sqlite3`; redaction Workers permanecem one-shot/resource-bounded;
+- environment authority é explicitamente projetada e não herda credenciais MCP/OAuth/session;
+- operational cache e security proof possuem identities/lifetimes separados, e snapshot instável não
+  é cacheado;
+- SQLite v14 materializa latest pointers, retention é latest-preserving/chunked e checkpoint PASSIVE
+  pesado é offloaded ao owner Infra;
+- `sqlite-catalog-store.js` foi decomposto por função clara em owners de retention e schema
+  migration, reduzindo o hotspot de 205.966 para 165.188 bytes sem elevar o ceiling de 175.000;
+- `resolveApplicationSqlitePath` recebeu uma micro-surface pública própria, preservando a closure
+  histórica do lifecycle SQLite;
+- repository source integrity passou a ter micro-surface pública governada; JSONC validation via
+  `jsonc-parser` é dependência explícita do patch owner, não efeito transitivo invisível;
+- owner governance final: 68 owners, 222 arestas diretas, zero SCC e zero mismatch;
+- `copilot:architecture:check` fecha integralmente verde no source local final.
+
+O rebaseline final local foi executado sobre os 79 arquivos modificados/untracked sob fingerprint
+pré/pós idêntico `c7c1d2513bc14d1d088c4158900775cd514945f020d3015b79c0b354c9c8d898`. Em N=20, fresh
+operational proof-reuse mediu p50 ~6,382 s, p95 ~6,552 s e max ~6,569 s; lifecycle terminou 27
+created/27 terminated/current=0. O SLO local permanece p95 <=7,0 s. Host-real acceptance, controlled
+reload e retention real intencional continuam gates separados e não são inferidos desta prova local.

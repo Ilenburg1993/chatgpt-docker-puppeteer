@@ -760,7 +760,7 @@
       "audiences": ["public", "testing"],
       "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
       "policyHooks": ["config", "cost", "process", "surface"],
-      "allowedDependencies": ["mcp.process", "mcp.workspace"]
+      "allowedDependencies": ["mcp.process", "mcp.workspace", "mcp.workspace.repository"]
     },
     {
       "ownerId": "mcp.runtime.startup-maintenance",
@@ -786,8 +786,8 @@
       "protectedBoundary": false,
       "role": "MCP launchers and architecture gates",
       "audiences": [],
-      "authorityClasses": ["config-authority"],
-      "policyHooks": ["config"],
+      "authorityClasses": ["config-authority", "process-launcher"],
+      "policyHooks": ["config", "process"],
       "allowedDependencies": [
         "mcp.cloudflare.transport-benchmark",
         "mcp.composition.process-config",
@@ -804,7 +804,8 @@
         "mcp.runtime.reload",
         "mcp.transport",
         "mcp.validation",
-        "mcp.workspace"
+        "mcp.workspace",
+        "mcp.workspace.repository"
       ]
     },
     {
@@ -858,6 +859,7 @@
         "mcp.runtime.reload",
         "mcp.validation",
         "mcp.workspace.git",
+        "mcp.workspace.repository",
         "mcp.workspace.repository.patch",
         "mcp.workspace.repository.read",
         "mcp.workspace.repository.status",
@@ -925,9 +927,9 @@
       "kind": "owner",
       "protectedBoundary": false,
       "role": "Repository operation owners",
-      "audiences": [],
-      "authorityClasses": [],
-      "policyHooks": [],
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
       "allowedDependencies": []
     },
     {
@@ -988,7 +990,12 @@
       "audiences": ["public"],
       "authorityClasses": ["public-surface"],
       "policyHooks": ["cost", "surface"],
-      "allowedDependencies": ["mcp.validation", "mcp.workspace.repository.patch", "mcp.workspace.repository.read-cache"]
+      "allowedDependencies": [
+        "mcp.validation",
+        "mcp.workspace.repository",
+        "mcp.workspace.repository.patch",
+        "mcp.workspace.repository.read-cache"
+      ]
     }
   ],
   "policy": {

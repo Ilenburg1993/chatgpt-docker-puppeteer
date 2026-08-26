@@ -154,6 +154,7 @@
     "src/copilot/mcp/maintenance/dependencies/runtime.js",
     "src/copilot/mcp/process/terminal/runtime.js",
     "src/copilot/mcp/runtime/reload/runner.js",
+    "src/copilot/mcp/scripts/source-barrier.js",
     "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
     "src/copilot/mcp/validation/devcontainer-shell/runtime.js",
     "src/copilot/mcp/validation/jobs/runtime.js",
@@ -427,6 +428,25 @@
           "environmentAuthority": "explicit-projection",
           "processGroup": "yes",
           "bound": "accepted reload runner owns bounded restart child lifecycle"
+        }
+      ]
+    },
+    {
+      "path": "src/copilot/mcp/scripts/source-barrier.js",
+      "ownerId": "mcp.scripts",
+      "launchers": [
+        {
+          "id": "source-bound-command",
+          "executableAuthority": "caller-command",
+          "credentialAuthority": "projected-only",
+          "signalPolicy": "attached-supervisor",
+          "terminality": "attached",
+          "completionModel": "attached-close",
+          "callerCancellation": "not-applicable",
+          "cwdAuthority": "fixed-workspace",
+          "environmentAuthority": "explicit-projection",
+          "processGroup": "no",
+          "bound": "CLI waits for physical child close and verifies the same source manifest immediately before and after execution"
         }
       ]
     },

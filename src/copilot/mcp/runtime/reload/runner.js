@@ -13,6 +13,7 @@ import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/pu
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
+import { verifyRepositorySourceBarrierManifest } from '#copilot/mcp/public/workspace/repository/integrity';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -37,6 +38,8 @@ const RUNNER_PROFILE_TARGETS = Object.freeze({
 });
 const REQUEST_ID_RE = /^mcp-reload-[a-z0-9-]{8,80}$/u;
 const RELOAD_RUNNER_LAUNCHER = 'src/copilot/mcp/scripts/scheduled-restart-runner.js';
+const SOURCE_BARRIER_CLI = 'src/copilot/mcp/scripts/source-barrier.js';
+const SOURCE_BARRIER_FINGERPRINT_RE = /^[a-f0-9]{64}$/u;
 const RESTART_CHILD_TIMEOUT_MS = 120_000;
 
 /** @param {number} ms */
@@ -66,12 +69,25 @@ function parseArgs(argv) {
     const requestId = read('--request-id');
     const profile = read('--profile');
     const delayMs = Number(read('--delay-ms'));
+    const sourceBarrierManifestPath = read('--source-barrier-manifest');
+    const expectedSourceFingerprint = read('--expected-source-fingerprint').trim().toLowerCase();
     if (!REQUEST_ID_RE.test(requestId)) throw new Error('Invalid generated request id.');
     if (!Object.hasOwn(RUNNER_PROFILE_TARGETS, profile)) throw new Error('Invalid restart profile.');
     if (!Number.isInteger(delayMs) || delayMs < MCP_RELOAD_MIN_DELAY_MS || delayMs > MCP_RELOAD_MAX_DELAY_MS) {
         throw new Error('Invalid restart delay.');
     }
-    return { requestId, profile, delayMs, target: targetForProfile(profile) };
+    if (!sourceBarrierManifestPath) throw new Error('Controlled reload requires a source-barrier manifest.');
+    if (!SOURCE_BARRIER_FINGERPRINT_RE.test(expectedSourceFingerprint)) {
+        throw new Error('Controlled reload requires a valid expected source fingerprint.');
+    }
+    return {
+        requestId,
+        profile,
+        delayMs,
+        target: targetForProfile(profile),
+        sourceBarrierManifestPath,
+        expectedSourceFingerprint,
+    };
 }
 
 /**
@@ -100,6 +116,9 @@ export function buildControlledReloadRunnerEnvironment(parentEnv) {
  *     delayMs: number;
  *     reason: string | null;
  *     runnerEnvironment: Readonly<NodeJS.ProcessEnv>;
+ *     sourceBarrierManifestPath: string;
+ *     expectedSourceFingerprint: string;
+ *     audit?: Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'readTail'>;
  *     signal?: AbortSignal;
  * }} input
  */
@@ -116,15 +135,24 @@ export async function scheduleControlledMcpReload(input) {
  *     delayMs: number;
  *     reason: string | null;
  *     runnerEnvironment: Readonly<NodeJS.ProcessEnv>;
+ *     sourceBarrierManifestPath: string;
+ *     expectedSourceFingerprint: string;
+ *     audit?: Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'readTail'>;
  *     signal?: AbortSignal;
  * }} input
- * @param {{ spawnChild?: typeof spawn; createRequestUuid?: () => string }} dependencies
+ * @param {{ spawnChild?: typeof spawn; createRequestUuid?: () => string; verifySourceBarrierManifest?: typeof verifyRepositorySourceBarrierManifest }} dependencies
  */
 export async function scheduleControlledMcpReloadWithDependencies(input, dependencies) {
     if (!input.workspace) throw new TypeError('Controlled reload scheduling requires a workspace capability.');
     if (input.signal?.aborted) {
         throw input.signal.reason ?? new Error('Controlled MCP reload scheduling aborted before acceptance.');
     }
+    const verifySourceBarrierManifest =
+        dependencies.verifySourceBarrierManifest ?? verifyRepositorySourceBarrierManifest;
+    const sourceBarrier = await verifySourceBarrierManifest(input.workspace, input.sourceBarrierManifestPath, {
+        expectedFingerprint: input.expectedSourceFingerprint,
+        ...(input.audit ? { audit: input.audit } : {}),
+    });
     const target = targetForProfile(input.profile);
     if (
         !Number.isInteger(input.delayMs) ||
@@ -145,6 +173,9 @@ export async function scheduleControlledMcpReloadWithDependencies(input, depende
         target,
         reason: input.reason,
         requestedByPid: process.pid,
+        sourceBarrierManifestPath: sourceBarrier.manifestPath,
+        sourceBarrierFingerprint: sourceBarrier.fingerprint,
+        sourceBarrierVerifiedAt: sourceBarrier.verifiedAt,
     };
     await input.workspace.io.writeFileAtomic(MCP_RELOAD_STATE_FILE, `${JSON.stringify(launchingState, null, 2)}\n`);
 
@@ -178,6 +209,10 @@ export async function scheduleControlledMcpReloadWithDependencies(input, depende
                 String(input.delayMs),
                 '--request-id',
                 requestId,
+                '--source-barrier-manifest',
+                sourceBarrier.manifestPath,
+                '--expected-source-fingerprint',
+                sourceBarrier.fingerprint,
             ],
             {
                 cwd: MCP_WORKSPACE_ROOT,
@@ -211,7 +246,15 @@ export async function scheduleControlledMcpReloadWithDependencies(input, depende
         const acceptedAt = Date.now();
         accepted = true;
         child.unref();
-        return { requestId, requestedAt, acceptedAt, runnerPid: child.pid, target };
+        return {
+            requestId,
+            requestedAt,
+            acceptedAt,
+            runnerPid: child.pid,
+            target,
+            sourceBarrierManifestPath: sourceBarrier.manifestPath,
+            sourceBarrierFingerprint: sourceBarrier.fingerprint,
+        };
     } catch (error) {
         if (supervisor && supervisor.snapshot().state !== 'closed') {
             terminateBeforeAcceptance?.();
@@ -229,15 +272,47 @@ export async function scheduleControlledMcpReloadWithDependencies(input, depende
 }
 
 /**
+ * Build the exact argv used for a certified reload. Keeping this pure makes the promotion boundary independently
+ * testable without starting a restart process.
+ *
+ * @param {string} target
+ * @param {{ manifestPath: string; fingerprint: string }} sourceBarrier
+ */
+export function buildControlledReloadRestartInvocation(target, sourceBarrier) {
+    return Object.freeze({
+        executable: process.execPath,
+        args: Object.freeze([
+            SOURCE_BARRIER_CLI,
+            'run',
+            '--manifest',
+            sourceBarrier.manifestPath,
+            '--expected-fingerprint',
+            sourceBarrier.fingerprint,
+            '--',
+            process.execPath,
+            'src/copilot/mcp/scripts/stateful-env.js',
+            'run',
+            target,
+        ]),
+    });
+}
+
+/**
+ * The restart command itself is executed through the source-barrier wrapper. The wrapper verifies the exact certified
+ * bytes immediately before spawning the restart and again after it exits; a drifted source therefore cannot produce a
+ * successful promotion record even if scheduling happened earlier.
+ *
  * @param {string} target
  * @param {NodeJS.ProcessEnv} parentEnv
+ * @param {{ manifestPath: string; fingerprint: string }} sourceBarrier
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null }>}
  */
-async function runRestart(target, parentEnv) {
+async function runRestart(target, parentEnv, sourceBarrier) {
     const env = buildControlledReloadRunnerEnvironment(parentEnv);
+    const invocation = buildControlledReloadRestartInvocation(target, sourceBarrier);
     let child;
     try {
-        child = spawn(process.execPath, ['src/copilot/mcp/scripts/stateful-env.js', 'run', target], {
+        child = spawn(invocation.executable, invocation.args, {
             cwd: MCP_WORKSPACE_ROOT,
             env,
             stdio: 'ignore',
@@ -276,9 +351,13 @@ async function runRestart(target, parentEnv) {
     };
 }
 
-/** @param {{ requestId: string; profile: string; delayMs: number; target: string; parentEnv: NodeJS.ProcessEnv }} input */
+/** @param {{ requestId: string; profile: string; delayMs: number; target: string; sourceBarrierManifestPath: string; expectedSourceFingerprint: string; parentEnv: NodeJS.ProcessEnv }} input */
 async function executeControlledReload(input) {
     const scheduledAt = Date.now();
+    const sourceBarrierState = {
+        sourceBarrierManifestPath: input.sourceBarrierManifestPath,
+        sourceBarrierFingerprint: input.expectedSourceFingerprint,
+    };
     await writeState({
         schemaVersion: 1,
         status: 'scheduled',
@@ -288,6 +367,7 @@ async function executeControlledReload(input) {
         delayMs: input.delayMs,
         target: input.target,
         runnerPid: process.pid,
+        ...sourceBarrierState,
     });
     await sleep(input.delayMs);
     const startedAt = Date.now();
@@ -301,8 +381,12 @@ async function executeControlledReload(input) {
         delayMs: input.delayMs,
         target: input.target,
         runnerPid: process.pid,
+        ...sourceBarrierState,
     });
-    const result = await runRestart(input.target, input.parentEnv);
+    const result = await runRestart(input.target, input.parentEnv, {
+        manifestPath: input.sourceBarrierManifestPath,
+        fingerprint: input.expectedSourceFingerprint,
+    });
     await writeState({
         schemaVersion: 1,
         status: result.exitCode === 0 ? 'completed' : 'failed',
@@ -314,6 +398,7 @@ async function executeControlledReload(input) {
         delayMs: input.delayMs,
         target: input.target,
         runnerPid: process.pid,
+        ...sourceBarrierState,
         exitCode: result.exitCode,
         timedOut: result.timedOut,
         error: result.error,

@@ -7,6 +7,7 @@ import { describe, it } from 'vitest';
 import {
     buildModelGatewayLiveRunEnvironment,
     buildModelGatewayLiveRunPlan,
+    buildModelGatewayReadinessChildEnvironment,
     buildModelGatewayReadOnlyChildEnvironment,
     createModelGatewayLiveRunEnvironmentAuthority,
     createModelGatewayLiveRunEnvironmentAuthorityWithDependencies,
@@ -18,6 +19,7 @@ const PARENT_ENV = Object.freeze({
     PATH: '/usr/local/bin:/usr/bin',
     HOME: '/tmp/unit-home',
     LANG: 'C.UTF-8',
+    COPILOT_DB_PATH: '/tmp/model-gateway-authority.sqlite',
     COPILOT_MCP_STATIC_BEARER_TOKEN: 'mcp-static-must-never-cross',
     FUTURE_UNKNOWN_SECRET: 'future-secret-must-never-cross',
     GITHUB_TOKEN: 'github-token-authority',
@@ -50,6 +52,8 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         mutableEnv.COPILOT_CONNECTION_TOKEN = 'rotated-copilot-after-capture';
 
         assert.equal(authority.readOnlyEnvironment()['OPENAI_API_KEY'], undefined);
+        assert.equal(authority.readinessEnvironment()['OPENAI_API_KEY'], 'openai-provider-authority');
+        assert.equal(authority.readinessEnvironment()['COPILOT_CONNECTION_TOKEN'], undefined);
         assert.equal(
             authority.liveRunEnvironment({ invokesModel: false, invokesRealProvider: true })['OPENAI_API_KEY'],
             'openai-provider-authority',
@@ -75,6 +79,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
             CHUTES_API_KEY: 'chutes-file-secret',
             OPENROUTER_API_KEY: 'openrouter-file-secret',
             COPILOT_BYOK_PROFILES_JSON: '[{"id":"unit"}]',
+            COPILOT_DB_PATH: '/tmp/file-must-not-own-application-db.sqlite',
             COPILOT_BYOK_API_KEY_ENV: 'CUSTOM_BYOK_SECRET',
             CUSTOM_BYOK_SECRET: 'custom-byok-file-secret',
             GITHUB_TOKEN: 'must-not-enter-file-projection',
@@ -86,6 +91,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         assert.equal(projected['CHUTES_API_KEY'], 'chutes-file-secret');
         assert.equal(projected['OPENROUTER_API_KEY'], 'openrouter-file-secret');
         assert.equal(projected['CUSTOM_BYOK_SECRET'], 'custom-byok-file-secret');
+        assert.equal(projected['COPILOT_DB_PATH'], undefined);
         assert.equal(projected['GITHUB_TOKEN'], undefined);
         assert.equal(projected['COPILOT_CONNECTION_TOKEN'], undefined);
         assert.equal(projected['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
@@ -95,6 +101,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         const authority = createModelGatewayLiveRunEnvironmentAuthorityWithDependencies(
             {
                 PATH: '/usr/bin',
+                COPILOT_DB_PATH: '/tmp/process-owned-application.sqlite',
                 ZAI_API_KEY: 'zai-process-wins',
                 COPILOT_CONNECTION_TOKEN: 'copilot-process-only',
             },
@@ -103,6 +110,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
                     reads += 1;
                     return [
                         'ZAI_API_KEY=zai-file-loses',
+                        'COPILOT_DB_PATH=/tmp/file-must-not-override-process.sqlite',
                         'CHUTES_API_KEY=chutes-file-secret',
                         'OPENROUTER_API_KEY=openrouter-file-secret',
                         'GITHUB_TOKEN=must-not-enter',
@@ -130,6 +138,13 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         assert.equal(modelOnly['ZAI_API_KEY'], undefined);
         assert.equal(modelOnly['CHUTES_API_KEY'], undefined);
 
+        const readiness = authority.readinessEnvironment();
+        assert.equal(readiness['COPILOT_DB_PATH'], '/tmp/process-owned-application.sqlite');
+        assert.equal(readiness['ZAI_API_KEY'], 'zai-process-wins');
+        assert.equal(readiness['CHUTES_API_KEY'], 'chutes-file-secret');
+        assert.equal(readiness['COPILOT_CONNECTION_TOKEN'], undefined);
+        assert.equal(readiness['GITHUB_TOKEN'], undefined);
+
         const readOnly = authority.readOnlyEnvironment();
         assert.equal(readOnly['ZAI_API_KEY'], undefined);
         assert.equal(readOnly['CHUTES_API_KEY'], undefined);
@@ -149,6 +164,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         );
         for (const env of [readOnly, control]) {
             assert.equal(env['PATH'], PARENT_ENV.PATH);
+            assert.equal(env['COPILOT_DB_PATH'], PARENT_ENV.COPILOT_DB_PATH);
             assert.equal(env['MODEL_GATEWAY_LOAD_DOTENV'], 'false');
             assert.equal(env['COPILOT_TERMINAL_LOAD_DOTENV_LOCAL'], 'false');
             assertAbsent(env, [
@@ -180,8 +196,29 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         ]);
     });
 
+    it('grants readiness only provider inspection authority without Copilot or MCP credentials', () => {
+        const env = buildModelGatewayReadinessChildEnvironment(PARENT_ENV);
+        assert.equal(env['COPILOT_DB_PATH'], PARENT_ENV.COPILOT_DB_PATH);
+        assertPresent(env, [
+            'OPENAI_API_KEY',
+            'ANTHROPIC_API_KEY',
+            'CUSTOM_BYOK_SECRET',
+            'COPILOT_BYOK_API_KEY_ENV',
+            'COPILOT_BYOK_ACCOUNT_UNIT__OPENAI_API_KEY',
+            'COPILOT_BYOK_BASE_URL',
+        ]);
+        assertAbsent(env, [
+            'GITHUB_TOKEN',
+            'COPILOT_GITHUB_TOKEN',
+            'COPILOT_CONNECTION_TOKEN',
+            'COPILOT_MCP_STATIC_BEARER_TOKEN',
+            'FUTURE_UNKNOWN_SECRET',
+        ]);
+    });
+
     it('grants only recognized/explicit provider authority without granting Copilot or MCP credentials', () => {
         const env = buildModelGatewayLiveRunEnvironment({ invokesModel: false, invokesRealProvider: true }, PARENT_ENV);
+        assert.equal(env['COPILOT_DB_PATH'], PARENT_ENV.COPILOT_DB_PATH);
         assertPresent(env, [
             'OPENAI_API_KEY',
             'ANTHROPIC_API_KEY',

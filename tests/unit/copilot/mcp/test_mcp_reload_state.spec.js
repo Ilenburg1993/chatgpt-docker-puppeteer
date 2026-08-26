@@ -7,12 +7,28 @@ import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/pr
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
 import { summarizeMcpReloadState } from '#copilot/mcp/public/runtime/reload';
 import {
+    buildControlledReloadRestartInvocation,
     readMcpReloadProcessConfig,
     scheduleControlledMcpReloadWithDependencies,
 } from '#copilot/testing/mcp/runtime/reload';
 import { mcpReloadPlanTool } from '#copilot/testing/mcp/tools/reload';
 
 const RELOAD_TEST_HOST = createComposedMcpProcessHost({ hostId: 'reload-state-test-host', backgroundServices: false });
+const TEST_SOURCE_BARRIER_MANIFEST = 'src/copilot/.ai/jobs/reload-test-source-barrier.json';
+const TEST_SOURCE_FINGERPRINT = 'a'.repeat(64);
+
+/** @type {typeof import('#copilot/mcp/public/workspace/repository/integrity').verifyRepositorySourceBarrierManifest} */
+const acceptTestSourceBarrier = async (_workspace, manifestPath, options) =>
+    /** @type {any} */ ({
+        ok: true,
+        manifestPath,
+        expectedFingerprint: options.expectedFingerprint,
+        fingerprint: TEST_SOURCE_FINGERPRINT,
+        currentFingerprint: TEST_SOURCE_FINGERPRINT,
+        entryCount: 1,
+        verifiedAt: new Date().toISOString(),
+    });
+
 function reloadOperationContext() {
     return createMcpToolOperationContext(
         { mcpReq: { id: 'reload-state-test', method: 'tools/call', signal: new AbortController().signal } },
@@ -30,6 +46,74 @@ describe('MCP reload state reconciliation', () => {
             'mcp_post_restart_readiness',
             'mcp_runtime_health',
         ]);
+    });
+
+    it('builds the actual restart argv through the same source-barrier wrapper and fingerprint', () => {
+        const invocation = buildControlledReloadRestartInvocation('copilot:mcp:quic:restart', {
+            manifestPath: TEST_SOURCE_BARRIER_MANIFEST,
+            fingerprint: TEST_SOURCE_FINGERPRINT,
+        });
+        expect(invocation.executable).toBe(process.execPath);
+        expect(invocation.args.slice(0, 7)).toEqual([
+            'src/copilot/mcp/scripts/source-barrier.js',
+            'run',
+            '--manifest',
+            TEST_SOURCE_BARRIER_MANIFEST,
+            '--expected-fingerprint',
+            TEST_SOURCE_FINGERPRINT,
+            '--',
+        ]);
+        expect(invocation.args.slice(7)).toEqual([
+            process.execPath,
+            'src/copilot/mcp/scripts/stateful-env.js',
+            'run',
+            'copilot:mcp:quic:restart',
+        ]);
+    });
+
+    it('rejects a source-barrier failure before persisting launch state or spawning the runner', async () => {
+        const events = [];
+        let spawnCount = 0;
+        const workspace = {
+            io: {
+                writeFileAtomic: async () => {
+                    events.push('state-write');
+                    return {};
+                },
+            },
+        };
+        const reloadConfig = readMcpReloadProcessConfig({ PATH: '/usr/bin:/bin', HOME: '/tmp' });
+        const barrierError = Object.assign(new Error('source drift before reload'), { code: 'ERR_SOURCE_DRIFT' });
+
+        await expect(
+            scheduleControlledMcpReloadWithDependencies(
+                {
+                    workspace: /** @type {any} */ (workspace),
+                    profile: 'quic',
+                    delayMs: 1200,
+                    reason: 'unit-source-drift',
+                    runnerEnvironment: reloadConfig.runnerEnvironment,
+                    sourceBarrierManifestPath: TEST_SOURCE_BARRIER_MANIFEST,
+                    expectedSourceFingerprint: TEST_SOURCE_FINGERPRINT,
+                },
+                {
+                    verifySourceBarrierManifest: async () => {
+                        throw barrierError;
+                    },
+                    spawnChild: /** @type {typeof import('node:child_process').spawn} */ (
+                        /** @type {unknown} */ (
+                            () => {
+                                spawnCount += 1;
+                                throw new Error('must-not-spawn');
+                            }
+                        )
+                    ),
+                },
+            ),
+        ).rejects.toMatchObject({ code: 'ERR_SOURCE_DRIFT' });
+
+        expect(events).toEqual([]);
+        expect(spawnCount).toBe(0);
     });
 
     it('drains a cancelled detached reload before persisting failed launch state', async () => {
@@ -78,10 +162,13 @@ describe('MCP reload state reconciliation', () => {
                     delayMs: 1200,
                     reason: 'unit-cancellation',
                     runnerEnvironment: reloadConfig.runnerEnvironment,
+                    sourceBarrierManifestPath: TEST_SOURCE_BARRIER_MANIFEST,
+                    expectedSourceFingerprint: TEST_SOURCE_FINGERPRINT,
                     signal: controller.signal,
                 },
                 {
                     createRequestUuid: () => '11111111-1111-4111-8111-111111111111',
+                    verifySourceBarrierManifest: acceptTestSourceBarrier,
                     spawnChild,
                 },
             ),

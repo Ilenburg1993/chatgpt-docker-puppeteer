@@ -14,6 +14,7 @@ import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilo
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { MODEL_GATEWAY_LIVE_COMMANDS, MODEL_GATEWAY_LIVE_RUNNER_SCRIPT } from './contracts.js';
 
 const DETACHED_LIVE_RUNS_DIR = 'src/copilot/.ai/mcp/llmb-live-runs';
@@ -21,6 +22,33 @@ export const DETACHED_LIVE_RUN_ID_RE = /^mcp-[0-9a-f-]{36}$/u;
 const DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES = 128 * 1024;
 const DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS = 30_000;
 const DEFAULT_LIVE_COMMAND_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+
+/** @type {Map<string, { created:number; terminated:number; current:number; cancelled:number; timedOut:number; outputLimited:number; abnormalExit:number }>} */
+const liveCommandLifecycleByCommand = new Map();
+
+/** @param {string} command */
+function liveCommandLifecycleState(command) {
+    let state = liveCommandLifecycleByCommand.get(command);
+    if (state) return state;
+    state = { created: 0, terminated: 0, current: 0, cancelled: 0, timedOut: 0, outputLimited: 0, abnormalExit: 0 };
+    liveCommandLifecycleByCommand.set(command, state);
+    return state;
+}
+
+export function readModelGatewayLiveCommandLifecycleForTests() {
+    return Object.freeze(
+        Object.fromEntries(
+            [...liveCommandLifecycleByCommand.entries()].map(([command, state]) => [
+                command,
+                Object.freeze({ ...state }),
+            ]),
+        ),
+    );
+}
+
+export function resetModelGatewayLiveCommandLifecycleForTests() {
+    liveCommandLifecycleByCommand.clear();
+}
 
 /**
  * @typedef {object} DetachedLiveRunManifest
@@ -157,14 +185,20 @@ export async function runModelGatewayLiveCommand(input) {
     const env =
         input.command === 'live-runner'
             ? input.environmentAuthority.liveRunEnvironment(input.plan ?? {})
-            : input.environmentAuthority.readOnlyEnvironment();
-    const startedAt = Date.now();
+            : input.command === 'readiness'
+              ? input.environmentAuthority.readinessEnvironment()
+              : input.environmentAuthority.readOnlyEnvironment();
+    const lifecycle = liveCommandLifecycleState(input.command);
+    lifecycle.created += 1;
+    lifecycle.current += 1;
+    const startedAt = performance.now();
     const child = spawn(process.execPath, [script, ...input.args], {
         cwd: input.workspace.workspaceRoot,
         env,
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
     });
+    const spawnReturnMs = Number((performance.now() - startedAt).toFixed(3));
     const supervisor = createAttachedChildProcessSupervisor(child, { processGroup: process.platform !== 'win32' });
     let stdout = '';
     let stderr = '';
@@ -173,6 +207,14 @@ export async function runModelGatewayLiveCommand(input) {
     let outputLimitExceeded = false;
     let timedOut = false;
     let aborted = false;
+    /** @type {number | null} */
+    let firstStdoutMs = null;
+    /** @type {number | null} */
+    let lastStdoutMs = null;
+    /** @type {number | null} */
+    let firstStderrMs = null;
+    /** @type {number | null} */
+    let lastStderrMs = null;
     /** @type {string | null} */
     let spawnErrorMessage = null;
 
@@ -182,12 +224,18 @@ export async function runModelGatewayLiveCommand(input) {
         supervisor.requestTermination({ graceMs: 500 });
     };
     child.stdout?.on('data', (chunk) => {
+        const observedAtMs = Number((performance.now() - startedAt).toFixed(3));
+        if (firstStdoutMs === null) firstStdoutMs = observedAtMs;
+        lastStdoutMs = observedAtMs;
         const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk ?? ''), 'utf8');
         stdoutBytesObserved += bytes;
         stdout = appendBoundedOutput(stdout, chunk, maxOutputBytes);
         if (stdoutBytesObserved + stderrBytesObserved > maxOutputBytes) requestPressureTermination();
     });
     child.stderr?.on('data', (chunk) => {
+        const observedAtMs = Number((performance.now() - startedAt).toFixed(3));
+        if (firstStderrMs === null) firstStderrMs = observedAtMs;
+        lastStderrMs = observedAtMs;
         const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk ?? ''), 'utf8');
         stderrBytesObserved += bytes;
         stderr = appendBoundedOutput(stderr, chunk, maxOutputBytes);
@@ -197,23 +245,40 @@ export async function runModelGatewayLiveCommand(input) {
         spawnErrorMessage = error.message;
     });
 
+    // Readiness owns synchronous better-sqlite3 work. Worker-thread termination cannot preempt a native SQLite call, so
+    // its process boundary escalates immediately to SIGKILL after SIGTERM. Other live commands retain a graceful drain.
+    const terminationGraceMs = input.command === 'readiness' ? 0 : 1_000;
     const timeoutTimer = setTimeout(() => {
         timedOut = true;
-        supervisor.requestTermination({ graceMs: 1_000 });
+        supervisor.requestTermination({ graceMs: terminationGraceMs });
     }, timeoutMs);
     timeoutTimer.unref();
 
     const abortSignal = input.signal;
     const onAbort = () => {
         aborted = true;
-        supervisor.requestTermination({ graceMs: 1_000 });
+        supervisor.requestTermination({ graceMs: terminationGraceMs });
     };
     if (abortSignal?.aborted) onAbort();
     else abortSignal?.addEventListener('abort', onAbort, { once: true });
 
     const observation = await supervisor.closed;
+    const closeMs = Number((performance.now() - startedAt).toFixed(3));
     clearTimeout(timeoutTimer);
     abortSignal?.removeEventListener('abort', onAbort);
+    lifecycle.current = Math.max(0, lifecycle.current - 1);
+    lifecycle.terminated += 1;
+    if (aborted) lifecycle.cancelled += 1;
+    if (timedOut) lifecycle.timedOut += 1;
+    if (outputLimitExceeded) lifecycle.outputLimited += 1;
+    if (
+        !aborted &&
+        !timedOut &&
+        !outputLimitExceeded &&
+        (spawnErrorMessage !== null || observation.signal !== null || observation.exitCode !== 0)
+    ) {
+        lifecycle.abnormalExit += 1;
+    }
     const error = spawnErrorMessage
         ? spawnErrorMessage
         : aborted
@@ -239,7 +304,16 @@ export async function runModelGatewayLiveCommand(input) {
         outputLimitExceeded,
         stdoutBytesObserved,
         stderrBytesObserved,
-        durationMs: Date.now() - startedAt,
+        durationMs: closeMs,
+        processTiming: {
+            spawnReturnMs,
+            firstStdoutMs,
+            lastStdoutMs,
+            firstStderrMs,
+            lastStderrMs,
+            closeMs,
+            closeTailMs: Number((closeMs - (lastStdoutMs ?? lastStderrMs ?? closeMs)).toFixed(3)),
+        },
         error,
     };
 }
@@ -260,6 +334,84 @@ function parseJsonOutput(text) {
             return null;
         }
     }
+}
+
+/**
+ * Execute canonical readiness in a call-scoped subprocess. This boundary is intentionally a process rather than a
+ * Worker thread because synchronous better-sqlite3 native calls are not reliably preempted by Worker.terminate().
+ *
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {boolean} includeSqliteRuntimeHealth
+ * @param {{
+ *     signal?: AbortSignal;
+ *     environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority;
+ *     redactionProof?: Record<string, unknown> | null;
+ *     redactionProofContextId?: string | null;
+ *     diagnostics?: boolean;
+ * }} options
+ */
+export async function runModelGatewayLiveReadinessProcess(workspace, includeSqliteRuntimeHealth, options) {
+    if (!options?.environmentAuthority) {
+        throw new TypeError('Model Gateway readiness process requires an explicit environment authority.');
+    }
+    const args = ['--json'];
+    if (includeSqliteRuntimeHealth) args.push('--sqlite-runtime-health');
+    if (options.diagnostics === true) args.push('--diagnostics');
+    const redactionProofContextId = String(options.redactionProofContextId ?? '').trim();
+    if (redactionProofContextId) args.push(`--redaction-proof-context-id=${redactionProofContextId}`);
+    if (options.redactionProof) {
+        if (!redactionProofContextId) {
+            throw new TypeError('Model Gateway redaction proof transport requires a proof context id.');
+        }
+        const serializedProof = JSON.stringify(options.redactionProof);
+        const proofBytes = Buffer.byteLength(serializedProof, 'utf8');
+        if (proofBytes > 64 * 1024) {
+            throw new RangeError(
+                `Model Gateway redaction proof exceeds 64 KiB transport budget (${proofBytes} bytes).`,
+            );
+        }
+        args.push(`--redaction-proof-base64=${Buffer.from(serializedProof, 'utf8').toString('base64url')}`);
+    }
+    const result = await runModelGatewayLiveCommand({
+        workspace,
+        command: 'readiness',
+        args,
+        timeoutMs: 60_000,
+        maxOutputBytes: 1024 * 1024,
+        environmentAuthority: options.environmentAuthority,
+        ...(options.signal ? { signal: options.signal } : {}),
+    });
+    const parseStartedAt = performance.now();
+    const parsedValue = parseJsonOutput(result.stdout);
+    const parseJsonMs = Number((performance.now() - parseStartedAt).toFixed(3));
+    const parsed =
+        parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+            ? /** @type {Record<string, any>} */ (parsedValue)
+            : null;
+    if (!result.success || !parsed) {
+        return {
+            ...result,
+            success: false,
+            parsed: null,
+            error: result.error ?? 'LLM-B live readiness did not return valid JSON.',
+        };
+    }
+    const domainDurationMs = Number(parsed?.['timing']?.['totalMs'] ?? 0);
+    return {
+        ...result,
+        success: true,
+        parsed,
+        readinessTiming: {
+            parseJsonMs,
+            domainDurationMs,
+            processMinusDomainMs: Number(Math.max(0, result.durationMs - domainDurationMs).toFixed(3)),
+            processDiagnostics:
+                parsed?.['processDiagnostics'] && typeof parsed['processDiagnostics'] === 'object'
+                    ? parsed['processDiagnostics']
+                    : null,
+        },
+        error: null,
+    };
 }
 
 /**

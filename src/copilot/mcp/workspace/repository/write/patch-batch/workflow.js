@@ -1,6 +1,10 @@
 // @ts-check
 /** Patch-batch execution state machine independent from MCP result presentation. */
 
+import {
+    captureRepositorySourceBarrier,
+    verifyRepositorySourceBarrier,
+} from '#copilot/mcp/public/workspace/repository/integrity';
 import { summarizeRepositoryPatchFailures } from '#copilot/mcp/public/workspace/repository/patch';
 import { runRepoWritePatchTargetGroups } from '../patch/runtime.js';
 import { runPostPatchValidations } from '../post-validation/runtime.js';
@@ -35,6 +39,7 @@ function emptyPostValidation(requests) {
         failedCount: 0,
         durationMs: 0,
         results: /** @type {Record<string, unknown>[]} */ ([]),
+        sourceBarrier: /** @type {Record<string, unknown> | null} */ (null),
     };
 }
 
@@ -130,11 +135,53 @@ export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun,
             if (!options.validationConfig) {
                 throw new TypeError('Post-validation requires a validation process config projection.');
             }
-            postValidation = await runPostPatchValidations(
-                options.postValidationRequests,
-                runtime,
-                options.validationConfig,
-            );
+            const barrierPaths = [
+                ...new Set(
+                    succeeded
+                        .map((operation) => operation['path'])
+                        .filter(
+                            /** @returns {value is string} */ (value) => typeof value === 'string' && value.length > 0,
+                        ),
+                ),
+            ];
+            const sourceBarrier =
+                barrierPaths.length > 0 ? await captureRepositorySourceBarrier(runtime.workspace, barrierPaths) : null;
+            postValidation = {
+                ...(await runPostPatchValidations(options.postValidationRequests, runtime, options.validationConfig)),
+                sourceBarrier: null,
+            };
+            if (sourceBarrier) {
+                try {
+                    const verified = await verifyRepositorySourceBarrier(runtime.workspace, sourceBarrier, {
+                        audit: runtime.audit,
+                    });
+                    postValidation = {
+                        ...postValidation,
+                        sourceBarrier: {
+                            capturedFingerprint: sourceBarrier.fingerprint,
+                            verifiedFingerprint: verified.currentFingerprint,
+                            entryCount: sourceBarrier.entryCount,
+                            passed: true,
+                        },
+                    };
+                } catch (error) {
+                    const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (
+                        error
+                    );
+                    postValidation = {
+                        ...postValidation,
+                        allPassed: false,
+                        sourceBarrier: {
+                            capturedFingerprint: sourceBarrier.fingerprint,
+                            entryCount: sourceBarrier.entryCount,
+                            passed: false,
+                            code: candidate.code ?? 'ERR_SOURCE_DRIFT',
+                            error: candidate.message,
+                            details: candidate.details ?? null,
+                        },
+                    };
+                }
+            }
         }
     }
 

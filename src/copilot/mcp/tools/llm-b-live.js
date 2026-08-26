@@ -24,11 +24,13 @@ import {
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     errorResult,
+    estimateStructuredTextResultBytes,
     okResult,
     requireMcpToolAuditCapability,
     requireMcpToolModelGatewayLiveRunEnvironmentAuthority,
     requireMcpToolModelGatewaySqliteFingerprintCapability,
     requireMcpToolWorkspace,
+    withResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
@@ -58,6 +60,130 @@ const liveModeSchema = z.enum([
 const transportSchema = z.enum(['pty', 'stdio']);
 const selectionPolicySchema = z.enum(['metadata_first', 'prefer_runtime_proved', 'require_runtime_proof']);
 
+/** @param {unknown} value */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, any>} */ (value)
+        : {};
+}
+
+/** @param {unknown} value */
+function finiteNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+/** @param {Record<string, any>} parsed @param {Awaited<ReturnType<typeof executeModelGatewayLiveReadiness>>} execution */
+function buildCompactLiveReadinessResult(parsed, execution) {
+    const checks = Array.isArray(parsed['checks'])
+        ? parsed['checks'].filter((item) => item && typeof item === 'object')
+        : [];
+    const failedChecks = checks
+        .filter((check) => check['ok'] !== true)
+        .slice(0, 16)
+        .map((check) => ({ id: String(check['id'] ?? 'unknown'), detail: String(check['detail'] ?? '') }));
+    const redaction = asRecord(parsed['redaction']);
+    const catalogRedaction = asRecord(redaction['catalog']);
+    const sqliteRedaction = asRecord(redaction['sqlite']);
+    const selection = asRecord(parsed['selection']);
+    const effectiveStrict = asRecord(selection['effectiveStrict']);
+    const runtimeSelector = asRecord(selection['runtimeSelectorPlan']);
+    const terminalSelector = asRecord(selection['terminalLiveRuntimeSelectorPlan']);
+    const sqlite = asRecord(parsed['sqlite']);
+    return {
+        schema: String(parsed['schema'] ?? 'model-gateway-live-readiness'),
+        ok: parsed['ok'] === true,
+        snapshotId: typeof parsed['snapshotId'] === 'string' ? parsed['snapshotId'] : null,
+        generatedAt: typeof parsed['generatedAt'] === 'string' ? parsed['generatedAt'] : null,
+        checks: {
+            total: checks.length,
+            passed: checks.length - failedChecks.length,
+            failed: failedChecks,
+        },
+        sqlite: {
+            parityOk: sqlite['parityOk'] === true,
+            runtimeHealthReadLimit: finiteNumber(sqlite['runtimeHealthReadLimit']),
+            runtimeProbeOnlyRecords: finiteNumber(sqlite['runtimeProbeOnlyRecords']),
+            runtimeProbeProofRecords: finiteNumber(sqlite['runtimeProbeProofRecords']),
+        },
+        redaction: {
+            ok: redaction['ok'] === true,
+            proofReused: redaction['proofReused'] === true,
+            catalog: {
+                mode: catalogRedaction['mode'] ?? null,
+                ok: catalogRedaction['ok'] === true,
+                leakCount: finiteNumber(catalogRedaction['leakCount']),
+                scannedStringCount: finiteNumber(catalogRedaction['scannedStringCount']),
+            },
+            sqlite: {
+                mode: sqliteRedaction['mode'] ?? null,
+                ok: sqliteRedaction['ok'] === true,
+                leakCount: finiteNumber(sqliteRedaction['leakCount']),
+                scannedStringCount: finiteNumber(sqliteRedaction['scannedStringCount']),
+                rowCount: finiteNumber(sqliteRedaction['rowCount']),
+                maxRowsPerTable: finiteNumber(sqliteRedaction['maxRowsPerTable']),
+            },
+        },
+        selection: {
+            effectiveStrict: {
+                ok: effectiveStrict['ok'] === true,
+                selected: finiteNumber(effectiveStrict['selected']),
+                profiles: finiteNumber(effectiveStrict['profiles']),
+                providers: asRecord(effectiveStrict['providers']),
+            },
+            runtimeSelectorPlan: {
+                ok: runtimeSelector['ok'] === true,
+                ready: runtimeSelector['ready'] === true,
+                selected: finiteNumber(runtimeSelector['selected']),
+                profiles: finiteNumber(runtimeSelector['profiles']),
+                blocked: finiteNumber(runtimeSelector['blocked']),
+            },
+            terminalLiveRuntimeSelectorPlan: {
+                ok: terminalSelector['ok'] === true,
+                ready: terminalSelector['ready'] === true,
+                selected: finiteNumber(terminalSelector['selected']),
+                blocked: finiteNumber(terminalSelector['blocked']),
+                profiles: Array.isArray(terminalSelector['profiles']) ? terminalSelector['profiles'].slice(0, 8) : [],
+            },
+        },
+        mcpAdapter: {
+            execution: execution.execution,
+            cacheAgeMs: execution.cacheAgeMs,
+            cacheTtlMs: MODEL_GATEWAY_LIVE_READINESS_CACHE_TTL_MS,
+            durationMs: execution.durationMs,
+            processDurationMs: execution.processDurationMs,
+            timing: execution.timing,
+            isolation: execution.execution === 'fresh-process' ? 'call-scoped-process' : 'memory-cache',
+            invalidation: 'catalog-file+sqlite-change-token+byok-health-fingerprint',
+        },
+        detailsAvailable: true,
+    };
+}
+
+/** @param {Record<string, any>} structured */
+function renderCompactLiveReadinessText(structured) {
+    const checks = asRecord(structured['checks']);
+    const redaction = asRecord(structured['redaction']);
+    const selection = asRecord(structured['selection']);
+    const terminal = asRecord(selection['terminalLiveRuntimeSelectorPlan']);
+    const adapter = asRecord(structured['mcpAdapter']);
+    const failed = Array.isArray(checks['failed']) ? checks['failed'] : [];
+    const failedIds = failed
+        .map((item) => asRecord(item)['id'])
+        .filter(Boolean)
+        .slice(0, 6);
+    return [
+        `LLM-B readiness ${structured['ok'] === true ? 'READY' : 'BLOCKED'}`,
+        `checks=${String(checks['passed'] ?? 0)}/${String(checks['total'] ?? 0)}`,
+        `proof=${redaction['proofReused'] === true ? 'reused' : 'fresh'}`,
+        `terminalRoutes=${String(terminal['selected'] ?? 0)}/${String((terminal['profiles'] ?? []).length || 0)}`,
+        `execution=${String(adapter['execution'] ?? 'unknown')}`,
+        `durationMs=${String(adapter['durationMs'] ?? 0)}`,
+        ...(failedIds.length > 0 ? [`failed=${failedIds.join(',')}`] : []),
+        'details=includeDetails:true',
+    ].join(' | ');
+}
+
 const commonPlanInput = {
     mode: liveModeSchema.optional()['describe']('Default control-only.'),
     scenario: liveScenarioSchema.optional()['describe']('Default canonical.'),
@@ -77,9 +203,13 @@ export const llmBLiveTools = [
             'Run the canonical read-only Model Gateway/terminal LLM-B readiness audit. Does not start the terminal or call providers.',
         inputSchema: {
             includeSqliteRuntimeHealth: z.boolean().optional(),
+            includeDetails: z
+                .boolean()
+                .optional()
+                ['describe']('Return the complete readiness tree. Default: compact operational view.'),
         },
 
-        handler: async ({ includeSqliteRuntimeHealth }, operationContext) => {
+        handler: async ({ includeSqliteRuntimeHealth, includeDetails }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
             const execution = await executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth === true, {
@@ -94,18 +224,21 @@ export const llmBLiveTools = [
                     stdoutTail: String(execution.stdout ?? '').slice(-8000),
                 });
             }
-            const parsed = {
-                ...execution.parsed,
-                mcpAdapter: {
-                    execution: execution.execution,
-                    cacheAgeMs: execution.cacheAgeMs,
-                    cacheTtlMs: MODEL_GATEWAY_LIVE_READINESS_CACHE_TTL_MS,
-                    durationMs: execution.durationMs,
-                    subprocessDurationMs: execution.execution === 'fallback-subprocess' ? execution.durationMs : null,
-                    invalidation: 'catalog-file+model-gateway-sqlite-logical+byok-health-fingerprint',
-                },
-            };
-            return okResult(parsed, JSON.stringify(parsed, null, 2));
+            const compact = buildCompactLiveReadinessResult(execution.parsed, execution);
+            const structured =
+                includeDetails === true
+                    ? {
+                          ...execution.parsed,
+                          mcpAdapter: compact.mcpAdapter,
+                          detailsAvailable: true,
+                      }
+                    : compact;
+            const text = renderCompactLiveReadinessText(compact);
+            return withResultSizeHint(okResult(structured, text), {
+                bytes: estimateStructuredTextResultBytes(structured, text),
+                strategy: 'conservative-estimate',
+                source: 'llmb-live-readiness',
+            });
         },
     }),
     defineMcpRawTool({

@@ -78,14 +78,17 @@
   // Subfase 02.1) Arquivos e encoding
   "files.associations": {},
   "files.autoGuessEncoding": true,
-  "files.autoSave": "onFocusChange",
+  // Saves remain explicit in this automation-heavy workspace. This prevents focus navigation
+  // from publishing a restored/stale editor buffer over source changed by MCP or another process.
+  "files.autoSave": "off",
   "files.autoSaveDelay": 1000,
   "files.encoding": "utf8",
   "files.eol": "\n",
   "files.insertFinalNewline": true,
-  "files.refactoring.autoSave": true,
+  "files.refactoring.autoSave": false,
   "files.restoreUndoStack": true,
-  "files.saveConflictResolution": "overwriteFileOnDisk",
+  // Fail closed when the editor buffer no longer matches the file on disk.
+  "files.saveConflictResolution": "askUser",
   "files.simpleDialog.enable": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,

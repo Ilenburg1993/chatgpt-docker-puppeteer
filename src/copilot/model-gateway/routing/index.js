@@ -38,6 +38,7 @@ export {
 } from './local-provider-opt-in.js';
 export {
     DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
+    prepareModelGatewayCatalogRoutingSnapshot,
     routeGatewayModels,
     routeModelGatewayCatalogSnapshot,
     scoreGatewayModelCandidate,
@@ -60,6 +61,8 @@ export {
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    auditPreparedModelGatewayPostRuntimeSelection,
+    auditPreparedModelGatewayPreRuntimeSelection,
     compareModelGatewaySelectionAudits,
     explainModelGatewaySelectionComparison,
     resolveModelGatewaySelectionPolicy,

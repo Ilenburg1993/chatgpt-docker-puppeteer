@@ -438,6 +438,19 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         resultMode === 'detailed'
             ? workflow.applied
             : workflow.succeeded.map((operation) => compactPatchBatchSuccessRow(operation));
+    const targetTransitions = summarizePatchBatchTargets(workflow.succeeded, false)
+        .filter(
+            (summary) =>
+                typeof summary['path'] === 'string' &&
+                typeof summary['initialHash'] === 'string' &&
+                typeof summary['finalHash'] === 'string',
+        )
+        .map((summary) => ({
+            path: summary['path'],
+            previousHash: summary['initialHash'],
+            contentHash: summary['finalHash'],
+            traceId: typeof summary['traceId'] === 'string' ? summary['traceId'] : null,
+        }));
     await runtime.audit.append({
         event: workflow.patchFullyApplied ? 'repo_apply_patch_batch_applied' : 'repo_apply_patch_batch_partial_failure',
         tool: 'repo_apply_patch_batch',
@@ -453,6 +466,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         skippedCount: workflow.skipped.length,
         partial: workflow.partial,
         workflowSuccess: workflow.patchFullyApplied,
+        targetTransitions,
         causalFailureCount: workflow.failureSummary.causalFailureCount,
         failedTargetCount: workflow.failureSummary.failedTargetCount,
         abortedOperationCount: workflow.failureSummary.abortedOperationCount,

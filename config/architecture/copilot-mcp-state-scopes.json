@@ -288,7 +288,7 @@
       "scope": "process",
       "lifecycle": "bounded-cache",
       "boundedness": "bounded",
-      "bound": "TTL + max 8 completed entries; inflight removed on settle",
+      "bound": "TTL + max 8 completed entries; proof state is weakly keyed by environment authority identity",
       "resetOrDispose": "resetModelGatewayLiveReadinessCacheForTests",
       "migrationTarget": false,
       "declarations": [
@@ -298,12 +298,30 @@
           "collection": "Map"
         },
         {
-          "name": "liveReadinessInFlight",
+          "name": "redactionProofStateByAuthority",
+          "kind": "let",
+          "collection": "WeakMap"
+        }
+      ],
+      "rationale": "Operational results are TTL/size bounded; security-proof state is independently weak-keyed and no shared in-flight Promise remains."
+    },
+    {
+      "path": "src/copilot/mcp/integrations/model-gateway/live-runs/runtime.js",
+      "ownerId": "mcp.integrations.model-gateway.live-runs",
+      "scope": "process",
+      "lifecycle": "registry",
+      "boundedness": "bounded",
+      "bound": "finite allowlisted live-command names; resettable diagnostic counters only",
+      "resetOrDispose": "resetModelGatewayLiveCommandLifecycleForTests",
+      "migrationTarget": false,
+      "declarations": [
+        {
+          "name": "liveCommandLifecycleByCommand",
           "kind": "const",
           "collection": "Map"
         }
       ],
-      "rationale": "Readiness result cache is TTL/size bounded and inflight entries drain on completion."
+      "rationale": "Lifecycle counters are bounded by the finite governed live-command surface and retain no child handles."
     },
     {
       "path": "src/copilot/mcp/observability/metrics/runtime.js",

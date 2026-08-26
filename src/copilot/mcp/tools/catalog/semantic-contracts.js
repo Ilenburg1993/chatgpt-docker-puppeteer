@@ -853,7 +853,7 @@ const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpToolContr
                 cancellation: 'cancellable',
                 drainTimeoutMs: 15000,
                 rationale:
-                    'OperationContext.signal reaches the owned cancellable/acceptance boundary; after abort the handler must settle only after owned call-scoped work is terminal.',
+                    'Fresh readiness runs in one call-scoped subprocess. Caller abort terminates its process group with immediate SIGKILL escalation and the handler settles only after child close, so synchronous SQLite work and nested redaction Workers cannot outlive the invocation.',
             },
             output: 'intentional-untyped',
             network: 'local',

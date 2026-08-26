@@ -9,9 +9,10 @@
  * @module copilot/boot/application-infra-host
  */
 
+import { resolveApplicationSqlitePath } from '#copilot/infra/public/composition/database/sqlite/path';
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { PROCESS_SHUTDOWN_PHASE, createProcessInfra } from '#copilot/infra/public/composition/process';
-import { dirname, resolve, sep } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 const DEFAULT_SHUTDOWN_HANDLER_NAME = 'copilot.application-infra.dispose';
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
@@ -19,9 +20,22 @@ let hostSequence = 0;
 
 /** @typedef {import('#copilot/infra/public/database/sqlite').InfraSqliteProvider} InfraSqliteProvider */
 /**
+ * @typedef {(options?:{mode?:'PASSIVE';timeoutMs?:number;busyTimeoutMs?:number}) => Promise<Readonly<{
+ *   attempted:boolean;
+ *   mode:'PASSIVE';
+ *   busy:number;
+ *   walPages:number;
+ *   checkpointedPages:number;
+ *   durationMs:number;
+ *   workerDurationMs:number;
+ *   reason?:string;
+ * }>>} ApplicationSqliteCheckpoint
+ */
+/**
  * @typedef {{
  *   ensureDirectory: () => Promise<unknown>;
  *   getDatabase: InfraSqliteProvider;
+ *   checkpoint?: ApplicationSqliteCheckpoint;
  *   dispose?: () => void | Promise<void>;
  * }} ApplicationInfraSqliteProvider
  */
@@ -46,7 +60,10 @@ export function createApplicationInfraHost(options = {}) {
     const runtimeId = options.runtimeId?.trim() || `${hostId}:runtime`;
     const defaultWorkspaceRoot = options.defaultWorkspaceRoot ? resolve(options.defaultWorkspaceRoot) : null;
     const processEnv = options.env ?? process.env;
-    const applicationDbPath = resolveApplicationDbPath(processEnv, defaultWorkspaceRoot);
+    const applicationDbPath = resolveApplicationSqlitePath(
+        processEnv,
+        defaultWorkspaceRoot ?? resolve(import.meta.dirname, '../../..'),
+    );
     const processInfra = createProcessInfra({
         processId,
         activateProcessPolicies: options.activateProcessPolicies === true,
@@ -62,6 +79,8 @@ export function createApplicationInfraHost(options = {}) {
     let disposePromise = null;
     /** @type {(() => void | Promise<void>) | null} */
     let sqliteDispose = null;
+    /** @type {ApplicationSqliteCheckpoint | null} */
+    let sqliteCheckpoint = null;
     let shutdownRegistered = false;
     /** @type {(() => void) | null} */
     let unregisterShutdown = null;
@@ -82,7 +101,32 @@ export function createApplicationInfraHost(options = {}) {
     /** @param {InfraSqliteProvider} provider */
     function configureSqliteProvider(provider) {
         assertActive();
+        // A structural provider alone carries no physical-path authority. Reconfiguration must revoke any checkpoint
+        // capability retained from a previous concrete resource rather than accidentally targeting the wrong database.
+        sqliteCheckpoint = null;
         return runtime.database.configure(provider);
+    }
+
+    /**
+     * Execute path-bound SQLite maintenance through the concrete application resource without exposing dbPath to domains.
+     *
+     * @param {{mode?:'PASSIVE';timeoutMs?:number;busyTimeoutMs?:number}} [checkpointOptions]
+     */
+    async function checkpointSqlite(checkpointOptions = {}) {
+        assertActive();
+        if (!sqliteCheckpoint) {
+            return Object.freeze({
+                attempted: false,
+                mode: /** @type {const} */ ('PASSIVE'),
+                busy: 0,
+                walPages: 0,
+                checkpointedPages: 0,
+                durationMs: 0,
+                workerDurationMs: 0,
+                reason: 'application_sqlite_checkpoint_unavailable',
+            });
+        }
+        return sqliteCheckpoint(checkpointOptions);
     }
 
     async function bootstrapSqliteProvider() {
@@ -94,6 +138,7 @@ export function createApplicationInfraHost(options = {}) {
         sqliteBootstrap = (async () => {
             const provider = await loadSqliteProvider();
             sqliteDispose = provider.dispose ?? null;
+            sqliteCheckpoint = provider.checkpoint ?? null;
             await provider.ensureDirectory();
             // Dispose may have started while the asynchronous provider module/directory was loading. In that case the
             // bootstrap must not activate a provider into a runtime already entering teardown.
@@ -120,6 +165,7 @@ export function createApplicationInfraHost(options = {}) {
             applicationDbPath,
             shutdownRegistered,
             sqliteBootstrapInFlight: sqliteBootstrap !== null,
+            sqliteCheckpointConfigured: sqliteCheckpoint !== null,
             process: processInfra.lifecycleSnapshot(),
             runtime: runtime.lifecycleSnapshot(),
         });
@@ -143,6 +189,7 @@ export function createApplicationInfraHost(options = {}) {
                 // Revoke the database capability before closing its resource. A retained runtime reference must not be
                 // able to reacquire/reopen SQLite after host teardown.
                 runtime.database.reset();
+                sqliteCheckpoint = null;
                 try {
                     await sqliteDispose?.();
                 } finally {
@@ -162,6 +209,7 @@ export function createApplicationInfraHost(options = {}) {
         runtime,
         workspace,
         configureSqliteProvider,
+        checkpointSqlite,
         bootstrapSqliteProvider,
         snapshot,
         dispose,
@@ -179,16 +227,6 @@ export function createApplicationInfraHost(options = {}) {
     }
 
     return api;
-}
-
-/** @param {NodeJS.ProcessEnv} env @param {string | null} workspaceRoot */
-function resolveApplicationDbPath(env, workspaceRoot) {
-    const configured = String(env['COPILOT_DB_PATH'] ?? '').trim();
-    if (configured === ':memory:') return configured;
-    const base = workspaceRoot ?? resolve(import.meta.dirname, '../../..');
-    const raw = configured || resolve(base, 'data', 'copilot.sqlite');
-    const looksLikeDirectory = raw.endsWith(sep) || raw.endsWith('/') || raw.endsWith('\\');
-    return resolve(looksLikeDirectory ? resolve(raw, 'copilot.sqlite') : raw);
 }
 
 /** @param {string} dbPath */
@@ -214,6 +252,7 @@ async function loadDefaultSqliteProvider(dbPath) {
     return Object.freeze({
         ensureDirectory: () => ensureApplicationDbDirectory(dbPath),
         getDatabase: resource.getStructuralDatabase,
+        checkpoint: resource.checkpoint,
         dispose: resource.close,
     });
 }

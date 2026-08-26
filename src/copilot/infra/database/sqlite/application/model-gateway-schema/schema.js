@@ -11,7 +11,7 @@
  * @module copilot/infra/database/sqlite/application/model-gateway-schema/schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 13;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 14;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -33,6 +33,8 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_runtime_probe_runs',
     'copilot_model_gateway_runtime_probe_results',
     'copilot_model_gateway_health_observations',
+    'copilot_model_gateway_runtime_probe_latest',
+    'copilot_model_gateway_runtime_health_latest',
     'copilot_model_gateway_route_decisions',
     'copilot_model_gateway_automation_decisions',
     'copilot_model_gateway_automation_policy_snapshots',
@@ -314,6 +316,8 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_runtime_probe_results(provider_id, provider_model, route_profile, probe_kind, observed_at_ms DESC, result_key DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_results_status
         ON copilot_model_gateway_runtime_probe_results(probe_kind, ok, status, observed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_results_retention
+        ON copilot_model_gateway_runtime_probe_results(observed_at_ms ASC, result_key ASC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_health_observations (
         observation_key    TEXT PRIMARY KEY,
@@ -333,8 +337,39 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_health_observations(provider_id, provider_model, route_profile, observed_at_ms DESC, observation_key DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_health_observations_observed
         ON copilot_model_gateway_health_observations(observed_at_ms DESC, observation_key ASC);
+    CREATE INDEX IF NOT EXISTS idx_mg_health_observations_retention
+        ON copilot_model_gateway_health_observations(observed_at_ms ASC, observation_key ASC);
     CREATE INDEX IF NOT EXISTS idx_mg_health_observations_status
         ON copilot_model_gateway_health_observations(status, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_runtime_health_latest (
+        provider_id     TEXT NOT NULL,
+        provider_model  TEXT NOT NULL,
+        route_profile   TEXT NOT NULL DEFAULT 'default',
+        observation_key TEXT NOT NULL UNIQUE,
+        observed_at_ms  INTEGER NOT NULL,
+        PRIMARY KEY (provider_id, provider_model, route_profile),
+        FOREIGN KEY (observation_key)
+            REFERENCES copilot_model_gateway_health_observations(observation_key)
+            ON DELETE RESTRICT
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_runtime_health_latest_observed
+        ON copilot_model_gateway_runtime_health_latest(observed_at_ms DESC, observation_key ASC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_runtime_probe_latest (
+        provider_id    TEXT NOT NULL,
+        provider_model TEXT NOT NULL,
+        route_profile  TEXT NOT NULL DEFAULT 'default',
+        probe_kind     TEXT NOT NULL,
+        result_key     TEXT NOT NULL UNIQUE,
+        observed_at_ms INTEGER NOT NULL,
+        PRIMARY KEY (provider_id, provider_model, route_profile, probe_kind),
+        FOREIGN KEY (result_key)
+            REFERENCES copilot_model_gateway_runtime_probe_results(result_key)
+            ON DELETE RESTRICT
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_latest_observed
+        ON copilot_model_gateway_runtime_probe_latest(observed_at_ms DESC, result_key ASC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_route_decisions (
         decision_id    TEXT PRIMARY KEY,

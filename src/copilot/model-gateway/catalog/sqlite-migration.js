@@ -143,17 +143,15 @@ function sortedDifference(left, right) {
 }
 
 /**
- * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
- * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
+ * @param {Record<string, string[]>} sourceKeys
+ * @param {Record<string, string[]>} sqliteKeys
  * @returns {{ field: string; missingFromSqlite: string[]; missingFromSource: string[] }[]}
  */
-function compareSnapshotKeyParity(sourceSnapshot, sqliteSnapshot) {
-    const sourceKeys = snapshotParityKeys(sourceSnapshot);
-    const sqliteKeys = snapshotParityKeys(sqliteSnapshot);
+function compareSnapshotKeyProjections(sourceKeys, sqliteKeys) {
     return Object.keys(sourceKeys)
         .map((field) => {
-            const source = sourceKeys[/** @type {keyof typeof sourceKeys} */ (field)] ?? [];
-            const sqlite = sqliteKeys[/** @type {keyof typeof sqliteKeys} */ (field)] ?? [];
+            const source = sourceKeys[field] ?? [];
+            const sqlite = sqliteKeys[field] ?? [];
             return {
                 field,
                 missingFromSqlite: sortedDifference(source, sqlite).slice(0, KEY_MISMATCH_SAMPLE_LIMIT),
@@ -198,20 +196,31 @@ export function summarizeModelGatewayCatalogSnapshot(snapshot) {
 }
 
 /**
- * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
- * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
- * @returns {{
- *     ok: boolean;
- *     snapshotIdMatches: boolean;
- *     sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *     sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *     countMismatches: { field: string; source: number; sqlite: number }[];
- *     keyMismatches: { field: string; missingFromSqlite: string[]; missingFromSource: string[] }[];
- * }}
+ * Build the small structural parity projection actually consumed by readiness/mirror verification. Payload contents are
+ * intentionally not part of this contract; security/content identity is owned separately by redaction fingerprints.
+ *
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} snapshot
  */
-export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot) {
-    const sourceCounts = summarizeModelGatewayCatalogSnapshot(sourceSnapshot);
-    const sqliteCounts = summarizeModelGatewayCatalogSnapshot(sqliteSnapshot);
+export function projectModelGatewayCatalogStructuralParity(snapshot) {
+    return {
+        snapshotId: snapshot.snapshotId,
+        counts: summarizeModelGatewayCatalogSnapshot(snapshot),
+        keys: snapshotParityKeys(snapshot),
+    };
+}
+
+/**
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
+ * @param {{
+ *   snapshotId:string;
+ *   counts:ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *   keys:Record<string,string[]>;
+ * }} sqliteProjection
+ */
+export function compareModelGatewayCatalogSnapshotToStructuralParityProjection(sourceSnapshot, sqliteProjection) {
+    const sourceProjection = projectModelGatewayCatalogStructuralParity(sourceSnapshot);
+    const sourceCounts = sourceProjection.counts;
+    const sqliteCounts = sqliteProjection.counts;
     const countMismatches = Object.keys(sourceCounts)
         .filter(
             (field) =>
@@ -223,8 +232,8 @@ export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteS
             source: sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)],
             sqlite: sqliteCounts[/** @type {keyof typeof sqliteCounts} */ (field)],
         }));
-    const keyMismatches = compareSnapshotKeyParity(sourceSnapshot, sqliteSnapshot);
-    const snapshotIdMatches = sourceSnapshot.snapshotId === sqliteSnapshot.snapshotId;
+    const keyMismatches = compareSnapshotKeyProjections(sourceProjection.keys, sqliteProjection.keys);
+    const snapshotIdMatches = sourceProjection.snapshotId === sqliteProjection.snapshotId;
     return {
         ok: snapshotIdMatches && countMismatches.length === 0 && keyMismatches.length === 0,
         snapshotIdMatches,
@@ -233,6 +242,19 @@ export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteS
         countMismatches,
         keyMismatches,
     };
+}
+
+/**
+ * Compatibility wrapper for callers that already materialized both snapshots.
+ *
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
+ */
+export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot) {
+    return compareModelGatewayCatalogSnapshotToStructuralParityProjection(
+        sourceSnapshot,
+        projectModelGatewayCatalogStructuralParity(sqliteSnapshot),
+    );
 }
 
 /**

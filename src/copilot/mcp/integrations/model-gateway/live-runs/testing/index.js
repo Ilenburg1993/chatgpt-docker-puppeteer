@@ -4,6 +4,7 @@
 export {
     buildModelGatewayLiveRunEnvironment,
     buildModelGatewayReadOnlyChildEnvironment,
+    buildModelGatewayReadinessChildEnvironment,
     createModelGatewayLiveRunEnvironmentAuthority,
     createModelGatewayLiveRunEnvironmentAuthorityWithDependencies,
     projectModelGatewayAuthorityFileEnvironment,
@@ -12,7 +13,10 @@ export { buildModelGatewayLiveRunPlan } from '../plan.js';
 export { resetModelGatewayLiveReadinessCacheForTests } from '../readiness.js';
 export {
     inspectDetachedLiveRunProcessIdentity,
+    readModelGatewayLiveCommandLifecycleForTests,
     reapCompletedDetachedLiveRuns,
+    resetModelGatewayLiveCommandLifecycleForTests,
     runModelGatewayLiveCommand,
+    runModelGatewayLiveReadinessProcess,
     spawnDetachedLiveRunWithDependencies,
 } from '../runtime.js';

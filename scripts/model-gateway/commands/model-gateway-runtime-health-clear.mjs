@@ -4,6 +4,7 @@ import {
     flushAndMirrorByokProviderHealthToSqlite,
     flushByokProviderHealth,
     listByokProviderModelHealth,
+    readHydratedByokProviderHealthSnapshot,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
 import '../bootstrap-sqlite.mjs';
@@ -58,7 +59,7 @@ const scope = {
     routeProfile: clean(readArg('--profile')) ?? clean(readColonArg('profile')),
 };
 const hasScope = all || scope.providerId || scope.providerModel || scope.routeProfile;
-const before = listByokProviderModelHealth();
+const { records: before } = await readHydratedByokProviderHealthSnapshot();
 const matched = before.filter((record) => matchesScope(record, scope, all));
 let after = before;
 let mirror = null;

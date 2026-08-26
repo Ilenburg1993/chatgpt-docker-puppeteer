@@ -75,6 +75,12 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {number} observedAt
  * @property {string | null} key
  * @property {ByokProviderHealthRecord | null} record
+ * @property {{
+ *     routeProfile: string | null;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     all: boolean;
+ * }} scope
  */
 
 /** @type {Map<string, ByokProviderHealthRecord>} */
@@ -547,15 +553,23 @@ function pruneByokProviderHealth() {
 /**
  * @param {ByokProviderHealthChangeEvent['reason']} reason
  * @param {ByokProviderHealthRecord | null} record
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; all?: boolean } | null} [scope]
  * @returns {void}
  */
-function notifyByokProviderHealthChange(reason, record) {
+function notifyByokProviderHealthChange(reason, record, scope = null) {
     if (_byokProviderHealthChangeListeners.size === 0) return;
+    const eventScope = {
+        routeProfile: scope?.routeProfile ?? record?.routeProfile ?? null,
+        providerId: scope?.providerId ?? record?.providerId ?? null,
+        providerModel: scope?.providerModel ?? record?.providerModel ?? null,
+        all: scope?.all === true,
+    };
     const event = {
         reason,
         observedAt: Date.now(),
         key: record?.key ?? null,
         record,
+        scope: eventScope,
     };
     for (const listener of _byokProviderHealthChangeListeners) {
         try {
@@ -588,6 +602,7 @@ export function hydrateByokProviderHealthFromDisk() {
                     LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
                 ].includes(/** @type {number} */ (parsed['schemaVersion']))
             ) {
+                _byokProviderHealthLastError = 'invalid BYOK provider-health persistence schema';
                 return;
             }
             const records = Array.isArray(parsed['records']) ? parsed['records'] : [];
@@ -614,6 +629,26 @@ export function hydrateByokProviderHealthFromDisk() {
         }
     })();
     return _byokProviderHealthHydrationPromise;
+}
+
+/**
+ * Read an authoritative in-process snapshot only after durable provider-health hydration has completed.
+ *
+ * Missing persistence is a valid empty baseline. Corrupt/unreadable persistence is not: callers that use the file
+ * ledger for selection, reconciliation or operator decisions must fail closed instead of silently treating it as an
+ * empty healthy store.
+ *
+ * @returns {Promise<{
+ *     records: ByokProviderHealthRecord[];
+ *     state: ReturnType<typeof readByokProviderHealthState>;
+ * }>}
+ */
+export async function readHydratedByokProviderHealthSnapshot() {
+    await hydrateByokProviderHealthFromDisk();
+    const state = readByokProviderHealthState();
+    if (!state.loaded) throw new Error('BYOK provider-health hydration did not complete');
+    if (state.error) throw new Error(`BYOK provider-health hydration failed: ${state.error}`);
+    return { records: listByokProviderModelHealth(), state };
 }
 
 function scheduleByokProviderHealthFlush() {
@@ -1051,7 +1086,12 @@ export function clearByokProviderModelHealth(input = {}) {
         }
     }
     scheduleByokProviderHealthFlush();
-    notifyByokProviderHealthChange('clear', null);
+    notifyByokProviderHealthChange('clear', null, {
+        routeProfile: identity.routeProfile,
+        providerId: identity.providerId,
+        providerModel: identity.providerModel,
+        all: !identity.routeProfile && !identity.providerId && !identity.providerModel,
+    });
 }
 
 /**

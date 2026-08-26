@@ -26,6 +26,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -46,6 +47,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -65,6 +67,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -180,6 +183,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -200,6 +204,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -220,6 +225,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -263,6 +269,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -523,6 +530,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -558,6 +566,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -577,6 +586,7 @@
         "cloudflare",
         "ignore",
         "jose",
+        "jsonc-parser",
         "lru-cache",
         "minimatch",
         "p-limit",
@@ -688,12 +698,20 @@
       "externalPackages": []
     },
     {
+      "alias": "#copilot/mcp/public/workspace/repository/integrity",
+      "moduleCount": 2,
+      "maxModuleCount": 3,
+      "sourceBytes": 18281,
+      "maxSourceBytes": 27422,
+      "externalPackages": []
+    },
+    {
       "alias": "#copilot/mcp/public/workspace/repository/patch",
       "moduleCount": 10,
       "maxModuleCount": 15,
       "sourceBytes": 80156,
       "maxSourceBytes": 120234,
-      "externalPackages": []
+      "externalPackages": ["jsonc-parser"]
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/read",
@@ -725,7 +743,7 @@
       "maxModuleCount": 71,
       "sourceBytes": 339789,
       "maxSourceBytes": 509684,
-      "externalPackages": ["zod"]
+      "externalPackages": ["jsonc-parser", "zod"]
     }
   ]
 }

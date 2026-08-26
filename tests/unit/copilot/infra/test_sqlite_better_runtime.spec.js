@@ -29,14 +29,14 @@ describe('Infra better-sqlite3 application resource', () => {
         const runtime = createBetterSqliteApplicationRuntime({ dbPath });
         runtimes.push(runtime);
 
-        expect(runtime.status()).toEqual({ dbPath, open: false, disposed: false });
+        expect(runtime.status()).toEqual({ dbPath, open: false, disposed: false, checkpointInFlight: false });
         expect(runtime.getDatabase().prepare('SELECT 1 AS value').get()).toEqual({ value: 1 });
         expect(runtime.getStructuralDatabase().prepare('SELECT 2 AS value').get()).toEqual({ value: 2 });
-        expect(runtime.status()).toEqual({ dbPath, open: true, disposed: false });
+        expect(runtime.status()).toEqual({ dbPath, open: true, disposed: false, checkpointInFlight: false });
 
         runtime.close();
         runtime.close();
-        expect(runtime.status()).toEqual({ dbPath, open: false, disposed: true });
+        expect(runtime.status()).toEqual({ dbPath, open: false, disposed: true, checkpointInFlight: false });
         expect(() => runtime.getDatabase()).toThrow(/has been disposed/u);
     });
 
@@ -55,9 +55,54 @@ describe('Infra better-sqlite3 application resource', () => {
         expect(second.getDatabase().prepare('SELECT value FROM isolated').get()).toEqual({ value: 'second' });
 
         first.close();
-        expect(first.status()).toEqual({ dbPath: firstPath, open: false, disposed: true });
-        expect(second.status()).toEqual({ dbPath: secondPath, open: true, disposed: false });
+        expect(first.status()).toEqual({
+            dbPath: firstPath,
+            open: false,
+            disposed: true,
+            checkpointInFlight: false,
+        });
+        expect(second.status()).toEqual({
+            dbPath: secondPath,
+            open: true,
+            disposed: false,
+            checkpointInFlight: false,
+        });
         expect(second.getDatabase().prepare('SELECT value FROM isolated').get()).toEqual({ value: 'second' });
+    });
+
+    it('offloads PASSIVE WAL checkpoint I/O to a coalesced worker-thread capability', async () => {
+        const root = await createTempDir();
+        const dbPath = join(root, 'checkpoint.sqlite');
+        const runtime = createBetterSqliteApplicationRuntime({ dbPath });
+        runtimes.push(runtime);
+        const database = runtime.getDatabase();
+        database.exec('CREATE TABLE checkpoint_probe(id INTEGER PRIMARY KEY, payload TEXT NOT NULL)');
+        const insert = database.prepare('INSERT INTO checkpoint_probe(payload) VALUES (?)');
+        const write = database.transaction(() => {
+            for (let index = 0; index < 2_000; index += 1) insert.run(`payload-${index}-${'x'.repeat(64)}`);
+        });
+        write();
+
+        const first = runtime.checkpoint();
+        const second = runtime.checkpoint();
+        expect(second).toBe(first);
+        expect(runtime.status().checkpointInFlight).toBe(true);
+        let eventLoopTurnObserved = false;
+        await new Promise((resolve) =>
+            setImmediate(() => {
+                eventLoopTurnObserved = true;
+                resolve(undefined);
+            }),
+        );
+        const result = await first;
+
+        expect(eventLoopTurnObserved).toBe(true);
+        expect(result).toMatchObject({ attempted: true, mode: 'PASSIVE', busy: 0 });
+        expect(result.walPages).toBeGreaterThanOrEqual(0);
+        expect(result.checkpointedPages).toBeGreaterThanOrEqual(0);
+        expect(result.durationMs).toBeGreaterThanOrEqual(result.workerDurationMs);
+        expect(runtime.status().checkpointInFlight).toBe(false);
+        expect(database.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' });
     });
 
     it('supports explicit resource management without exporting application-global accessors', async () => {

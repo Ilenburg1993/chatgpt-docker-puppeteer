@@ -28,6 +28,7 @@ import {
     withResultExecutionHint,
 } from '#copilot/mcp/public/protocol/tools';
 import { execWorkspaceGit as execGit } from '#copilot/mcp/public/workspace/git';
+import { verifyRepositorySourceBarrierManifest } from '#copilot/mcp/public/workspace/repository/integrity';
 import { z } from 'zod';
 
 const MAX_STAGE_PATHS = 200;
@@ -534,6 +535,15 @@ export const gitWriteTools = [
             paths: explicitPathsSchema,
             message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
             expectedHead: z.string().max(64).optional()['describe']('Optional initial HEAD prefix precondition.'),
+            sourceBarrierManifest: z
+                .string()
+                .min(1)
+                .max(1024)
+                ['describe']('Workspace-relative source-barrier manifest certified by the validation gate.'),
+            expectedSourceFingerprint: z
+                .string()
+                .regex(/^[a-f0-9]{64}$/u)
+                ['describe']('Exact source fingerprint certified by the validation gate.'),
             push: z.boolean().optional()['describe']('Push after commit. Default: true.'),
             pushDryRunFirst: z
                 .boolean()
@@ -546,9 +556,27 @@ export const gitWriteTools = [
                 ['describe']('Explicit acknowledgement of stage + commit + optional upstream push.'),
         },
 
-        handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }, operationContext) => {
+        handler: async (
+            { paths, message, expectedHead, sourceBarrierManifest, expectedSourceFingerprint, push, pushDryRunFirst },
+            operationContext,
+        ) => {
             const runtime = createGitWriteRuntime(operationContext);
             const startedAt = Date.now();
+            let sourceBarrier;
+            try {
+                sourceBarrier = await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrierManifest, {
+                    expectedFingerprint: expectedSourceFingerprint,
+                    audit: runtime.audit,
+                });
+            } catch (error) {
+                const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                return errorResult(candidate.message, {
+                    code: candidate.code ?? 'ERR_GIT_PUBLISH_SOURCE_BARRIER',
+                    sourceBarrierManifest,
+                    expectedSourceFingerprint,
+                    details: candidate.details ?? null,
+                });
+            }
             const initialHead = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, initialHead);
             if (headError) {
@@ -606,6 +634,21 @@ export const gitWriteTools = [
                     identity,
                 });
             }
+            try {
+                await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrier.manifestPath, {
+                    expectedFingerprint: sourceBarrier.fingerprint,
+                    audit: runtime.audit,
+                });
+            } catch (error) {
+                await runtime.exec(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
+                const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                return errorResult(candidate.message, {
+                    code: candidate.code ?? 'ERR_GIT_PUBLISH_SOURCE_DRIFT_BEFORE_COMMIT',
+                    stageReverted: true,
+                    sourceBarrierFingerprint: sourceBarrier.fingerprint,
+                    details: candidate.details ?? null,
+                });
+            }
             const commitStartedAt = Date.now();
             const commit = await runtime.exec(['commit', '-m', message.trim()], {
                 timeoutMs: 120_000,
@@ -619,6 +662,22 @@ export const gitWriteTools = [
                 });
             }
             const committedHead = await readHead(runtime);
+            try {
+                await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrier.manifestPath, {
+                    expectedFingerprint: sourceBarrier.fingerprint,
+                    audit: runtime.audit,
+                });
+            } catch (error) {
+                const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                return errorResult(candidate.message, {
+                    code: candidate.code ?? 'ERR_GIT_PUBLISH_SOURCE_DRIFT_AFTER_COMMIT',
+                    committed: true,
+                    committedHead,
+                    pushed: false,
+                    sourceBarrierFingerprint: sourceBarrier.fingerprint,
+                    details: candidate.details ?? null,
+                });
+            }
             const shouldPush = push !== false;
             let pushResult = null;
             let pushStartedAt = null;
@@ -687,6 +746,8 @@ export const gitWriteTools = [
                 committedFiles: staged.names,
                 pushed: shouldPush,
                 upstream: afterPush?.['upstream'] ?? beforePush?.['upstream'] ?? null,
+                sourceBarrierManifestPath: sourceBarrier.manifestPath,
+                sourceBarrierFingerprint: sourceBarrier.fingerprint,
             });
             const structured = {
                 success: true,
@@ -697,6 +758,8 @@ export const gitWriteTools = [
                 stat: staged.stat,
                 executableModeDrift: plan.executableModeDrift,
                 repairedExecutableModes,
+                sourceBarrierManifestPath: sourceBarrier.manifestPath,
+                sourceBarrierFingerprint: sourceBarrier.fingerprint,
                 pushed: shouldPush,
                 pushDryRunFirst: pushDryRunFirst === true,
                 beforePush,
