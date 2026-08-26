@@ -1107,9 +1107,12 @@ describe('copilot MCP tools', () => {
         assert.equal(executionLimits['terminal']?.['maxSessions'], 128);
         assert.equal(executionLimits['validator']?.['maxBatchConcurrency'], 1);
         assert.equal(executionLimits['validator']?.['acceptedInputMaxConcurrency'], 2);
-        const schemaConvergence = /** @type {Record<string, unknown>} */ (structured['schemaConvergence']);
-        assert.equal(typeof schemaConvergence['runtimeEpoch'], 'string');
-        assert.equal(typeof schemaConvergence['status'], 'string');
+        const descriptorObservation = /** @type {Record<string, unknown>} */ (structured['descriptorObservation']);
+        assert.equal(descriptorObservation['scope'], 'origin-mcp-descriptor-observation');
+        assert.equal(typeof descriptorObservation['runtimeEpoch'], 'string');
+        assert.equal(typeof descriptorObservation['status'], 'string');
+        const chatgptSnapshot = /** @type {Record<string, unknown>} */ (descriptorObservation['chatgptActionSnapshot']);
+        assert.equal(chatgptSnapshot['observableFromOrigin'], false);
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
         assert.equal(hostApprovalProfile['oauthInitialScopeProfile'], 'max-autonomy');
         assert.equal(hostApprovalProfile['oauthStepUpPreferred'], false);
@@ -1364,7 +1367,7 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['auditTemplate'], 'object');
     });
 
-    it('mcp_host_block_diagnostics identifies likely stale client schema before MCP', async () => {
+    it('mcp_host_block_diagnostics recommends administrative Refresh without claiming to observe the ChatGPT snapshot', async () => {
         const tool = findTool('mcp_host_block_diagnostics');
         const result = await tool.handler({
             toolName: 'repo_apply_patch_batch',
@@ -1376,11 +1379,15 @@ describe('copilot MCP tools', () => {
             mcpAuditEventPresent: false,
         });
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent?.['classification']?.['code'], 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION');
+        assert.equal(result.structuredContent?.['classification']?.['code'], 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT');
         assert.equal(result.structuredContent?.['classification']?.['layer'], 'chatgpt-host-schema');
         const projection = /** @type {Record<string, unknown>} */ (result.structuredContent?.['projectionDiagnosis']);
-        assert.equal(projection['status'], 'likely-stale-client-projection');
-        assert.equal(projection['hostRefreshRequired'], true);
+        assert.equal(projection['status'], 'refresh-review-recommended');
+        assert.equal(projection['hostRefreshRecommended'], true);
+        const descriptorObservation = /** @type {Record<string, unknown>} */ (projection['descriptorObservation']);
+        assert.equal(descriptorObservation['scope'], 'origin-mcp-descriptor-observation');
+        const snapshot = /** @type {Record<string, unknown>} */ (descriptorObservation['chatgptActionSnapshot']);
+        assert.equal(snapshot['observableFromOrigin'], false);
         assert.equal(projection['executionLimitsVersion'], 2);
         const limits = /** @type {Record<string, Record<string, unknown>>} */ (projection['executionLimits']);
         assert.equal(limits['repoPatch']?.['maxBatchOperations'], 128);

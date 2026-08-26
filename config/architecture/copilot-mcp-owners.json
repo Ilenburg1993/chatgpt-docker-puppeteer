@@ -444,8 +444,8 @@
       "kind": "owner",
       "protectedBoundary": true,
       "role": "OAuth smoke diagnostics",
-      "audiences": ["public"],
-      "authorityClasses": ["public-surface"],
+      "audiences": ["public", "testing"],
+      "authorityClasses": ["public-surface", "testing-surface"],
       "policyHooks": ["cost", "surface"],
       "allowedDependencies": ["mcp.auth", "mcp.protocol"]
     },

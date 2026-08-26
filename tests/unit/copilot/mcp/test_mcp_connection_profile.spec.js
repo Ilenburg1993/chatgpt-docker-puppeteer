@@ -34,6 +34,7 @@ import {
     readMcpConnectionConfig,
     validatePublicConnectorUrl,
 } from '#copilot/mcp/public/connection';
+import { runMcpOAuthSmoke } from '#copilot/mcp/public/diagnostics/oauth-smoke';
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 async function allocateLoopbackPort() {
     const probe = createNetServer();
@@ -381,6 +382,37 @@ describe('copilot MCP ChatGPT connection profile', () => {
             assert.equal(typeof refreshed['access_token'], 'string');
             assert.match(String(refreshed['refresh_token']), /^rt_/u);
             assert.notEqual(refreshed['refresh_token'], refreshToken);
+            const rotatedRefreshToken = String(refreshed['refresh_token']);
+
+            const revokeResponse = await fetch(`${resource}/oauth/revoke`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://chatgpt.com' },
+                body: new URLSearchParams({
+                    token: rotatedRefreshToken,
+                    token_type_hint: 'refresh_token',
+                    client_id: clientId,
+                }),
+            });
+            assert.equal(revokeResponse.status, 200);
+            const persistenceAfterRevoke = await processHost.authRuntime.issuerRuntime.readPersistenceStatus();
+            assert.equal(persistenceAfterRevoke.tokenCount, 0);
+            const refreshStoreAfterRevoke = JSON.parse(
+                await readFile(process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'], 'utf8'),
+            );
+            assert.equal(refreshStoreAfterRevoke.consumedRefreshTokenHashes.length, 0);
+            assert.equal(refreshStoreAfterRevoke.revokedRefreshTokenFamilies.length, 1);
+            const revokedRefreshResponse = await fetch(`${resource}/oauth/token`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://chatgpt.com' },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    client_id: clientId,
+                    refresh_token: rotatedRefreshToken,
+                    resource,
+                }),
+            });
+            assert.equal(revokedRefreshResponse.status, 400);
+            assert.equal((await revokedRefreshResponse.json()).error, 'invalid_grant');
 
             const compatibility = await processHost.toolCapabilities.audit.readCompatibilitySummary({
                 tailBytes: 512 * 1024,
@@ -395,6 +427,98 @@ describe('copilot MCP ChatGPT connection profile', () => {
             const auditText = await readFile(process.env['COPILOT_MCP_AUDIT_FILE'], 'utf8');
             assert.equal(auditText.includes(clientId), false);
             assert.equal(auditText.includes(refreshToken), false);
+        } finally {
+            if (server) await closeHttpMcpServer(server);
+            await processHost?.dispose();
+            restoreEnv(oldEnv);
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('returns active refresh credentials to baseline after repeated canonical CIMD smoke runs', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-oauth-smoke-hygiene-'));
+        const oldEnv = snapshotEnv([
+            'COPILOT_MCP_AUTH_MODE',
+            'COPILOT_MCP_AUTH_ENFORCEMENT',
+            'COPILOT_MCP_PUBLIC_URL',
+            'COPILOT_MCP_CLOUDFLARE_PUBLIC_URL',
+            'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
+            'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
+            'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
+            'COPILOT_MCP_AUDIT_FILE',
+            'COPILOT_MCP_ALLOWED_ORIGINS',
+        ]);
+        /** @type {import('node:http').Server | null} */
+        let server = null;
+        /** @type {ReturnType<typeof createComposedMcpProcessHost> | null} */
+        let processHost = null;
+        try {
+            const port = await allocateLoopbackPort();
+            const resource = `http://127.0.0.1:${port}`;
+            process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
+            process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] = 'all';
+            process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
+            process.env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] = 'https://mcp.aurelin.org/mcp';
+            process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
+            process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
+            process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] = path.join(tempDir, 'oauth-clients.json');
+            process.env['COPILOT_MCP_AUDIT_FILE'] = path.join(tempDir, 'audit.jsonl');
+            process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://chatgpt.com,http://127.0.0.1';
+
+            processHost = createComposedMcpProcessHost({
+                hostId: `mcp-oauth-smoke-hygiene-${randomBytes(6).toString('hex')}`,
+                env: process.env,
+                backgroundServices: false,
+            });
+            server = await startHttpMcpServer({
+                host: '127.0.0.1',
+                port,
+                processHost,
+                processConfig: processHost.processConfig,
+            });
+            const baseline = await processHost.authRuntime.issuerRuntime.readPersistenceStatus();
+            assert.equal(baseline.tokenCount, 0);
+
+            for (let iteration = 1; iteration <= 2; iteration += 1) {
+                const smoke = await runMcpOAuthSmoke({
+                    env: process.env,
+                    resource,
+                    timeoutMs: 5_000,
+                    retryAttempts: 1,
+                    retryBaseDelayMs: 0,
+                    retryMaxDelayMs: 0,
+                    runDcrCompatibility: false,
+                    runLegacyCompatibility: false,
+                    runPrivateKeyJwt: false,
+                    runNegativeResourceChecks: false,
+                    localToolNames: getCanonicalMcpTools().map((tool) => tool.name),
+                });
+                assert.equal(
+                    smoke['ok'],
+                    true,
+                    `canonical CIMD smoke ${iteration} should pass: ${JSON.stringify(smoke['failedChecks'])}`,
+                );
+                const cimd = /** @type {Record<string, unknown>} */ (smoke['cimdFlow']);
+                assert.equal(cimd['primaryOk'], true);
+                const cleanup = /** @type {Record<string, unknown>} */ (cimd['cleanup']);
+                assert.equal(cleanup['ok'], true);
+
+                const persistence = await processHost.authRuntime.issuerRuntime.readPersistenceStatus();
+                assert.equal(persistence.tokenCount, baseline.tokenCount);
+                const persistedText = await readFile(process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'], 'utf8');
+                const persisted = JSON.parse(persistedText);
+                assert.equal(persisted.tokens.length, 0);
+                assert.equal(/"rt_[A-Za-z0-9_-]+"/u.test(persistedText), false);
+                // Revocation tombstones are intentionally retained for replay safety, but are time-bounded to 30 days.
+                assert.ok(persisted.revokedRefreshTokenFamilies.length >= iteration);
+                assert.ok(
+                    persisted.revokedRefreshTokenFamilies.every(
+                        (record) =>
+                            Number(record.expiresAt) > Date.now() &&
+                            Number(record.expiresAt) <= Date.now() + 30 * 24 * 60 * 60 * 1000 + 5_000,
+                    ),
+                );
+            }
         } finally {
             if (server) await closeHttpMcpServer(server);
             await processHost?.dispose();

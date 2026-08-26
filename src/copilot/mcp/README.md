@@ -95,6 +95,32 @@ Quick Tunnel continua disponivel como fallback explicito:
 COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick
 ```
 
+## Semântica de conexão e reconexão
+
+No runtime atual, **reconnect** não é um único fenômeno. Diagnóstico e operação devem distinguir:
+
+1. **continuidade do access token OAuth** — uma nova conexão HTTP pode continuar autorizada enquanto
+   o JWT ainda estiver válido;
+2. **refresh OAuth** — após expiração do access token, `refresh_token` rotativo cria nova family
+   member; `offline_access` é anunciado e o issuer persiste somente hashes;
+3. **compatibilidade 2025** — GET/SSE, `Mcp-Session-Id` e `Last-Event-ID` pertencem exclusivamente à
+   era legacy e não provam continuidade MCP 2026;
+4. **subscription MCP 2026** — notifications usam `subscriptions/listen`. Se a stream termina
+   remotamente, o owner do client precisa abrir uma nova `listen()`; o SDK não transforma isso em
+   replay legacy implícito;
+5. **snapshot administrativo do ChatGPT** — tools/actions aprovadas pelo host possuem lifecycle de
+   `Refresh`/revisão próprio. `server/discover`, `tools/list`, TTL ou `list_changed` no origin não
+   provam que esse snapshot administrativo foi atualizado.
+
+O smoke canônico usa **MCP 2026-07-28 pelo SDK oficial v2** e CIMD. O caminho stateful/SSE 2025 e
+DCR são compatibilidade opt-in e devem ser rotulados como tal. `mcp_runtime_health` e
+`mcp_tools_status` expõem `descriptorObservation`, cujo scope é somente o que esta geração do origin
+observou; `chatgptActionSnapshot.observableFromOrigin=false` é intencional.
+
+Depois de mudar descriptors/actions, use o fluxo de **Refresh/review do app no ChatGPT** quando o
+host precisar reaprender a surface. Reiniciar ou reconectar o MCP, por si só, não é evidência de
+refresh administrativo.
+
 ## Claude
 
 O mesmo endpoint remoto tambem pode ser usado em Claude custom connectors:

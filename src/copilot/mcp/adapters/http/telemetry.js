@@ -44,14 +44,19 @@ export function classifyMcpCompatibilityRpcClass(method) {
 }
 
 /**
- * @param {{ httpMethod?: string; rpcMethod: string | null; lastEventIdPresent: boolean }} input
- * @returns {'none' | 'stream-open' | 'stream-resume'}
+ * Classify protocol continuity without collapsing the legacy SSE replay model into the 2026 subscription model.
+ * `Last-Event-ID` has continuity meaning only for the 2025 compatibility transport; modern subscriptions are explicit
+ * `subscriptions/listen` requests and require a new listen after a remote close.
+ *
+ * @param {{ protocolEra: '2025' | '2026'; httpMethod?: string; rpcMethod: string | null; lastEventIdPresent: boolean }} input
+ * @returns {'none' | 'legacy-stream-open' | 'legacy-stream-resume' | 'modern-subscription-open'}
  */
 export function classifyMcpCompatibilityContinuity(input) {
-    if (input.lastEventIdPresent) return 'stream-resume';
-    if (String(input.httpMethod ?? '').toUpperCase() === 'GET' || input.rpcMethod === 'subscriptions/listen') {
-        return 'stream-open';
+    if (input.protocolEra === '2026') {
+        return input.rpcMethod === 'subscriptions/listen' ? 'modern-subscription-open' : 'none';
     }
+    if (input.lastEventIdPresent) return 'legacy-stream-resume';
+    if (String(input.httpMethod ?? '').toUpperCase() === 'GET') return 'legacy-stream-open';
     return 'none';
 }
 

@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/host-blocks
  */
 
-import { defineMcpRawTool, readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
+import { defineMcpRawTool, readMcpDescriptorObservationState } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
@@ -72,19 +72,19 @@ function classifyByEvidence(input) {
     const mcpAuditEventPresent = optionalBoolean(input.mcpAuditEventPresent);
     const schemaErrorPresent = optionalBoolean(input.schemaErrorPresent);
     const toolResultIsError = optionalBoolean(input.toolResultIsError);
-    const schemaConvergence = readMcpSchemaConvergenceState();
+    const descriptorObservation = readMcpDescriptorObservationState();
 
     if (
         mcpReachedServer === false &&
         schemaErrorPresent === true &&
-        schemaConvergence.status !== 'converged-observed'
+        descriptorObservation.status !== 'listed-this-generation'
     ) {
         return {
-            code: 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION',
+            code: 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT',
             layer: 'chatgpt-host-schema',
             confidence: 'high',
             severity: 'medium',
-            reason: 'The host rejected the input before MCP while this server generation has not observed a fresh tools/list. The client-visible schema is likely stale relative to server capability truth.',
+            reason: 'The host rejected the input before MCP while this origin generation has not observed a fresh tools/list. A stale ChatGPT approved-action snapshot is plausible, but the origin cannot observe that administrative state directly; use Refresh/review before attributing the failure to MCP runtime drift.',
             recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary'],
         };
     }
@@ -306,18 +306,18 @@ export const mcpHostBlockDiagnosticsTool = defineMcpRawTool({
         });
         const classification =
             evidenceClassification ?? classifyHostBlock({ toolName, hostMessage, operationKind, argsShape });
-        const schemaConvergence = readMcpSchemaConvergenceState();
+        const descriptorObservation = readMcpDescriptorObservationState();
         const projectionDiagnosis = {
             status:
-                classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION'
-                    ? 'likely-stale-client-projection'
-                    : schemaConvergence.status === 'converged-observed'
-                      ? 'server-observed-client-relist'
-                      : 'unverified-client-projection',
+                classification.code === 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT'
+                    ? 'refresh-review-recommended'
+                    : descriptorObservation.status === 'listed-this-generation'
+                      ? 'origin-observed-descriptor-list'
+                      : 'origin-descriptor-list-unverified',
             executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
             executionLimits: MCP_TOOL_EXECUTION_LIMITS,
-            schemaConvergence,
-            hostRefreshRequired: classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION',
+            descriptorObservation,
+            hostRefreshRecommended: classification.code === 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT',
         };
         return okResult({
             success: true,
@@ -339,8 +339,8 @@ export const mcpHostBlockDiagnosticsTool = defineMcpRawTool({
             auditTemplate: HOST_BLOCK_TEMPLATE,
             nextSteps: [
                 'Prefer the recommendedAlternatives list before retrying the blocked tool.',
-                classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION'
-                    ? 'Do not add a plan call just to work around schema rejection. Compare mcp_tools_status capability truth, then refresh/reconnect the client projection when needed; use compatibility-safe legacy arguments meanwhile.'
+                classification.code === 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT'
+                    ? 'Do not add a plan call just to work around schema rejection. Compare mcp_tools_status origin capability truth, then use the ChatGPT app/action Refresh or administrative review flow when the approved action snapshot may be stale; reconnect alone is not evidence of snapshot refresh.'
                     : 'Use a *_plan tool only when preview, destructive-risk review, or a separate approval boundary adds information; plan is not a generic recovery step.',
                 'If the block is network/tunnel related, verify the permanent connector/tunnel state before changing transport or DNS.',
                 'Record the auditTemplate fields in the external ChatGPT audit report.',

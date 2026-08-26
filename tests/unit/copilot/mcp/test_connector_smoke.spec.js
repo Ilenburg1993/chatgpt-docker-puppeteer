@@ -53,7 +53,8 @@ function healthyOauthSmoke() {
                 missingLocalTools: [],
                 unexpectedRemoteTools: [],
             },
-            authenticatedSse: { ok: true, status: 200 },
+            modernSubscription: { ok: true, status: 200, opened: true },
+            legacy2025Compatibility: { enabled: false, ok: true, protocolVersion: '2025-11-25' },
         },
     };
 }
@@ -113,7 +114,8 @@ describe('canonical connector smoke', () => {
                     runtimeFlow: {
                         identity: 'cimd',
                         authenticatedToolsList: { ok: false, status: 500, tools: 0 },
-                        authenticatedSse: { ok: false, status: 500 },
+                        modernSubscription: { ok: false, status: 500, opened: false },
+                        legacy2025Compatibility: { enabled: false, ok: true, protocolVersion: '2025-11-25' },
                     },
                 }),
                 writeState: async (state) => {
@@ -193,6 +195,7 @@ describe('canonical connector smoke', () => {
                 runOauthSmoke: async (options) => {
                     oauthEnv = /** @type {NodeJS.ProcessEnv | null} */ (options['env'] ?? null);
                     assert.equal(options.runDcrCompatibility, false);
+                    assert.equal(options.runLegacyCompatibility, false);
                     assert.equal(options.runPrivateKeyJwt, false);
                     assert.equal(options.runNegativeResourceChecks, false);
                     return healthyOauthSmoke();

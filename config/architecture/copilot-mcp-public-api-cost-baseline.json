@@ -331,7 +331,7 @@
       "maxModuleCount": 69,
       "sourceBytes": 579489,
       "maxSourceBytes": 869234,
-      "externalPackages": ["jose"]
+      "externalPackages": ["@modelcontextprotocol/client", "jose"]
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/project-doctor",

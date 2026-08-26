@@ -87,7 +87,9 @@ export function summarizeConnectorSmokeReport(value) {
     const authenticated = smokeRecord(report['authenticatedOAuthSmoke']);
     const runtimeHealth = smokeRecord(authenticated['runtimeHealth']);
     const toolsList = smokeRecord(authenticated['authenticatedToolsList']);
-    const sse = smokeRecord(authenticated['authenticatedSse']);
+    const modernSubscription = smokeRecord(authenticated['modernSubscription']);
+    const legacy2025 = smokeRecord(authenticated['legacy2025Compatibility']);
+    const legacySse = smokeRecord(legacy2025['authenticatedSse']);
     const failedChecks = Array.isArray(authenticated['failedChecks']) ? authenticated['failedChecks'] : [];
     const missingLocalTools = Array.isArray(toolsList['missingLocalTools']) ? toolsList['missingLocalTools'] : [];
     const unexpectedRemoteTools = Array.isArray(toolsList['unexpectedRemoteTools'])
@@ -124,13 +126,23 @@ export function summarizeConnectorSmokeReport(value) {
                 missingCount: missingLocalTools.length,
                 unexpectedCount: unexpectedRemoteTools.length,
             },
-            sse: {
-                ok: sse['ok'] === true,
-                status: sse['status'] ?? null,
-                durationMs: sse['durationMs'] ?? null,
-                initialOk: sse['initialOk'] === true,
-                reconnectOk: sse['reconnectOk'] === true,
-                lastEventIdAccepted: sse['lastEventIdAccepted'] === true,
+            modernSubscription: {
+                ok: modernSubscription['ok'] === true,
+                status: modernSubscription['status'] ?? null,
+                opened: modernSubscription['opened'] === true,
+                closedAs: modernSubscription['closedAs'] ?? null,
+            },
+            legacy2025Compatibility: {
+                enabled: legacy2025['enabled'] === true,
+                ok: legacy2025['ok'] === true,
+                protocolVersion: legacy2025['protocolVersion'] ?? null,
+                sse: {
+                    ok: legacySse['ok'] === true,
+                    status: legacySse['status'] ?? null,
+                    initialOk: legacySse['initialOk'] === true,
+                    reconnectOk: legacySse['reconnectOk'] === true,
+                    lastEventIdAccepted: legacySse['lastEventIdAccepted'] === true,
+                },
             },
         },
     };

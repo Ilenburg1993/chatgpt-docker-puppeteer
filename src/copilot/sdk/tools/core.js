@@ -53,16 +53,23 @@ function isRecordObject(value) {
 }
 
 /**
+ * Structural type for the optional `zod-to-json-schema` fallback. Keeping this local is intentional: the package is
+ * loaded opportunistically at runtime and must not become a static TypeScript/package dependency solely through JSDoc.
+ *
+ * @typedef {(schema: import('zod/v3').ZodTypeAny, options?: unknown) => unknown} ZodToJsonSchemaConverter
+ */
+
+/**
  * Estado hoist-safe para ciclos ESM. `createTool()` pode ser chamado durante a avaliação circular de módulos de tools;
  * propriedades em função evitam TDZ.
  *
- * @returns {{ converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean }}
+ * @returns {{ converter: ZodToJsonSchemaConverter | null; attempted: boolean }}
  */
 function getZodConverterState() {
     const fn =
         /**
          * @type {typeof getZodConverterState & {
-         *     _state?: { converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean };
+         *     _state?: { converter: ZodToJsonSchemaConverter | null; attempted: boolean };
          * }}
          */ (getZodConverterState);
     if (!fn._state) {
@@ -75,7 +82,7 @@ function getZodConverterState() {
  * Carrega o conversor sob demanda. Isso evita falhas de boot em ciclos ESM onde `createTool()` pode ser chamado antes
  * de este módulo terminar sua avaliação.
  *
- * @returns {typeof import('zod-to-json-schema').zodToJsonSchema | null}
+ * @returns {ZodToJsonSchemaConverter | null}
  */
 function loadZodToJsonSchema() {
     const state = getZodConverterState();

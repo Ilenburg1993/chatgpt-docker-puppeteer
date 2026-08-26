@@ -99,11 +99,12 @@ describe('MCP HTTP dual protocol shadow', () => {
             assert.ok(summary.protocol.byRpcClass['tools-list'] > 0);
             assert.equal(
                 classifyMcpCompatibilityContinuity({
+                    protocolEra: '2025',
                     httpMethod: 'GET',
                     rpcMethod: null,
                     lastEventIdPresent: true,
                 }),
-                'stream-resume',
+                'legacy-stream-resume',
             );
         } finally {
             await requestHandler.close();

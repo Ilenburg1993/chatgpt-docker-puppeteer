@@ -9,11 +9,11 @@
 export { normalizeMcpToolDefinitions } from '../metadata.js';
 export { defineMcpRawTool } from '../contracts/definition.js';
 export {
-    MCP_SCHEMA_CONVERGENCE_VERSION,
+    MCP_DESCRIPTOR_OBSERVATION_VERSION,
     maybeSendMcpToolsListChangedNotification,
-    readMcpSchemaConvergenceState,
+    readMcpDescriptorObservationState,
     recordMcpDescriptorObservation,
     recordMcpToolsListObserved,
-} from '../convergence.js';
+} from '../descriptor-observation.js';
 
 export { classifyMcpToolContractRisk, projectMcpToolAnnotations, validateMcpToolContractSemantics } from '../contracts/semantics.js';

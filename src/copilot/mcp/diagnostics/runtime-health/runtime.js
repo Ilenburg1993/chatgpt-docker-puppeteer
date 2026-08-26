@@ -22,7 +22,7 @@ import { readMcpRuntimeSourceDrift } from '#copilot/mcp/public/diagnostics/runti
 import { readMcpWorkspaceSmokeSummary } from '#copilot/mcp/public/diagnostics/workspace-smoke';
 import { readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
-import { readMcpSchemaConvergenceState } from '#copilot/mcp/public/protocol/catalog';
+import { readMcpDescriptorObservationState } from '#copilot/mcp/public/protocol/catalog';
 import { readMcpStartupMaintenanceState } from '#copilot/mcp/public/runtime/startup-maintenance';
 import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful/config';
 import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
@@ -467,14 +467,22 @@ function summarizeIoCacheCompact(cache) {
 }
 
 /** @param {Record<string, unknown>} state */
-function summarizeSchemaConvergence(state) {
+function summarizeDescriptorObservation(state) {
+    const chatgptActionSnapshot = recordOrEmpty(state['chatgptActionSnapshot']);
     return {
+        scope: state['scope'] ?? 'origin-mcp-descriptor-observation',
         status: state['status'] ?? 'uninitialized',
         descriptorRevision: state['descriptorRevision'] ?? 0,
         currentToolCount: state['currentToolCount'] ?? 0,
+        toolsListObservedCount: state['toolsListObservedCount'] ?? 0,
+        lastToolsListProtocolVersion: state['lastToolsListProtocolVersion'] ?? null,
         listChangedSentCount: state['listChangedSentCount'] ?? 0,
         listChangedErrorCount: state['listChangedErrorCount'] ?? 0,
         lastListChangedError: state['lastListChangedError'] ?? null,
+        chatgptActionSnapshot: {
+            observableFromOrigin: chatgptActionSnapshot['observableFromOrigin'] === true,
+            status: chatgptActionSnapshot['status'] ?? 'external-admin-state',
+        },
     };
 }
 
@@ -674,7 +682,7 @@ export async function readMcpRuntimeHealth(
         available: false,
         reason: 'http-session-runtime-not-owned-by-current-transport',
     };
-    const schemaConvergence = readMcpSchemaConvergenceState();
+    const descriptorObservation = readMcpDescriptorObservationState();
     const roundTripAnalyticsMonitor = readMcpRoundTripAnalyticsMonitorState();
     const compileCache = ioProcess.compileCache;
     const warnings = [];
@@ -773,7 +781,7 @@ export async function readMcpRuntimeHealth(
                 },
                 statefulPolicy,
                 statefulRuntime,
-                schemaConvergence: summarizeSchemaConvergence(schemaConvergence),
+                descriptorObservation: summarizeDescriptorObservation(descriptorObservation),
                 roundTripAnalyticsMonitor: summarizeRoundTripAnalyticsMonitor(roundTripAnalyticsMonitor),
                 nodeRuntime: {
                     nodeVersion: process.version,
@@ -865,6 +873,7 @@ export async function readMcpRuntimeHealth(
             },
             statefulPolicy,
             statefulRuntime,
+            descriptorObservation,
             nodeRuntime: {
                 nodeVersion: process.version,
                 compileCache,

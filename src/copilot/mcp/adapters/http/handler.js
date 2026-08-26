@@ -422,6 +422,7 @@ export function createMcpHttpRequestHandler(options) {
                                     transportMode: 'modern-2026',
                                     rpcClass: classifyMcpCompatibilityRpcClass(rpcMethod),
                                     continuity: classifyMcpCompatibilityContinuity({
+                                        protocolEra: '2026',
                                         httpMethod: req.method,
                                         rpcMethod,
                                         lastEventIdPresent: Boolean(readHeader(req, 'last-event-id')),
@@ -483,6 +484,7 @@ export function createMcpHttpRequestHandler(options) {
                                     transportMode: 'stateful',
                                     rpcClass: classifyMcpCompatibilityRpcClass(rpcMethod),
                                     continuity: classifyMcpCompatibilityContinuity({
+                                        protocolEra: '2025',
                                         httpMethod: req.method,
                                         rpcMethod,
                                         lastEventIdPresent: Boolean(readHeader(req, 'last-event-id')),
@@ -522,6 +524,7 @@ export function createMcpHttpRequestHandler(options) {
                                 transportMode: 'stateless-fallback',
                                 rpcClass: classifyMcpCompatibilityRpcClass(rpcMethod),
                                 continuity: classifyMcpCompatibilityContinuity({
+                                    protocolEra: '2025',
                                     httpMethod: req.method,
                                     rpcMethod,
                                     lastEventIdPresent: Boolean(readHeader(req, 'last-event-id')),

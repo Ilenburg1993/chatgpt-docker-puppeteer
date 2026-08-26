@@ -47,6 +47,8 @@ export function evaluateMcpCompatibilityRetirementReadiness(summary, policyInput
     const grants = asRecord(oauth['grants']);
     const grantsByClientSource = asRecord(grants['byClientSource']);
     const clientActivityBySource = asRecord(clientActivity['bySource']);
+    const clientActivityBySourceAndActor = asRecord(clientActivity['bySourceAndActorClass']);
+    const grantsBySourceAndActor = asRecord(grants['bySourceAndActorClass']);
 
     const sourceOk = source['ok'] === true;
     const observationWindowMs = nonNegativeNumber(window['durationMs']);
@@ -55,7 +57,20 @@ export function evaluateMcpCompatibilityRetirementReadiness(summary, policyInput
     const legacy2025Requests = nonNegativeNumber(byEra['2025']);
     const dcrClientActivity = nonNegativeNumber(clientActivityBySource['dcr']);
     const dcrGrantActivity = nonNegativeNumber(grantsByClientSource['dcr']);
-    const dcrUseSignals = dcrClientActivity + dcrGrantActivity;
+    const dcrClientActorRow = asRecord(clientActivityBySourceAndActor['dcr']);
+    const dcrGrantActorRow = asRecord(grantsBySourceAndActor['dcr']);
+    const dcrDiagnosticClientActivity = nonNegativeNumber(dcrClientActorRow['diagnostic']);
+    const dcrDiagnosticGrantActivity = nonNegativeNumber(dcrGrantActorRow['diagnostic']);
+    const dcrExternalClientActivity =
+        nonNegativeNumber(dcrClientActorRow['consumer']) + nonNegativeNumber(dcrClientActorRow['unknown']);
+    const dcrExternalGrantActivity =
+        nonNegativeNumber(dcrGrantActorRow['consumer']) + nonNegativeNumber(dcrGrantActorRow['unknown']);
+    // Backward-compatible summaries without the actor cross-product are fail-safe: all observed DCR remains external.
+    const hasActorBreakdown = Object.keys(dcrClientActorRow).length > 0 || Object.keys(dcrGrantActorRow).length > 0;
+    const dcrExternalUseSignals = hasActorBreakdown
+        ? dcrExternalClientActivity + dcrExternalGrantActivity
+        : dcrClientActivity + dcrGrantActivity;
+    const dcrDiagnosticUseSignals = hasActorBreakdown ? dcrDiagnosticClientActivity + dcrDiagnosticGrantActivity : 0;
 
     const hostEvidence = Object.fromEntries(
         policy.requiredHostClasses.map((hostClass) => [hostClass, nonNegativeNumber(successfulByHostClass[hostClass])]),
@@ -75,7 +90,7 @@ export function evaluateMcpCompatibilityRetirementReadiness(summary, policyInput
         zeroUseLabel: '2025-protocol-zero-use',
         useLabel: '2025-protocol-still-observed',
     });
-    const dcr = classifyCandidate(sharedBlockers, dcrUseSignals, {
+    const dcr = classifyCandidate(sharedBlockers, dcrExternalUseSignals, {
         zeroUseLabel: 'dcr-zero-use',
         useLabel: 'dcr-still-observed',
     });
@@ -108,11 +123,14 @@ export function evaluateMcpCompatibilityRetirementReadiness(summary, policyInput
             },
             dcr: {
                 ...dcr,
-                observedUseSignals: dcrUseSignals,
+                observedUseSignals: dcrExternalUseSignals,
                 observedClientActivity: dcrClientActivity,
                 observedGrantActivity: dcrGrantActivity,
+                observedDiagnosticUseSignals: dcrDiagnosticUseSignals,
+                observedDiagnosticClientActivity: dcrDiagnosticClientActivity,
+                observedDiagnosticGrantActivity: dcrDiagnosticGrantActivity,
                 exitCondition:
-                    'Candidate only after the minimum evidence window/volume/required-host gates pass and both DCR client activity and DCR-backed grants remain zero in that retained window.',
+                    'Candidate only after the minimum evidence window/volume/required-host gates pass and external/unknown DCR client activity and DCR-backed grants remain zero. Explicitly diagnostic activity is reported separately and does not fabricate consumer demand.',
             },
         },
         decisionBoundary:

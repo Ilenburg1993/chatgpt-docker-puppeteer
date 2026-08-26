@@ -17,7 +17,7 @@ import { registerCopilotAppsSdkResources } from '#copilot/mcp/public/protocol/ap
 import {
     classifyMcpToolContractRisk,
     projectMcpToolAnnotations,
-    readMcpSchemaConvergenceState,
+    readMcpDescriptorObservationState,
     recordMcpDescriptorObservation,
     validateMcpToolContractSemantics,
 } from '#copilot/mcp/public/protocol/catalog';
@@ -291,7 +291,7 @@ export function getCopilotMcpServerFactoryStatus() {
             protocolSupport: MCP_PROTOCOL_SUPPORT,
         },
         runtime: { ...serverFactoryRuntime },
-        schemaConvergence: readMcpSchemaConvergenceState(),
+        descriptorObservation: readMcpDescriptorObservationState(),
         defaultServerInfo: COPILOT_MCP_SERVER_INFO,
         currentProfile: redactProfileForStatus(readCopilotMcpServerProfile()),
         registry: getCanonicalMcpRegistryState(),

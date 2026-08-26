@@ -18,12 +18,31 @@
 
 import { readBoundedResponseText } from '#copilot/infra/public/platform/http-response';
 import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
-import { MCP_PROTOCOL_LEGACY_DEFAULT_VERSION } from '#copilot/mcp/public/protocol/version';
+import { MCP_PROTOCOL_LEGACY_DEFAULT_VERSION, MCP_PROTOCOL_MODERN_VERSION } from '#copilot/mcp/public/protocol/version';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import {
+    asRecord,
+    hasJsonRpcError,
+    summarizeAuthenticatedToolsList,
+    summarizeClientMetadata,
+    summarizeIntrospection,
+    summarizeJwks,
+    summarizeMetadataProbe,
+    summarizeModernSubscription,
+    summarizeProtectedResourceProbe,
+    summarizeRegistration,
+    summarizeRuntimeProbe,
+    summarizeSseProbe,
+    summarizeToken,
+    summarizeTokenCleanup,
+    summarizeUserinfo,
+} from './report.js';
+import { isTransientOAuthSmokeHttpStatus, retryOAuthSmokeOperation } from './retry-policy.js';
+import { runModernMcpRuntimeChecks } from './runtime-checks/modern.js';
 
 export const OAUTH_SMOKE_IMPLEMENTATION_NAME = 'copilot-mcp-oauth-smoke';
-export const OAUTH_SMOKE_IMPLEMENTATION_VERSION = '1.4.0';
+export const OAUTH_SMOKE_IMPLEMENTATION_VERSION = '1.5.0';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_ATTEMPTS = 5;
@@ -62,6 +81,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     retryMaxDelayMs?: number;
  *     strict?: boolean;
  *     runDcrCompatibility?: boolean;
+ *     runLegacyCompatibility?: boolean;
  *     runPrivateKeyJwt?: boolean;
  *     runNegativeResourceChecks?: boolean;
  *     verboseTools?: boolean;
@@ -77,11 +97,13 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     retryMaxDelayMs: number;
  *     strict: boolean;
  *     runDcrCompatibility: boolean;
+ *     runLegacyCompatibility: boolean;
  *     runPrivateKeyJwt: boolean;
  *     runNegativeResourceChecks: boolean;
  *     verboseTools: boolean;
  *     localToolNames: string[];
- *     protocolVersion: string;
+ *     protocolVersion: typeof MCP_PROTOCOL_MODERN_VERSION;
+ *     legacyProtocolVersion: string;
  * }} OAuthSmokeRuntimeOptions
  *
  *
@@ -254,15 +276,56 @@ export async function runMcpOAuthSmoke(options) {
         : typeof primaryRuntimeAccessToken === 'string'
           ? await runMcpToolRuntimeChecks(mcpUrl, primaryRuntimeAccessToken, runtime)
           : {
-                runtimeHealth: failure(`${primaryRuntimeIdentity} token missing`),
-                authenticatedToolsList: failure(`${primaryRuntimeIdentity} token missing`),
-                authenticatedSse: failure(`${primaryRuntimeIdentity} token missing`),
+                modern2026: {
+                    protocolEra: /** @type {const} */ ('2026'),
+                    protocolVersion: MCP_PROTOCOL_MODERN_VERSION,
+                    discovery: failure(`${primaryRuntimeIdentity} token missing`),
+                    runtimeHealth: failure(`${primaryRuntimeIdentity} token missing`),
+                    authenticatedToolsList: failure(`${primaryRuntimeIdentity} token missing`),
+                    subscription: failure(`${primaryRuntimeIdentity} token missing`),
+                    requestEvidence: [],
+                    serverVersion: null,
+                },
+                legacy2025Compatibility: {
+                    enabled: false,
+                    protocolVersion: runtime.legacyProtocolVersion,
+                    reason: `${primaryRuntimeIdentity} token missing`,
+                },
             };
     finishPhase('runtimeChecks');
-    const runtimeHealth = runtimeChecks.runtimeHealth;
-    const authenticatedToolsList = await Promise.resolve(runtimeChecks.authenticatedToolsList);
+    const modernRuntime = runtimeChecks.modern2026;
+    const runtimeHealth = modernRuntime.runtimeHealth;
+    const authenticatedToolsList = modernRuntime.authenticatedToolsList;
     const authenticatedToolsSummary = summarizeAuthenticatedToolsList(authenticatedToolsList, runtime);
-    const authenticatedSse = await Promise.resolve(runtimeChecks.authenticatedSse);
+    const modernSubscription = modernRuntime.subscription;
+    const legacyCompatibility = asRecord(runtimeChecks.legacy2025Compatibility) ?? {};
+    const legacyRuntimeHealth = asRecord(legacyCompatibility['runtimeHealth']);
+    const legacyToolsList = asRecord(legacyCompatibility['authenticatedToolsList']);
+    const legacySse = asRecord(legacyCompatibility['authenticatedSse']);
+    const legacyCompatibilityOk =
+        !runtime.runLegacyCompatibility ||
+        (legacyRuntimeHealth?.['ok'] === true && legacyToolsList?.['ok'] === true && legacySse?.['ok'] === true);
+
+    const dcrClientId = String(registrationBody?.['client_id'] ?? '');
+    const dcrRefreshCredential =
+        typeof dcrRefreshTokenBody?.['refresh_token'] === 'string'
+            ? dcrRefreshTokenBody['refresh_token']
+            : typeof dcrTokenBody?.['refresh_token'] === 'string'
+              ? dcrTokenBody['refresh_token']
+              : null;
+    const parRefreshCredential =
+        typeof parTokenBody?.['refresh_token'] === 'string' ? parTokenBody['refresh_token'] : null;
+    const [dcrCleanup, parCleanup] = dcrEnabled
+        ? await Promise.all([
+              dcrRefreshCredential
+                  ? revokeToken(metadata, resource, dcrClientId, dcrRefreshCredential, runtime)
+                  : Promise.resolve(skippedProbe('DCR refresh credential unavailable.')),
+              parRefreshCredential
+                  ? revokeToken(metadata, resource, dcrClientId, parRefreshCredential, runtime)
+                  : Promise.resolve(skippedProbe('PAR refresh credential unavailable.')),
+          ])
+        : [skippedProbe('DCR compatibility smoke disabled.'), skippedProbe('DCR compatibility smoke disabled.')];
+    const dcrCleanupOk = !dcrEnabled || (dcrCleanup.ok && parCleanup.ok);
 
     const privateKeyJwtFlow = dcrEnabled
         ? await runPrivateKeyJwtSmoke({
@@ -299,9 +362,12 @@ export async function runMcpOAuthSmoke(options) {
         dcrIntrospection: !dcrEnabled || dcrIntrospection.ok,
         dcrRefreshToken: !dcrEnabled || dcrRefreshToken.ok,
         dcrRefreshTokenClaims: !dcrEnabled || dcrRefreshTokenValidation.ok,
+        dcrCleanup: dcrCleanupOk,
+        modernDiscovery: modernRuntime.discovery.ok,
         runtimeHealth: runtimeHealth.ok,
         authenticatedToolsList: authenticatedToolsSummary.ok,
-        authenticatedSse: authenticatedSse.ok,
+        modernSubscription: modernSubscription.ok,
+        legacyCompatibility: legacyCompatibilityOk,
         cimd: dcrEnabled ? !cimdAdvertised || Boolean(cimdFlow.ok) : cimdAdvertised && Boolean(cimdFlow.ok),
         privateKeyJwt: !dcrEnabled || !privateKeyJwtFlow.required || privateKeyJwtFlow.ok,
         negativeResourceChecks: !dcrEnabled || !runtime.runNegativeResourceChecks || negativeResourceChecks.ok,
@@ -346,18 +412,33 @@ export async function runMcpOAuthSmoke(options) {
             introspection: summarizeIntrospection(dcrIntrospection),
             refreshToken: summarizeToken(dcrRefreshToken),
             refreshTokenValidation: dcrRefreshTokenValidation,
+            cleanup: {
+                ok: dcrCleanupOk,
+                rotatedGrant: summarizeTokenCleanup(dcrCleanup),
+                parGrant: summarizeTokenCleanup(parCleanup),
+            },
         },
         runtimeFlow: {
             identity: primaryRuntimeIdentity,
-            runtimeHealth: {
-                ok: runtimeHealth.ok,
-                status: runtimeHealth.status ?? null,
-                attempts: runtimeHealth.attempts ?? null,
-                hasJsonRpcError: hasJsonRpcError(runtimeHealth.body),
-                error: runtimeHealth.error ?? null,
+            protocolEra: modernRuntime.protocolEra,
+            protocolVersion: modernRuntime.protocolVersion,
+            modern2026: {
+                discovery: summarizeRuntimeProbe(modernRuntime.discovery),
+                runtimeHealth: summarizeRuntimeProbe(runtimeHealth),
+                authenticatedToolsList: authenticatedToolsSummary,
+                subscription: summarizeModernSubscription(modernSubscription),
+                requestEvidence: modernRuntime.requestEvidence,
+                serverVersion: modernRuntime.serverVersion,
             },
+            // Compatibility aliases for existing connector-smoke consumers. They now project the modern engine only.
+            runtimeHealth: summarizeRuntimeProbe(runtimeHealth),
             authenticatedToolsList: authenticatedToolsSummary,
-            authenticatedSse: summarizeSseProbe(authenticatedSse),
+            modernSubscription: summarizeModernSubscription(modernSubscription),
+            legacy2025Compatibility: {
+                ...legacyCompatibility,
+                ok: legacyCompatibilityOk,
+                ...(legacySse ? { authenticatedSse: summarizeSseProbe(/** @type {ProbeResult} */ (legacySse)) } : {}),
+            },
         },
         cimdFlow,
         privateKeyJwtFlow,
@@ -401,6 +482,12 @@ function readSmokeRuntimeOptions(options, env) {
             'COPILOT_MCP_OAUTH_SMOKE_DCR_COMPATIBILITY',
             false,
         ),
+        runLegacyCompatibility: readBooleanOption(
+            options.runLegacyCompatibility,
+            env,
+            'COPILOT_MCP_OAUTH_SMOKE_LEGACY_COMPATIBILITY',
+            false,
+        ),
         runPrivateKeyJwt: readBooleanOption(
             options.runPrivateKeyJwt,
             env,
@@ -415,8 +502,15 @@ function readSmokeRuntimeOptions(options, env) {
         ),
         verboseTools: readBooleanOption(options.verboseTools, env, 'COPILOT_MCP_OAUTH_SMOKE_VERBOSE_TOOLS', false),
         localToolNames: [...new Set(options.localToolNames ?? [])].sort((left, right) => left.localeCompare(right)),
-        protocolVersion: String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? MCP_PROTOCOL_LEGACY_DEFAULT_VERSION).trim(),
+        protocolVersion: MCP_PROTOCOL_MODERN_VERSION,
+        legacyProtocolVersion: normalizeLegacyProtocolVersion(env['COPILOT_MCP_PROTOCOL_VERSION']),
     };
+}
+
+/** @param {unknown} value */
+function normalizeLegacyProtocolVersion(value) {
+    const configured = String(value ?? '').trim();
+    return /^2025-\d{2}-\d{2}$/u.test(configured) ? configured : MCP_PROTOCOL_LEGACY_DEFAULT_VERSION;
 }
 
 /**
@@ -552,7 +646,7 @@ async function probeMcpUnauthorizedChallenge(mcpUrl, runtime) {
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 async function probeCorsPreflightWithRetry(url, requestMethod, runtime) {
-    return retryOperation(
+    return retryOAuthSmokeOperation(
         async () => probeCorsPreflightOnce(url, requestMethod, runtime),
         runtime,
         isTransientCorsProbe,
@@ -585,7 +679,7 @@ async function probeCorsPreflightOnce(url, requestMethod, runtime) {
                 allowOrigin === 'https://chatgpt.com' &&
                 /authorization/iu.test(allowHeaders) &&
                 /content-type/iu.test(allowHeaders),
-            transient: isTransientHttpStatus(response.status),
+            transient: isTransientOAuthSmokeHttpStatus(response.status),
             status: response.status,
             allowOrigin,
             allowHeaders,
@@ -879,14 +973,33 @@ async function runPrivateKeyJwtSmoke(input) {
             expectedScopes: FULL_REPO_SCOPE,
             expectedClientId: clientId,
         });
+        const refreshCredential =
+            typeof refreshBody?.['refresh_token'] === 'string'
+                ? refreshBody['refresh_token']
+                : typeof tokenBody?.['refresh_token'] === 'string'
+                  ? tokenBody['refresh_token']
+                  : null;
+        const cleanup = refreshCredential
+            ? await revokeToken(
+                  input.metadata,
+                  input.resource,
+                  clientId,
+                  refreshCredential,
+                  input.runtime,
+                  assertionFactory,
+              )
+            : skippedProbe('private_key_jwt refresh credential unavailable.');
+        const primaryOk = registration.ok && token.ok && refresh.ok && tokenValidation.ok && refreshValidation.ok;
         return {
-            ok: registration.ok && token.ok && refresh.ok && tokenValidation.ok && refreshValidation.ok,
+            ok: primaryOk && cleanup.ok,
+            primaryOk,
             required,
             registration: summarizeRegistration(registration),
             token: summarizeToken(token),
             tokenValidation,
             refreshToken: summarizeToken(refresh),
             refreshTokenValidation: refreshValidation,
+            cleanup: summarizeTokenCleanup(cleanup),
         };
     } catch (error) {
         return {
@@ -1106,6 +1219,37 @@ async function refreshToken(metadata, resource, clientId, token, runtime, client
 }
 
 /**
+ * Revoke the newest refresh credential issued to a smoke client. RFC 7009 intentionally returns 200 for both revoked
+ * and already-invalid credentials, so this probe treats HTTP success as cleanup success without trying to infer token
+ * existence from a side channel.
+ *
+ * @param {Record<string, unknown> | null} metadata
+ * @param {string} resource
+ * @param {string} clientId
+ * @param {string} token
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @param {(endpoint: string) => Promise<Record<string, string>>} [clientAssertion]
+ * @returns {Promise<ProbeResult>}
+ */
+async function revokeToken(metadata, resource, clientId, token, runtime, clientAssertion) {
+    const endpoint = String(metadata?.['revocation_endpoint'] ?? `${resource}/oauth/revoke`);
+    const body = new URLSearchParams({ token, token_type_hint: 'refresh_token', client_id: clientId });
+    if (clientAssertion) {
+        const assertionFields = await clientAssertion(endpoint);
+        for (const [key, value] of Object.entries(assertionFields)) body.set(key, value);
+    }
+    return probeJsonWithRetry(
+        endpoint,
+        {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+            body: body.toString(),
+        },
+        runtime,
+    );
+}
+
+/**
  * @param {Record<string, unknown> | null} metadata
  * @param {string} resource
  * @param {string} clientId
@@ -1270,16 +1414,27 @@ async function runCimdSmoke(input) {
                   input.runtime,
               )
             : failure('userinfo unavailable');
+    const refreshCredential =
+        typeof refreshBody?.['refresh_token'] === 'string'
+            ? refreshBody['refresh_token']
+            : typeof tokenBody?.['refresh_token'] === 'string'
+              ? tokenBody['refresh_token']
+              : null;
+    const cleanup = refreshCredential
+        ? await revokeToken(input.metadata, input.resource, cimdClientMetadataUrl, refreshCredential, input.runtime)
+        : skippedProbe('No refresh credential was issued.');
+    const primaryOk =
+        cimdClientMetadata.ok &&
+        clientMetadataValidation.ok &&
+        token.ok &&
+        tokenValidation.ok &&
+        refresh.ok &&
+        refreshValidation.ok &&
+        userinfo.ok;
     return {
         report: {
-            ok:
-                cimdClientMetadata.ok &&
-                clientMetadataValidation.ok &&
-                token.ok &&
-                tokenValidation.ok &&
-                refresh.ok &&
-                refreshValidation.ok &&
-                userinfo.ok,
+            ok: primaryOk && cleanup.ok,
+            primaryOk,
             advertised: true,
             canonicalForThisIssuer: 'cimd',
             clientMetadata: summarizeClientMetadata(cimdClientMetadata),
@@ -1289,6 +1444,7 @@ async function runCimdSmoke(input) {
             refreshToken: summarizeToken(refresh),
             refreshTokenValidation: refreshValidation,
             userinfo: summarizeUserinfo(userinfo),
+            cleanup: summarizeTokenCleanup(cleanup),
         },
         accessToken: typeof tokenBody?.['access_token'] === 'string' ? tokenBody['access_token'] : null,
     };
@@ -1393,31 +1549,47 @@ function summarizeNegativeProbe(probe) {
 }
 
 /**
- * @param {string} mcpUrl
- * @param {string} accessToken
- * @param {string} toolName
- * @param {OAuthSmokeRuntimeOptions} runtime
- * @returns {Promise<ProbeResult>}
- */
-/**
  * @param {string} a
  * @param {string} b
  * @param {OAuthSmokeRuntimeOptions} c
  * @returns {Promise<{
- *     runtimeHealth: ProbeResult;
- *     authenticatedToolsList: ProbeResult;
- *     authenticatedSse: ProbeResult;
+ *     modern2026: Awaited<ReturnType<typeof runModernMcpRuntimeChecks>>;
+ *     legacy2025Compatibility:
+ *         | { enabled: true; protocolVersion: string; runtimeHealth: ProbeResult; authenticatedToolsList: ProbeResult; authenticatedSse: ProbeResult }
+ *         | { enabled: false; protocolVersion: string; reason: string };
  * }>}
  */
 async function runMcpToolRuntimeChecks(a, b, c) {
-    // Each check creates and owns its own MCP request/session lifecycle. They validate independent surfaces and therefore
-    // should not serialize three remote round trips on the critical connector-readiness path.
-    const [one, two, three] = await Promise.all([
+    const modernPromise = runModernMcpRuntimeChecks({ mcpUrl: a, accessToken: b, timeoutMs: c.timeoutMs });
+    const legacyPromise = c.runLegacyCompatibility ? runLegacyMcpToolRuntimeChecks(a, b, c) : Promise.resolve(null);
+    const [modern2026, legacy2025] = await Promise.all([modernPromise, legacyPromise]);
+    return {
+        modern2026,
+        legacy2025Compatibility: legacy2025
+            ? { enabled: true, protocolVersion: c.legacyProtocolVersion, ...legacy2025 }
+            : {
+                  enabled: false,
+                  protocolVersion: c.legacyProtocolVersion,
+                  reason: 'Legacy 2025 compatibility smoke disabled.',
+              },
+    };
+}
+
+/**
+ * Legacy compatibility engine only. Modern 2026 diagnostics must use the official v2 client above instead of this
+ * initialize/session/SSE lifecycle.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @param {OAuthSmokeRuntimeOptions} c
+ */
+async function runLegacyMcpToolRuntimeChecks(a, b, c) {
+    const [runtimeHealth, authenticatedToolsList, authenticatedSse] = await Promise.all([
         callMcpTool(a, b, 'mcp_runtime_health', c),
         listMcpTools(a, b, c),
         probeMcpSseStatefully(a, b, c),
     ]);
-    return { runtimeHealth: one, authenticatedToolsList: two, authenticatedSse: three };
+    return { runtimeHealth, authenticatedToolsList, authenticatedSse };
 }
 
 /** @param {string} mcpUrl @param {string} accessToken @param {string} toolName @param {OAuthSmokeRuntimeOptions} runtime
@@ -1463,7 +1635,7 @@ async function probeMcpSseStatefully(mcpUrl, accessToken, runtime) {
                 id: 'oauth-smoke-sse-initialize',
                 method: 'initialize',
                 params: {
-                    protocolVersion: runtime.protocolVersion,
+                    protocolVersion: runtime.legacyProtocolVersion,
                     capabilities: {},
                     clientInfo: { name: OAUTH_SMOKE_IMPLEMENTATION_NAME, version: OAUTH_SMOKE_IMPLEMENTATION_VERSION },
                 },
@@ -1512,7 +1684,7 @@ async function probeMcpSseStatefully(mcpUrl, accessToken, runtime) {
         authorization: `Bearer ${accessToken}`,
         accept: 'text/event-stream',
         'mcp-session-id': sessionId,
-        'mcp-protocol-version': runtime.protocolVersion,
+        'mcp-protocol-version': runtime.legacyProtocolVersion,
         'x-copilot-mcp-sdk-sse-probe': '1',
     };
     try {
@@ -1692,7 +1864,7 @@ async function postMcpJsonRpcStatefully(mcpUrl, accessToken, request, runtime) {
                 id: 'oauth-smoke-initialize',
                 method: 'initialize',
                 params: {
-                    protocolVersion: runtime.protocolVersion,
+                    protocolVersion: runtime.legacyProtocolVersion,
                     capabilities: {},
                     clientInfo: { name: OAUTH_SMOKE_IMPLEMENTATION_NAME, version: OAUTH_SMOKE_IMPLEMENTATION_VERSION },
                 },
@@ -1770,7 +1942,7 @@ function buildMcpAuthorizationHeaders(accessToken, runtime) {
         authorization: `Bearer ${accessToken}`,
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
-        'mcp-protocol-version': runtime.protocolVersion,
+        'mcp-protocol-version': runtime.legacyProtocolVersion,
     };
 }
 
@@ -1829,7 +2001,7 @@ export function parseMcpJsonResponseText(text) {
  * @returns {Promise<ProbeResult>}
  */
 async function probeRawWithRetry(url, init, runtime) {
-    return retryOperation(async () => probeRawOnce(url, init, runtime), runtime, isTransientProbe);
+    return retryOAuthSmokeOperation(async () => probeRawOnce(url, init, runtime), runtime, isTransientProbe);
 }
 
 /**
@@ -1853,7 +2025,7 @@ async function probeRawOnce(url, init, runtime) {
             body: text,
             headers,
             responseBytes: Buffer.byteLength(text),
-            transient: isTransientHttpStatus(response.status) || isCloudflareTunnelErrorBody(text),
+            transient: isTransientOAuthSmokeHttpStatus(response.status) || isCloudflareTunnelErrorBody(text),
             durationMs: Date.now() - startedAtMs,
         };
     } catch (error) {
@@ -1866,72 +2038,9 @@ async function probeRawOnce(url, init, runtime) {
     }
 }
 
-/**
- * @template {ProbeResult | (Record<string, unknown> & { ok: boolean; transient?: boolean })} T
- * @param {() => Promise<T>} operation
- * @param {OAuthSmokeRuntimeOptions} runtime
- * @param {(probe: T) => boolean} isTransient
- * @returns {Promise<T>}
- */
-async function retryOperation(operation, runtime, isTransient) {
-    let last = /** @type {T | null} */ (null);
-    for (let attempt = 1; attempt <= runtime.retryAttempts; attempt += 1) {
-        last = await operation();
-        last['attempts'] = attempt;
-        if (last.ok || !isTransient(last) || attempt >= runtime.retryAttempts) return last;
-        await sleep(computeBackoffMs(attempt, runtime));
-    }
-    return /** @type {T} */ (last);
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {boolean}
- */
+/** @param {ProbeResult} probe */
 function isTransientProbe(probe) {
     return Boolean(!probe.ok && probe.transient);
-}
-
-/**
- * @param {number} attempt
- * @param {OAuthSmokeRuntimeOptions} runtime
- * @returns {number}
- */
-function computeBackoffMs(attempt, runtime) {
-    const exponential = runtime.retryBaseDelayMs * 2 ** Math.max(0, attempt - 1);
-    const jitter = Math.floor(Math.random() * Math.max(1, runtime.retryBaseDelayMs));
-    return Math.min(runtime.retryMaxDelayMs, exponential + jitter);
-}
-
-/**
- * @param {number} ms
- * @returns {Promise<void>}
- */
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * @param {number | undefined} status
- * @returns {boolean}
- */
-function isTransientHttpStatus(status) {
-    if (!status) return true;
-    return (
-        status === 429 ||
-        status === 530 ||
-        status === 520 ||
-        status === 521 ||
-        status === 522 ||
-        status === 523 ||
-        status === 524 ||
-        status === 525 ||
-        status === 526 ||
-        status === 527 ||
-        status === 502 ||
-        status === 503 ||
-        status === 504
-    );
 }
 
 /**
@@ -1966,16 +2075,6 @@ function extractAuthorizationServer(body) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, unknown> | null}
- */
-function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? /** @type {Record<string, unknown>} */ (value)
-        : null;
-}
-
-/**
- * @param {unknown} value
  * @returns {string[]}
  */
 function normalizeStringArray(value) {
@@ -1988,279 +2087,6 @@ function normalizeStringArray(value) {
  */
 function normalizeScopeList(value) {
     return typeof value === 'string' ? value.split(/\s+/u).filter(Boolean) : normalizeStringArray(value);
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeProtectedResourceProbe(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok,
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        resource: body?.['resource'] ?? null,
-        authorizationServers: body?.['authorization_servers'] ?? [],
-        scopesSupported: body?.['scopes_supported'] ?? [],
-        bearerMethodsSupported: body?.['bearer_methods_supported'] ?? [],
-        error: probe.error ?? null,
-        bodyKind: typeof probe.body,
-        transient: probe.transient ?? false,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeMetadataProbe(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok,
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        issuer: body?.['issuer'] ?? null,
-        authorizationEndpointConfigured: typeof body?.['authorization_endpoint'] === 'string',
-        tokenEndpointConfigured: typeof body?.['token_endpoint'] === 'string',
-        registrationEndpointConfigured: typeof body?.['registration_endpoint'] === 'string',
-        introspectionEndpointConfigured: typeof body?.['introspection_endpoint'] === 'string',
-        clientIdMetadataDocumentSupported: body?.['client_id_metadata_document_supported'] === true,
-        userinfoEndpointConfigured: typeof body?.['userinfo_endpoint'] === 'string',
-        jwksUriConfigured: typeof body?.['jwks_uri'] === 'string',
-        codeChallengeMethodsSupported: body?.['code_challenge_methods_supported'] ?? [],
-        tokenEndpointAuthMethodsSupported: body?.['token_endpoint_auth_methods_supported'] ?? [],
-        tokenEndpointAuthSigningAlgValuesSupported: body?.['token_endpoint_auth_signing_alg_values_supported'] ?? [],
-        idTokenSigningAlgValuesSupported: body?.['id_token_signing_alg_values_supported'] ?? [],
-        resourceParameterSupported: body?.['resource_parameter_supported'] === true,
-        authorizationResponseIssParameterSupported: body?.['authorization_response_iss_parameter_supported'] === true,
-        scopesSupported: body?.['scopes_supported'] ?? [],
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeJwks(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok,
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        keys: Array.isArray(body?.['keys']) ? body['keys'].length : 0,
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} registration
- * @returns {Record<string, unknown>}
- */
-function summarizeRegistration(registration) {
-    const body = asRecord(registration.body);
-    return {
-        ok: registration.ok,
-        status: registration.status ?? null,
-        attempts: registration.attempts ?? null,
-        clientIdIssued: typeof body?.['client_id'] === 'string',
-        tokenEndpointAuthMethod: body?.['token_endpoint_auth_method'] ?? null,
-        redirectUris: body?.['redirect_uris'] ?? [],
-        error: registration.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeIntrospection(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok && body?.['active'] === true,
-        status: probe.status ?? null,
-        active: body?.['active'] ?? null,
-        tokenType: body?.['token_type'] ?? null,
-        clientId: body?.['client_id'] ?? null,
-        scope: body?.['scope'] ?? null,
-        audience: body?.['aud'] ?? null,
-        resource: body?.['resource'] ?? null,
-        cnfPresent: typeof body?.['cnf'] === 'object' && body?.['cnf'] !== null,
-        error: probe.error ?? null,
-    };
-}
-/**
- * @param {ProbeResult} token
- * @returns {Record<string, unknown>}
- */
-function summarizeToken(token) {
-    const body = asRecord(token.body);
-    return {
-        ok: token.ok,
-        status: token.status ?? null,
-        attempts: token.attempts ?? null,
-        tokenType: body?.['token_type'] ?? null,
-        expiresIn: body?.['expires_in'] ?? null,
-        scope: body?.['scope'] ?? null,
-        refreshTokenIssued: typeof body?.['refresh_token'] === 'string',
-        refreshTokenExpiresIn: body?.['refresh_token_expires_in'] ?? null,
-        idTokenIssued: typeof body?.['id_token'] === 'string',
-        error: token.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown> & { ok: boolean }}
- */
-function summarizeSseProbe(probe) {
-    const body =
-        probe.body && typeof probe.body === 'object' && !Array.isArray(probe.body)
-            ? /** @type {Record<string, unknown>} */ (probe.body)
-            : {};
-    const initial =
-        body['initial'] && typeof body['initial'] === 'object' && !Array.isArray(body['initial'])
-            ? /** @type {Record<string, unknown>} */ (body['initial'])
-            : {};
-    const reconnect =
-        body['reconnect'] && typeof body['reconnect'] === 'object' && !Array.isArray(body['reconnect'])
-            ? /** @type {Record<string, unknown>} */ (body['reconnect'])
-            : {};
-    return {
-        ok: probe.ok,
-        status: probe.status ?? initial['status'] ?? reconnect['status'] ?? null,
-        attempts: probe.attempts ?? null,
-        durationMs: probe.durationMs ?? null,
-        contentType: probe.headers?.['content-type'] ?? initial['contentType'] ?? reconnect['contentType'] ?? null,
-        diagnosticProbe:
-            probe.headers?.['x-copilot-mcp-sse-probe'] === 'ok' ||
-            initial['diagnosticProbe'] === true ||
-            reconnect['diagnosticProbe'] === true,
-        envelopeOk: body['envelopeOk'] ?? null,
-        diagnosticEnvelopeOnly: body['diagnosticEnvelopeOnly'] ?? null,
-        realLastEventIdObserved: body['realLastEventIdObserved'] ?? null,
-        realReplayCandidate: body['realReplayCandidate'] ?? null,
-        eventReceived: probe['eventReceived'] ?? initial['eventReceived'] ?? reconnect['eventReceived'] ?? null,
-        lastEventId: probe['lastEventId'] ?? null,
-        initialOk: initial['ok'] ?? null,
-        initialStatus: initial['status'] ?? null,
-        initialEventReceived: initial['eventReceived'] ?? null,
-        initialLastEventId: initial['lastEventId'] ?? null,
-        initialError: initial['error'] ?? null,
-        reconnectOk: reconnect['ok'] ?? null,
-        reconnectStatus: reconnect['status'] ?? null,
-        reconnectEventReceived: reconnect['eventReceived'] ?? null,
-        reconnectLastEventId: reconnect['lastEventId'] ?? null,
-        reconnectError: reconnect['error'] ?? null,
-        lastEventIdAccepted: body['lastEventIdAccepted'] ?? null,
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @param {OAuthSmokeRuntimeOptions} runtime
- * @returns {Record<string, unknown> & { ok: boolean }}
- */
-function summarizeAuthenticatedToolsList(probe, runtime) {
-    const remoteToolNames = extractMcpToolNames(probe.body);
-    const localToolNames = runtime.localToolNames;
-    const missingLocalTools = localToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
-    const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
-    const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
-    return {
-        ok: Boolean(probe.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry),
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        responseBytes: probe.responseBytes ?? null,
-        tools: remoteToolNames.length,
-        expectedLocalTools: localToolNames.length,
-        toolsMatchLocalRegistry,
-        missingLocalTools,
-        unexpectedRemoteTools,
-        ...(runtime.verboseTools ? { remoteToolNames } : { remoteToolNamesPreview: previewList(remoteToolNames) }),
-        hasJsonRpcError: hasJsonRpcError(probe.body),
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function previewList(values) {
-    return values.length <= 20
-        ? values
-        : [...values.slice(0, 10), `...${values.length - 20} omitted...`, ...values.slice(-10)];
-}
-
-/**
- * @param {unknown} body
- * @returns {string[]}
- */
-function extractMcpToolNames(body) {
-    if (Array.isArray(body)) {
-        const names = new Set();
-        for (const message of body) {
-            for (const name of extractMcpToolNames(message)) names.add(name);
-        }
-        return [...names].sort((left, right) => left.localeCompare(right));
-    }
-    if (!body || typeof body !== 'object') return [];
-    if (!('result' in body) || !body.result || typeof body.result !== 'object') return [];
-    if (!('tools' in body.result) || !Array.isArray(body.result.tools)) return [];
-    return body.result.tools
-        .map((tool) => {
-            if (!tool || typeof tool !== 'object') return undefined;
-            if (!('name' in tool) || typeof tool.name !== 'string') return undefined;
-            return tool.name;
-        })
-        .filter((toolName) => typeof toolName === 'string')
-        .sort((left, right) => left.localeCompare(right));
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeClientMetadata(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok,
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        clientId: body?.['client_id'] ?? null,
-        clientNameConfigured: typeof body?.['client_name'] === 'string',
-        tokenEndpointAuthMethod: body?.['token_endpoint_auth_method'] ?? null,
-        redirectUris: body?.['redirect_uris'] ?? [],
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {ProbeResult} probe
- * @returns {Record<string, unknown>}
- */
-function summarizeUserinfo(probe) {
-    const body = asRecord(probe.body);
-    return {
-        ok: probe.ok,
-        status: probe.status ?? null,
-        attempts: probe.attempts ?? null,
-        subject: body?.['sub'] ?? null,
-        emailVerified: body?.['email_verified'] ?? null,
-        error: probe.error ?? null,
-    };
-}
-
-/**
- * @param {unknown} body
- * @returns {boolean}
- */
-function hasJsonRpcError(body) {
-    if (Array.isArray(body)) return body.some((message) => hasJsonRpcError(message));
-    return Boolean(body && typeof body === 'object' && 'error' in body && body.error);
 }
 
 /**

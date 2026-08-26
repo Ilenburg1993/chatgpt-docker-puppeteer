@@ -83,6 +83,11 @@ const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 const JSON_CONTENT_TYPE = 'application/json';
 const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
 const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
+const DIAGNOSTIC_OAUTH_CLIENT_NAMES = Object.freeze([
+    'Copilot MCP CIMD smoke client',
+    'Copilot MCP OAuth smoke public client',
+    'Copilot MCP OAuth smoke private_key_jwt client',
+]);
 const CHATGPT_CIMD_ORIGIN = 'https://chatgpt.com';
 const CHATGPT_PLATFORM_CIMD_CLIENT_PATH = '/oauth/client.json';
 const CHATGPT_PLATFORM_JWKS_URI = 'https://chatgpt.com/oauth/jwks.json';
@@ -596,6 +601,7 @@ export function createDevOAuthRuntime(options = {}) {
                     kind: 'oauth-client',
                     clientSource: 'dcr',
                     hostClass: 'unknown',
+                    actorClass: 'unknown',
                     resolution: 'dynamic-registration',
                     outcome: 'rejected',
                 });
@@ -608,6 +614,7 @@ export function createDevOAuthRuntime(options = {}) {
                     kind: 'oauth-client',
                     clientSource: 'dcr',
                     hostClass: 'unknown',
+                    actorClass: classifyOAuthCompatibilityActorFromClientName(String(body['client_name'] ?? '')),
                     resolution: 'dynamic-registration',
                     outcome: 'rejected',
                 });
@@ -621,6 +628,7 @@ export function createDevOAuthRuntime(options = {}) {
                     kind: 'oauth-client',
                     clientSource: 'dcr',
                     hostClass: 'unknown',
+                    actorClass: classifyOAuthCompatibilityActorFromClientName(validation.clientName),
                     resolution: 'dynamic-registration',
                     outcome: 'rejected',
                 });
@@ -646,6 +654,7 @@ export function createDevOAuthRuntime(options = {}) {
                 kind: 'oauth-client',
                 clientSource: 'dcr',
                 hostClass: 'unknown',
+                actorClass: classifyOAuthCompatibilityActorFromClientName(client.clientName),
                 resolution: 'dynamic-registration',
                 outcome: 'succeeded',
             });
@@ -1214,6 +1223,7 @@ export function createDevOAuthRuntime(options = {}) {
                     grantType,
                     clientSource: identity.clientSource,
                     hostClass: identity.hostClass,
+                    actorClass: identity.actorClass,
                     outcome:
                         res.headersSent && res.statusCode >= 200 && res.statusCode < 300 ? 'succeeded' : 'rejected',
                 });
@@ -1455,17 +1465,19 @@ export function createDevOAuthRuntime(options = {}) {
                 kind: 'oauth-client',
                 clientSource: 'dcr',
                 hostClass: 'unknown',
+                actorClass: classifyOAuthCompatibilityActorFromClientName(registered.clientName),
                 resolution: 'dynamic-registration',
                 outcome: 'succeeded',
             });
             return registered;
         }
         const resolved = await resolveClientMetadataDocument(clientId, issuerConfig);
-        const identity = classifyOAuthCompatibilityClientIdentity(clientId);
+        const identity = classifyOAuthCompatibilityClientIdentity(clientId, resolved?.clientName);
         recordCompatibilityObservation({
             kind: 'oauth-client',
             clientSource: resolved?.source ?? identity.clientSource,
             hostClass: identity.hostClass,
+            actorClass: identity.actorClass,
             resolution: resolved?.trustedFallback ? 'trusted-fallback' : 'metadata-document',
             outcome: resolved ? 'succeeded' : 'rejected',
         });
@@ -1692,7 +1704,14 @@ export function createDevOAuthRuntime(options = {}) {
         const client = effectiveClientId ? await resolveOAuthClientById(effectiveClientId, issuerConfig) : undefined;
 
         if (client && client.tokenEndpointAuthMethod !== 'none') {
-            if (!(await verifyClientTokenEndpointAuthentication(body, client, config))) {
+            if (
+                !(await verifyClientTokenEndpointAuthentication(
+                    body,
+                    client,
+                    config,
+                    `${config.resource}/oauth/revoke`,
+                ))
+            ) {
                 logDevOAuthEvent('WARN', 'OAuth token revocation rejected.', {
                     reason: 'client_authentication_failed',
                     clientId: summarizeClientIdForLog(effectiveClientId),
@@ -1704,9 +1723,14 @@ export function createDevOAuthRuntime(options = {}) {
         }
 
         if (credentialHash && saved && (!clientId || saved.clientId === clientId)) {
-            renewCredentials.delete(credentialHash);
-            rememberConsumedRefreshTokenHash(credentialHash, saved);
+            const removed = revokeRefreshTokenFamily(saved.familyId, saved.clientId, 'client-revocation', {
+                retainConsumedEvidence: false,
+            });
             await persistRenewCredentials(issuerConfig);
+            logDevOAuthEvent('INFO', 'OAuth refresh token family revoked by client request.', {
+                clientId: summarizeClientIdForLog(saved.clientId),
+                activeTokensRemoved: removed,
+            });
         }
 
         writeJson(res, 200, {});
@@ -2405,16 +2429,23 @@ export function createDevOAuthRuntime(options = {}) {
      * @param {string} familyId
      * @param {string} clientId
      * @param {string} reason
+     * @param {{ retainConsumedEvidence?: boolean }} [options]
      * @returns {number}
      */
-    function revokeRefreshTokenFamily(familyId, clientId, reason) {
+    function revokeRefreshTokenFamily(familyId, clientId, reason, options = {}) {
         if (!familyId) return 0;
+        const retainConsumedEvidence = options.retainConsumedEvidence !== false;
         let removed = 0;
         for (const [tokenHash, metadata] of renewCredentials) {
             if (metadata.familyId === familyId) {
                 renewCredentials.delete(tokenHash);
-                rememberConsumedRefreshTokenHash(tokenHash, metadata);
+                if (retainConsumedEvidence) rememberConsumedRefreshTokenHash(tokenHash, metadata);
                 removed += 1;
+            }
+        }
+        if (!retainConsumedEvidence) {
+            for (const [tokenHash, metadata] of consumedRefreshTokenHashes) {
+                if (metadata.familyId === familyId) consumedRefreshTokenHashes.delete(tokenHash);
             }
         }
         revokedRefreshTokenFamilies.set(familyId, {
@@ -3843,14 +3874,23 @@ export function createDevOAuthRuntime(options = {}) {
     }
 
     /**
-     * Classify only stable client-id shapes that are safe for aggregate compatibility telemetry. Exact trusted CIMD
-     * origins may yield a host class; opaque DCR ids and all other client ids remain hostClass=unknown.
+     * Classify only stable client-id/name shapes that are safe for aggregate compatibility telemetry. The output is
+     * enum-only; raw ids and names never cross the audit API. Known first-party smoke identities are diagnostic,
+     * trusted ChatGPT/Claude CIMD identities are consumers, and everything ambiguous remains unknown/fail-safe.
      *
      * @param {string} clientId
-     * @returns {{ clientSource: 'cimd' | 'dcr' | 'unknown'; hostClass: 'chatgpt' | 'claude' | 'unknown' }}
+     * @param {string} [clientName]
+     * @returns {{ clientSource: 'cimd' | 'dcr' | 'unknown'; hostClass: 'chatgpt' | 'claude' | 'unknown'; actorClass: 'consumer' | 'diagnostic' | 'unknown' }}
      */
-    function classifyOAuthCompatibilityClientIdentity(clientId) {
-        if (clientId.startsWith('mcp_dev_')) return { clientSource: 'dcr', hostClass: 'unknown' };
+    function classifyOAuthCompatibilityClientIdentity(clientId, clientName = '') {
+        if (clientId.startsWith('mcp_dev_')) {
+            const registeredName = clientName || registeredClients.get(clientId)?.clientName || '';
+            return {
+                clientSource: 'dcr',
+                hostClass: 'unknown',
+                actorClass: classifyOAuthCompatibilityActorFromClientName(registeredName),
+            };
+        }
         try {
             const url = new URL(clientId);
             if (
@@ -3858,18 +3898,31 @@ export function createDevOAuthRuntime(options = {}) {
                 (url.pathname === CHATGPT_PLATFORM_CIMD_CLIENT_PATH ||
                     CHATGPT_CIMD_CLIENT_PATH_PATTERN.test(url.pathname))
             ) {
-                return { clientSource: 'cimd', hostClass: 'chatgpt' };
+                return { clientSource: 'cimd', hostClass: 'chatgpt', actorClass: 'consumer' };
             }
             if (url.origin === CLAUDE_CIMD_ORIGIN && url.pathname === CLAUDE_CIMD_CLIENT_PATH) {
-                return { clientSource: 'cimd', hostClass: 'claude' };
+                return { clientSource: 'cimd', hostClass: 'claude', actorClass: 'consumer' };
             }
-            if (url.pathname === DEV_CLIENT_METADATA_PATH || url.protocol === 'https:') {
-                return { clientSource: 'cimd', hostClass: 'unknown' };
+            if (url.pathname === DEV_CLIENT_METADATA_PATH) {
+                return { clientSource: 'cimd', hostClass: 'unknown', actorClass: 'diagnostic' };
+            }
+            if (url.protocol === 'https:') {
+                return {
+                    clientSource: 'cimd',
+                    hostClass: 'unknown',
+                    actorClass: classifyOAuthCompatibilityActorFromClientName(clientName),
+                };
             }
         } catch {
             // Opaque non-DCR ids intentionally remain unclassified.
         }
-        return { clientSource: 'unknown', hostClass: 'unknown' };
+        return { clientSource: 'unknown', hostClass: 'unknown', actorClass: 'unknown' };
+    }
+
+    /** @param {string} clientName @returns {'consumer' | 'diagnostic' | 'unknown'} */
+    function classifyOAuthCompatibilityActorFromClientName(clientName) {
+        const normalized = String(clientName ?? '').trim();
+        return DIAGNOSTIC_OAUTH_CLIENT_NAMES.includes(normalized) ? 'diagnostic' : 'unknown';
     }
 
     /**

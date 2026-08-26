@@ -1,23 +1,23 @@
 // @ts-check
 /**
- * Process-local MCP tool-schema convergence evidence.
+ * Process-local MCP descriptor-observation evidence.
  *
  * The server owns descriptor truth while the HTTP adapter can observe client tools/list requests. Keeping this state in
- * the protocol catalog avoids a server -> registry -> tools -> server dependency cycle and makes convergence observable
- * without assuming that a server restart forces a client-side schema refresh.
+ * the protocol catalog avoids a server -> registry -> tools -> server dependency cycle and makes origin descriptor observation explicit
+ * without assuming that a server restart forces a client-side schema refresh or changes ChatGPT administrative state.
  *
- * @module copilot/mcp/protocol/catalog/convergence
+ * @module copilot/mcp/protocol/catalog/descriptor-observation
  */
 
 import { randomUUID } from 'node:crypto';
 
-export const MCP_SCHEMA_CONVERGENCE_VERSION = 1;
+export const MCP_DESCRIPTOR_OBSERVATION_VERSION = 2;
 
 /** @typedef {'uninitialized'
-    | 'server-descriptor-unlisted'
-    | 'converged-observed'
-    | 'server-changed-client-unverified'
-    | 'notification-sent-awaiting-refresh'} McpSchemaConvergenceStatus */
+    | 'not-listed-this-generation'
+    | 'listed-this-generation'
+    | 'descriptor-changed-unlisted'
+    | 'notification-sent-unlisted'} McpDescriptorObservationStatus */
 
 const runtimeEpoch = randomUUID();
 
@@ -46,7 +46,7 @@ const state = {
  */
 export function recordMcpDescriptorObservation(input) {
     const fingerprint = String(input.fingerprint ?? '').trim();
-    if (!fingerprint) return readMcpSchemaConvergenceState();
+    if (!fingerprint) return readMcpDescriptorObservationState();
     const observedAtMs = normalizeObservedAt(input.observedAtMs);
     const changed = state.currentDescriptorFingerprint !== fingerprint;
     state.descriptorObservations += 1;
@@ -59,7 +59,7 @@ export function recordMcpDescriptorObservation(input) {
         state.descriptorRevision += 1;
         state.descriptorSinceAtMs = observedAtMs;
     }
-    return readMcpSchemaConvergenceState();
+    return readMcpDescriptorObservationState();
 }
 
 /**
@@ -70,7 +70,7 @@ export function recordMcpToolsListObserved(input = {}) {
     state.toolsListObservedCount += 1;
     state.lastToolsListObservedAtMs = observedAtMs;
     state.lastToolsListProtocolVersion = normalizeProtocolVersion(input.protocolVersion);
-    return readMcpSchemaConvergenceState();
+    return readMcpDescriptorObservationState();
 }
 
 /**
@@ -90,7 +90,7 @@ export function recordMcpToolsListChangedNotification(input) {
         state.listChangedErrorCount += 1;
         state.lastListChangedError = String(input.error).slice(0, 240);
     }
-    return readMcpSchemaConvergenceState();
+    return readMcpDescriptorObservationState();
 }
 
 /** Return true only once per descriptor revision while the current list remains unverified by an observed tools/list. */
@@ -146,8 +146,10 @@ export async function maybeSendMcpToolsListChangedNotification(server) {
 /**
  * @returns {{
  *     schemaVersion: number;
+ *     scope: 'origin-mcp-descriptor-observation';
+ *     chatgptActionSnapshot: { observableFromOrigin: false; status: 'external-admin-state'; refreshBoundary: string; inferenceBoundary: string };
  *     runtimeEpoch: string;
- *     status: McpSchemaConvergenceStatus;
+ *     status: McpDescriptorObservationStatus;
  *     descriptorRevision: number;
  *     descriptorObservations: number;
  *     currentDescriptorFingerprint: string | null;
@@ -167,11 +169,20 @@ export async function maybeSendMcpToolsListChangedNotification(server) {
  *     lastListChangedError: string | null;
  * }}
  */
-export function readMcpSchemaConvergenceState() {
+export function readMcpDescriptorObservationState() {
     return {
-        schemaVersion: MCP_SCHEMA_CONVERGENCE_VERSION,
+        schemaVersion: MCP_DESCRIPTOR_OBSERVATION_VERSION,
+        scope: /** @type {const} */ ('origin-mcp-descriptor-observation'),
+        chatgptActionSnapshot: {
+            observableFromOrigin: /** @type {const} */ (false),
+            status: /** @type {const} */ ('external-admin-state'),
+            refreshBoundary:
+                'ChatGPT action/tool changes are governed by the host administrative Refresh/review lifecycle, not by origin tools/list observation alone.',
+            inferenceBoundary:
+                'A tools/list observation proves only MCP descriptor retrieval by a client request reaching this origin; it does not prove the approved ChatGPT action snapshot changed.',
+        },
         runtimeEpoch,
-        status: classifyMcpSchemaConvergenceStatus(),
+        status: classifyMcpDescriptorObservationStatus(),
         descriptorRevision: state.descriptorRevision,
         descriptorObservations: state.descriptorObservations,
         currentDescriptorFingerprint: state.currentDescriptorFingerprint,
@@ -193,7 +204,7 @@ export function readMcpSchemaConvergenceState() {
 }
 
 /** Test-only reset; runtimeEpoch intentionally remains process-stable. */
-export function resetMcpSchemaConvergenceStateForTests() {
+export function resetMcpDescriptorObservationStateForTests() {
     state.descriptorRevision = 0;
     state.descriptorObservations = 0;
     state.currentDescriptorFingerprint = null;
@@ -213,16 +224,16 @@ export function resetMcpSchemaConvergenceStateForTests() {
     state.lastListChangedError = null;
 }
 
-/** @returns {McpSchemaConvergenceStatus} */
-function classifyMcpSchemaConvergenceStatus() {
+/** @returns {McpDescriptorObservationStatus} */
+function classifyMcpDescriptorObservationStatus() {
     if (!state.currentDescriptorFingerprint || state.descriptorSinceAtMs === null) return 'uninitialized';
     if (state.lastToolsListObservedAtMs !== null && state.lastToolsListObservedAtMs >= state.descriptorSinceAtMs) {
-        return 'converged-observed';
+        return 'listed-this-generation';
     }
     if (state.lastListChangedSentAtMs !== null && state.lastListChangedSentAtMs >= state.descriptorSinceAtMs) {
-        return 'notification-sent-awaiting-refresh';
+        return 'notification-sent-unlisted';
     }
-    return state.descriptorRevision > 1 ? 'server-changed-client-unverified' : 'server-descriptor-unlisted';
+    return state.descriptorRevision > 1 ? 'descriptor-changed-unlisted' : 'not-listed-this-generation';
 }
 
 /** @param {unknown} value */

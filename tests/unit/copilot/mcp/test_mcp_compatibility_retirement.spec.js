@@ -19,6 +19,10 @@ import { describe, it } from 'vitest';
  *   claudeSuccesses?: number;
  *   dcrClients?: number;
  *   dcrGrants?: number;
+ *   diagnosticDcrClients?: number;
+ *   diagnosticDcrGrants?: number;
+ *   unknownDcrClients?: number;
+ *   unknownDcrGrants?: number;
  *   sourceOk?: boolean;
  * }} [input]
  */
@@ -36,14 +40,38 @@ function summary(input = {}) {
         },
         oauth: {
             clientActivity: {
-                bySource: { cimd: 2, dcr: input.dcrClients ?? 0, unknown: 0 },
+                bySource: {
+                    cimd: 2,
+                    dcr: (input.dcrClients ?? 0) + (input.diagnosticDcrClients ?? 0) + (input.unknownDcrClients ?? 0),
+                    unknown: 0,
+                },
+                bySourceAndActorClass: {
+                    dcr: {
+                        consumer: input.dcrClients ?? 0,
+                        diagnostic: input.diagnosticDcrClients ?? 0,
+                        unknown: input.unknownDcrClients ?? 0,
+                    },
+                },
                 successfulByHostClass: {
                     chatgpt: input.chatgptSuccesses ?? 1,
                     claude: input.claudeSuccesses ?? 0,
                     unknown: 0,
                 },
             },
-            grants: { byClientSource: { cimd: 2, dcr: input.dcrGrants ?? 0, unknown: 0 } },
+            grants: {
+                byClientSource: {
+                    cimd: 2,
+                    dcr: (input.dcrGrants ?? 0) + (input.diagnosticDcrGrants ?? 0) + (input.unknownDcrGrants ?? 0),
+                    unknown: 0,
+                },
+                bySourceAndActorClass: {
+                    dcr: {
+                        consumer: input.dcrGrants ?? 0,
+                        diagnostic: input.diagnosticDcrGrants ?? 0,
+                        unknown: input.unknownDcrGrants ?? 0,
+                    },
+                },
+            },
         },
     };
 }
@@ -84,6 +112,19 @@ describe('MCP compatibility retirement readiness', () => {
         assert.equal(dcrUse.retirement.protocol2025.status, 'candidate');
         assert.equal(dcrUse.retirement.dcr.status, 'blocked-by-use');
         assert.equal(dcrUse.retirement.dcr.observedUseSignals, 3);
+    });
+
+    it('reports diagnostic DCR activity without fabricating consumer demand and keeps unknown DCR fail-safe', () => {
+        const diagnosticOnly = evaluateMcpCompatibilityRetirementReadiness(
+            summary({ diagnosticDcrClients: 3, diagnosticDcrGrants: 4 }),
+        );
+        assert.equal(diagnosticOnly.retirement.dcr.status, 'candidate');
+        assert.equal(diagnosticOnly.retirement.dcr.observedUseSignals, 0);
+        assert.equal(diagnosticOnly.retirement.dcr.observedDiagnosticUseSignals, 7);
+
+        const unknown = evaluateMcpCompatibilityRetirementReadiness(summary({ unknownDcrClients: 1 }));
+        assert.equal(unknown.retirement.dcr.status, 'blocked-by-use');
+        assert.equal(unknown.retirement.dcr.observedUseSignals, 1);
     });
 
     it('can require Claude evidence explicitly without silently changing the default consumer policy', () => {

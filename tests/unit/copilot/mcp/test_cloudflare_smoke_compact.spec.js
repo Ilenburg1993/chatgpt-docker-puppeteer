@@ -37,10 +37,10 @@ describe('cloudflare connector smoke compact mode', () => {
         expect(parsed).toMatchObject({ ok: true, toolsList: { tools: 85 } });
     });
 
-    it('projects a compact decision summary without losing OAuth, tools parity or SSE readiness', () => {
+    it('projects a compact decision summary without mixing modern subscription readiness with legacy SSE', () => {
         const summary = summarizeConnectorSmokeReport({
             ok: true,
-            protocolVersion: '2025-11-25',
+            protocolVersion: '2026-07-28',
             authMode: 'oauth',
             orchestrationTimings: { totalMs: 1044, unauthenticatedMs: 234, authenticatedOauthMs: 1035 },
             health: { ok: true, status: 200 },
@@ -66,26 +66,31 @@ describe('cloudflare connector smoke compact mode', () => {
                     unexpectedRemoteTools: [],
                     remoteToolNames: ['a', 'b'],
                 },
-                authenticatedSse: {
+                modernSubscription: {
                     ok: true,
                     status: 200,
-                    durationMs: 159,
-                    initialOk: true,
-                    reconnectOk: true,
-                    lastEventIdAccepted: true,
+                    opened: true,
+                    closedAs: 'local',
+                },
+                legacy2025Compatibility: {
+                    enabled: false,
+                    ok: true,
+                    protocolVersion: '2025-11-25',
                 },
             },
         });
 
         expect(summary).toMatchObject({
             ok: true,
-            protocolVersion: '2025-11-25',
+            protocolVersion: '2026-07-28',
             authenticated: {
                 ok: true,
                 toolsList: { tools: 119, expectedLocalTools: 119, toolsMatchLocalRegistry: true },
-                sse: { ok: true, initialOk: true, reconnectOk: true, lastEventIdAccepted: true },
+                modernSubscription: { ok: true, opened: true, closedAs: 'local' },
+                legacy2025Compatibility: { enabled: false, protocolVersion: '2025-11-25' },
             },
         });
+        expect(summary.authenticated.legacy2025Compatibility.sse.ok).toBe(false);
         expect(JSON.stringify(summary)).not.toContain('phaseTimings');
         expect(JSON.stringify(summary)).not.toContain('remoteToolNames');
         expect(Buffer.byteLength(JSON.stringify(summary))).toBeLessThan(2 * 1024);

@@ -5,13 +5,13 @@ import { beforeEach, describe, it } from 'vitest';
 
 import {
     maybeSendMcpToolsListChangedNotification,
-    readMcpSchemaConvergenceState,
+    readMcpDescriptorObservationState,
     recordMcpDescriptorObservation,
     recordMcpToolsListObserved,
 } from '#copilot/mcp/public/protocol/catalog';
 import {
     recordMcpToolsListChangedNotification,
-    resetMcpSchemaConvergenceStateForTests,
+    resetMcpDescriptorObservationStateForTests,
 } from '#copilot/testing/mcp/protocol/catalog';
 import {
     createCopilotMcpServer,
@@ -20,11 +20,11 @@ import {
 } from '#copilot/testing/mcp/server';
 
 beforeEach(() => {
-    resetMcpSchemaConvergenceStateForTests();
+    resetMcpDescriptorObservationStateForTests();
     resetCopilotMcpServerFactoryRuntimeForTests();
 });
 
-describe('MCP schema convergence control plane', () => {
+describe('MCP descriptor observation control plane', () => {
     it('tracks descriptor revisions only when the fingerprint changes', () => {
         const first = recordMcpDescriptorObservation({
             fingerprint: 'aaa',
@@ -32,7 +32,7 @@ describe('MCP schema convergence control plane', () => {
             listChangedAdvertised: false,
             observedAtMs: 1_000,
         });
-        assert.equal(first.status, 'server-descriptor-unlisted');
+        assert.equal(first.status, 'not-listed-this-generation');
         assert.equal(first.descriptorRevision, 1);
         assert.equal(first.descriptorObservations, 1);
         assert.equal(first.currentDescriptorFingerprint, 'aaa');
@@ -55,7 +55,7 @@ describe('MCP schema convergence control plane', () => {
             listChangedAdvertised: true,
             observedAtMs: 3_000,
         });
-        assert.equal(changed.status, 'server-changed-client-unverified');
+        assert.equal(changed.status, 'descriptor-changed-unlisted');
         assert.equal(changed.descriptorRevision, 2);
         assert.equal(changed.currentDescriptorFingerprint, 'bbb');
         assert.equal(changed.previousDescriptorFingerprint, 'aaa');
@@ -63,7 +63,7 @@ describe('MCP schema convergence control plane', () => {
         assert.equal(changed.listChangedAdvertised, true);
     });
 
-    it('distinguishes notification awaiting refresh from an observed tools/list convergence', () => {
+    it('distinguishes a notification nudge from an origin-observed tools/list', () => {
         recordMcpDescriptorObservation({
             fingerprint: 'aaa',
             toolCount: 10,
@@ -77,16 +77,16 @@ describe('MCP schema convergence control plane', () => {
             observedAtMs: 2_000,
         });
         const notified = recordMcpToolsListChangedNotification({ sent: true, observedAtMs: 2_100 });
-        assert.equal(notified.status, 'notification-sent-awaiting-refresh');
+        assert.equal(notified.status, 'notification-sent-unlisted');
         assert.equal(notified.listChangedSentCount, 1);
 
         const relisted = recordMcpToolsListObserved({ protocolVersion: '2025-11-25', observedAtMs: 2_200 });
-        assert.equal(relisted.status, 'converged-observed');
+        assert.equal(relisted.status, 'listed-this-generation');
         assert.equal(relisted.toolsListObservedCount, 1);
         assert.equal(relisted.lastToolsListProtocolVersion, '2025-11-25');
     });
 
-    it('nudges exactly once per unverified descriptor revision and converges after tools/list', async () => {
+    it('nudges exactly once per unlisted descriptor revision and records a later tools/list', async () => {
         recordMcpDescriptorObservation({
             fingerprint: 'aaa',
             toolCount: 10,
@@ -104,15 +104,15 @@ describe('MCP schema convergence control plane', () => {
         assert.deepEqual(first, { attempted: true, sent: true, reason: 'sent' });
         assert.deepEqual(second, { attempted: false, sent: false, reason: 'not-needed' });
         assert.equal(sent, 1);
-        let state = readMcpSchemaConvergenceState();
-        assert.equal(state.status, 'notification-sent-awaiting-refresh');
+        let state = readMcpDescriptorObservationState();
+        assert.equal(state.status, 'notification-sent-unlisted');
         assert.equal(state.listChangedAttemptCount, 1);
         assert.equal(state.lastNotificationAttemptRevision, 1);
         assert.equal(state.listChangedSentCount, 1);
 
         recordMcpToolsListObserved({ protocolVersion: '2025-11-25', observedAtMs: Date.now() + 10 });
-        state = readMcpSchemaConvergenceState();
-        assert.equal(state.status, 'converged-observed');
+        state = readMcpDescriptorObservationState();
+        assert.equal(state.status, 'listed-this-generation');
         assert.deepEqual(await maybeSendMcpToolsListChangedNotification(server), {
             attempted: false,
             sent: false,
@@ -135,22 +135,27 @@ describe('MCP schema convergence control plane', () => {
         assert.equal(failed.attempted, true);
         assert.equal(failed.sent, false);
         assert.equal(failed.reason, 'send-failed');
-        assert.equal(readMcpSchemaConvergenceState().listChangedErrorCount, 1);
+        assert.equal(readMcpDescriptorObservationState().listChangedErrorCount, 1);
         assert.equal((await maybeSendMcpToolsListChangedNotification({})).attempted, false);
     });
 
-    it('records the canonical factory descriptor in the same convergence state', async () => {
+    it('records the canonical factory descriptor in the same origin observation state', async () => {
         const server = createCopilotMcpServer();
         try {
             const factory = getCopilotMcpServerFactoryStatus();
             const runtime = /** @type {Record<string, unknown>} */ (factory['runtime']);
-            const convergence = /** @type {Record<string, unknown>} */ (factory['schemaConvergence']);
-            const direct = readMcpSchemaConvergenceState();
-            assert.equal(convergence['currentDescriptorFingerprint'], runtime['lastDescriptorFingerprint']);
-            assert.equal(convergence['currentDescriptorFingerprint'], direct.currentDescriptorFingerprint);
-            assert.equal(convergence['currentToolCount'], runtime['lastToolCount']);
-            assert.equal(convergence['descriptorRevision'], 1);
-            assert.equal(convergence['listChangedAdvertised'], true);
+            const observation = /** @type {Record<string, unknown>} */ (factory['descriptorObservation']);
+            const direct = readMcpDescriptorObservationState();
+            assert.equal(observation['scope'], 'origin-mcp-descriptor-observation');
+            assert.equal(observation['currentDescriptorFingerprint'], runtime['lastDescriptorFingerprint']);
+            assert.equal(observation['currentDescriptorFingerprint'], direct.currentDescriptorFingerprint);
+            assert.equal(observation['currentToolCount'], runtime['lastToolCount']);
+            assert.equal(observation['descriptorRevision'], 1);
+            assert.equal(observation['listChangedAdvertised'], true);
+            const chatgptSnapshot = /** @type {Record<string, unknown>} */ (observation['chatgptActionSnapshot']);
+            assert.equal(chatgptSnapshot['observableFromOrigin'], false);
+            assert.equal(chatgptSnapshot['status'], 'external-admin-state');
+            assert.match(String(chatgptSnapshot['inferenceBoundary']), /does not prove/u);
         } finally {
             await server.close();
         }

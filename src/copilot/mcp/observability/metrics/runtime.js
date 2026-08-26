@@ -166,6 +166,8 @@ const MCP_HTTP_TOOL_TIMING_CONTEXT = new AsyncLocalStorage();
     recent: HttpRequestActivityEvent[];
     byRoute: Map<string, number>;
     byRpcMethod: Map<string, number>;
+    byStatusClass: Map<string, number>;
+    rateLimitedByRoute: Map<string, number>;
 }} */
 const HTTP_REQUEST_ACTIVITY_METRICS = {
     totalRequests: 0,
@@ -174,6 +176,8 @@ const HTTP_REQUEST_ACTIVITY_METRICS = {
     recent: [],
     byRoute: new Map(),
     byRpcMethod: new Map(),
+    byStatusClass: new Map(),
+    rateLimitedByRoute: new Map(),
 };
 
 /** @type {HttpToolBoundaryMetrics} */
@@ -534,6 +538,13 @@ function finishMcpHttpRequestActivity(context, statusCode, observedAt = Date.now
     HTTP_REQUEST_ACTIVITY_METRICS.active.delete(context.requestId);
     HTTP_REQUEST_ACTIVITY_METRICS.completedRequests += 1;
     const normalizedStatus = Number(statusCode);
+    const normalizedStatusCode = Number.isInteger(normalizedStatus) && normalizedStatus > 0 ? normalizedStatus : null;
+    if (normalizedStatusCode !== null) {
+        incrementMapCount(HTTP_REQUEST_ACTIVITY_METRICS.byStatusClass, classifyHttpStatusClass(normalizedStatusCode));
+        if (normalizedStatusCode === 429) {
+            incrementMapCount(HTTP_REQUEST_ACTIVITY_METRICS.rateLimitedByRoute, context.routeClass ?? 'other');
+        }
+    }
     HTTP_REQUEST_ACTIVITY_METRICS.recent.push({
         requestId: context.requestId,
         receivedAt: context.receivedAt,
@@ -542,7 +553,7 @@ function finishMcpHttpRequestActivity(context, statusCode, observedAt = Date.now
         httpMethod: context.httpMethod ?? 'UNKNOWN',
         routeClass: context.routeClass ?? 'other',
         rpcMethod: context.rpcMethod,
-        statusCode: Number.isInteger(normalizedStatus) && normalizedStatus > 0 ? normalizedStatus : null,
+        statusCode: normalizedStatusCode,
         edgeColo: context.edgeColo,
     });
     if (HTTP_REQUEST_ACTIVITY_METRICS.recent.length > MAX_HTTP_REQUEST_ACTIVITY_EVENTS) {
@@ -886,6 +897,8 @@ export function recordMcpToolMetric(tool, event) {
  *                 activeRequests: number;
  *                 byRoute: Record<string, number>;
  *                 byRpcMethod: Record<string, number>;
+ *                 byStatusClass: Record<string, number>;
+ *                 rateLimitedByRoute: Record<string, number>;
  *                 lastCompleted: ReturnType<typeof compactHttpRequestActivityEvent>;
  *             };
  *         };
@@ -1092,6 +1105,8 @@ export function readMcpMetricsSnapshot() {
                     activeRequests: HTTP_REQUEST_ACTIVITY_METRICS.active.size,
                     byRoute: mapCountsToRecord(HTTP_REQUEST_ACTIVITY_METRICS.byRoute),
                     byRpcMethod: mapCountsToRecord(HTTP_REQUEST_ACTIVITY_METRICS.byRpcMethod),
+                    byStatusClass: mapCountsToRecord(HTTP_REQUEST_ACTIVITY_METRICS.byStatusClass),
+                    rateLimitedByRoute: mapCountsToRecord(HTTP_REQUEST_ACTIVITY_METRICS.rateLimitedByRoute),
                     lastCompleted: compactHttpRequestActivityEvent(HTTP_REQUEST_ACTIVITY_METRICS.recent.at(-1) ?? null),
                 },
             },
@@ -1150,6 +1165,8 @@ export function resetMcpMetricsForTests() {
     HTTP_REQUEST_ACTIVITY_METRICS.recent.length = 0;
     HTTP_REQUEST_ACTIVITY_METRICS.byRoute.clear();
     HTTP_REQUEST_ACTIVITY_METRICS.byRpcMethod.clear();
+    HTTP_REQUEST_ACTIVITY_METRICS.byStatusClass.clear();
+    HTTP_REQUEST_ACTIVITY_METRICS.rateLimitedByRoute.clear();
     resetDurationSamples(HTTP_TOOL_BOUNDARY_METRICS.preHandler);
     resetDurationSamples(HTTP_TOOL_BOUNDARY_METRICS.postHandler);
 }
@@ -1232,6 +1249,16 @@ function compactHttpRequestActivityEvent(event) {
         statusCode: event.statusCode,
         edgeColo: event.edgeColo,
     };
+}
+
+/** @param {number} statusCode */
+function classifyHttpStatusClass(statusCode) {
+    if (statusCode >= 100 && statusCode < 200) return '1xx';
+    if (statusCode >= 200 && statusCode < 300) return '2xx';
+    if (statusCode >= 300 && statusCode < 400) return '3xx';
+    if (statusCode >= 400 && statusCode < 500) return '4xx';
+    if (statusCode >= 500 && statusCode < 600) return '5xx';
+    return 'other';
 }
 
 /** @param {unknown} value @param {string} fallback */

@@ -56,8 +56,8 @@ describe('copilot MCP audit capability', () => {
                 kind: 'protocol-request',
                 protocolEra: '2026',
                 transportMode: 'modern-2026',
-                rpcClass: 'tools-call',
-                continuity: 'stream-resume',
+                rpcClass: 'subscriptions-listen',
+                continuity: 'modern-subscription-open',
                 clientId: 'must-never-persist',
                 token: 'must-never-persist',
             });
@@ -65,6 +65,7 @@ describe('copilot MCP audit capability', () => {
                 kind: 'oauth-client',
                 clientSource: 'cimd',
                 hostClass: 'chatgpt',
+                actorClass: 'consumer',
                 resolution: 'trusted-fallback',
                 outcome: 'succeeded',
                 redirectUri: 'https://example.invalid/private',
@@ -74,8 +75,19 @@ describe('copilot MCP audit capability', () => {
                 grantType: 'refresh_token',
                 clientSource: 'cimd',
                 hostClass: 'chatgpt',
+                actorClass: 'consumer',
                 outcome: 'succeeded',
                 subject: 'must-never-persist',
+            });
+
+            await audit.append({
+                event: 'mcp_compat_observation',
+                schemaVersion: 1,
+                kind: 'protocol-request',
+                protocolEra: '2025',
+                transportMode: 'stateful',
+                rpcClass: 'other',
+                continuity: 'stream-resume',
             });
 
             const text = await readFile(auditFile, 'utf8');
@@ -97,16 +109,20 @@ describe('copilot MCP audit capability', () => {
             ]);
 
             const summary = await audit.readCompatibilitySummary({ tailBytes: 64 * 1024, maxEvents: 100 });
-            assert.equal(summary.observations, 3);
-            assert.equal(summary.protocol.totalRequests, 1);
+            assert.equal(summary.schemaVersion, 2);
+            assert.equal(summary.observations, 4);
+            assert.equal(summary.protocol.totalRequests, 2);
             assert.equal(summary.protocol.byEra['2026'], 1);
-            assert.equal(summary.protocol.byContinuity['stream-resume'], 1);
+            assert.equal(summary.protocol.byContinuity['modern-subscription-open'], 1);
+            assert.equal(summary.protocol.byContinuity['legacy-stream-resume'], 1);
             assert.equal(summary.oauth.clientActivity.bySource.cimd, 1);
             assert.equal(summary.oauth.clientActivity.byHostClass.chatgpt, 1);
             assert.equal(summary.oauth.clientActivity.successfulByHostClass.chatgpt, 1);
             assert.equal(summary.oauth.clientActivity.byOutcome.succeeded, 1);
+            assert.equal(summary.oauth.clientActivity.byActorClass.consumer, 1);
             assert.equal(summary.oauth.grants.byGrantType.refresh_token, 1);
             assert.equal(summary.oauth.grants.byOutcome.succeeded, 1);
+            assert.equal(summary.oauth.grants.byActorClass.consumer, 1);
             assert.ok(summary.window.firstObservedAt);
             assert.ok(summary.window.lastObservedAt);
             await assert.rejects(

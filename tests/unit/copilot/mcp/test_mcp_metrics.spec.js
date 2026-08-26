@@ -225,6 +225,27 @@ describe('MCP runtime metrics', () => {
         assert.deepEqual(boundary.requestActivity.byRpcMethod, { 'tools/call': 2, 'tools/list': 1 });
     });
 
+    it('aggregates sanitized HTTP status classes and 429s by fixed route class', async () => {
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
+        let finishToken = null;
+        await runWithMcpHttpToolTimingContext({ requestId: 'oauth-rate-limit', receivedAt: 10_000 }, async () => {
+            finishToken = activateMcpHttpRequestActivity({ httpMethod: 'POST', routeClass: 'oauth-token' });
+        });
+        requireRequestFinalizer(finishToken)(429, 10_025);
+
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
+        let finishMcp = null;
+        await runWithMcpHttpToolTimingContext({ requestId: 'mcp-ok', receivedAt: 11_000 }, async () => {
+            finishMcp = activateMcpHttpRequestActivity({ httpMethod: 'POST', routeClass: 'mcp' });
+        });
+        requireRequestFinalizer(finishMcp)(200, 11_010);
+
+        const activity = readMcpMetricsSnapshot().interaction.originBoundary.requestActivity;
+        assert.deepEqual(activity.byStatusClass, { '2xx': 1, '4xx': 1 });
+        assert.deepEqual(activity.rateLimitedByRoute, { 'oauth-token': 1 });
+        assert.equal(activity.lastCompleted?.statusCode, 200);
+    });
+
     it('bounds dynamic tool and phase cardinality and safely handles special keys', () => {
         for (let index = 0; index < 1100; index += 1) {
             recordMcpToolMetric(`dynamic_${index}`, {

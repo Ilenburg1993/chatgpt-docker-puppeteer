@@ -217,9 +217,11 @@ Os achados centrais desta auditoria, reconciliados após as transformações exe
     derivadas. Os **34 warnings heurísticos caíram para zero** e
     `strictRiskValidation`/`strictToolRiskValidation` foram removidos: truthfulness de risco agora é
     invariant fail-closed, não toggle opt-in.
-11. **[P2, confirmado] O caminho moderno 2026 está correto, mas ainda não usa cache positivo de
-    descriptors.** `tools/list`/`server/discover` modernos permanecem válidos com `ttlMs: 0` e
-    `cacheScope: "private"`; qualquer TTL positivo exige freshness/invalidation proof.
+11. **[SUPERADO por K.4; snapshot histórico pré-K.4] O caminho moderno 2026 ainda não usava cache
+    positivo neste ponto da auditoria.** A afirmação `ttlMs: 0` abaixo descreve o estado anterior à
+    implementação K.4. O estado live/canônico posterior é `tools/list = 300000 ms / private`, com
+    fingerprint generation-bound e regression de invalidation; `server/discover` permanece
+    `0/private`.
 12. **[P1, confirmado] Hotspots importantes ainda são multi-responsibility.** `repo-write`, auth
     issuer, diagnostics e alguns wire/application modules continuam candidatos a decomposição por
     função/authority. O antigo `http-shared` já foi extinto pela Faixa G. Tamanho permanece sinal
@@ -1468,16 +1470,21 @@ Adicionar schema onde isso:
 
 Não reintroduzir `z.record(z.any())` passthrough apenas para obter 100% nominal.
 
-## 6.12 Modern descriptor caching
+## 6.12 Modern descriptor caching — análise histórica pré-K.4
 
-`ttlMs: 0` é conservador e correto, mas pode ser desperdício.
+> **SUPERADO:** esta subseção preserva a decisão antes da implementação K.4. O estado atual está na
+> Faixa K.4: `tools/list = 300000/private`, `server/discover = 0/private`, fingerprint wire
+> generation-bound e invalidation provada. A observação do origin é distinta do snapshot
+> administrativo de actions do ChatGPT.
 
-Estado-alvo potencial:
+Naquele checkpoint, `ttlMs: 0` era conservador e correto, mas potencialmente desperdício. O
+estado-alvo então proposto era:
 
 - descriptor fingerprint é a identidade da surface;
 - `tools/list`/discover recebe TTL positivo moderado;
 - mudança de fingerprint dispara listChanged/invalidation;
-- schema convergence comprova que o host observou a nova revision;
+- observação de `tools/list` comprova somente descriptor retrieval no origin; não prova atualização
+  do snapshot administrativo do ChatGPT;
 - cache é privado e não mistura auth-dependent surfaces indevidamente.
 
 ### Evidence gate
@@ -3268,6 +3275,19 @@ fechou Prettier, zero suppressions (**0 em 3.563 arquivos ativos**) e `mcp-fast`
 **100/100 test files, 577/577 testes**. Este barrier autoriza commit/push do source; promoção/reload
 do runtime e revalidação do conector pertencem ao checkpoint seguinte e devem provar o novo HEAD
 publicado, não bloquear a publicação do source já certificado.
+
+**Barrier AURELIN 4 / MCP 2026 recertificado — 2026-08-25:** a campanha especializada de
+conexão/reconexão modernizou o canonical smoke para MCP `2026-07-28`, separou compatibility 2025,
+fechou refresh-token hygiene, descriptor-observation boundary e telemetry por era, e aplicou o lote
+seguro de dependências. O barrier source final passou TS7 strict, lint, Prettier/diff-check e
+architecture integral; owners **68/49**, state **25/52**, env **38/61**, grafo **2.261/6.109/0
+ciclos**, public-cost/import-purity/cold-import sem violações. A suíte MCP final fechou **102/102
+arquivos, 586/586 testes**, exit 0. `oauth-smoke/runtime.js` permanece abaixo do hotspot budget em
+**90.881 bytes** após extração de reporting puro, sem rebaseline de tier. O fallback local Chromium
+148 continua classificado como gap independente de DevContainer: o binário trava antes de CDP mesmo
+fora do Puppeteer; o caminho canônico do repo permanece Chrome externo via `wsEndpoint`, e o live
+browser gate só pode ser refeito quando 9224/9225 estiver ativo. Publicação e host-real da nova
+geração pertencem ao checkpoint subsequente.
 
 **Gate N:** source, gates, runtime, host e upstream contam a mesma história.
 

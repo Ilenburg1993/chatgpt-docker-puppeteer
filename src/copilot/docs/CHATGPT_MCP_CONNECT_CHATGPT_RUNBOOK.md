@@ -1,10 +1,13 @@
 # Runbook — Conectar ChatGPT ao Repo via MCP
 
-**Data:** 2026-05-22  
-**Escopo:** `src/copilot/`  
-**Servidor local:** `src/copilot/mcp`  
-**Endpoint MCP local HTTP:** `http://127.0.0.1:3333/mcp`  
-**Endpoint público esperado no ChatGPT:** `https://<endpoint-do-tunel>/mcp`
+| Campo                                | Valor                         |
+| ------------------------------------ | ----------------------------- |
+| Data original                        | 2026-05-22                    |
+| Atualizado                           | 2026-08-25                    |
+| Escopo                               | `src/copilot/`                |
+| Servidor local                       | `src/copilot/mcp`             |
+| Endpoint MCP local HTTP              | `http://127.0.0.1:3333/mcp`   |
+| Endpoint público canônico no ChatGPT | `https://mcp.aurelin.org/mcp` |
 
 ---
 
@@ -17,10 +20,10 @@ O resultado esperado é:
 
 ```text
 ChatGPT
-  -> Connector Apps & Connectors
-  -> HTTPS /mcp
-  -> Cloudflare Quick Tunnel temporario, Secure MCP Tunnel ou tunnel HTTPS equivalente
-  -> MCP local no Dev Container
+  -> App/Connector OAuth
+  -> https://mcp.aurelin.org/mcp
+  -> Cloudflare Tunnel permanente
+  -> origin HTTPS/HTTP2 no Dev Container
   -> src/copilot/mcp
   -> repo real
 ```
@@ -137,132 +140,81 @@ Use `stdio` para VS Code, MCP Inspector local por comando, ou Secure MCP Tunnel 
 
 ### 5.1 Escolha canônica deste workspace
 
-Para a caixa do ChatGPT mostrada na captura, o caminho operacional atual e temporario:
+O caminho operacional atual é **permanente**, não Quick Tunnel:
 
 ```text
 ChatGPT
-  -> https://<aleatorio>.trycloudflare.com/mcp
-  -> Cloudflare Quick Tunnel
-  -> http://127.0.0.1:3333/mcp
+  -> OAuth/CIMD
+  -> https://mcp.aurelin.org/mcp
+  -> Cloudflare named tunnel
+  -> HTTPS origin / HTTP2
   -> src/copilot/mcp
 ```
 
-Configure a rota Cloudflare para o origin raiz:
+No formulário do ChatGPT use exatamente:
 
 ```text
-http://127.0.0.1:3333
+URL: https://mcp.aurelin.org/mcp
+Authentication: OAuth
 ```
 
-Cole no ChatGPT a URL publica temporaria com o path MCP:
+O issuer anuncia CIMD, PKCE S256, `private_key_jwt`, refresh tokens e `offline_access`. O client
+platform-wide atual do ChatGPT é `https://chatgpt.com/oauth/client.json`; o servidor também mantém
+compatibilidade com a forma histórica por handle enquanto houver evidence de consumer.
 
-```text
-https://<aleatorio>.trycloudflare.com/mcp
-```
+### 5.2 Operação do tunnel permanente
 
-Nao teremos dominio fixo por ora. Isso e intencional: cada sessao gera uma URL nova e o conector no
-ChatGPT deve ser atualizado/recriado com essa URL.
-
-### 5.2 Cloudflare Quick Tunnel
-
-Quick Tunnel e o modo principal sem conta Cloudflare e sem dominio fixo:
+Use os comandos canônicos do repo:
 
 ```bash
-npm run copilot:mcp:http
-npm run copilot:mcp:cloudflare:doctor
-npm run copilot:mcp:cloudflare:quick
+make copilot-mcp-up
+make copilot-mcp-status
 ```
 
-O wrapper captura a URL HTTPS aleatoria `trycloudflare.com`, acrescenta `/mcp`, grava
-`src/copilot/.ai/cloudflare/quick-tunnel.json` e imprime o endpoint para uso no ChatGPT.
+ou os scripts equivalentes `copilot:mcp:stateful:*`. A configuração permanente deve manter:
 
-Em outro terminal:
+- URL `https://mcp.aurelin.org/mcp`;
+- health local e público 200;
+- origin HTTP/2;
+- edge QUIC quando disponível;
+- OAuth enforcement `all`;
+- nenhum Quick Tunnel ativo como caminho principal.
+
+Depois de mudança de MCP/Cloudflare, use `mcp_cloudflare_post_change_gates` ou o comando canônico de
+post-change em vez de trocar hostname por tentativa e erro.
+
+### 5.3 Quick Tunnel é fallback explícito
+
+Quick Tunnel continua disponível apenas como fallback de desenvolvimento:
 
 ```bash
-npm run copilot:mcp:cloudflare:status
-npm run copilot:mcp:cloudflare:smoke
+COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick
 ```
 
-Cloudflare documenta Quick Tunnels como teste/desenvolvimento, com URL temporaria, limite de
-concorrencia e sem suporte a SSE. Esses limites sao aceitos neste projeto por enquanto.
+Não recrie o app normal do ChatGPT em uma URL `trycloudflare.com` enquanto o named tunnel permanente
+estiver saudável. URLs temporárias mudam identidade operacional e dificultam distinguir falha de
+OAuth, DNS, tunnel e snapshot administrativo do host.
 
-### 5.3 Cloudflare Tunnel publicado futuro opcional
+### 5.4 Smoke e reconexão
 
-Nao usaremos dominio fixo por ora. Esta subfase fica apenas como referencia futura se a natureza do
-projeto mudar.
+O smoke canônico deve usar **MCP 2026-07-28 via SDK oficial**. O caminho legacy
+`initialize -> Mcp-Session-Id -> GET/SSE -> Last-Event-ID` é somente compatibility smoke 2025 e não
+pode ser usado para declarar reconnect moderno verde.
 
-Para uma URL estavel futura:
+Depois de restart do origin/tunnel, diferencie:
 
-1. Crie no painel Cloudflare um tunnel remoto.
-2. Adicione uma rota de published application.
-3. Escolha o hostname publico.
-4. Configure o service/origin como `http://127.0.0.1:3333` no ambiente que roda `cloudflared`.
-5. Copie o token do tunnel para segredo local.
-6. Rode:
+1. access token ainda válido e tool calls voltando;
+2. refresh OAuth após expiração;
+3. `subscriptions/listen` moderno e eventual re-listen após remote close;
+4. replay SSE/Last-Event-ID legacy;
+5. snapshot administrativo de tools/actions no ChatGPT.
 
-```bash
-npm run copilot:mcp:http
-export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
-export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://<hostname-cloudflare>/mcp"
-npm run copilot:mcp:cloudflare:doctor
-npm run copilot:mcp:cloudflare:run
-```
+O item 5 possui lifecycle próprio: se descriptors/actions mudaram, use **Refresh/review** no app do
+ChatGPT. `tools/list`, cache TTL, reconnect ou `list_changed` observados no origin não provam que o
+snapshot administrativo do ChatGPT mudou.
 
-### 5.4 Status e smoke da sessao temporaria
-
-Status:
-
-```bash
-npm run copilot:mcp:cloudflare:status
-```
-
-Retorna:
-
-1. Nome.
-2. Descricao.
-3. URL MCP temporaria para a caixa do ChatGPT.
-4. Autenticacao `none-dev`.
-5. Arquivo de estado local.
-
-Se o PID do `cloudflared` salvo no estado ja tiver encerrado, `status` retorna `ok=false`; a URL
-antiga deve ser tratada como expirada.
-
-Smoke:
-
-```bash
-npm run copilot:mcp:cloudflare:smoke
-```
-
-Valida:
-
-1. `GET https://<aleatorio>.trycloudflare.com/health`.
-2. `POST https://<aleatorio>.trycloudflare.com/mcp` com `tools/list`.
-3. Quantidade de tools retornadas.
-4. Paridade exata entre `tools/list` remoto e `getCanonicalMcpTools()`.
-5. Presenca das tools criticas de leitura, validacao, runtime, smoke e indice.
-
-Se `toolsMatchLocalRegistry=false`, a URL nao deve ser usada como conector operacional. O caso mais
-comum durante desenvolvimento e simples: o `cloudflared` continua vivo, mas o origin local
-`127.0.0.1:3333` ainda esta rodando uma versao antiga do MCP. Nesse caso:
-
-1. Reinicie somente o origin MCP em `3333`.
-2. Mantenha o processo `cloudflared` vivo quando possivel, para preservar a mesma URL temporaria.
-3. Rode `npm run copilot:mcp:smoke:local` contra `http://127.0.0.1:3333/mcp`.
-4. Rode `npm run copilot:mcp:cloudflare:smoke`.
-5. Use a URL no ChatGPT somente quando `toolsMatchLocalRegistry=true`, `criticalToolsPresent=true`,
-   `missingLocalTools=[]` e `unexpectedRemoteTools=[]`.
-
-Estado validado em 2026-05-22 apos a rodada de paridade IO/indice:
-
-```text
-URL publica: https://hull-grove-hence-departmental.trycloudflare.com/mcp
-Origin: http://127.0.0.1:3333/mcp
-Tools remotas: 43
-Tools esperadas: 43
-toolsMatchLocalRegistry: true
-criticalToolsPresent: true
-missingLocalTools: []
-unexpectedRemoteTools: []
-```
+O estado normal esperado é **131 tools** e paridade exata com o registry local. Nunca use contagens
+históricas deste runbook como target atual; consulte `mcp_tools_status`/`mcp_capabilities_summary`.
 
 ### 5.5 Instalacao do cloudflared
 
@@ -420,7 +372,7 @@ Conecta o ChatGPT ao repositório aberto no VS Code Dev Container. Permite ler a
 ### URL do servidor MCP
 
 ```text
-https://<aleatorio>.trycloudflare.com/mcp
+https://mcp.aurelin.org/mcp
 ```
 
 Nunca use no formulário:
@@ -430,28 +382,20 @@ http://localhost:3333/mcp
 http://127.0.0.1:3333/mcp
 ```
 
-Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo
-Cloudflare Quick Tunnel temporario ou endpoint OpenAI do Secure MCP Tunnel.
+Essas URLs só funcionam localmente. O app canônico usa o hostname permanente
+`https://mcp.aurelin.org/mcp`; Quick Tunnel é fallback explícito.
 
 ### Autenticação
 
-Para Cloudflare Tunnel:
+Use **OAuth**. O issuer MCP embutido oferece protected-resource metadata, authorization-server
+metadata, CIMD, PKCE S256, `private_key_jwt`, refresh rotation/revocation e `offline_access`.
 
-1. O MCP server atual nao implementa OAuth proprio.
-2. Se o formulario oferecer modo sem autenticacao em developer mode, use-o apenas no ambiente
-   controlado.
-3. Se voce selecionar OAuth, a URL `/mcp` precisa ter fluxo OAuth compativel; Cloudflare Tunnel
-   simples nao o fornece.
-4. Uma pagina de login interativa Cloudflare Access diante de `/mcp` pode bloquear o backend do
-   ChatGPT.
-5. O perfil JSON usa `authMode=none-dev` por default e aceita override
-   `COPILOT_MCP_CHATGPT_AUTH_MODE`.
+Não coloque Cloudflare Access/login interativo diante de `/mcp` ou `/oauth/*`: o backend do ChatGPT
+precisa alcançar essas rotas programaticamente. DCR existe apenas como compatibilidade opt-in; CIMD
+é o caminho canônico.
 
-Para Secure MCP Tunnel:
-
-1. Use a opcao compativel com o tunnel configurado.
-2. Para uso persistente fora do ambiente controlado, prefira OAuth 2.1 ou autenticacao compativel
-   com a infraestrutura.
+Se a autorização falhar, primeiro use `mcp_oauth_issuer_diagnostics` e
+`chatgpt_connector_current_url_status`; não troque para `none-dev` como recuperação rotineira.
 
 ### Confirmação de risco
 
@@ -675,6 +619,19 @@ Verifique:
 5. MCP local responde.
 6. ChatGPT developer mode está habilitado.
 
+### Conector volta após restart, mas actions/tools parecem antigas
+
+Isto pode ser **snapshot administrativo do ChatGPT**, não falha de reconnect MCP. Verifique
+`mcp_tools_status` e `descriptorObservation`; se o origin está correto e descriptors mudaram, use o
+fluxo **Refresh/review** do app no ChatGPT. Reconnect do socket/OAuth sozinho não é prova de
+atualização do snapshot.
+
+### Subscription moderna cai
+
+Em MCP 2026, notifications usam `subscriptions/listen`. Um remote close resolve a subscription como
+`remote`; o client owner precisa abrir nova `listen()`. Não tente recuperar isso com
+`Last-Event-ID`, que pertence à compatibilidade 2025.
+
 ### Tools não aparecem
 
 Verifique:
@@ -712,8 +669,9 @@ Verifique:
 2. `GET /health` responde.
 3. `GET /chatgpt-connector.json` responde.
 4. `tools/list` inclui `chatgpt_connector_profile`.
-5. Cloudflare Quick Tunnel temporario ou Secure MCP Tunnel configurado.
-6. ChatGPT recebe `https://<aleatorio>.trycloudflare.com/mcp`.
+5. Cloudflare named tunnel permanente saudável (`https://mcp.aurelin.org/mcp`); Quick Tunnel apenas
+   fallback.
+6. ChatGPT recebe `https://mcp.aurelin.org/mcp`.
 7. ChatGPT lista tools.
 8. ChatGPT chama `repo_status`.
 9. ChatGPT chama `repo_tree`.
@@ -723,7 +681,14 @@ Verifique:
 
 ---
 
-## 16. Validacao local executada nesta implementacao
+## 16. Histórico de validações anteriores — SUPERADO COMO ESTADO ATUAL
+
+> Esta seção preserva evidência temporal das primeiras ondas do runbook. Contagens de tools, Quick
+> Tunnel como modo principal, `none-dev` e falhas de suites aqui registradas **não descrevem o HEAD
+> atual**. Para o estado vigente use `mcp_tools_status`, `mcp_runtime_health`, o roadmap AURELIN 4
+> de 2026-08-25 e os checkpoints mais recentes de release.
+
+### Validação local executada na implementação histórica
 
 1. Typecheck strict:
 
@@ -815,7 +780,7 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 9. `npm run test:copilot:unit` repetiu as 6 falhas preexistentes fora do MCP: 3033 testes totais,
    3027 passaram.
 
-### Validacao adicional apos promocao do dominio temporario
+### Validação histórica após promoção do domínio temporário — SUPERADA
 
 1. O modo operacional principal passou a ser Quick Tunnel temporario.
 2. O CLI captura a URL `trycloudflare.com` automaticamente.

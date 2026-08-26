@@ -15,7 +15,8 @@ const MAX_AUDIT_HISTORY_TAIL_BYTES = 16 * 1024 * 1024;
 const DEFAULT_AUDIT_HISTORY_EVENTS = 25_000;
 const MAX_AUDIT_HISTORY_EVENTS = 100_000;
 const MCP_COMPATIBILITY_OBSERVATION_EVENT = 'mcp_compat_observation';
-const MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION = 1;
+const MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION = 2;
+const MCP_COMPATIBILITY_OBSERVATION_READABLE_SCHEMA_VERSIONS = Object.freeze([1, 2]);
 const COMPATIBILITY_PROTOCOL_ERAS = Object.freeze(['2025', '2026']);
 const COMPATIBILITY_TRANSPORT_MODES = Object.freeze(['modern-2026', 'stateful', 'stateless-fallback']);
 const COMPATIBILITY_RPC_CLASSES = Object.freeze([
@@ -36,7 +37,13 @@ const COMPATIBILITY_CLIENT_RESOLUTIONS = Object.freeze([
 ]);
 const COMPATIBILITY_GRANT_TYPES = Object.freeze(['authorization_code', 'refresh_token']);
 const COMPATIBILITY_OUTCOMES = Object.freeze(['attempted', 'succeeded', 'rejected']);
-const COMPATIBILITY_CONTINUITY_SIGNALS = Object.freeze(['none', 'stream-open', 'stream-resume']);
+const COMPATIBILITY_ACTOR_CLASSES = Object.freeze(['consumer', 'diagnostic', 'unknown']);
+const COMPATIBILITY_CONTINUITY_SIGNALS = Object.freeze([
+    'none',
+    'legacy-stream-open',
+    'legacy-stream-resume',
+    'modern-subscription-open',
+]);
 
 /** @param {import('./config.js').McpAuditProcessConfig} config */
 function createMcpAuditRuntime(config) {
@@ -421,6 +428,7 @@ function normalizeMcpCompatibilityObservation(observation) {
                 'clientSource',
             ),
             hostClass: requireCompatibilityEnum(observation['hostClass'], COMPATIBILITY_HOST_CLASSES, 'hostClass'),
+            actorClass: requireCompatibilityEnum(observation['actorClass'], COMPATIBILITY_ACTOR_CLASSES, 'actorClass'),
             resolution: requireCompatibilityEnum(
                 observation['resolution'],
                 COMPATIBILITY_CLIENT_RESOLUTIONS,
@@ -441,6 +449,7 @@ function normalizeMcpCompatibilityObservation(observation) {
                 'clientSource',
             ),
             hostClass: requireCompatibilityEnum(observation['hostClass'], COMPATIBILITY_HOST_CLASSES, 'hostClass'),
+            actorClass: requireCompatibilityEnum(observation['actorClass'], COMPATIBILITY_ACTOR_CLASSES, 'actorClass'),
             outcome: requireCompatibilityEnum(observation['outcome'], COMPATIBILITY_OUTCOMES, 'outcome'),
         };
     }
@@ -499,6 +508,8 @@ async function readMcpCompatibilitySummary(runtime, options = {}) {
                 total: 0,
                 bySource: { cimd: 0, dcr: 0, unknown: 0 },
                 byHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
+                byActorClass: { consumer: 0, diagnostic: 0, unknown: 0 },
+                bySourceAndActorClass: buildCompatibilitySourceActorCounters(),
                 successfulByHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
                 byResolution: Object.fromEntries([...COMPATIBILITY_CLIENT_RESOLUTIONS].map((key) => [key, 0])),
                 byOutcome: { attempted: 0, succeeded: 0, rejected: 0 },
@@ -508,6 +519,8 @@ async function readMcpCompatibilitySummary(runtime, options = {}) {
                 byGrantType: { authorization_code: 0, refresh_token: 0 },
                 byClientSource: { cimd: 0, dcr: 0, unknown: 0 },
                 byHostClass: { chatgpt: 0, claude: 0, unknown: 0 },
+                byActorClass: { consumer: 0, diagnostic: 0, unknown: 0 },
+                bySourceAndActorClass: buildCompatibilitySourceActorCounters(),
                 byOutcome: { attempted: 0, succeeded: 0, rejected: 0 },
             },
         },
@@ -517,34 +530,42 @@ async function readMcpCompatibilitySummary(runtime, options = {}) {
     for (const event of tail.events) {
         if (
             event['event'] !== MCP_COMPATIBILITY_OBSERVATION_EVENT ||
-            event['schemaVersion'] !== MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION
+            !MCP_COMPATIBILITY_OBSERVATION_READABLE_SCHEMA_VERSIONS.includes(Number(event['schemaVersion']))
         ) {
             continue;
         }
+        const compatibilityEvent = normalizeReadableCompatibilityEvent(event);
         summary.observations += 1;
         const observedAt = Date.parse(String(event['ts'] ?? ''));
         if (Number.isFinite(observedAt)) observedTimes.push(observedAt);
-        if (event['kind'] === 'protocol-request') {
+        if (compatibilityEvent['kind'] === 'protocol-request') {
             summary.protocol.totalRequests += 1;
-            incrementSummaryCounter(summary.protocol.byEra, event['protocolEra']);
-            incrementSummaryCounter(summary.protocol.byTransportMode, event['transportMode']);
-            incrementSummaryCounter(summary.protocol.byRpcClass, event['rpcClass']);
-            incrementSummaryCounter(summary.protocol.byContinuity, event['continuity']);
-        } else if (event['kind'] === 'oauth-client') {
+            incrementSummaryCounter(summary.protocol.byEra, compatibilityEvent['protocolEra']);
+            incrementSummaryCounter(summary.protocol.byTransportMode, compatibilityEvent['transportMode']);
+            incrementSummaryCounter(summary.protocol.byRpcClass, compatibilityEvent['rpcClass']);
+            incrementSummaryCounter(summary.protocol.byContinuity, compatibilityEvent['continuity']);
+        } else if (compatibilityEvent['kind'] === 'oauth-client') {
             summary.oauth.clientActivity.total += 1;
-            incrementSummaryCounter(summary.oauth.clientActivity.bySource, event['clientSource']);
-            incrementSummaryCounter(summary.oauth.clientActivity.byHostClass, event['hostClass']);
-            if (event['outcome'] === 'succeeded') {
-                incrementSummaryCounter(summary.oauth.clientActivity.successfulByHostClass, event['hostClass']);
+            incrementSummaryCounter(summary.oauth.clientActivity.bySource, compatibilityEvent['clientSource']);
+            incrementSummaryCounter(summary.oauth.clientActivity.byHostClass, compatibilityEvent['hostClass']);
+            incrementSummaryCounter(summary.oauth.clientActivity.byActorClass, compatibilityEvent['actorClass']);
+            incrementSourceActorCounter(summary.oauth.clientActivity.bySourceAndActorClass, compatibilityEvent);
+            if (compatibilityEvent['outcome'] === 'succeeded') {
+                incrementSummaryCounter(
+                    summary.oauth.clientActivity.successfulByHostClass,
+                    compatibilityEvent['hostClass'],
+                );
             }
-            incrementSummaryCounter(summary.oauth.clientActivity.byResolution, event['resolution']);
-            incrementSummaryCounter(summary.oauth.clientActivity.byOutcome, event['outcome']);
-        } else if (event['kind'] === 'oauth-grant') {
+            incrementSummaryCounter(summary.oauth.clientActivity.byResolution, compatibilityEvent['resolution']);
+            incrementSummaryCounter(summary.oauth.clientActivity.byOutcome, compatibilityEvent['outcome']);
+        } else if (compatibilityEvent['kind'] === 'oauth-grant') {
             summary.oauth.grants.total += 1;
-            incrementSummaryCounter(summary.oauth.grants.byGrantType, event['grantType']);
-            incrementSummaryCounter(summary.oauth.grants.byClientSource, event['clientSource']);
-            incrementSummaryCounter(summary.oauth.grants.byHostClass, event['hostClass']);
-            incrementSummaryCounter(summary.oauth.grants.byOutcome, event['outcome']);
+            incrementSummaryCounter(summary.oauth.grants.byGrantType, compatibilityEvent['grantType']);
+            incrementSummaryCounter(summary.oauth.grants.byClientSource, compatibilityEvent['clientSource']);
+            incrementSummaryCounter(summary.oauth.grants.byHostClass, compatibilityEvent['hostClass']);
+            incrementSummaryCounter(summary.oauth.grants.byActorClass, compatibilityEvent['actorClass']);
+            incrementSourceActorCounter(summary.oauth.grants.bySourceAndActorClass, compatibilityEvent);
+            incrementSummaryCounter(summary.oauth.grants.byOutcome, compatibilityEvent['outcome']);
         }
     }
     if (observedTimes.length > 0) {
@@ -555,6 +576,52 @@ async function readMcpCompatibilitySummary(runtime, options = {}) {
         summary.window.durationMs = Math.max(0, lastObservedAt - firstObservedAt);
     }
     return summary;
+}
+
+/** Build the fixed client-source × actor-class aggregate shape without retaining client identity. */
+function buildCompatibilitySourceActorCounters() {
+    return Object.fromEntries(
+        COMPATIBILITY_CLIENT_SOURCES.map((source) => [
+            source,
+            Object.fromEntries(COMPATIBILITY_ACTOR_CLASSES.map((actorClass) => [actorClass, 0])),
+        ]),
+    );
+}
+
+/** @param {Record<string, Record<string, number>>} counters @param {Record<string, unknown>} event */
+function incrementSourceActorCounter(counters, event) {
+    const source = String(event['clientSource'] ?? 'unknown');
+    const actorClass = String(event['actorClass'] ?? 'unknown');
+    const row = counters[source];
+    if (row && Object.hasOwn(row, actorClass)) row[actorClass] = (row[actorClass] ?? 0) + 1;
+}
+
+/**
+ * Normalize historical schema-v1 continuity into the era-specific v2 vocabulary. V1 OAuth observations have no
+ * actor classification, so they remain `unknown` rather than being retroactively guessed.
+ *
+ * @param {Record<string, unknown>} event
+ */
+function normalizeReadableCompatibilityEvent(event) {
+    if (Number(event['schemaVersion']) === MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION) return event;
+    if (event['kind'] === 'protocol-request') {
+        const protocolEra = String(event['protocolEra'] ?? '');
+        const rpcClass = String(event['rpcClass'] ?? '');
+        const oldContinuity = String(event['continuity'] ?? 'none');
+        let continuity = 'none';
+        if (protocolEra === '2026' && rpcClass === 'subscriptions-listen' && oldContinuity === 'stream-open') {
+            continuity = 'modern-subscription-open';
+        } else if (protocolEra === '2025' && oldContinuity === 'stream-open') {
+            continuity = 'legacy-stream-open';
+        } else if (protocolEra === '2025' && oldContinuity === 'stream-resume') {
+            continuity = 'legacy-stream-resume';
+        }
+        return { ...event, continuity };
+    }
+    if (event['kind'] === 'oauth-client' || event['kind'] === 'oauth-grant') {
+        return { ...event, actorClass: 'unknown' };
+    }
+    return event;
 }
 
 /**

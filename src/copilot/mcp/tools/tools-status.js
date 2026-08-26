@@ -9,7 +9,7 @@ import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payl
 import {
     classifyMcpToolContractRisk,
     defineMcpRawTool,
-    readMcpSchemaConvergenceState,
+    readMcpDescriptorObservationState,
 } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
@@ -219,7 +219,7 @@ export const mcpToolsStatusTool = defineMcpRawTool({
             },
             executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
             executionLimits: MCP_TOOL_EXECUTION_LIMITS,
-            schemaConvergence: readMcpSchemaConvergenceState(),
+            descriptorObservation: readMcpDescriptorObservationState(),
             publicationWorkflow: {
                 preferred: 'git_publish_changes',
                 happyPath:

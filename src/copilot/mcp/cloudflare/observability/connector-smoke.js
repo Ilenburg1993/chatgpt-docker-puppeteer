@@ -42,7 +42,8 @@ function asRecord(value) {
  *     failedChecks: string[];
  *     runtimeHealth: Record<string, unknown> | null;
  *     authenticatedToolsList: AuthenticatedToolsListProjection | null;
- *     authenticatedSse: Record<string, unknown> | null;
+ *     modernSubscription: Record<string, unknown> | null;
+ *     legacy2025Compatibility: Record<string, unknown> | null;
  * }} AuthenticatedOAuthSmokeProjection
  *
  *
@@ -111,6 +112,7 @@ export async function runCanonicalConnectorSmoke({
         retryBaseDelayMs: 250,
         retryMaxDelayMs: 1_000,
         runDcrCompatibility: false,
+        runLegacyCompatibility: false,
         runPrivateKeyJwt: false,
         runNegativeResourceChecks: false,
         localToolNames,
@@ -122,7 +124,8 @@ export async function runCanonicalConnectorSmoke({
     const oauthRecord = asRecord(oauth);
     const runtimeFlow = asRecord(oauthRecord['runtimeFlow']);
     const authenticatedToolsList = asRecord(runtimeFlow['authenticatedToolsList']);
-    const authenticatedSse = asRecord(runtimeFlow['authenticatedSse']);
+    const modernSubscription = asRecord(runtimeFlow['modernSubscription']);
+    const legacy2025Compatibility = asRecord(runtimeFlow['legacy2025Compatibility']);
     const runtimeHealth = asRecord(runtimeFlow['runtimeHealth']);
     /** @type {AuthenticatedToolsListProjection | null} */
     const authenticatedToolsListProjection =
@@ -158,7 +161,8 @@ export async function runCanonicalConnectorSmoke({
             failedChecks: stringArray(oauthRecord['failedChecks']),
             runtimeHealth: Object.keys(runtimeHealth).length > 0 ? runtimeHealth : null,
             authenticatedToolsList: authenticatedToolsListProjection,
-            authenticatedSse: Object.keys(authenticatedSse).length > 0 ? authenticatedSse : null,
+            modernSubscription: Object.keys(modernSubscription).length > 0 ? modernSubscription : null,
+            legacy2025Compatibility: Object.keys(legacy2025Compatibility).length > 0 ? legacy2025Compatibility : null,
         },
     };
 

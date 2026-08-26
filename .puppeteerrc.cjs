@@ -105,8 +105,10 @@ module.exports = {
     // skipDownload: false (padrão - baixa Chromium automaticamente)
     // Environment: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
     //
-    // Descomente próxima linha para NUNCA baixar Chromium:
-    // skipDownload: true,
+    // O DevContainer instala /usr/bin/chromium e o caminho canônico usa Chrome externo via CDP.
+    // Não baixar Chrome for Testing no postinstall: evita duplicação de centenas de MiB e mantém o
+    // install hermético. O executablePath abaixo continua sendo o fallback local explícito.
+    skipDownload: true,
 
     // ==========================================================================
     // EXECUTABLE PATH: Chrome/Chromium customizado (opcional)
