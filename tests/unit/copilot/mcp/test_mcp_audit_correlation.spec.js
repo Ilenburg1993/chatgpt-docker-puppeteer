@@ -159,6 +159,28 @@ describe('MCP audit correlation boundary', () => {
         assert.equal(JSON.stringify(metadata).includes(sensitive), false);
     });
 
+    it('does not misclassify compact tree summaries as duplicated structured payload', () => {
+        const structured = { success: true, path: 'src/copilot/mcp', entries: [{ name: 'README.md' }] };
+        const legacy = JSON.stringify(structured, null, 2);
+        const legacyMetadata = buildMcpToolResultAuditMetadataForTests(
+            'repo_tree',
+            { content: [{ type: 'text', text: legacy }], structuredContent: structured },
+            { strategy: 'stringify', bytes: 4_000 },
+            undefined,
+        );
+        assert.equal(legacyMetadata['duplicateTextBytes'], Buffer.byteLength(legacy, 'utf8'));
+
+        const compact =
+            'Tree src/copilot/mcp: entries=1, scanned=1, blocked=0, truncated=false; full tree entries are in structuredContent.entries.';
+        const compactMetadata = buildMcpToolResultAuditMetadataForTests(
+            'repo_tree',
+            { content: [{ type: 'text', text: compact }], structuredContent: structured },
+            { strategy: 'hint', bytes: 2_000 },
+            undefined,
+        );
+        assert.equal(compactMetadata['duplicateTextBytes'], undefined);
+    });
+
     it('builds per-call correlation from bounded metadata only', () => {
         const correlation = buildMcpToolCallAuditCorrelation({
             callId: 'call-123',

@@ -212,7 +212,7 @@ describe('copilot MCP tools', () => {
         assert.match(String(details['nextAction'] ?? ''), /reread will not bypass/i);
     });
 
-    it('repo_read_file returns structured content and text content', async () => {
+    it('repo_read_file keeps full content only in structuredContent and returns a compact text summary', async () => {
         const tool = findTool('repo_read_file');
         const result = await tool.handler({
             path: 'src/copilot/mcp/README.md',
@@ -227,8 +227,13 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['path'], 'src/copilot/mcp/README.md');
         assert.equal(typeof structured['sha256'], 'string');
         assert.equal(typeof structured['returnedSha256'], 'string');
+        assert.ok(String(structured['content'] ?? '').includes('Copilot MCP Server'));
         assert.ok(Array.isArray(result.content));
-        assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
+        const legacyText = String(result.content[0]?.text ?? '');
+        assert.match(legacyText, /^Read src\/copilot\/mcp\/README\.md:/u);
+        assert.ok(legacyText.includes('structuredContent.content'));
+        assert.equal(legacyText.includes('Copilot MCP Server'), false);
+        assert.ok(Buffer.byteLength(legacyText, 'utf8') <= 2048);
     });
 
     it('repo_read_file supports reduced hash payload modes', async () => {
@@ -552,11 +557,15 @@ describe('copilot MCP tools', () => {
         assert.equal(invalidRange.structuredContent?.['code'], 'ERR_INVALID_LINE_RANGE');
     });
 
-    it('repo_tree accepts empty path and repo_root_tree exposes workspace root', async () => {
+    it('repo_tree keeps entries in structuredContent and uses compact text summaries for normal and root trees', async () => {
         const treeTool = findTool('repo_tree');
         const tree = await treeTool.handler({ path: '', maxEntries: 5 });
         assert.equal(tree.isError, undefined);
         assert.equal(tree.structuredContent?.['path'], 'src/copilot');
+        const treeText = String(tree.content?.[0]?.text ?? '');
+        assert.match(treeText, /^Tree src\/copilot:/u);
+        assert.ok(treeText.includes('structuredContent.entries'));
+        assert.equal(treeText.includes('absolutePath'), false);
 
         const rootTool = findTool('repo_root_tree');
         const root = await rootTool.handler({ maxEntries: 20 });
@@ -564,6 +573,9 @@ describe('copilot MCP tools', () => {
         assert.equal(root.structuredContent?.['path'], '.');
         const entries = /** @type {unknown[]} */ (root.structuredContent?.['entries']);
         assert.ok(entries.length > 0);
+        const rootText = String(root.content?.[0]?.text ?? '');
+        assert.match(rootText, /^Tree \.:/u);
+        assert.equal(rootText.includes('absolutePath'), false);
     });
 
     it('repo_root_tree redacts protected hidden path metadata', async () => {
@@ -664,7 +676,7 @@ describe('copilot MCP tools', () => {
         assert.equal(legacyText.includes('repo_read_file.js'), false);
     });
 
-    it('repo_search_text returns match and line counts separately when context is included', async () => {
+    it('repo_search_text returns counts and keeps matched output out of the compact legacy summary', async () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({
             pattern: 'repo_read_file_chunks',
@@ -678,6 +690,12 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['returnedLineCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
         assert.ok(Number(structured['totalMatchCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
         assert.equal(structured['countsPostSanitization'], true);
+        assert.ok(String(structured['output'] ?? '').includes('repo_read_file_chunks'));
+        const legacyText = String(result.content?.[0]?.text ?? '');
+        assert.match(legacyText, /^Search /u);
+        assert.ok(legacyText.includes('structuredContent.output'));
+        assert.equal(legacyText.includes('/workspaces/chatgpt-docker-puppeteer/'), false);
+        assert.ok(Buffer.byteLength(legacyText, 'utf8') <= 2048);
     });
 
     it('repo_find_symbol_usages mirrors LLM-B symbol usage search semantics', async () => {

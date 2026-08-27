@@ -250,27 +250,66 @@ function boundRepoBulkResultPayload(inputResults, budgetBytes) {
  *
  * @param {Awaited<ReturnType<typeof readRepositoryFile>>} operation
  * @param {string} [sizeHintSource]
+ * @param {'read-file' | 'search-text' | 'tree'} [heavySummaryKind]
  * @returns {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult}
  */
-function frameRepositoryReadOperation(operation, sizeHintSource) {
+function frameRepositoryReadOperation(operation, sizeHintSource, heavySummaryKind) {
     if (!operation.ok) return errorResult(operation.message, operation.details);
-    const result = okResult(operation.structured, operation.text);
+    const text = heavySummaryKind
+        ? buildHeavyRepositoryResultSummary(heavySummaryKind, operation.structured)
+        : operation.text;
+    const result = okResult(operation.structured, text);
     if (!sizeHintSource) return result;
     return withResultSizeHint(result, {
-        bytes: estimateStructuredTextResultBytes(operation.structured, operation.text ?? ''),
+        bytes: estimateStructuredTextResultBytes(operation.structured, text ?? ''),
         strategy: 'conservative-estimate',
         source: sizeHintSource,
     });
 }
 
+const MAX_HEAVY_RESULT_SUMMARY_BYTES = 2048;
+
+/**
+ * Keep heavy repository payloads exactly once in structuredContent while retaining a small deterministic TextContent
+ * compatibility surface. This is intentionally tool-local instead of changing okResult globally: only result shapes
+ * with proven structuredContent visibility and measured duplication use compact framing.
+ *
+ * @param {'read-file' | 'search-text' | 'tree'} kind
+ * @param {Record<string, unknown>} structured
+ */
+function buildHeavyRepositoryResultSummary(kind, structured) {
+    const path = String(structured['path'] ?? '.');
+    let text;
+    if (kind === 'read-file') {
+        const returned =
+            structured['returnedLines'] && typeof structured['returnedLines'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (structured['returnedLines'])
+                : {};
+        text = `Read ${path}: bytes=${Number(structured['bytes'] ?? 0)}, lines=${Number(returned['start'] ?? 0)}-${Number(returned['end'] ?? 0)}/${Number(structured['totalLines'] ?? 0)}; full file text is in structuredContent.content.`;
+    } else if (kind === 'search-text') {
+        text = `Search ${JSON.stringify(String(structured['pattern'] ?? ''))} in ${path}: returnedMatches=${Number(structured['returnedMatchCount'] ?? structured['matchCount'] ?? 0)}/${Number(structured['totalMatchCount'] ?? structured['totalMatches'] ?? 0)}, returnedLines=${Number(structured['returnedLineCount'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; full matched output is in structuredContent.output.`;
+    } else {
+        text = `Tree ${path}: entries=${Number(structured['count'] ?? 0)}, scanned=${Number(structured['totalScanned'] ?? 0)}, blocked=${Number(structured['blockedEntriesCount'] ?? 0)}, truncated=${structured['truncated'] === true}; full tree entries are in structuredContent.entries.`;
+    }
+    return truncateUtf8String(text, MAX_HEAVY_RESULT_SUMMARY_BYTES).text;
+}
+
 /** @param {RepoReadWorkspaceCapability} workspace @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig @param {{ path?: string | undefined; startLine?: number | undefined; endLine?: number | undefined; hashMode?: 'full' | 'returned' | 'none' | undefined }} input */
 async function runRepoReadFileCall(workspace, cacheConfig, input) {
-    return frameRepositoryReadOperation(await readRepositoryFile(workspace, input, cacheConfig), 'repo_read_file');
+    return frameRepositoryReadOperation(
+        await readRepositoryFile(workspace, input, cacheConfig),
+        'repo_read_file',
+        'read-file',
+    );
 }
 
 /** @param {RepoReadWorkspaceCapability} workspace @param {{ pattern?: string | undefined; query?: string | undefined; path?: string | undefined; isRegex?: boolean | undefined; caseSensitive?: boolean | undefined; includePattern?: string | undefined; excludePattern?: string | undefined; contextLines?: number | undefined; maxResults?: number | undefined; cursor?: string | undefined }} input */
 async function runRepoSearchTextCall(workspace, input) {
-    return frameRepositoryReadOperation(await searchRepositoryText(workspace, input), 'repo_search_text');
+    return frameRepositoryReadOperation(
+        await searchRepositoryText(workspace, input),
+        'repo_search_text',
+        'search-text',
+    );
 }
 
 /** @param {RepoReadWorkspaceCapability} workspace @param {{ path: string; includeHash?: boolean; maxHashBytes?: number }} input */
@@ -317,6 +356,8 @@ export const repoReadTools = [
                     ...(maxEntries === undefined ? {} : { maxEntries }),
                     ...(showHidden === undefined ? {} : { showHidden }),
                 }),
+                undefined,
+                'tree',
             ),
     }),
     defineMcpRawTool({
@@ -339,6 +380,8 @@ export const repoReadTools = [
                     ...(maxEntries === undefined ? {} : { maxEntries }),
                     ...(showHidden === undefined ? {} : { showHidden }),
                 }),
+                undefined,
+                'tree',
             ),
     }),
     defineMcpRawTool({

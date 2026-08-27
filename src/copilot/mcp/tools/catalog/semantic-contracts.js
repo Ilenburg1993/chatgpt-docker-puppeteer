@@ -1152,9 +1152,10 @@ const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpToolContr
             idempotency: 'idempotent',
             callerScope: 'read',
             execution: {
-                cancellation: 'not-applicable',
+                cancellation: 'cancellable',
+                drainTimeoutMs: 1000,
                 rationale:
-                    'The operation does not claim caller-owned long-running work for which cooperative drain is a meaningful lifecycle promise.',
+                    'Immediate reads remain synchronous in effect; optional bounded output-or-exit waits are event-driven and OperationContext cancellation releases only the read waiter without terminating the persistent process.',
             },
             output: 'specific',
             maxResultBytes: 12582912,

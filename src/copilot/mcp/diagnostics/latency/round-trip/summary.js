@@ -15,7 +15,6 @@ const INSPECTION_TOOLS = Object.freeze([
     'repo_working_set',
 ]);
 const PATCH_TOOLS = Object.freeze(['repo_apply_patch', 'repo_apply_patch_batch']);
-const TERMINAL_EVENT_SET = new Set(MCP_TOOL_CALL_TERMINAL_EVENTS);
 /** @type {Readonly<Record<string, string>>} */
 const PLAN_APPLY_PAIRS = Object.freeze({
     repo_patch_plan: 'repo_apply_patch',
@@ -255,7 +254,7 @@ export function summarizeMcpRoundTripRows(rows, options) {
             continue;
         }
 
-        if (TERMINAL_EVENT_SET.has(event) && tool) {
+        if (MCP_TOOL_CALL_TERMINAL_EVENTS.includes(event) && tool) {
             terminalCallCount += 1;
             const terminal = readCallEvidence(row, tool, tsMs);
             if (event === 'tool_call_completed') recordExecutionCompletion(row, tool);

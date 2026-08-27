@@ -18,4 +18,5 @@ export {
     getTerminalCapabilities,
     openTerminalSession,
     readTerminalSession,
+    readTerminalSessionWithWait,
 } from '../runtime.js';

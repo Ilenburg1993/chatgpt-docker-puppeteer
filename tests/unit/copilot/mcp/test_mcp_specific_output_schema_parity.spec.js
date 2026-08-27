@@ -135,6 +135,13 @@ describe('MCP specific output-schema runtime parity', () => {
         );
         assert.ok(sessionId, 'terminal session-control parity fixture must expose a session id');
         try {
+            const waited = await invokeAndAssertParity('terminal_session_read', {
+                action: 'read',
+                sessionId,
+                waitFor: 'output-or-exit',
+                waitMs: 20,
+            });
+            assert.equal(waited.structuredContent?.['waitOutcome'], 'timeout');
             await invokeAndAssertParity('terminal_session_control', { action: 'close', sessionId, graceMs: 500 });
         } finally {
             const forget = findTool('terminal_session_control');

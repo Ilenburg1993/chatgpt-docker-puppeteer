@@ -4,9 +4,10 @@
 
 > **Status do documento:** CANÔNICO / VIVO / REFERÊNCIA OBRIGATÓRIA.
 >
-> **Revisão documental:** 4.0 — **ROADMAP I CONCLUÍDO**. Source/unit/static/live gates fechados;
-> implementação promovida por source barrier, pronta para publicação e para uma futura rodada do
-> Roadmap II.
+> **Revisão documental:** 6.0 — **ROADMAP II TECNICAMENTE CONCLUÍDO / PUBLICAÇÃO FINAL EM GATE**.
+> Roadmap I permanece concluído e publicado; Roadmap II foi rebaselineado sobre cohorts pós-I,
+> II-1/II-2 foram promovidos por evidência controlada e II-3→II-11 receberam disposição formal por
+> evidência. Resta apenas o gate de publicação/limpeza final do repositório.
 >
 > **Workspace:** `/workspaces/chatgpt-docker-puppeteer`.
 >
@@ -24,8 +25,8 @@
 > **Snapshot quantitativo principal congelado:** `2026-08-27T02:00:00Z`, equivalente a
 > `2026-08-26T23:00:00-03:00` em `America/Sao_Paulo`.
 >
-> **Escopo desta revisão:** investigação, implementação, revisão pós-implementação e encerramento do
-> Roadmap I. O Roadmap II permanece deliberadamente **não iniciado** nesta rodada.
+> **Escopo desta revisão:** investigação, implementação, promoção live, disposição evidence-gated e
+> encerramento técnico do Roadmap II, preservando o Roadmap I como fundação já publicada.
 
 ---
 
@@ -1777,12 +1778,88 @@ A unidade econômica correta será:
 
 ## FAIXA II-0 — Rebaseline e priorização causal
 
-- [ ] reler integralmente este documento;
-- [ ] usar somente cohorts pós-Roadmap I para priorização;
-- [ ] ranquear `repeat-after-unsaturated-complete-batch` por hot tool;
-- [ ] ranquear continuation/poll/recovery causal;
-- [ ] ranquear payload duplication por bytes e follow-up;
-- [ ] escolher a primeira onda por ganho esperado × confiança × risco.
+- [x] reler integralmente este documento — 2.393 linhas na revisão 4.0, incluindo o fechamento
+      pós-rollout;
+- [x] usar somente cohorts pós-Roadmap I para priorização — boundary operacional
+      `2026-08-27T04:15:01Z`;
+- [x] ranquear `repeat-after-unsaturated-complete-batch` por hot tool — nenhum caso pós-I material
+      foi observado na amostra pequena; não autoriza cap tuning;
+- [x] ranquear continuation/poll/recovery causal — continuation/saturation pós-I = 0 na amostra;
+      polling de terminal foi provado por EXP-04 controlado;
+- [x] ranquear payload duplication por bytes e follow-up — EXP-03 controlado quantificou
+      `repo_tree > repo_read_file > repo_search_text`;
+- [x] escolher a primeira onda por ganho esperado × confiança × risco — **II-1 Heavy Framing → II-2
+      Terminal Long-Poll**.
+
+### II-0.1 Rebaseline pós-Roadmap I — 2026-08-27
+
+O recorte começa no processo da promoção final do Roadmap I, `2026-08-27T04:15:01Z`. O restart
+externo posterior preservou `HEAD=935eb58c4` e source bytes publicados, mas abriu o novo epoch
+`b01903fb-dd8c-429c-94ad-2dee297be2e9` com `sourceBinding=manual-unbound`; `sourceDrift=false`,
+runtime `status=ok`, worktree limpa. Para priorização, ambos são pós-Roadmap I; generations
+continuam separáveis no índice v4.
+
+A amostra natural pós-I ainda é pequena. Antes desta investigação havia somente 23 starts desde a
+boundary. Logo, **não** há base honesta para aumentar caps/budgets, reduzir a tool surface, criar
+novo composite ou promover Working Set V3. O Roadmap II deve usar experimentos controlados onde a
+causalidade pode ser estabelecida agora e aguardar workload natural onde não pode.
+
+### II-0.2 EXP-03 baseline — duplicação wire controlada
+
+Inputs fixos executados no epoch `b01903fb-...` antes da mudança de framing:
+
+| Tool / input controlado                                               | result bytes | text bytes | duplicate text bytes |        duplicação/result |
+| --------------------------------------------------------------------- | -----------: | ---------: | -------------------: | -----------------------: |
+| `repo_tree(src/copilot/mcp, recursive, depth=3, maxEntries=500)`      |      223.640 |    126.172 |              126.172 |                    56,4% |
+| `repo_read_file(src/copilot/mcp/tools/repo-read.js, full)`            |       97.764 |     47.516 |               47.516 | 48,6% da call controlada |
+| `repo_search_text(return, src/copilot/mcp, context=3, maxResults=80)` |       18.740 |      8.816 |                8.816 |                    47,0% |
+
+As três calls somaram **182.504 bytes de texto semanticamente duplicado**. Os modos
+`repo_read_file.batch`, `repo_search_text.batch` e `repo_bulk_inspect` já usam full
+`structuredContent` + summary textual compacto nesta mesma integração ChatGPT, com sucesso. Isso é
+compatibility evidence prévia forte para II-1, mas o rollout single continuará A/B e tool-scoped.
+
+### II-0.3 EXP-04 baseline — polling terminal comprovadamente mecânico
+
+Uma persistent pipe session foi aberta com output deliberadamente atrasado. Três chamadas
+consecutivas de `terminal_session_read({afterSeq:0})` retornaram, cada uma:
+
+- `status=running`;
+- `returnedBytes=0`;
+- `events=[]`;
+- `hasMore=false`;
+- `nextSeq=0`.
+
+Logo, o contrato atual obriga o caller a fazer polling para descobrir output/exit futuro. A semana
+anterior continha `430` starts de `terminal_session_read`, dos quais `206` eram self-loops temporais
+imediatos (~47,9%). O experimento controlado fecha a causalidade que a telemetria histórica, sem
+traceparent do host, não poderia provar sozinha.
+
+### II-0.4 Decisão de priorização
+
+**Onda A — II-1 / promover agora se A/B passar**
+
+1. manter full payload em `structuredContent`;
+2. compactar somente o texto legado de `repo_read_file`, `repo_search_text`, `repo_tree` e
+   `repo_root_tree`;
+3. não alterar globalmente `okResult`;
+4. repetir exatamente EXP-03 após reload e comparar bytes/correctness/reread.
+
+**Onda B — II-2 / promover agora se testes + EXP-04 passarem**
+
+1. waiter event-driven por sessão;
+2. `waitFor="output-or-exit"` + `waitMs` bounded;
+3. immediate read permanece default e compatível;
+4. cancellation cancela somente a espera, jamais mata a persistent session;
+5. wake em output, failed/exit, close/forget/cancel/timeout; sem busy loop;
+6. repetir EXP-04 com uma única read aguardando o evento.
+
+**Investigação posterior, sem implementação nesta primeira onda:** II-3.
+
+**Sem promoção por falta de evidência atual:** II-4, II-5, II-7, II-8, II-9, II-10 e II-11. Em
+particular, `repo_working_set` teve apenas 26 starts na semana; `batchConcurrency=1 + fail-fast` já
+expressa sequência terminal; nenhuma saturation/continuation pós-I material foi observada; e a
+surface reduzida ainda não possui coverage ≥99% provado.
 
 ---
 
@@ -1790,26 +1867,50 @@ A unidade econômica correta será:
 
 ### Investigação
 
-- [ ] confirmar comportamento do ChatGPT atual com structuredContent completo + text summary;
-- [ ] medir compatibilidade em `repo_read_file`, `repo_search_text`, `repo_tree`;
-- [ ] medir bytes before/after;
-- [ ] verificar reread/wrong-answer regressions;
-- [ ] confirmar output-schema parity.
+- [x] confirmar comportamento do ChatGPT atual com structuredContent completo + text summary — já
+      comprovado pelos modos batch de read/search/bulk na mesma integração;
+- [x] medir compatibilidade live em `repo_read_file`, `repo_search_text`, `repo_tree` após promoção
+      da source single compacta — full structured payload permaneceu observável nas respostas
+      ChatGPT;
+- [x] medir bytes before/after — read `97.764→51.969 B` (-46,8%), search `18.740→10.006 B` (-46,6%),
+      tree `223.640→86.844 B` (-61,2%);
+- [x] verificar reread/wrong-answer regressions no A/B live — nenhum reread mecânico foi necessário
+      no experimento controlado e o conteúdo completo permaneceu estruturado; lineage natural
+      continua unknown porque o host não propaga traceparent;
+- [x] confirmar output-schema parity — structured shapes não mudaram; read/search/tree não ganharam
+      outputSchema novo.
 
 ### Implementação condicional
 
-- [ ] helper de heavy structured framing;
-- [ ] full payload uma vez em structuredContent;
-- [ ] bounded deterministic summary em text;
-- [ ] fallback apenas se compatibilidade exigir;
-- [ ] rollout por tool, não big-bang.
+- [x] helper tool-local de heavy structured framing no adaptador `repo-read`;
+- [x] full payload uma vez em structuredContent;
+- [x] bounded deterministic summary em text, hard cap 2 KiB;
+- [x] fallback apenas se compatibilidade exigir — nenhum fallback prévio adicionado; A/B live decide
+      promoção/reversão;
+- [x] rollout por tool, não big-bang — somente read-file/search-text/tree/root-tree, sem mudar
+      `okResult` global.
 
 ### Promotion gate
 
-- [ ] redução material de wire bytes;
-- [ ] zero perda de informação observável;
-- [ ] zero aumento de reread mecânico;
-- [ ] silent gap/turn time não piora.
+- [x] redução material de wire bytes — ~47% em read/search e ~61% em tree nos inputs congelados;
+- [x] zero perda de informação observável — full payload preservado em `structuredContent` e schemas
+      estruturados inalterados;
+- [x] zero aumento de reread mecânico no experimento controlado; telemetria natural não pode
+      atribuir causalidade sem traceparent;
+- [x] silent gap/turn time não mostrou regressão atribuível ao framing; runtime/handler health
+      permaneceu saudável. O ganho provado desta faixa é wire/context, não alegação de wall-clock
+      causal.
+
+### II-1.1 Resultado final e correção de telemetria
+
+A primeira promoção revelou um false positive somente na observabilidade: o estimator histórico de
+`repo_tree` marcava qualquer TextContent como duplicado. O framing já estava correto, mas os 126 B
+do novo summary foram classificados como duplication. O estimator foi restringido ao antigo
+TextContent JSON-shaped contendo `entries`, com regression test. Na geração final
+`d2153652-36dd-4af1-8162-2ea2050bfd6f`, fingerprint `ac6da4d07e7b...`, o mesmo tree controlado
+registrou `resultBytes=86.844`, `textResultBytes=126`, `duplicateTextBytes=0`.
+
+**Decisão II-1:** `PROMOVIDO`.
 
 ---
 
@@ -1817,12 +1918,16 @@ A unidade econômica correta será:
 
 ### Investigação
 
-- [ ] confirmar self-loop causal de polling pós-Roadmap I;
-- [ ] auditar event/buffer primitives do terminal runtime;
-- [ ] cancellation semantics;
-- [ ] close/exit races;
-- [ ] retention cursor correctness;
-- [ ] resource cost de waits concorrentes.
+- [x] confirmar self-loop causal de polling pós-Roadmap I — EXP-04 produziu 3 reads vazias
+      consecutivas; histórico 206/430 self-loops;
+- [x] auditar event/buffer primitives do terminal runtime;
+- [x] cancellation semantics — abort libera somente waiter; persistent process mantém lifecycle
+      próprio;
+- [x] close/exit races — waiter registra e revalida predicate para fechar lost-wakeup race;
+      exit/failure notificam;
+- [x] retention cursor correctness — cursor behind retention retorna imediatamente, sem esperar;
+- [x] resource cost de waits concorrentes — waiter é event-driven, sem polling, bounded a 64 por
+      sessão e 120s.
 
 ### Design candidato
 
@@ -1837,18 +1942,56 @@ terminal_session_read({
 
 ### Implementação condicional
 
-- [ ] event-driven wait;
-- [ ] no busy loop;
-- [ ] wake on output/exit/timeout/cancel;
-- [ ] specific output semantics;
-- [ ] compatibility com read imediato.
+- [x] event-driven wait por sessão;
+- [x] no busy loop — inclusive `waitForSessionExit` interno deixou polling de 25ms;
+- [x] wake on output/exit/timeout/cancel;
+- [x] specific output semantics com `waitOutcome`, `waitedMs`, `waitFor`, `waitMs`;
+- [x] compatibility com read imediato — `waitFor` é opt-in; `readTerminalSession` síncrono foi
+      preservado.
 
 ### Promotion gate
 
-- [ ] polling self-loop ↓ materialmente, alvo inicial ≥70% em workload comparável;
-- [ ] sem memory/session leak;
-- [ ] cancellation/close sem regressão;
-- [ ] wall-clock não piora.
+- [x] polling self-loop ↓ materialmente — EXP-04 protocol-level: baseline 3 reads/2 self-loops → 1
+      read/0 self-loops, **100%** de redução controlada;
+- [x] sem memory/session leak — waiters são removidos em settle/cancel/timeout, limite 64/session;
+      sessão experimental foi fechada e runtime remoto permaneceu sem active sessions;
+- [x] cancellation/close sem regressão — unit tests cobrem cancellation do waiter sem matar process
+      e close/event wake;
+- [x] wall-clock não piora no experimento controlado: uma única call aguardou ~710 ms pelo output
+      que só existia ~700 ms depois, em vez de três respostas vazias; não há busy loop.
+
+### II-2.1 Checkpoint source/unit antes do rollout
+
+- terminal control contract elevado de v3 para v4;
+- public membrane ganhou somente `readTerminalSessionWithWait`, permanecendo dentro do cost headroom
+  existente;
+- focused terminal tests: output, timeout, cancellation e lifecycle verdes;
+- specific output-schema parity do long-poll: verde;
+- TS7 strict: verde;
+- lint/Prettier/diff check: verdes;
+- public API cost governance: verde;
+- nenhum cap de command batch/result foi ampliado.
+
+### II-2.2 Evidência protocol-level e compatibilidade do host
+
+Após a promoção final `ac6da4d07e7b8a7ec226bf2a1541a951b9b166ee9fdf1fcbe33fd86d25280a75`, o remote
+smoke fechou 131/131 tools, OAuth/subscription/readiness verdes e runtime health `ok`. `tools/list`
+do SDK real anuncia `waitFor`/`waitMs`. Um cliente MCP stdio canônico, em child efêmero com auth
+local `none-dev/off` e **sem reutilizar credenciais**, executou open → read(waitFor) → close:
+`waitOutcome=output`, `waitedMs=710`, client elapsed `717 ms`, `eventCount=1`, `returnedBytes=21`,
+output esperado presente e sessão ainda `running` após a read.
+
+A projeção de tools já carregada por **esta conversa ChatGPT** continuou exibindo o schema anterior
+de `terminal_session_read`. Isso é cache/relist do host, não drift do servidor: remote/local
+`tools/list` já contêm os novos argumentos. Como long-poll é opt-in, hosts com descriptor antigo
+mantêm o read imediato anterior sem quebra. O A/B pelo próprio host do novo argumento exige
+relist/reconexão em uma conversa/connector projection atualizada; não é requisito para correctness
+do servidor.
+
+O tools/list total passou de aproximadamente `160.319 B` para `161.381 B` (+1.062 B, +0,66%), ainda
+com `248.219 B` de headroom. O descriptor de `terminal_session_read` passou a `8.822 B`.
+
+**Decisão II-2:** `PROMOVIDO`.
 
 ---
 
@@ -1865,10 +2008,16 @@ preferredTool quando determinístico
 
 ### Investigação
 
-- [ ] listar families em que nextAction já é determinístico;
-- [ ] evitar criar taxonomy excessiva;
-- [ ] verificar impacto de descriptor/schema bytes;
-- [ ] definir versioning/compat.
+- [x] listar families em que nextAction já é determinístico — 11 owner modules já expõem
+      `nextAction`/`nextActions`/`waitOutcome`/`continuationRequired`; patch, validation, Git e
+      terminal têm semantics locais mais ricas;
+- [x] evitar criar taxonomy excessiva — as classes genéricas perderiam informação de `retryability`,
+      `recoveryRequired`, validator status e terminal wait outcome;
+- [x] verificar impacto de descriptor/schema bytes — tools/list já possui `20.110 B` de output
+      schemas e `161.381 B` totais; um envelope transversal repetiria campos em resultados/schemas
+      sem benefício mensurável;
+- [x] definir versioning/compat — decisão: **não criar versão transversal nesta geração**; preservar
+      contratos locais backward-compatible.
 
 ### Classes candidatas
 
@@ -1881,9 +2030,15 @@ preferredTool quando determinístico
 
 ### Promotion gate
 
-- [ ] advice-adherence mensurável melhora;
-- [ ] poll/retry errado reduz;
-- [ ] descriptor/result pressure não anula ganho.
+- [x] advice-adherence avaliada: pós-I `planCalls=0` e `validatorPoll=0`; não existe headroom
+      mensurável para uma taxonomy transversal melhorar esses rituais;
+- [x] poll/retry errado avaliado: nenhum poll ritual pós-I; patch new-cohort mantém nextAction
+      coverage 100%; não há redução incremental demonstrável;
+- [x] descriptor/result pressure avaliado e considerado custo líquido sem ganho observado.
+
+**Decisão II-3:** `REJEITADO NESTA GERAÇÃO`. Reabrir somente se telemetria mostrar follow-up errado
+material apesar dos contratos locais/Workflow Policy, idealmente com lineage suficiente para
+atribuir o erro.
 
 ---
 
@@ -1891,10 +2046,14 @@ preferredTool quando determinístico
 
 ### Investigação
 
-- [ ] medir fraction de `search→read` lineage-bound realmente mecânica;
-- [ ] separar descoberta semântica de leitura previsível;
-- [ ] medir arquivos pequenos vs grandes;
-- [ ] medir byte headroom.
+- [x] medir fraction de `search→read` lineage-bound realmente mecânica — pós-I: 4 adjacências
+      temporais <=5min e **0 lineage-bound**;
+- [x] separar descoberta semântica de leitura previsível — impossível classificar causalmente com
+      trace absent; manter unknown em vez de promover heurística;
+- [x] medir arquivos pequenos vs grandes — short-circuit: sem cohort mecânico comprovado, hidratar
+      qualquer faixa de tamanho aumentaria payload por especulação;
+- [x] medir byte headroom — framing II-1 reduziu payload sem hydration; search já oferece
+      contextLines/cursor/hash e batch/bulk bounded.
 
 ### Opções candidatas
 
@@ -1905,11 +2064,16 @@ preferredTool quando determinístico
 
 ### Restrições
 
-- [ ] max files;
-- [ ] max bytes;
-- [ ] sem uncontrolled fan-out;
-- [ ] sem fuzzy mutation acoplada;
-- [ ] não manter feature se payload cresce sem reduzir calls/turn time.
+- [x] max files — não foi criada hydration;
+- [x] max bytes — não foi criada hydration;
+- [x] sem uncontrolled fan-out — preservado;
+- [x] sem fuzzy mutation acoplada — preservado;
+- [x] não manter feature se payload cresce sem reduzir calls/turn time — candidato não promovido por
+      falta de prova causal.
+
+**Decisão II-4:** `DEPRIORITIZADO / NÃO IMPLEMENTADO`. Reabrir somente com cohort lineage-bound ou
+experimento controlado que demonstre search→read mecanicamente previsível e ganho líquido de
+calls/wall-clock.
 
 ---
 
@@ -1917,14 +2081,20 @@ preferredTool quando determinístico
 
 Só executar se workflows pós-Roadmap I demonstrarem reuse substancial de subtree/context.
 
-- [ ] medir reuse real;
-- [ ] revisar por que uso atual é baixo;
-- [ ] manifest com hashes quando útil;
-- [ ] delta refresh hints;
-- [ ] integração advisory com patch;
-- [ ] sem nova correctness authority;
-- [ ] sem duplicar content cache;
-- [ ] promoção somente após redução real de calls.
+- [x] medir reuse real — `repo_working_set`: 0 starts pós-I e apenas 26 starts na janela histórica
+      semanal;
+- [x] revisar por que uso atual é baixo — workload dominante usa read/search/bulk/terminal diretos;
+      o working set atual já cobre open/context/find/refresh, seeds, coverage selection e delta
+      refresh;
+- [x] manifest com hashes quando útil — nenhum gap de calls atual justificou ampliar o manifest;
+- [x] delta refresh hints — capacidade atual já aceita `modifiedPaths` e invalidations conhecidas;
+- [x] integração advisory com patch — não promovida sem reuse mensurável;
+- [x] sem nova correctness authority — preservado;
+- [x] sem duplicar content cache — preservado;
+- [x] promoção somente após redução real de calls — redução não demonstrada, portanto sem promoção.
+
+**Decisão II-5:** `DEPRIORITIZADO`. Reabrir se `repo_working_set` ou subtree reuse se tornar
+material e um A/B mostrar redução real de read/search calls sem duplicar o read cache.
 
 ---
 
@@ -1932,13 +2102,23 @@ Só executar se workflows pós-Roadmap I demonstrarem reuse substancial de subtr
 
 Começar offline/shadow, sem alterar execução:
 
-- [ ] reconstruir traces lineage-bound;
-- [ ] classificar calls provably batchable;
-- [ ] separar semantic-dependent/unknown;
-- [ ] calcular counterfactual **call count**, não “horas salvas”;
-- [ ] comparar prediction com experimentos reais;
-- [ ] ranking por hot tool/workflow;
-- [ ] somente depois avaliar guidance automática.
+- [x] reconstruir traces lineage-bound — 114 starts pós-I possuem `trace_context_state=absent`;
+      nenhum trace natural reconstruível;
+- [x] classificar calls provably batchable — somente experimentos controlados permitem classificação
+      causal nesta geração; analytics natural permanece unknown;
+- [x] separar semantic-dependent/unknown — analytics v4 já faz essa separação e não chama pressure
+      de avoidable;
+- [x] calcular counterfactual **call count**, não “horas salvas” — execution accounting/coalescing
+      já fornece o fato de agrupamento; advisor novo não é necessário;
+- [x] comparar prediction com experimentos reais — II-1/II-2 foram decididos por A/B direto, não por
+      previsão shadow;
+- [x] ranking por hot tool/workflow — concluído em II-0;
+- [x] somente depois avaliar guidance automática — não promovida;
+      `optimizationEvidence.newCompositeRecommendation=none-from-analytics-alone`.
+
+**Decisão II-6:** `REJEITADO COMO NOVO COMPONENTE NESTA GERAÇÃO`. O analytics v4 já é o substrate
+shadow seguro. Reabrir quando lineage natural existir em volume suficiente para validar prediction
+vs actual.
 
 ---
 
@@ -1947,10 +2127,17 @@ Começar offline/shadow, sem alterar execução:
 Hoje `batchConcurrency=1 + fail-fast` expressa sequência determinística. Avaliar se um enum
 explícito melhora seleção/erros:
 
-- [ ] medir misuse atual;
-- [ ] comparar descriptor cost;
-- [ ] candidato `executionMode=parallel|sequential` somente se reduzir erro;
-- [ ] não duplicar opções semanticamente equivalentes sem benefício.
+- [x] medir misuse atual — pós-I há 21 `terminal-batch:best-effort` e 1 `terminal-batch:fail-fast`;
+      nenhuma evidência de seleção semântica errada ou skip induzido por falta de enum;
+- [x] comparar descriptor cost — enum adicional aumentaria input schema e duplicaria semântica já
+      expressa por `batchConcurrency` + `batchFailureMode`;
+- [x] candidato `executionMode=parallel|sequential` somente se reduzir erro — redução não
+      demonstrada;
+- [x] não duplicar opções semanticamente equivalentes sem benefício — preservado pela não
+      implementação.
+
+**Decisão II-7:** `REJEITADO COMO REDUNDANTE`. Reabrir somente se telemetry/testes mostrarem erro de
+seleção recorrente que não possa ser resolvido pela Workflow Policy atual.
 
 ---
 
@@ -1958,24 +2145,37 @@ explícito melhora seleção/erros:
 
 Somente após behavioral cleanup:
 
-- [ ] rerodar call coverage;
-- [ ] exigir coverage alvo, preferencialmente ≥99% do workload normal definido;
-- [ ] A/B tool selection errors;
-- [ ] A/B TTFT/host latency quando possível;
-- [ ] full fallback sempre disponível;
-- [ ] não depender de dynamic relist não provado.
+- [x] rerodar call coverage — 1.935 calls / 45 tools observadas em 24h;
+- [x] exigir coverage alvo, preferencialmente ≥99% — melhor reduced mode (`latency`) ficou em
+      **97,364%**, perdendo 15 tools observadas;
+- [x] A/B tool selection errors — short-circuited: surface candidata falhou o gate de coverage antes
+      de justificar exposição a seleção degradada;
+- [x] A/B TTFT/host latency quando possível — não executado por segurança metodológica após falha do
+      prerequisite de coverage; descriptor savings isolado não autoriza default change;
+- [x] full fallback sempre disponível — `full` permanece default;
+- [x] não depender de dynamic relist não provado — preservado; a própria conversa atual mostrou que
+      schema projection pode permanecer cacheada após reload.
+
+**Decisão II-8:** `REJEITAR MUDANÇA DE DEFAULT`. Full permanece a surface correta nesta geração.
+Reabrir somente se uma reduced policy atingir ≥99% do workload normal e houver A/B host-side de
+seleção/TTFT.
 
 ---
 
 ## FAIXA II-9 — Cap/Budget Tuning
 
-- [ ] aumentar cap somente se saturation causar repeat causal;
-- [ ] aumentar budget somente se truncation causar continuation material;
-- [ ] medir memory/CPU/context pressure;
-- [ ] evitar maximizar batch utilization artificialmente;
-- [ ] manter resource headroom.
+- [x] aumentar cap somente se saturation causar repeat causal — pós-I: **0 saturated batches** nas
+      hot tools observadas; nenhum aumento autorizado;
+- [x] aumentar budget somente se truncation causar continuation material — **0 truncated
+      operations**; única continuation foi `repo_bulk_inspect` 12/64, result 156.487 B sob budget 3
+      MiB, logo não foi pressão do budget global;
+- [x] medir memory/CPU/context pressure — runtime health permaneceu `ok`; não há razão para trocar
+      headroom por caps maiores;
+- [x] evitar maximizar batch utilization artificialmente — preservado;
+- [x] manter resource headroom — preservado.
 
-Nenhum aumento de `terminal_exec` 32, repo 64 ou patch 128/64 é pré-aprovado por este documento.
+Nenhum aumento de `terminal_exec` 32, repo 64 ou patch 128/64 é aprovado. **Decisão II-9:**
+`REJEITAR TUNING NESTA GERAÇÃO`; reabrir somente com saturation/truncation causal e repetível.
 
 ---
 
@@ -1992,13 +2192,19 @@ Somente criar composite quando telemetry provar sequência:
 Exemplos existentes mostram que o padrão funciona (`postValidate`, `git_publish_changes`), mas não
 justificam uma mega-tool.
 
-- [ ] identificar candidato;
-- [ ] shadow counterfactual;
-- [ ] threat/correctness analysis;
-- [ ] bounded schema;
-- [ ] A/B;
-- [ ] rollback;
-- [ ] remover/rejeitar composite se não reduzir wall-clock/calls de forma material.
+- [x] identificar candidato — nenhum candidato passa os cinco prerequisites; analytics retorna
+      `newCompositeRecommendation=none-from-analytics-alone`;
+- [x] shadow counterfactual — sem candidato/lineage, não fabricar counterfactual causal;
+- [x] threat/correctness analysis — qualquer novo composite ampliaria authority/schema sem sequência
+      same-workflow provada;
+- [x] bounded schema — não criado por short-circuit do prerequisite;
+- [x] A/B — não executado sem candidato válido;
+- [x] rollback — desnecessário porque nenhum composite foi promovido;
+- [x] remover/rejeitar composite se não reduzir wall-clock/calls de forma material — decisão de
+      rejeição aplicada antes de adicionar código.
+
+**Decisão II-10:** `REJEITADO NESTA GERAÇÃO`. Reabrir somente quando telemetry lineage-bound apontar
+uma sequência frequente, mecânica e sem decisão semântica intermediária.
 
 ---
 
@@ -2009,12 +2215,20 @@ tracing.
 
 Somente considerar se:
 
-- [ ] ChatGPT não propagar trace context suficiente;
-- [ ] analytics continuar incapaz de medir objetivos importantes;
-- [ ] handle puder ser threaded sem call extra;
-- [ ] não criar state correctness escondido;
-- [ ] TTL/lifecycle forem claros;
-- [ ] o benefício de attribution justificar descriptor/context cost.
+- [x] ChatGPT não propagar trace context suficiente — confirmado: 114/114 starts pós-I observados
+      com state `absent`;
+- [x] analytics continuar incapaz de medir objetivos importantes — **não**: os upgrades
+      materialmente justificáveis II-1/II-2 puderam ser decididos por experimentos controlados;
+      ausência de lineage não bloqueia objetivo operacional atual;
+- [x] handle puder ser threaded sem call extra — não há evidência host-side atual; exigir threading
+      explícito adicionaria context/state e possivelmente novas falhas;
+- [x] não criar state correctness escondido — preservado pela não implementação;
+- [x] TTL/lifecycle forem claros — seriam nova complexidade sem benefício atual;
+- [x] o benefício de attribution justificar descriptor/context cost — não justifica nesta geração.
+
+**Decisão II-11:** `DEPRIORITIZADO / NÃO IMPLEMENTADO`. Reabrir somente se ausência de lineage
+bloquear uma decisão de otimização material que não possa ser resolvida por experimento controlado e
+se o host puder carregar o handle sem round trip adicional.
 
 ---
 
@@ -2242,15 +2456,28 @@ Roadmap II não precisa necessariamente implementar todo candidato; ele estará 
 os candidatos tiverem sido **implementados e promovidos** ou **formalmente rejeitados/depriorizados
 por evidência**, e:
 
-- [ ] round trips evitáveis forem métricas lineage/evidence-bound;
-- [ ] hot workflows demonstrarem menor call count quando mecanicamente agrupáveis;
-- [ ] golden workflows mostrarem wall-clock menor ou igual com mesma correctness;
-- [ ] polling mecânico tiver sido comprimido onde justificável;
-- [ ] payload wire tiver sido reduzido onde seguro;
-- [ ] nenhum upgrade relaxar security/correctness boundaries;
-- [ ] resource health permanecer saudável;
-- [ ] docs, tests e runtime estiverem sincronizados;
+- [x] round trips evitáveis forem métricas lineage/evidence-bound — analytics v4 preserva temporal
+      pressure como não causal e exige lineage/evidência controlada para promoção;
+- [x] hot workflows demonstrarem menor call count quando mecanicamente agrupáveis — terminal
+      long-poll reduziu o EXP-04 de 3 reads/2 self-loops para 1 read/0 self-loops;
+- [x] golden workflows mostrarem wall-clock menor ou igual com mesma correctness — EXP-03 preservou
+      structured payload completo com wire menor e EXP-04 retornou output event-driven no tempo
+      causal do processo;
+- [x] polling mecânico tiver sido comprimido onde justificável — EXP-04: redução controlada de 100%
+      dos self-loops;
+- [x] payload wire tiver sido reduzido onde seguro — read −46,8%, search −46,6%, tree −61,2% nos
+      inputs controlados, sem perda do structuredContent;
+- [x] nenhum upgrade relaxar security/correctness boundaries — hashes/path
+      policy/lifecycle/cancellation e read imediato permaneceram preservados;
+- [x] resource health permanecer saudável — connector smoke 131/131, OAuth/subscription/health
+      verdes e sem critical runtime findings;
+- [x] docs, tests e runtime estiverem sincronizados — 98/98 testes focados + 19/19 round-trip, TS7
+      strict, lint, docs-contract e architecture-contract verdes; source final segue para último
+      barrier/reload;
 - [ ] repo estiver publicado e limpo no encerramento final da frente.
+
+**Único gate restante da revisão 6.0:** publicar o conjunto final, comprovar `main == origin/main` e
+worktree limpa; somente então o último checkbox pode ser fechado.
 
 ---
 
@@ -2296,6 +2523,34 @@ Esta seção deve crescer ao longo da execução.
 - runtime final `3af912b4-33da-40bc-bfd0-3ed812e7a391`, source drift `false`;
 - connector smoke 131/131, runtime health `ok`, analytics v4 e batch accounting comprovados live;
 - Gate I→II aberto; Roadmap II permanece não iniciado.
+
+## 2026-08-27 — Revisão 5.0 — execução evidence-gated do Roadmap II
+
+- II-0 rebaselineado sobre cohorts pós-Roadmap I;
+- II-1 Heavy Structured Result Framing implementado e promovido: `repo_read_file` −46,8%,
+  `repo_search_text` −46,6% e `repo_tree` −61,2% no EXP-03 controlado;
+- false positive de `duplicateTextBytes` para tree summary identificado e corrigido;
+- II-2 Terminal Session Long-Poll implementado com wait event-driven bounded, cancellation sem matar
+  processo e zero busy loop;
+- EXP-04 protocol-level reduziu 3 reads/2 self-loops para 1 read/0 self-loops (−100%);
+- descriptor total permaneceu com ~248 KiB de headroom;
+- II-3→II-11 auditados e formalmente rejeitados/depriorizados quando não havia benefício incremental
+  provado, saturation/truncation causal ou coverage suficiente.
+
+## 2026-08-27 — Revisão 6.0 — fechamento técnico e saneamento dos gates finais
+
+- connector smoke renovado após restart: 131/131, OAuth, health e modern subscription verdes;
+- gate focal final: 98/98 testes em cinco arquivos, incluindo public API cost governance;
+- round-trip analytics adicional: 19/19;
+- TS7 strict, lint, Prettier, `git diff --check` e docs-contract verdes;
+- architecture-contract inicialmente revelou duas regressões herdadas já presentes no
+  `HEAD 935eb58c4`: `workflow-policy` ausente do owner manifest e `summary.js` usando um `Set`
+  mutável top-level apenas para lookup;
+- dívida herdada saneada sem ampliar baseline: `workflow-policy` classificado como owner protegido
+  com membrane pública e `summary.js` passou a usar diretamente a lista terminal canônica;
+- architecture-contract repetido integralmente: verde (`owners=70`, mutable state `26/53`, zero
+  violações);
+- único gate ainda aberto: publicação final + comprovação de worktree limpa.
 
 ## Template obrigatório para próximas revisões
 
@@ -2365,22 +2620,14 @@ failure semantics
 telemetry de batch/payload
 ```
 
-Somente quando essa fundação estiver pronta passaremos para os upgrades:
+Com essa fundação pronta, o Roadmap II foi executado como programa evidence-gated, não como lista
+obrigatória de features. `compact framing` e `long-poll` foram promovidos porque passaram A/Bs
+controlados; machine outcome transversal, hydration, Working Set V3, advisor separado, adaptive
+surface, cap tuning e novos composites foram rejeitados/depriorizados nesta geração porque seus
+prerequisites empíricos não foram satisfeitos.
 
-```text
-compact framing
-long-poll
-machine outcome
-hydration
-working set v3
-shadow advisor
-adaptive surface
-cap tuning
-bounded composites
-```
-
-Isso evita o erro arquitetural mais perigoso desta frente: **otimizar contra uma métrica que ainda
-não distingue pressão de causalidade**.
+Isso preserva a principal regra arquitetural desta frente: **não otimizar contra uma métrica que não
+distingue pressão de causalidade e não adicionar features sem ganho incremental demonstrável**.
 
 As hot tools já concentram 83,8% das calls do baseline de 7 dias e já possuem batching substancial.
 Portanto, há espaço real para ganhos. Mas o objetivo não é simplesmente “menos calls”. O objetivo é:

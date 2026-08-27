@@ -12,6 +12,7 @@ import {
     openTerminalSession,
     readMcpTerminalProcessConfig,
     readTerminalSession,
+    readTerminalSessionWithWait,
 } from '#copilot/mcp/public/process/terminal';
 
 const TERMINAL_TEST_CONFIG = readMcpTerminalProcessConfig(process.env);
@@ -349,6 +350,93 @@ describe('MCP terminal control plane', () => {
         const closed = asRecord(await controlTerminalSession({ action: 'close', sessionId, graceMs: 100 }));
         assert.equal(closed['success'], true);
         assert.notEqual(asRecord(closed['session'])['status'], 'running');
+    });
+
+    it('waits event-driven for persistent session output without polling', async () => {
+        const opened = asRecord(
+            await openTerminalSessionForTest({
+                command: process.execPath,
+                args: [
+                    '-e',
+                    "setTimeout(()=>process.stdout.write('wait-output\\n'),60);setTimeout(()=>process.exit(0),300)",
+                ],
+                shell: false,
+                backend: 'pipe',
+            }),
+        );
+        const sessionId = String(asRecord(opened['session'])['id']);
+        const read = asRecord(
+            await readTerminalSessionWithWait(
+                {
+                    action: 'read',
+                    sessionId,
+                    afterSeq: 0,
+                    maxBytes: 128 * 1024,
+                    waitFor: 'output-or-exit',
+                    waitMs: 1_000,
+                },
+                TERMINAL_TEST_RUNTIME,
+            ),
+        );
+        assert.equal(read['success'], true);
+        assert.equal(read['waitOutcome'], 'output');
+        assert.ok(Number(read['waitedMs'] ?? 0) > 0);
+        assert.ok(
+            asArray(read['events']).some((event) => String(asRecord(event)['data'] ?? '').includes('wait-output')),
+        );
+    });
+
+    it('returns a bounded timeout without changing persistent session ownership', async () => {
+        const opened = asRecord(
+            await openTerminalSessionForTest({
+                command: process.execPath,
+                args: ['-e', 'setInterval(() => {}, 1000)'],
+                shell: false,
+                backend: 'pipe',
+            }),
+        );
+        const sessionId = String(asRecord(opened['session'])['id']);
+        const read = asRecord(
+            await readTerminalSessionWithWait(
+                { action: 'read', sessionId, afterSeq: 0, waitFor: 'output-or-exit', waitMs: 30 },
+                TERMINAL_TEST_RUNTIME,
+            ),
+        );
+        assert.equal(read['waitOutcome'], 'timeout');
+        assert.equal(asArray(read['events']).length, 0);
+        assert.equal(asRecord(read['session'])['status'], 'running');
+    });
+
+    it('cancels only a long-poll waiter and leaves the accepted persistent session running', async () => {
+        const opened = asRecord(
+            await openTerminalSessionForTest({
+                command: process.execPath,
+                args: ['-e', 'setInterval(() => {}, 1000)'],
+                shell: false,
+                backend: 'pipe',
+            }),
+        );
+        const sessionId = String(asRecord(opened['session'])['id']);
+        const controller = new AbortController();
+        const runtime = {
+            workspaceRoot: process.cwd(),
+            config: TERMINAL_TEST_CONFIG,
+            signal: controller.signal,
+            cancellationSource: () => /** @type {const} */ ('caller'),
+        };
+        const pending = readTerminalSessionWithWait(
+            { action: 'read', sessionId, afterSeq: 0, waitFor: 'output-or-exit', waitMs: 1_000 },
+            runtime,
+        );
+        setTimeout(() => controller.abort(new Error('cancel-read-wait-only')), 30);
+        await assert.rejects(pending, (error) => {
+            const candidate = /** @type {Error & { code?: string }} */ (error);
+            assert.equal(candidate.code, 'MCP_TOOL_CANCELLED');
+            assert.match(candidate.message, /cancel-read-wait-only/u);
+            return true;
+        });
+        const status = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        assert.equal(asRecord(status['session'])['status'], 'running');
     });
 
     it('keeps shell and operational environment bound to the captured generation', async () => {

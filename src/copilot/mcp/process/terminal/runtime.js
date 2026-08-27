@@ -22,7 +22,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-export const MCP_TERMINAL_CONTROL_VERSION = 3;
+export const MCP_TERMINAL_CONTROL_VERSION = 4;
 
 const require = createRequire(import.meta.url);
 const DEFAULT_EXEC_TIMEOUT_MS = 120_000;
@@ -35,6 +35,9 @@ const DEFAULT_SESSION_BUFFER_BYTES = 4 * 1024 * 1024;
 const MAX_SESSION_BUFFER_BYTES = 64 * 1024 * 1024;
 const DEFAULT_SESSION_READ_BYTES = 512 * 1024;
 const MAX_SESSION_READ_BYTES = 8 * 1024 * 1024;
+const DEFAULT_SESSION_WAIT_MS = 30_000;
+const MAX_SESSION_WAIT_MS = 120_000;
+const MAX_SESSION_WAITERS_PER_SESSION = 64;
 const MAX_TERMINAL_SESSIONS = 128;
 const MAX_TERMINAL_BATCH = 32;
 const MAX_TERMINAL_BATCH_CONCURRENCY = 16;
@@ -86,6 +89,7 @@ let nodePtyModule;
  *     droppedBytes: number;
  *     nextSeq: number;
  *     events: TerminalEvent[];
+ *     waiters: Set<() => void>;
  *     child: import('node:child_process').ChildProcessWithoutNullStreams | null;
  *     pty: import('node-pty').IPty | null;
  * }} TerminalSessionRecord
@@ -398,6 +402,7 @@ export async function openTerminalSession(input, runtime) {
         droppedBytes: 0,
         nextSeq: 1,
         events: [],
+        waiters: new Set(),
         child: null,
         pty: null,
     };
@@ -613,6 +618,59 @@ export function readTerminalSession(input, runtime) {
     };
 }
 
+/**
+ * Optionally wait for new output or process termination, then project the same cursor-bounded read result. Immediate
+ * read semantics remain the default; a wait never owns or terminates the persistent process.
+ *
+ * @param {{
+ *     action?: 'read' | 'status' | 'list' | 'capabilities';
+ *     sessionId?: string;
+ *     afterSeq?: number;
+ *     maxBytes?: number;
+ *     limit?: number;
+ *     waitFor?: 'output-or-exit';
+ *     waitMs?: number;
+ * }} input
+ * @param {TerminalExecutionRuntime} runtime
+ */
+export async function readTerminalSessionWithWait(input, runtime) {
+    const executionRuntime = requireTerminalExecutionRuntime(runtime);
+    const immediate = readTerminalSession(input, executionRuntime);
+    if ((input.action ?? 'read') !== 'read' || input.waitFor !== 'output-or-exit') return immediate;
+    if (immediate['success'] !== true) return immediate;
+
+    const record = sessions.get(String(input.sessionId ?? ''));
+    if (!record) return immediate;
+    const waitMs = clampInteger(input.waitMs, 1, MAX_SESSION_WAIT_MS, DEFAULT_SESSION_WAIT_MS);
+    const afterSeq = Math.max(0, Math.trunc(Number(input.afterSeq ?? 0)));
+    const immediateEvents = Array.isArray(immediate['events']) ? immediate['events'] : [];
+    if (immediate['cursorBehindRetention'] === true) {
+        return { ...immediate, waitFor: input.waitFor, waitMs, waitedMs: 0, waitOutcome: 'cursor-behind-retention' };
+    }
+    if (record.status !== 'running') {
+        return { ...immediate, waitFor: input.waitFor, waitMs, waitedMs: 0, waitOutcome: 'immediate-exit' };
+    }
+    if (immediateEvents.length > 0) {
+        return { ...immediate, waitFor: input.waitFor, waitMs, waitedMs: 0, waitOutcome: 'immediate-output' };
+    }
+
+    const startedAt = performance.now();
+    const signalOutcome = await waitForTerminalSessionReadChange(record, afterSeq, waitMs, executionRuntime);
+    const refreshed = readTerminalSession(input, executionRuntime);
+    const waitedMs = Math.max(0, Math.round(performance.now() - startedAt));
+    const refreshedRecord = sessions.get(String(input.sessionId ?? ''));
+    const refreshedEvents = Array.isArray(refreshed['events']) ? refreshed['events'] : [];
+    const waitOutcome =
+        refreshedRecord?.status !== 'running'
+            ? 'exit'
+            : refreshedEvents.length > 0
+              ? 'output'
+              : signalOutcome === 'timeout'
+                ? 'timeout'
+                : 'output';
+    return { ...refreshed, waitFor: input.waitFor, waitMs, waitedMs, waitOutcome };
+}
+
 /** Return terminal backend/process capabilities. @param {import('./config.js').McpTerminalProcessConfig} config */
 export function getTerminalCapabilities(config) {
     if (!config) throw new TypeError('Terminal capabilities require a terminal process config generation.');
@@ -642,6 +700,8 @@ export function getTerminalCapabilities(config) {
         maxBatchResultBudgetBytes: MAX_BATCH_RESULT_BUDGET_BYTES,
         maxExecOutputBytes: MAX_EXEC_OUTPUT_BYTES,
         maxSessionBufferBytes: MAX_SESSION_BUFFER_BYTES,
+        maxSessionWaitMs: MAX_SESSION_WAIT_MS,
+        maxSessionWaitersPerSession: MAX_SESSION_WAITERS_PER_SESSION,
         osBoundary: 'same-identity-namespace-mounts-and-privileges-as-mcp-process',
     };
 }
@@ -805,6 +865,7 @@ function appendSessionEvent(record, stream, data) {
         record.bufferedBytes -= removed.bytes;
         record.droppedBytes += removed.bytes;
     }
+    notifyTerminalSessionWaiters(record);
 }
 
 /** @param {TerminalSessionRecord} record @param {number | null} exitCode @param {string | number | null} signal */
@@ -825,6 +886,7 @@ function markSessionFailed(record) {
     record.endedAt = new Date().toISOString();
     record.child = null;
     record.pty = null;
+    notifyTerminalSessionWaiters(record);
 }
 
 /** @param {TerminalSessionRecord} record */
@@ -856,11 +918,110 @@ function terminalNotRunning(record) {
 
 /** @param {TerminalSessionRecord} record @param {number} waitMs */
 async function waitForSessionExit(record, waitMs) {
-    const deadline = Date.now() + waitMs;
-    while (record.status === 'running' && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
-    }
+    if (record.status !== 'running' || waitMs <= 0) return record.status !== 'running';
+    await new Promise((resolvePromise) => {
+        let settled = false;
+        /** @type {NodeJS.Timeout | null} */
+        let timeout = null;
+        const cleanup = () => {
+            record.waiters.delete(onChange);
+            if (timeout) clearTimeout(timeout);
+        };
+        const settle = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolvePromise(undefined);
+        };
+        const onChange = () => {
+            if (record.status !== 'running') settle();
+        };
+        record.waiters.add(onChange);
+        timeout = setTimeout(settle, waitMs);
+        timeout.unref();
+        if (record.status !== 'running') settle();
+    });
     return record.status !== 'running';
+}
+
+/** @param {TerminalSessionRecord} record */
+function notifyTerminalSessionWaiters(record) {
+    for (const waiter of [...record.waiters]) waiter();
+}
+
+/** @param {TerminalSessionRecord} record @param {number} afterSeq */
+function terminalSessionReadChangeAvailable(record, afterSeq) {
+    if (record.status !== 'running') return true;
+    const earliestSeq = record.events[0]?.seq ?? record.nextSeq;
+    if (afterSeq > 0 && afterSeq < earliestSeq - 1) return true;
+    return record.events.some((event) => event.seq > afterSeq);
+}
+
+/**
+ * @param {TerminalSessionRecord} record
+ * @param {number} afterSeq
+ * @param {number} waitMs
+ * @param {TerminalExecutionRuntime} runtime
+ * @returns {Promise<'change' | 'timeout'>}
+ */
+async function waitForTerminalSessionReadChange(record, afterSeq, waitMs, runtime) {
+    if (runtime.signal?.aborted) throw terminalSessionWaitCancellationError(runtime);
+    if (terminalSessionReadChangeAvailable(record, afterSeq)) return 'change';
+    if (record.waiters.size >= MAX_SESSION_WAITERS_PER_SESSION) {
+        throw Object.assign(new Error('Terminal session has reached the bounded concurrent read-wait limit.'), {
+            code: 'ERR_TERMINAL_SESSION_WAITER_LIMIT',
+            maxWaiters: MAX_SESSION_WAITERS_PER_SESSION,
+        });
+    }
+    return await new Promise((resolvePromise, rejectPromise) => {
+        let settled = false;
+        /** @type {NodeJS.Timeout | null} */
+        let timeout = null;
+        const cleanup = () => {
+            record.waiters.delete(onChange);
+            runtime.signal?.removeEventListener('abort', onAbort);
+            if (timeout) clearTimeout(timeout);
+        };
+        /** @param {'change' | 'timeout'} outcome */
+        const resolveOnce = (outcome) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolvePromise(outcome);
+        };
+        /** @param {unknown} error */
+        const rejectOnce = (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        };
+        const onChange = () => resolveOnce('change');
+        const onAbort = () => rejectOnce(terminalSessionWaitCancellationError(runtime));
+        record.waiters.add(onChange);
+        runtime.signal?.addEventListener('abort', onAbort, { once: true });
+        timeout = setTimeout(() => resolveOnce('timeout'), waitMs);
+        timeout.unref();
+        // Close the race between the immediate read and waiter registration.
+        if (terminalSessionReadChangeAvailable(record, afterSeq)) onChange();
+        else if (runtime.signal?.aborted) onAbort();
+    });
+}
+
+/** @param {TerminalExecutionRuntime} runtime */
+function terminalSessionWaitCancellationError(runtime) {
+    const source = runtime.cancellationSource?.() ?? 'caller';
+    const reason = runtime.signal?.reason;
+    return Object.assign(
+        new Error(
+            reason instanceof Error ? reason.message : `Terminal session read wait cancelled (${source}).`,
+            reason instanceof Error ? { cause: reason } : undefined,
+        ),
+        {
+            code: source === 'deadline' ? 'MCP_TOOL_TIMEOUT' : 'MCP_TOOL_CANCELLED',
+            cancellationSource: source,
+        },
+    );
 }
 
 function runningSessionCount() {

@@ -17,7 +17,7 @@ import {
     executeTerminalCommand,
     executeTerminalCommandBatch,
     openTerminalSession,
-    readTerminalSession,
+    readTerminalSessionWithWait,
 } from '#copilot/mcp/public/process/terminal';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
@@ -115,6 +115,8 @@ const terminalCapabilitiesSchema = z.object({
     maxBatchResultBudgetBytes: z.number().int().min(1),
     maxExecOutputBytes: z.number().int().min(1),
     maxSessionBufferBytes: z.number().int().min(1),
+    maxSessionWaitMs: z.number().int().min(1),
+    maxSessionWaitersPerSession: z.number().int().min(1),
     osBoundary: z.string(),
 });
 
@@ -258,6 +260,12 @@ const terminalSessionReadOutputSchema = z.object({
     cursorBehindRetention: z.boolean().optional(),
     returnedBytes: z.number().int().min(0).optional(),
     hasMore: z.boolean().optional(),
+    waitFor: z.literal('output-or-exit').optional(),
+    waitMs: z.number().int().min(1).max(120_000).optional(),
+    waitedMs: z.number().int().min(0).optional(),
+    waitOutcome: z
+        .enum(['immediate-output', 'immediate-exit', 'cursor-behind-retention', 'output', 'exit', 'timeout'])
+        .optional(),
     events: z.array(terminalEventSchema).optional(),
 });
 
@@ -306,6 +314,8 @@ function terminalResult(payload) {
             : {}),
         ...(payload['returnedBytes'] !== undefined ? { returnedBytes: payload['returnedBytes'] } : {}),
         ...(payload['hasMore'] !== undefined ? { hasMore: payload['hasMore'] } : {}),
+        ...(payload['waitOutcome'] !== undefined ? { waitOutcome: payload['waitOutcome'] } : {}),
+        ...(payload['waitedMs'] !== undefined ? { waitedMs: payload['waitedMs'] } : {}),
         ...(session && typeof session === 'object'
             ? {
                   session: {
@@ -524,7 +534,7 @@ export const terminalTools = [
         name: 'terminal_session_read',
         title: 'Read persistent terminal sessions',
         description:
-            'Read/list/status persistent MCP terminal sessions and inspect terminal capabilities without mutating a process. Output reads are cursor-based and bounded so long-running terminals do not require repeated full-log transfers.',
+            'Read/list/status persistent MCP terminal sessions and inspect terminal capabilities without mutating a process. Reads are cursor-based and bounded; optionally wait event-driven for new output or exit to avoid mechanical polling.',
         inputSchema: {
             action: z.enum(['read', 'status', 'list', 'capabilities']).optional().describe('Default: read.'),
             sessionId: z.string().min(1).max(128).optional(),
@@ -543,16 +553,45 @@ export const terminalTools = [
                 .max(128)
                 .optional()
                 .describe('Maximum sessions returned by list. Default: 50.'),
+            waitFor: z
+                .literal('output-or-exit')
+                .optional()
+                .describe(
+                    'For action=read only, wait event-driven until output arrives, the process exits, or waitMs expires.',
+                ),
+            waitMs: z
+                .number()
+                .int()
+                .min(1)
+                .max(120_000)
+                .optional()
+                .describe('Bounded wait for waitFor=output-or-exit. Default: 30000ms; hard max: 120000ms.'),
         },
         outputSchema: terminalSessionReadOutputSchema,
 
         maxResultBytes: TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES,
-        handler: async (input = {}, operationContext) =>
-            terminalResult(
-                readTerminalSession(
-                    /** @type {Parameters<typeof readTerminalSession>[0]} */ (isRecord(input) ? input : {}),
+        handler: async (input = {}, operationContext) => {
+            const value = isRecord(input) ? input : {};
+            if (value['waitMs'] !== undefined && value['waitFor'] !== 'output-or-exit') {
+                return okResult({
+                    success: false,
+                    code: 'ERR_TERMINAL_SESSION_WAIT_REQUIRES_WAIT_FOR',
+                    hint: 'Set waitFor="output-or-exit" when supplying waitMs.',
+                });
+            }
+            if (value['waitFor'] !== undefined && (value['action'] ?? 'read') !== 'read') {
+                return okResult({
+                    success: false,
+                    code: 'ERR_TERMINAL_SESSION_WAIT_REQUIRES_READ',
+                    hint: 'waitFor is supported only for action=read.',
+                });
+            }
+            return terminalResult(
+                await readTerminalSessionWithWait(
+                    /** @type {Parameters<typeof readTerminalSessionWithWait>[0]} */ (value),
                     terminalExecutionRuntime(operationContext),
                 ),
-            ),
+            );
+        },
     }),
 ];

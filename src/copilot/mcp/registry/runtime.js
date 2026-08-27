@@ -1646,8 +1646,8 @@ function countMcpResultTextBytes(result) {
 
 /**
  * These equality checks cover the currently proven duplicated single-result forms without serializing arbitrary
- * structuredContent again. Tree tools use okResult's structured stringify fallback by construction, so their text is
- * also a duplicate representation of the structured tree.
+ * structuredContent again. For tree tools, only the legacy JSON-shaped stringify fallback is counted as duplication;
+ * compact human summaries that merely point to structuredContent.entries must not become telemetry false positives.
  *
  * @param {string} toolName
  * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
@@ -1664,7 +1664,10 @@ function estimateKnownDuplicateTextBytes(toolName, result, textBytes) {
     if (toolName === 'repo_search_text' && typeof structured?.['output'] === 'string') {
         return structured['output'] === text ? textBytes : 0;
     }
-    if (toolName === 'repo_tree' || toolName === 'repo_root_tree') return textBytes;
+    if (toolName === 'repo_tree' || toolName === 'repo_root_tree') {
+        const trimmed = text.trimStart();
+        return trimmed.startsWith('{') && trimmed.includes('"entries"') ? textBytes : 0;
+    }
     return 0;
 }
 

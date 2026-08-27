@@ -877,6 +877,7 @@
         "mcp.protocol.apps-sdk",
         "mcp.runtime.reload",
         "mcp.validation",
+        "mcp.workflow-policy",
         "mcp.workspace.git",
         "mcp.workspace.repository",
         "mcp.workspace.repository.patch",
@@ -921,6 +922,18 @@
       "authorityClasses": ["mutable-state", "process-launcher", "public-surface", "testing-surface"],
       "policyHooks": ["cost", "process", "state", "surface"],
       "allowedDependencies": ["mcp.process", "mcp.workspace"]
+    },
+    {
+      "ownerId": "mcp.workflow-policy",
+      "path": "src/copilot/mcp/workflow-policy",
+      "parentOwnerId": "mcp",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Canonical low-round-trip workflow policy",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.protocol"]
     },
     {
       "ownerId": "mcp.workspace",
