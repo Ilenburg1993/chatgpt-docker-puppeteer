@@ -4,17 +4,27 @@
 
 > **Status do documento:** CANÔNICO / VIVO / REFERÊNCIA OBRIGATÓRIA.
 >
-> **Revisão documental:** 7.8 — **ROADMAP III-A ENCERRADO LIVE / GATE III-A→III-B ABERTO / III-B
-> AINDA NÃO INICIADO**. Roadmaps I e II permanecem concluídos e publicados. A camada de correctness
-> possui Option Contract SSOT `1.5.0` fail-closed, continuation semantics v7, matriz combinatória
-> bounded, outcome/option telemetry histórica e identidade wire por tool. A promoção superset foi
-> validada e promovida com source binding controlado; o connector smoke autenticado provou `131/131`
-> descriptors em schema parity remota. O pipeline de promoção foi endurecido com changed-lint
-> fail-fast, Source Barrier v2 com tombstones, output de sucesso compacto e validação sequencial sem
-> remover nenhum gate. O comportamento administrativo do ChatGPT diante de uma **mudança wire
-> futura** continua explicitamente fora da observabilidade do origin e será testado quando ocorrer
-> um schema change real; nesta revisão o fingerprint wire permaneceu estável e não houve necessidade
-> de reconnect manual.
+> **Revisão documental:** 8.9 — **ROADMAP III-A ENCERRADO / III-B1 RECOVERY RECIPE ENCERRADO LIVE /
+> III-B2 EXACT BOUNDED SELF-REPAIR ENCERRADO LIVE / III-B3 PATCH TARGET GROUPS V3 ENCERRADO
+> CODE+RUNTIME LIVE / III-B4 É A PRÓXIMA FAIXA, AINDA NÃO INICIADA**. Roadmaps I e II permanecem
+> concluídos e publicados e III-A permanece congelado no baseline live da revisão 7.8. III-B1
+> permanece promovido na Source Barrier v2 fingerprint
+> `ecbda618705f443083545ac6cfb36962cc7766a9f1234558d662f6fe6586115f`. III-B2 permanece promovido sob
+> `25170022708eac9c642c23d8ba8d2d288c86c8e1aa0ada679b3b1fe2bca9baa6`. III-B3-A foi validado em
+> `4e90979522010e8853bf86a7b927b1d7521fb35f8b26fb7593a8a6a3d72d6c65` e promovido sob a
+> runtime-scoped barrier `e98a2b3b5b3ec71a3cbe7c972414a189ac7fabf4709e2f44fab096478bbf5942`, com
+> `29` artefatos, `mcp-full` **743/743** em validation e promotion barrier, restart `quic`
+> concluído, smoke remoto `131/131`, schema parity `131/131`, descriptor live
+> `fa9401b0cb804a8cc270d0096575814363f5c72565ebb190f6a053ea4dfcf968` e `runtimeSourceDrift=false`. A
+> B3-B V3-only foi depois certificada sob validation barrier
+> `8c1c1a532067d62d24cfa1bdb7ce0714aeecd85f6484b3413aa05ade9d889058` e promovida sob a
+> runtime-scoped barrier `3133d8ca651518ecf5e387c5adb76ce9f609d72d74705fcd9934ee51a8273475`:
+> `mcp-full` **740/740**, restart `quic`, smoke remoto e schema parity `131/131`,
+> `runtimeSourceDrift=false`, payload live `162586 B`, `repo_apply_patch_batch=4636 B` e
+> `repo_patch_batch_plan=2908 B`. Uma chamada live `targets[]` com duas operações dependentes
+> same-file passou em dry-run mantendo o arquivo físico inalterado, enquanto a forma flat V2 foi
+> rejeitada por ausência de `targets`. O snapshot administrativo do ChatGPT pode ainda oscilar/stale
+> independentemente da origem; isso é estado externo e não reabre compatibilidade V2 no runtime.
 >
 > **Workspace:** `/workspaces/chatgpt-docker-puppeteer`.
 >
@@ -4465,40 +4475,529 @@ A ordem abaixo é candidata e deve ser reordenada pelos dados de III-A.
 
 ## FAIXA III-B1 — Machine-readable Recovery Recipe
 
-- [ ] contrato comum somente para failure/partial outcomes relevantes;
-- [ ] `retryInvocation` somente quando deterministicamente seguro;
-- [ ] suggested invocation separado de safe invocation;
-- [ ] target/group scope explícito;
-- [ ] Git partial publish também adota recipe compatível;
-- [ ] medir follow-up read/plan calls before/after.
+- [x] contrato comum somente para failure/partial outcomes relevantes;
+- [x] `retryInvocation` somente quando deterministicamente seguro;
+- [x] suggested invocation separado de safe invocation;
+- [x] target/group scope explícito;
+- [x] Git partial publish também adota recipe compatível;
+- [x] medir follow-up read/plan calls before/after.
+
+### Checkpoint source III-B1 — revisão 7.9
+
+- `protocol/tools/contracts/recovery.js` introduz Recovery Recipe `v1` como dado puro e imutável;
+  nenhum recipe executa tools e nenhuma authority genérica `tool-of-tools` foi criada;
+- dispositions canônicas: `retry-safe`, `suggested`, `manual` e `no-retry`; invocation segura e
+  invocation apenas sugerida são campos distintos e mutuamente governados;
+- patch `ERR_PATCH_NOT_FOUND` só recebe `retry-safe` quando existe `recoveryExactAnchor=true`,
+  `recoveryOldString` e `currentHash` provados no mesmo snapshot, o target é independente e o caller
+  não forneceu `expectedHash`, `replace_all`, `expected_occurrences` ou `occurrence_index` que
+  seriam semanticamente alterados pelo retry;
+- `EEXPECTEDHASH` permanece `suggested` para refresh hash-only; ambiguous/cardinality e same-file
+  dependency failures permanecem `manual`; convergence/no-op é `no-retry`;
+- Git publish pós-commit só recebe `retry-safe` quando a retomada pode ser expressa como `git_push`
+  com `expectedHead=committedHead`, `expectedUpstream` capturado e a mesma policy de push dry-run;
+  stage/commit jamais reaparecem no recipe de resume;
+- o completion audit genérico extrai somente cinco contadores bounded — total, retry-safe,
+  suggested, manual e no-retry. Invocation tool/args, paths, `old_string`, `new_string`,
+  HEAD/upstream e reason text não entram no JSONL/SQLite por esse caminho;
+- normalizer/derived index avançaram `v7 → v8`; `mcp_round_trip_analytics.recoveryRecipes` agrega as
+  dispositions globalmente e por tool, sem reinterpretar histórico pré-v8 como se recipes já
+  existissem;
+- gate causal ampliado: **44/44 testes** em quatro arquivos = `5940 ms`; TS7 strict final =
+  `1452 ms`; changed-lint verde. Um lint failure local anterior (`no-unsafe-optional-chaining`) foi
+  corrigido por narrowing explícita e não exigiu rerun broad;
+- a primeira forma importava Recovery Recipe pelo barrel amplo de protocol/tools e fez
+  `#copilot/mcp/public/workspace/repository/patch` exceder budget (`137194 > 120234 B`). O budget
+  não foi elevado: foi criada a exact membrane `#copilot/mcp/public/protocol/tools/recovery`,
+  reduzindo a closure de patch para **`95449 B`** (`-41745 B`, `-30,4%`). A leaf mede
+  `4222 B / 2 módulos`, com baseline próprio `6333 B / 3 módulos` a `1,5×`;
+- gates V2 finais source: public API = `82 aliases`, `0` manifest/cost/import-purity violations;
+  owner graph = `70 owners`, `879` local edges, `0` SCC e `0` mismatch; architecture contract =
+  **263/263**, package imports/surface/cold-import/Infra gates todos verdes;
+- a única checkbox source ainda aberta era deliberadamente live/quantitativa e foi encerrada na
+  promoção controlada descrita abaixo.
+
+### Checkpoint live III-B1 — revisão 8.0
+
+- candidate final certificada por Source Barrier v2 em `23` entries, zero tombstones, fingerprint
+  `ecbda618705f443083545ac6cfb36962cc7766a9f1234558d662f6fe6586115f`;
+- a primeira tentativa broad chegou a `718/719` units e revelou somente um `deepEqual` de fixture
+  que ainda esperava o `failureSummary` pré-recipe; o teste foi corrigido para afirmar
+  explicitamente `recoveryRecipeTargetCount`, `retrySafeRecoveryRecipeTargetCount` e
+  `suggestedRecoveryRecipeTargetCount`, ficando `8/8` no gate causal;
+- broad superset final sob a mesma fingerprint: typecheck `982 ms`, changed-lint `1036 ms`, docs
+  `213 ms`, architecture `19645 ms`, full lint `18856 ms`, units **`719/719`** em `67717 ms`, suite
+  total `108451 ms`; a barrier verificou fingerprint idêntica antes/depois;
+- reload controlado `mcp-reload-b79352c3-b2e4-42fd-8bf2-1572180fbf4d`, profile `quic`, exit `0`;
+  `mcp_connector_smoke_refresh` pós-reload fechou MCP `2026-07-28`, OAuth/health/subscription
+  verdes, `131/131` tools e
+  `schemaParity={required:true,available:true,matches:true,matchingToolCount:131}`; nenhuma
+  reconexão manual do ChatGPT foi necessária;
+- baseline analytics v8 imediatamente antes do experimento: janela 1h completa, `451/451`, coverage
+  `1`, e `recoveryRecipes={callsWithRecipe:0,recipeCount:0,retrySafeCount:0}`;
+- experimento B: `repo_apply_patch(dryRun=true)` recebeu mismatch LF↔CRLF, falhou
+  `ERR_PATCH_NOT_FOUND` e retornou `recoveryRecipe.disposition='retry-safe'` com anchor único
+  provado e `currentHash`; a call imediatamente seguinte executou **exatamente** `retryInvocation` e
+  passou em dry-run, `bytesWritten=0`, sem read/stat/plan intermediário — **2 MCP calls**;
+- após B, analytics v8 mostrou exatamente `callsWithRecipe=1`, `recipeCount=1`, `retrySafeCount=1`,
+  `byTool.repo_apply_patch=1`; o relatório contém apenas contagens/dispositions, sem path, source,
+  hash ou invocation args;
+- controle A deliberado na mesma classe: failure equivalente → `repo_file_stats(includeHash=true)` →
+  corrected dry-run patch = **3 MCP calls**, também `bytesWritten=0`; analytics final registrou o
+  segundo recipe e o único `repo_file_stats` do controle;
+- comparação causal controlada: `3 → 2` calls, redução de **1/3 = 33,3%** para esta classe de
+  exact-context mismatch. Isso não é extrapolado para failures ambíguos, hash conflicts, dependency
+  groups ou para o tráfego global;
+- a telemetria histórica sem W3C lineage continua epistemicamente separada: temporal adjacency segue
+  como pressure, não prova de retry causal. O A/B acima é válido porque as sequências foram
+  explicitamente construídas e observadas, não inferidas do histórico;
+- **III-B1 está encerrada live.** A próxima faixa autorizada é III-B2, com o Recovery Recipe v1 como
+  authority de elegibilidade e sem duplicar sua truth table em outro owner.
 
 ## FAIXA III-B2 — Exact bounded self-repair de patch
 
 Primeiro candidato de auto-retry:
 
-- [ ] `ERR_PATCH_NOT_FOUND` com exact recovery anchor provado único;
-- [ ] retry uma vez com currentHash;
-- [ ] zero fuzzy matching;
-- [ ] zero bypass de expectedHash fornecido pelo caller;
-- [ ] target-independent only;
-- [ ] group-aware para same-file dependencies;
-- [ ] kill switch;
-- [ ] A/B call count e correctness.
+- [x] `ERR_PATCH_NOT_FOUND` com exact recovery anchor provado único;
+- [x] retry uma vez com currentHash;
+- [x] zero fuzzy matching;
+- [x] zero bypass de expectedHash fornecido pelo caller;
+- [x] target-independent only;
+- [x] group-aware para same-file dependencies;
+- [x] kill switch;
+- [x] A/B call count e correctness live pós-promoção.
 
 Candidato separado:
 
 - [ ] `convergencePolicy=accept-proven` somente opt-in.
 
+### Plano de implementação III-B2 — revisão 8.0
+
+A investigação pré-código fixa as seguintes invariantes; qualquer implementação que as quebre deve
+ser rejeitada:
+
+1. **B1 é a authority de elegibilidade.** B2 não cria uma segunda truth table de “quando é seguro”.
+   A primeira tentativa falha normalmente, a failure semantics constrói Recovery Recipe v1 e somente
+   `disposition='retry-safe'` autoriza considerar self-repair.
+2. **Uma única segunda tentativa.** Não existe loop, recursão nem cadeia de fallbacks. A execução é
+   `attempt 0 → [optional attempt 1] → terminal outcome`.
+3. **Hash-bound reacquire.** O primeiro `computeTextPatch` roda sob lock e a failure retorna
+   `currentHash` da mesma snapshot; ao sair da call de IO o lock original é liberado. B2 reacquire o
+   lock pela mesma `patchTextLocked`, mas a segunda tentativa obrigatoriamente envia
+   `expectedHash=currentHash`. Qualquer race entre as duas tentativas vira `EEXPECTEDHASH` e falha
+   closed antes de mutar.
+4. **Zero fuzzy mutation.** O gerador Infra de `recoveryExactAnchor` só o emite para line-ending,
+   quote-escape ou combinação dessas normalizações e, antes de emitir, comprova que o literal
+   reconstruído já existe **exatamente uma vez no conteúdo original**. Whitespace/candidate
+   fragments nunca autorizam self-repair.
+5. **Caller intent inviolável.** Caller `expectedHash`, `replace_all`, `expected_occurrences` ou
+   `occurrence_index` impedem `retry-safe`; B2 não remove nem substitui essas escolhas.
+6. **Target-independent only.** Same-file groups continuam no `patchTextBatchLocked` e nunca fazem
+   retry isolado. Distinct-file batch pode self-repair cada target independente sem mudar
+   failureMode/concurrency do scheduler.
+7. **Kill switch sem schema churn.** A policy será capturada na configuração process-scoped a partir
+   de env e projetada no OperationContext; não será criado input knob na tool nem haverá leitura de
+   `process.env` no domain owner.
+8. **Mesmo engine e mesma validation.** A segunda tentativa reutiliza `patchResolvedTarget` e todas
+   as opções de validation/durability/diff aplicáveis; não existe patch implementation paralela.
+9. **Telemetry content-free.** Outcome/audit podem registrar attempted/succeeded/failed-closed e
+   reason code bounded, mas nunca recovery anchor, source text ou hash bruto no índice analítico.
+10. **Promotion gate:** false repair absoluto = `0`; race simulada deve produzir fail-closed; kill
+    switch off deve reproduzir exatamente o comportamento B1 (failure + recipe, sem segunda IO).
+
+Decisão arquitetural: **não** mover o self-repair para o Infra nesta faixa. Fazer isso duplicaria a
+policy B1 dentro de uma camada que não conhece caller/tool semantics. O custo de uma segunda
+lock/read local é aceito inicialmente porque o benefício alvo é eliminar um model→tool round trip;
+se telemetry provar que o local retry é hot, uma futura otimização poderá mover apenas a execução
+já-autorizada para dentro do lock sem mover a policy.
+
+### Checkpoint source III-B2 — revisão 8.1
+
+- `workspace/repository/patch/config.js` introduz `McpRepositoryPatchConfig v1`, imutável e
+  capturado uma vez por processo. Default: `exactSelfRepairEnabled=true`, hard ceiling
+  `exactSelfRepairMaxAttempts=1`; kill switch operacional:
+  `COPILOT_MCP_PATCH_EXACT_SELF_REPAIR_DISABLED=true`;
+- a config possui exact membrane `#copilot/mcp/public/workspace/repository/patch/config`; o wire
+  schema das tools não mudou. `createMcpProcessConfig` mantém a mesma instância em `repositoryPatch`
+  e `toolConfig.repositoryPatch`; `freezeToolConfig` foi atualizado explicitamente — um teste
+  revelou que a allowlist anterior não projetava a policy, evitando propagação silenciosa;
+- `RepoWriteRuntime` agora exige a config explicitamente, sem fallback legado. O único chamador de
+  produção de `runRepositoryPatchTargetGroups` é o bridge de repository-write, portanto o contrato
+  foi endurecido sem shim;
+- `executeIndependentPatchTarget` centraliza tentativa 0 + optional tentativa 1 para plan/apply de
+  targets independentes. A elegibilidade não é recalculada: somente Recovery Recipe v1 com
+  `version=1`, `disposition='retry-safe'`, `scope='target'`,
+  `reasonCode='patch-exact-anchor-same-snapshot'` e `tool='repo_apply_patch'` é consumida;
+- o retry verifica novamente path/new_string, `dryRun`, literal `old_string`, SHA-256 de 64 hex e
+  igualdade `retry.expectedHash === failure.details.currentHash`; recipe ou caller com
+  `expectedHash`, `replace_all`, `expected_occurrences` ou `occurrence_index` sai do caminho;
+- a tentativa 1 chama o mesmo `patchResolvedTarget`, reacquire o mesmo resource lock e envia
+  `expectedHash=currentHash`. Race simulada entre os locks produz `EEXPECTEDHASH`,
+  `failedClosed=true`, zero mutation e **nenhuma terceira tentativa**;
+- same-file groups continuam integralmente em `patchTextBatchLocked`: teste owner prova
+  `singleCalls=0`, `batchCalls=1`, recipe `manual/dependency-group` e ausência de self-repair;
+- wire/audit expõem somente projeção bounded:
+  `attempted/succeeded/failedClosed/attemptCount/reasonCode/failureCode`; batch agrega apenas
+  attempted/succeeded/failedClosed counts. Recovery anchor, source text e hashes não fazem parte
+  dessa projeção;
+- gate config: **3/3**; gate Recovery Recipe + wire real: **7/7**, incluindo apply efetivo em
+  arquivo temporário governado; gate patch batch: **8/8**; gate owner/security: **4/4**. Total
+  causal local: **22/22**, além de TS7 strict e focused ESLint verdes;
+- o teste compacto de 12 operações detectou regressão de payload: `3085 B` para SLO `<3 KiB`
+  (`3072 B`). O SLO não foi relaxado: o objeto top-level `exactSelfRepair` agora é completamente
+  omitido quando `attemptedCount=0`, restaurando `8/8` no batch suite;
+- **false repair observado em testes causais = 0**;
+- analytics foi promovida para **v9**: completion metadata persiste somente
+  `exactSelfRepairAttemptedCount`, `exactSelfRepairSucceededCount` e
+  `exactSelfRepairFailedClosedCount`; nenhuma recipe, path, hash, anchor, source text, reason string
+  ou invocation arg entra no índice. Migration idempotente adiciona três INTEGERs e o cursor `v8→v9`
+  força replay do audit source-of-record. Gates: audit boundary `12/12`, analytics `28/28`, wire
+  `1/1` = **41/41**;
+- consumers transversais permaneceram verdes: repository-write `32/32`, canonical tools `64/64` e
+  OperationContext `3/3` = **99/99**. Somados aos 63 gates causais/analíticos, são **162 testes
+  focados distintos verdes** nesta candidate;
+- a nova membrane `#copilot/mcp/public/workspace/repository/patch/config` foi medida pelo analisador
+  canônico em **2 módulos / 1911 B / zero external packages**. Baseline versionado recebeu somente
+  essa entry, com headroom 1,5× (`maxModuleCount=3`, `maxSourceBytes=2867`);
+- owner governance passou após declarar somente a edge
+  `mcp.composition.process-config → mcp.workspace.repository.patch`: `402` parsed files, `881` local
+  module edges, `70` owners, `230` direct owner dependencies, **0 SCC / 0 mismatch / 0 violation**;
+- public API cost está verde em `83/83` aliases, `1011` closure files, **0 manifest / 0 cost / 0
+  import-purity violations**; architecture umbrella fechou **264/264**, dependency graph `2285`
+  files / `6157` edges com zero cycles/unresolved imports e surface governance com zero violations;
+- formatação final foi aplicada somente ao worktree candidate e o regate pós-Prettier fechou strict,
+  changed lint, docs, formatting check e `31/31` testes diretamente afetados;
+- a **validation barrier v2** foi capturada por `capture-worktree` em `33` entries, `0` tombstones,
+  fingerprint `93a41fed6cbbc3d81bc1a3935d8549cee396ec50af4fbd319832082eb5b8d1af`;
+- sob essa mesma fingerprint, sem qualquer drift antes/depois, passaram: TS7 strict, changed lint,
+  full `lint:copilot`, docs contract e architecture umbrella `264/264`;
+- o único `mcp-full` da candidate também rodou sob `93a41f…d1af` e fechou **123 test files / 730/730
+  tests**, com typecheck `983 ms`, changed lint `934 ms`, docs `208 ms`, architecture `19643 ms`,
+  full lint `19038 ms`, unit MCP `69303 ms` e suite total `110110 ms`;
+- a validation barrier inclui MD/testes e permanece a prova da candidate validada. Para promoção
+  será criada uma **promotion barrier runtime-scoped** separada, contendo apenas `package.json` e
+  produção alterada em `src/copilot/mcp/**`; isso evita que futuras atualizações legítimas deste MD
+  façam o runtime promovido parecer source-drifted sem que bytes executáveis tenham mudado;
+- a **promotion barrier runtime-scoped** foi capturada explicitamente sobre `package.json` + os `20`
+  artefatos de produção alterados em `src/copilot/mcp/**`: `21` entries, `0` tombstones, fingerprint
+  `25170022708eac9c642c23d8ba8d2d288c86c8e1aa0ada679b3b1fe2bca9baa6`;
+- um novo `mcp-full` foi executado diretamente sob essa promotion barrier e preservou a fingerprint
+  antes/depois: **123 test files / 730/730 tests**, typecheck `1001 ms`, changed lint `928 ms`, docs
+  `213 ms`, architecture `19752 ms`, full lint `18978 ms`, unit MCP `63677 ms`, suite total
+  `104549 ms`;
+- reload controlado: request `mcp-reload-d8927a9c-25bd-4035-b868-7d55fc800817`, profile resolvido e
+  executado `quic`, exit `0`; a conexão ChatGPT/AURELIN 4 se recuperou automaticamente e nenhuma
+  reconexão manual foi necessária;
+- smoke pós-reload: MCP `2026-07-28`, health `200`, OAuth protected-resource/authorization-server/
+  challenge verdes, authenticated smoke verde, modern subscription verde, tools `131/131` e
+  `schemaParity={required:true,available:true,matches:true,comparedToolCount:131,matchingToolCount:131}`;
+- runtime generation pós-promoção: PID `130333`, `sourceBinding='controlled-promotion'`, mesmo
+  promotion request id, `sourceBarrierFingerprint=251700…baa6` e `runtimeSourceDrift=false`;
+- baseline analytics da nova geração: schema/normalizer **v9**, janela 1h completa `394/394`,
+  coverage `1`, nova cohort já presente e
+  `exactSelfRepair={callsWithAttempt:0,attemptedCount:0,succeededCount:0,failedClosedCount:0}`;
+- fixture live descartável fora do source runtime: conteúdo CRLF de `38` bytes, hash física inicial
+  `989b3b084615f6e2cd74fd7ef5097f9940bc0ed9ace89973148542382428061b`. Uma **única**
+  `repo_apply_patch(dryRun=true)` recebeu `old_string` LF contra a linha CRLF e retornou diretamente
+  `success=true`, `bytesWritten=0`,
+  `exactSelfRepair={attempted:true,succeeded:true,failedClosed:false,attemptCount:1}`;
+- a verificação física após a call manteve exatamente `38` bytes e a mesma hash `989b…061b`; o
+  fixture foi então removido;
+- analytics v9 pós-experimento passou exatamente para
+  `exactSelfRepair={callsWithAttempt:1,attemptedCount:1,succeededCount:1,failedClosedCount:0,successRate:1,failedClosedRate:0}`,
+  exclusivamente em `repo_apply_patch`; nenhuma path/hash/anchor/source/reason/invocation entrou no
+  índice derivado;
+- comparação causal final: fluxo III-B1 `failure → retryInvocation` = **2 patch-related MCP calls**;
+  III-B2 = **1**. Redução `2→1`: **1 call / 50%** nessa classe exact-anchor. Contra o controle
+  legado pré-B1 (`failure → file_stats → corrected patch`), a mesma classe passa `3→1`, redução de
+  **2 calls / 66,7%**. Nenhum desses percentuais é extrapolado para failures ambíguos, conflicts,
+  dependency groups ou tráfego global;
+- **false repair observado permanece 0** nos gates causais; o experimento live também fechou com
+  `failedClosed=0` e correctness física preservada;
+- **III-B2 está encerrada live.** O candidato separado `convergencePolicy=accept-proven` permanece
+  deliberadamente não implementado e não faz parte do gate desta faixa; qualquer implementação
+  futura exige opt-in, auditoria e experimento próprios. A próxima faixa autorizada é III-B3.
+
+### Checkpoint live III-B2 — revisão 8.4
+
+Estado final da faixa:
+
+- [x] source causal-green;
+- [x] analytics v9 content-free;
+- [x] public membrane/cost/owners/architecture verdes;
+- [x] validation barrier v2 certificada;
+- [x] promotion barrier runtime-scoped certificada;
+- [x] `mcp-full` `730/730` sob a promotion barrier;
+- [x] reload `quic` exit `0`;
+- [x] connector smoke + OAuth + subscription + schema parity `131/131`;
+- [x] runtime source binding/fingerprint comprovado e zero drift;
+- [x] A/B live `2→1` com hash física inalterada e `bytesWritten=0`;
+- [x] analytics v9 `attempted=1 / succeeded=1 / failedClosed=0`;
+- [x] false repair observado = `0`.
+
 ## FAIXA III-B3 — Patch Target Groups V3
 
-- [ ] desenhar canonical `targets[]` shape;
-- [ ] path/hash/durability ownership explícito;
-- [ ] operation list relativa ao target;
-- [ ] remover inferência de hash mode por coincidência de valores;
-- [ ] reduzir input bytes;
-- [ ] comparar schema bytes contra flat operations;
-- [ ] definir estratégia de migração **sem shim permanente**;
+- [x] desenhar canonical `targets[]` shape;
+- [x] path/hash/durability ownership explícito no contrato alvo;
+- [x] operation list relativa ao target no contrato alvo;
+- [x] remover inferência de hash mode por coincidência de valores da execução canônica;
+- [ ] reduzir input bytes no wire promovido;
+- [ ] comparar schema bytes contra flat operations após implementação;
+- [x] definir estratégia de migração **sem shim permanente**;
 - [ ] host refresh gate antes de remoção da forma antiga.
+
+### Investigação e contrato alvo III-B3 — revisão 8.5
+
+Baseline live antes da transformação:
+
+- `repo_apply_patch_batch` é o 4º maior descriptor do MCP: `4892 B` totais, `4200 B` de input
+  schema, `2426 B` somente de descriptions e `1774 B` de schema sem descriptions;
+- o wire V2 repete `path` e `expectedHash` em cada operation; o owner volta a agrupar por path e
+  hoje infere `group-baseline` quando hashes fornecidas coincidem. Logo target identity/precondition
+  não são explícitas: são reconstruídas por heurística a partir de operações flat;
+- payload sintético representativo, mantendo a mesma informação: `1` edit same-file `277→291 B`
+  (`+5,1%`, custo pequeno), `3` edits `661→379 B` (`-42,7%`), `12` edits `2393→779 B` (`-67,4%`),
+  `4 targets × 3 edits` `2089→1304 B` (`-37,6%`). O uso live recente de patch batch tem p50≈`3` e
+  p95≈`8`, portanto o ganho aparece no regime de uso relevante;
+- o runtime já observa descriptor revisions e pode enviar `tools/listChanged`, mas a própria
+  authority `descriptorObservation.chatgptActionSnapshot` classifica o snapshot do ChatGPT como
+  `external-admin-state`: tools/list observado na origem **não prova** que o action snapshot
+  aprovado pelo host foi atualizado. Isso impede remoção imediata da forma V2.
+
+Contrato V3 canônico:
+
+```text
+targets: [
+  {
+    path,
+    expectedHash?,
+    durability?,
+    operations: [
+      { old_string, new_string, replace_all?, expected_occurrences?, occurrence_index?,
+        allowNoop?, diffContextLines?, maxDiffLines?, includeDiffPreview? }
+    ]
+  }
+]
+```
+
+Invariantes:
+
+1. `path`, baseline `expectedHash` e `durability` pertencem ao target e não se repetem nas
+   operations;
+2. target paths são únicos no V3; same-file sequencing é expresso por uma única target com
+   operations ordenadas, não inferido reagrupando paths repetidos;
+3. `target.expectedHash` significa unicamente baseline da snapshot inicial. O caminho V3 não possui
+   per-operation expectedHash e nunca infere hash mode por coincidência;
+4. índices de resultado permanecem globais e determinísticos em ordem target-major, preservando a
+   superfície de failure/applied rows e affectedOperationIndices;
+5. limites permanecem `128` operations / `64` targets / `3 MiB`, calculados sobre o input wire real
+   e não sobre uma expansão flat artificial;
+6. top-level `durability` permanece **legacy-flat only** durante a migração; no V3 cada target
+   possui sua própria durability opcional e omission conserva o default do engine;
+7. `includeDiffPreview` em `targets.*.operations.*` continua forçando resultMode detailed e o Option
+   Contract SSOT será estendido para representar esse nesting explicitamente;
+8. audit target correlation aprende `targets[*].path`; nenhum path bruto novo entra na telemetria.
+
+Migração em duas fases, sem shim permanente:
+
+- **B3-A:** adicionar `targets[]` e torná-lo canonical internamente; manter `operations[]` apenas
+  como adapter wire `legacy-flat-v2`, rejeitando calls que forneçam ambos. O adapter reproduz a
+  semântica V2, inclusive o caso raro de hashes distintos por operation, mas toda inferência fica
+  isolada nele; o patch owner passa a receber target groups explícitos e não reagrupa nem infere
+  baseline;
+- promover B3-A, medir descriptor/input bytes, executar smoke/schema parity e solicitar/observar o
+  refresh administrativo do conector;
+- **B3-B:** somente após host refresh comprovado, remover `operations[]`, top-level legacy
+  durability, legacy per-operation hash support e o adapter inteiro na mesma mudança. Nenhum compat
+  layer fica permanente.
+
+Gate B3-A: V3 correctness igual ao V2, legacy parity verde, payload menor para batches `n>=2`,
+schema medido, target-native owner sem hash inference e todos os gates arquiteturais/testes verdes.
+Gate B3-B: host refresh explícito + nova descriptor observation + remoção integral do adapter
+legado.
+
+### Checkpoint source B3-A — revisão 8.6
+
+Implementação já concluída na candidate, ainda **não promovida** neste checkpoint:
+
+- `tools/repo-write/patch-input.js` tornou-se o único boundary de canonicalização. Ele exige
+  exatamente um shape (`targets[]` ou `operations[]`), mede o envelope wire completo, normaliza
+  paths, preserva índices globais target-major e aplica os limites `128 ops / 64 targets / 3 MiB`.
+  `targets[] + durability` top-level e `targets[] + operations[]` falham closed;
+- `workspace/repository/patch/contracts.js` passou a possuir o contrato estrutural de target. A
+  execução abaixo do wire recebe target groups explícitos; `patch/operations.js` não possui mais
+  `Map(path→ops)`, `buildLockedPatchBatchGroup`, `readPatchExpectedHash` nem qualquer inferência de
+  baseline pela igualdade de hashes;
+- single-operation target continua usando o mesmo caminho B2, preservando exact bounded self-repair.
+  Multi-operation target entra diretamente em `patchTextBatchLocked`, mantendo one lock/read/write e
+  proibindo retry isolado de dependency groups;
+- `repo_patch_batch_plan` e `repo_apply_patch_batch` aceitam V3 e, **somente durante B3-A**, o shape
+  V2. Ambos convergem para o mesmo `RepositoryPatchTarget[]` antes de criar/usar o domain runtime.
+  Result/audit expõem somente `inputShape=targets-v3|legacy-flat-v2`, sem conteúdo;
+- Option Contract SSOT avançou para `1.6.0`: `targets` é opção semântica declarada, top-level
+  durability exige `operations` e a regra `nested-collection-boolean-forces-enum` representa
+  `targets[].operations[].includeDiffPreview → resultMode=detailed` sem heurística no handler;
+- audit correlation passou a extrair targets exatos de `targets[*].path` e continua persistindo
+  apenas hashes opacos; guidance/meta/workflow policy agora indicam `targets[]` como happy path e
+  proíbem escolher o V2 para calls novas;
+- testes focados: canonicalizer V3 `7/7`, wire V3 `5/5`, legacy V2 parity `8/8`, B2 self-repair
+  `4/4`, option semantics `3/3`, Option Contract/matrix/enforcement `24/24`, audit correlation
+  `13/13`, registry `27/27`, repository-write `32/32` — superset central **123/123**.
+  `test_mcp_tools` soma **64/64**; TS7 strict e focused ESLint estão verdes;
+- governança: public API cost `83/83`, closure `1012`, zero cost/manifest/purity violations; owner
+  graph `404` files / `883` edges / `70` owners / `230` direct owner dependencies, **0 SCC / 0
+  mismatch**; architecture umbrella permanece **264/264**, dependency graph `2287` files / `6159`
+  edges, sem cycles/unresolved imports;
+- medição local B3-A: `repo_apply_patch_batch 4892→6413 B` (`+31,1%`) e
+  `repo_patch_batch_plan 2447→4481 B` (`+83,1%`) porque os dois schemas coexistem. O envelope total
+  `162381→165936 B`, somente `+3555 B / +2,19%`, ainda muito abaixo do teto `409600 B`. Esse aumento
+  é **custo transitório de migração, não estado-alvo**;
+- a economia de request payload do V3 permanece material: `3` edits same-file `-42,7%`, `12` edits
+  `-67,4%`, `4×3` `-37,6%`. A redução do descriptor só pode ser julgada após B3-B remover o schema
+  V2;
+- dívida temporária explicitamente bounded: `legacy-group-baseline`/`legacy-per-operation` ainda são
+  projetados pelo owner somente para preservar parity V2 durante B3-A. A heurística que decide esses
+  modos existe **somente em `patch-input.js`** e esses branches serão removidos junto com o adapter
+  em B3-B; não podem sobreviver ao encerramento da faixa;
+- a authority de descriptor foi promovida conscientemente para fingerprint B3-A
+  `fa9401b0cb804a8cc270d0096575814363f5c72565ebb190f6a053ea4dfcf968`, com asserts locais adicionais
+  `repo_apply_patch_batch=wire-v1:1fac494610fcb473` e
+  `repo_patch_batch_plan=wire-v1:dbc4f47bcc3837b6`;
+- a validation barrier pós-fingerprint foi recapturada por `capture-worktree`: `46` entries, `0`
+  tombstones, fingerprint `4e90979522010e8853bf86a7b927b1d7521fb35f8b26fb7593a8a6a3d72d6c65`. Sob
+  ela o `mcp-full` fechou **125/125 test files / 743/743 tests**, além de strict, changed lint,
+  docs, architecture e full lint, sem source drift;
+- a promotion barrier runtime-scoped foi capturada explicitamente sobre `package.json` + `28`
+  arquivos de produção alterados em `src/copilot/mcp/**`: `29` entries, `0` tombstones, fingerprint
+  `e98a2b3b5b3ec71a3cbe7c972414a189ac7fabf4709e2f44fab096478bbf5942`. Um novo `mcp-full` executado
+  diretamente sob essa barrier também fechou **125/125 / 743/743** e preservou o mesmo fingerprint
+  antes/depois.
+
+### Promoção live B3-A e host-refresh gate — revisão 8.7
+
+- reload request `mcp-reload-172cc81e-a28e-4b85-b186-fd9b7e306a18`, profile `quic`, promovido
+  diretamente da barrier `e98a2b3b…f5942`; a conexão AURELIN 4 recuperou-se automaticamente;
+- smoke pós-reload: protocolo `2026-07-28`, health `200`, OAuth protected-resource/authorization
+  metadata/challenge verdes, authenticated OAuth smoke verde, modern subscription verde, tools
+  `131/131` e schema parity **131/131** sem mismatch;
+- runtime generation live: PID `152391`, epoch `ef32a261-2fdd-4120-aeed-74eff95eb0e8`,
+  `sourceBinding='controlled-promotion'`, promotion request id idêntico, barrier `e98a2b3b…f5942` e
+  `runtimeSourceDrift=false`;
+- descriptor observation live: `currentDescriptorFingerprint=fa9401b0…cf968`, `131` tools,
+  `tools/list` observado em `2026-08-27T22:00:37.164Z`, protocol `2026-07-28`; o próprio runtime
+  classifica `chatgptActionSnapshot` como `external-admin-state` e proíbe inferir refresh do host a
+  partir da origem;
+- payload audit live reproduziu a medição source: envelope `165936 B`, headroom `243664 B`,
+  `repo_apply_patch_batch=6413 B` e `repo_patch_batch_plan=4481 B`;
+- **host-refresh gate falhou de modo esperado e seguro**: uma nova introspecção do schema AURELIN 4
+  feita pelo próprio host desta conversa, depois do reload e do smoke remoto verde, continuou
+  anunciando somente `operations[]` para `repo_apply_patch_batch`/`repo_patch_batch_plan`, com a
+  descrição V2 de repeated paths/group-baseline. Logo o snapshot ChatGPT permanece comprovadamente
+  stale embora a origem esteja B3-A e 131/131;
+- conclusão: B3-A está **promovido e saudável**, mas B3-B permanece bloqueado somente pela fronteira
+  administrativa do ChatGPT. Remover V2 antes do Refresh/reconexão quebraria o cliente atual e
+  violaria o gate definido na própria revisão 8.5.
+
+O usuário executou novo Refresh/reconexão administrativa e reiniciou MCP/Cloudflare antes da revisão
+8.8. A introspecção host-side desta própria conversa, porém, **continuou anunciando o descriptor
+V2** (`operations[]` no top-level e ausência de `targets[]`). Portanto a tentativa externa não
+satisfez o gate de promoção. Como a origem B3-A já estava estável e a dívida V2 era completamente
+isolada, B3-B foi executada e validada **source-only**, sem reload da candidate V3-only. A remoção
+live continua fail-closed até que uma action snapshot nova seja realmente observável pelo cliente.
+
+### Checkpoint source B3-B V3-only — revisão 8.8
+
+Estado da candidate V3-only:
+
+- [x] `tools/repo-write/patch-input.js` aceita exclusivamente `targets[]`; ausência de targets,
+      stale flat `operations[]` ou durability top-level falham como `ERR_PATCH_BATCH_INPUT_SHAPE` no
+      boundary interno;
+- [x] adapter `legacy-flat-v2` removido integralmente; não existe mais regrouping/inference de
+      paths/hashes;
+- [x] `RepositoryPatchExpectedHashMode` reduzido a `target-baseline | none`;
+- [x] `legacy-group-baseline`, `legacy-per-operation`, per-operation `expectedHash` e respectivos
+      branches removidos do patch owner;
+- [x] `repo_apply_patch_batch` e `repo_patch_batch_plan` exigem `targets[]` no descriptor e não
+      publicam mais `operations[]` nem durability top-level;
+- [x] `inputShape`/`sourceShape` transitórios foram removidos de resultado/audit/presentation;
+- [x] Option Contract SSOT avançou `1.6.0 → 1.7.0`, removendo a opção flat, inheritance de
+      durability e a regra flat de diff preview; permanece apenas
+      `targets[].operations[].includeDiffPreview → resultMode=detailed`;
+- [x] audit correlation de patch batch usa exclusivamente `targets[*].path`, continuando
+      content-free;
+- [x] guidance/meta deixou de documentar qualquer input de migração;
+- [x] teste histórico `test_mcp_patch_batch_v2.spec.js` foi aposentado/renomeado para
+      `test_mcp_patch_target_groups.spec.js`; seus oito cenários reais foram migrados para ownership
+      explícita de target;
+- [x] descriptor-level test prova `required=['targets']` e ausência de `operations`/durability
+      top-level nos dois patch-batch tools;
+- [x] busca negativa em `src/copilot/mcp` + `tests/unit/copilot/mcp` retorna zero para
+      `legacy-flat-v2`, `legacy-group-baseline`, `legacy-per-operation`,
+      `legacyPatchBatchOperationSchema`, `inputShape` e `sourceShape`;
+- [x] fingerprint source V3-only =
+      `2449c418de55b14c51ac8760fe42612d521bc62d7c2e461a8a356942f739cfa7`;
+- [x] revision tokens finais desta candidate: `repo_apply_patch_batch=wire-v1:345553b0bc26ad02` e
+      `repo_patch_batch_plan=wire-v1:5394ee0968c76fdc`;
+- [x] payload audit canônico `sdk-in-memory-tools/list` da candidate V3-only: envelope `162586 B`,
+      headroom `247014 B`, `repo_apply_patch_batch=4636 B`, `repo_patch_batch_plan=2908 B`;
+- [x] contra B3-A dual-shape: envelope `-3350 B / -2,02%`, apply descriptor `-1777 B / -27,71%`,
+      plan descriptor `-1573 B / -35,10%`;
+- [x] contra o baseline B2 pré-V3: envelope `+205 B / +0,13%`, apply descriptor `-256 B / -5,23%` e
+      plan descriptor `+461 B / +18,84%`; portanto o custo fixo total ficou essencialmente neutro
+      enquanto o request payload de batches reais mantém os ganhos medidos de `-42,7%` (3 edits
+      same-file), `-67,4%` (12 edits same-file) e `-37,6%` (4×3);
+- [x] focused causal/transversal gate final: **11 arquivos / 159/159 testes verdes**;
+- [x] TS7 strict verde;
+- [x] changed-lint verde (`44` files no gate broad final);
+- [x] architecture umbrella `264/264`; dependency graph `2287 files / 6159 edges`, zero
+      cycle/unresolved imports; owner graph
+      `404 files / 883 edges / 70 owners / 230 declared owner dependencies`, zero SCC/mismatch;
+      public API cost/manifest/purity zero violations;
+- [x] validation Source Barrier B3-B capturada por `capture-worktree`: **50 entries / 1 tombstone**,
+      fingerprint `8c1c1a532067d62d24cfa1bdb7ce0714aeecd85f6484b3413aa05ade9d889058`; o tombstone é
+      deliberadamente o teste V2 aposentado;
+- [x] `mcp-full` B3-B sob a mesma validation barrier: **125/125 test files / 740/740 tests**,
+      strict, changed-lint, docs, architecture e full lint verdes, suite total `110600 ms`,
+      fingerprint idêntica antes/depois. O primeiro attempt havia identificado exclusivamente uma
+      matrix stale (`739/740`); ela foi migrada para `targets[].operations[]` e o segundo/necessário
+      gate fechou integralmente sem qualquer mudança adicional de produção;
+- [x] promotion barrier runtime-scoped B3-B capturada sobre **29 runtime files / 0 tombstones** e
+      verificada byte-for-byte: `3133d8ca651518ecf5e387c5adb76ce9f609d72d74705fcd9934ee51a8273475`.
+      Não foi executado um segundo `mcp-full` redundante sob essa subset barrier: os mesmos 29 bytes
+      de produção são subconjunto imutável da validation candidate que acabou de fechar a suite; a
+      decisão reduz custo de validação sem remover nenhum gate funcional;
+- [x] **host action snapshot efetivamente expõe `targets[]` nesta conexão**: após a
+      reconexão/restart do usuário, a primeira introspecção ainda projetou V2; uma introspecção
+      host-side posterior passou a expor o descriptor B3-A dual-shape com `targets[]` em
+      `repo_apply_patch_batch` e `repo_patch_batch_plan`. Esse é o critério necessário para promoção
+      segura: o host já sabe formar chamadas V3, ainda que sua snapshot permaneça temporariamente
+      mais permissiva que a runtime final;
+- [x] reload/promoção B3-B V3-only concluída por request
+      `mcp-reload-ed80ebea-3c5a-448c-bba9-a86ebd7e1e42`, profile `quic`, sob a promotion barrier
+      `3133d8ca651518ecf5e387c5adb76ce9f609d72d74705fcd9934ee51a8273475`;
+- [x] smoke remoto + schema parity V3-only + runtime source binding/drift verdes: OAuth/protocolo
+      moderno `2026-07-28`, tools/list `131/131`, parity `131/131`,
+      `sourceBinding=controlled-promotion`, `runtimeSourceDrift=false`;
+- [x] payload audit live reproduziu exatamente a candidate: envelope `162586 B`, headroom
+      `247014 B`, `repo_apply_patch_batch=4636 B`, `repo_patch_batch_plan=2908 B`;
+- [x] prova live positiva V3: `targets[]` com 1 target e 2 operações dependentes same-file concluiu
+      `success=true`, `failedCount=0`, `expectedHashMode=target-baseline`; como era dry-run, o
+      SHA-256 físico permaneceu `e49c81e2d2f84e259d40e2fb8192f3bcd198b355184845d76d8f58807d0d78ee`;
+- [x] prova live negativa V2: a forma flat antiga foi recusada pela validação da tool porque
+      `targets` é obrigatório, demonstrando que o adapter legado também está extinto na runtime
+      promovida;
+- [x] analytics v9 reconheceu a cohort
+      `source:3133d8ca651518ecf5e387c5adb76ce9f609d72d74705fcd9934ee51a8273475`; a chamada V3
+      aparece sob Option Contract `1.7.0`, sem normalização/coerção/rejeição;
+- [x] III-B3 encerrada code+runtime live e III-B4 liberada para investigação, **não para
+      implementação automática nesta rodada**.
+
+**Boundary administrativo remanescente, não gate de runtime:** o action snapshot do ChatGPT/AURELIN
+4 é estado externo ao origin e foi observado oscilando entre projeções stale mesmo após a promoção.
+Isso não invalida a evidência do servidor: smoke remoto obteve parity `131/131`, `targets[]`
+funcionou live e a forma V2 foi rejeitada. Não reintroduzir compatibilidade V2 para acomodar
+snapshot administrativo stale; futuras divergências devem ser tratadas via Refresh/review/reconexão
+do host e diagnosticadas separadamente da verdade wire/runtime do origin.
 
 ## FAIXA III-B4 — Semantic execution profiles
 

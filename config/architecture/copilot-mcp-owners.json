@@ -249,6 +249,7 @@
         "mcp.transport",
         "mcp.validation",
         "mcp.workspace.git",
+        "mcp.workspace.repository.patch",
         "mcp.workspace.repository.read-cache"
       ]
     },
@@ -981,7 +982,7 @@
       "audiences": ["public"],
       "authorityClasses": ["public-surface"],
       "policyHooks": ["cost", "surface"],
-      "allowedDependencies": ["mcp.workspace.repository.read-cache"]
+      "allowedDependencies": ["mcp.protocol", "mcp.workspace.repository.read-cache"]
     },
     {
       "ownerId": "mcp.workspace.repository.read",

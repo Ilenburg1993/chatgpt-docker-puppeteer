@@ -17,14 +17,14 @@ function policy(tool, args) {
 describe('MCP Option Contract SSOT', () => {
     it('covers the first ten high-friction tools and stays in parity with the canonical wire catalog', () => {
         const coverage = readMcpToolOptionContractCoverage();
-        assert.equal(coverage.version, '1.5.0');
+        assert.equal(coverage.version, '1.7.0');
         assert.equal(coverage.coveredToolCount, 10);
-        assert.equal(coverage.optionCount, 101);
+        assert.equal(coverage.optionCount, 100);
         assert.deepEqual(coverage.categoryCounts, {
             semantic: 57,
             tuning: 18,
             result: 10,
-            safety: 14,
+            safety: 13,
             recovery: 2,
         });
         assert.deepEqual(coverage.toolNames, [
@@ -110,17 +110,17 @@ describe('MCP Option Contract SSOT', () => {
 
     it('models patch-batch dry-run/apply precedence and result-mode coercion explicitly', () => {
         const apply = policy('repo_apply_patch_batch', {
-            operations: [{ path: 'a', old_string: 'x', new_string: 'y' }],
+            targets: [{ path: 'a', operations: [{ old_string: 'x', new_string: 'y' }] }],
             confirmBatch: true,
         });
         assert.equal(apply.optionMode, 'apply');
         assert.equal(apply.optionIgnoredCount, 0);
 
         const dryRunWins = policy('repo_apply_patch_batch', {
-            operations: [{ path: 'a', old_string: 'x', new_string: 'y' }],
+            targets: [{ path: 'a', operations: [{ old_string: 'x', new_string: 'y' }] }],
             dryRun: true,
             confirmBatch: true,
-            durability: 'none',
+            failureMode: 'fail-fast',
         });
         assert.equal(dryRunWins.optionMode, 'dry-run');
         assert.equal(dryRunWins.optionIgnoredCount, 0);
@@ -128,7 +128,7 @@ describe('MCP Option Contract SSOT', () => {
         assert.equal(dryRunWins.optionConflictCount, 2);
 
         const coerced = policy('repo_apply_patch_batch', {
-            operations: [{ path: 'a', old_string: 'x', new_string: 'y', includeDiffPreview: true }],
+            targets: [{ path: 'a', operations: [{ old_string: 'x', new_string: 'y', includeDiffPreview: true }] }],
             resultMode: 'compact',
         });
         assert.equal(coerced.optionCoercedCount, 1);

@@ -9,13 +9,14 @@ import { runRepositoryPatchTargetGroups } from '#copilot/mcp/public/workspace/re
  * Run canonical repository patch target groups without exposing workspace/signal internals to the wire adapter.
  *
  * @param {RepoWriteRuntime} runtime
- * @param {Record<string, unknown>[]} operations
+ * @param {import('#copilot/mcp/public/workspace/repository/patch').RepositoryPatchTarget[]} targets
  * @param {boolean} dryRun
  * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number }} [options]
  */
-export function runRepoWritePatchTargetGroups(runtime, operations, dryRun, options = {}) {
-    return runRepositoryPatchTargetGroups(runtime.workspace, operations, dryRun, {
+export function runRepoWritePatchTargetGroups(runtime, targets, dryRun, options = {}) {
+    return runRepositoryPatchTargetGroups(runtime.workspace, targets, dryRun, {
         ...options,
+        repositoryPatchConfig: runtime.repositoryPatchConfig,
         ...(runtime.signal ? { signal: runtime.signal } : {}),
     });
 }

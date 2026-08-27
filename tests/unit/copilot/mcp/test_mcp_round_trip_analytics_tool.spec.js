@@ -58,9 +58,29 @@ describe('MCP round-trip analytics wire projection', () => {
             byTool: [],
             byRuntimeCohort: {},
         };
+        const recoveryRecipes = {
+            authority: 'bounded-recovery-recipe-disposition-counts-from-tool-completion-metadata-v8',
+            callsWithRecipe: 1,
+            recipeCount: 1,
+            retrySafeCount: 1,
+            suggestedCount: 0,
+            manualCount: 0,
+            noRetryCount: 0,
+            byTool: [{ tool: 'repo_apply_patch', callsWithRecipe: 1, recipeCount: 1, retrySafeCount: 1 }],
+        };
+        const exactSelfRepair = {
+            authority: 'bounded-exact-patch-self-repair-counts-from-tool-completion-metadata-v9',
+            callsWithAttempt: 1,
+            attemptedCount: 1,
+            succeededCount: 1,
+            failedClosedCount: 0,
+            successRate: 1,
+            failedClosedRate: 0,
+            byTool: [],
+        };
         const report = {
-            schemaVersion: 7,
-            normalizerVersion: 7,
+            schemaVersion: 9,
+            normalizerVersion: 9,
             authority: 'test-authority',
             windowMs: 3_600_000,
             includeSynthetic: false,
@@ -71,6 +91,8 @@ describe('MCP round-trip analytics wire projection', () => {
             sequenceEvidence: {},
             failures: {},
             resultOutcomes,
+            recoveryRecipes,
+            exactSelfRepair,
             optionPolicies,
             retryTax: {},
             recovery: {},
@@ -98,6 +120,8 @@ describe('MCP round-trip analytics wire projection', () => {
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.deepEqual(result.structuredContent?.['analytics']?.resultOutcomes, resultOutcomes);
+        assert.deepEqual(result.structuredContent?.['analytics']?.recoveryRecipes, recoveryRecipes);
+        assert.deepEqual(result.structuredContent?.['analytics']?.exactSelfRepair, exactSelfRepair);
         assert.deepEqual(result.structuredContent?.['analytics']?.optionPolicies, optionPolicies);
         assert.deepEqual(result.structuredContent?.['analytics']?.retryTax, {});
     });

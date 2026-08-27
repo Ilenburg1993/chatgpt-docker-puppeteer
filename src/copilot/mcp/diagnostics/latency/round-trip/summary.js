@@ -181,6 +181,18 @@ export function summarizeMcpRoundTripRows(rows, options) {
     const resultCodes = new Map();
     const resultOutcomesByTool = new Map();
     const resultOutcomeCohorts = new Map();
+    const recoveryRecipesByTool = new Map();
+    let recoveryRecipeCalls = 0;
+    let recoveryRecipeCount = 0;
+    let retrySafeRecoveryRecipeCount = 0;
+    let suggestedRecoveryRecipeCount = 0;
+    let manualRecoveryRecipeCount = 0;
+    let noRetryRecoveryRecipeCount = 0;
+    const exactSelfRepairByTool = new Map();
+    let exactSelfRepairCalls = 0;
+    let exactSelfRepairAttemptedCount = 0;
+    let exactSelfRepairSucceededCount = 0;
+    let exactSelfRepairFailedClosedCount = 0;
     const optionPoliciesByTool = new Map();
     const optionPolicyCohorts = new Map();
     const optionPolicyVersions = new Map();
@@ -353,6 +365,8 @@ export function summarizeMcpRoundTripRows(rows, options) {
             const terminal = readCallEvidence(row, tool, tsMs, event);
             if (event === 'tool_call_completed') {
                 recordResultOutcome(row, tool);
+                recordRecoveryRecipes(row, tool);
+                recordExactSelfRepair(row, tool);
                 recordExecutionCompletion(row, tool);
             }
             if (!terminal.callId) {
@@ -494,6 +508,28 @@ export function summarizeMcpRoundTripRows(rows, options) {
             byTool: renderResultOutcomeByTool(resultOutcomesByTool, options.top),
             byRuntimeCohort: renderResultOutcomeCohorts(resultOutcomeCohorts),
             caveat: 'Outcome fields are authoritative only for completions emitted after the v5 registry rollout. Replayed historical completions that never persisted result outcome metadata remain explicitly unobserved and are excluded from optionErrorRate.',
+        },
+        recoveryRecipes: {
+            authority: 'bounded-recovery-recipe-disposition-counts-from-tool-completion-metadata-v8',
+            callsWithRecipe: recoveryRecipeCalls,
+            recipeCount: recoveryRecipeCount,
+            retrySafeCount: retrySafeRecoveryRecipeCount,
+            suggestedCount: suggestedRecoveryRecipeCount,
+            manualCount: manualRecoveryRecipeCount,
+            noRetryCount: noRetryRecoveryRecipeCount,
+            byTool: renderRecoveryRecipesByTool(recoveryRecipesByTool, options.top),
+            caveat: 'Only recipe counts/dispositions are persisted. Invocation tool names, arguments, paths, source text and Git state are excluded from the audit/index.',
+        },
+        exactSelfRepair: {
+            authority: 'bounded-exact-patch-self-repair-counts-from-tool-completion-metadata-v9',
+            callsWithAttempt: exactSelfRepairCalls,
+            attemptedCount: exactSelfRepairAttemptedCount,
+            succeededCount: exactSelfRepairSucceededCount,
+            failedClosedCount: exactSelfRepairFailedClosedCount,
+            successRate: ratio(exactSelfRepairSucceededCount, exactSelfRepairAttemptedCount),
+            failedClosedRate: ratio(exactSelfRepairFailedClosedCount, exactSelfRepairAttemptedCount),
+            byTool: renderExactSelfRepairByTool(exactSelfRepairByTool, options.top),
+            caveat: 'Only bounded attempt/success/fail-closed counts emitted after the v9 rollout are persisted. Recovery anchors, hashes, paths, source text, reason strings and invocation arguments are excluded from the audit/index.',
         },
         optionPolicies: {
             authority: 'sanitized-request-option-contract-metadata-v6',
@@ -950,6 +986,75 @@ export function summarizeMcpRoundTripRows(rows, options) {
             toolMetric.domainOrUnknownFailures += 1;
             cohortMetric.domainOrUnknownFailures += 1;
         }
+    }
+
+    /** @param {Record<string, unknown>} row @param {string} toolName */
+    function recordRecoveryRecipes(row, toolName) {
+        const total = nonNegativeIntegerOrNull(row['recovery_recipe_count'] ?? row['recoveryRecipeCount']) ?? 0;
+        if (total <= 0) return;
+        const retrySafe =
+            nonNegativeIntegerOrNull(row['retry_safe_recovery_recipe_count'] ?? row['retrySafeRecoveryRecipeCount']) ??
+            0;
+        const suggested =
+            nonNegativeIntegerOrNull(row['suggested_recovery_recipe_count'] ?? row['suggestedRecoveryRecipeCount']) ??
+            0;
+        const manual =
+            nonNegativeIntegerOrNull(row['manual_recovery_recipe_count'] ?? row['manualRecoveryRecipeCount']) ?? 0;
+        const noRetry =
+            nonNegativeIntegerOrNull(row['no_retry_recovery_recipe_count'] ?? row['noRetryRecoveryRecipeCount']) ?? 0;
+        recoveryRecipeCalls += 1;
+        recoveryRecipeCount += total;
+        retrySafeRecoveryRecipeCount += retrySafe;
+        suggestedRecoveryRecipeCount += suggested;
+        manualRecoveryRecipeCount += manual;
+        noRetryRecoveryRecipeCount += noRetry;
+        const metric = recoveryRecipesByTool.get(toolName) ?? {
+            callsWithRecipe: 0,
+            recipeCount: 0,
+            retrySafeCount: 0,
+            suggestedCount: 0,
+            manualCount: 0,
+            noRetryCount: 0,
+        };
+        metric.callsWithRecipe += 1;
+        metric.recipeCount += total;
+        metric.retrySafeCount += retrySafe;
+        metric.suggestedCount += suggested;
+        metric.manualCount += manual;
+        metric.noRetryCount += noRetry;
+        recoveryRecipesByTool.set(toolName, metric);
+    }
+
+    /** @param {Record<string, unknown>} row @param {string} toolName */
+    function recordExactSelfRepair(row, toolName) {
+        const attempted =
+            nonNegativeIntegerOrNull(
+                row['exact_self_repair_attempted_count'] ?? row['exactSelfRepairAttemptedCount'],
+            ) ?? 0;
+        if (attempted <= 0) return;
+        const succeeded =
+            nonNegativeIntegerOrNull(
+                row['exact_self_repair_succeeded_count'] ?? row['exactSelfRepairSucceededCount'],
+            ) ?? 0;
+        const failedClosed =
+            nonNegativeIntegerOrNull(
+                row['exact_self_repair_failed_closed_count'] ?? row['exactSelfRepairFailedClosedCount'],
+            ) ?? 0;
+        exactSelfRepairCalls += 1;
+        exactSelfRepairAttemptedCount += attempted;
+        exactSelfRepairSucceededCount += Math.min(attempted, succeeded);
+        exactSelfRepairFailedClosedCount += Math.min(attempted, failedClosed);
+        const metric = exactSelfRepairByTool.get(toolName) ?? {
+            callsWithAttempt: 0,
+            attemptedCount: 0,
+            succeededCount: 0,
+            failedClosedCount: 0,
+        };
+        metric.callsWithAttempt += 1;
+        metric.attemptedCount += attempted;
+        metric.succeededCount += Math.min(attempted, succeeded);
+        metric.failedClosedCount += Math.min(attempted, failedClosed);
+        exactSelfRepairByTool.set(toolName, metric);
     }
 
     /** @param {Record<string, unknown>} row @param {string} toolName */
@@ -1607,6 +1712,27 @@ function renderResultOutcomeByTool(byTool, top) {
     return [...byTool.entries()]
         .map(([tool, metric]) => ({ tool, ...projectResultOutcomeMetric(metric) }))
         .sort((left, right) => right.calls - left.calls || left.tool.localeCompare(right.tool))
+        .slice(0, top);
+}
+
+/** @param {Map<string, any>} byTool @param {number} top */
+function renderRecoveryRecipesByTool(byTool, top) {
+    return [...byTool.entries()]
+        .map(([tool, metric]) => ({ tool, ...metric }))
+        .sort((left, right) => right.recipeCount - left.recipeCount || left.tool.localeCompare(right.tool))
+        .slice(0, top);
+}
+
+/** @param {Map<string, any>} byTool @param {number} top */
+function renderExactSelfRepairByTool(byTool, top) {
+    return [...byTool.entries()]
+        .map(([tool, metric]) => ({
+            tool,
+            ...metric,
+            successRate: ratio(metric.succeededCount, metric.attemptedCount),
+            failedClosedRate: ratio(metric.failedClosedCount, metric.attemptedCount),
+        }))
+        .sort((left, right) => right.attemptedCount - left.attemptedCount || left.tool.localeCompare(right.tool))
         .slice(0, top);
 }
 

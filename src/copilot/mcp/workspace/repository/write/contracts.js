@@ -29,6 +29,7 @@
  * quarantineDir: string;
  * quarantineMetadataWriter: RepoWriteQuarantineMetadataWriter;
  * audit: NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']>;
+ * repositoryPatchConfig: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
  * signal?: AbortSignal;
  * }>} RepoWriteRuntime */
 

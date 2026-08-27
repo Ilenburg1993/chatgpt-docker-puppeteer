@@ -154,9 +154,9 @@ export function readMcpToolTargetCorrelation(toolName, args) {
         });
     } else if (
         ['repo_apply_patch_batch', 'repo_patch_batch_plan'].includes(toolName) &&
-        Array.isArray(args['operations'])
+        Array.isArray(args['targets'])
     ) {
-        candidates = args['operations'].map((item) => readObjectField(item, 'path'));
+        candidates = args['targets'].map((item) => readObjectField(item, 'path'));
     } else if (toolName === 'repo_diff_files') {
         candidates = [args['pathA'], args['pathB']];
     } else if (toolName === 'repo_move_file') {

@@ -11,6 +11,7 @@ import {
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     requireMcpToolAuditCapability,
+    requireMcpToolRepositoryPatchConfig,
     requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
@@ -46,6 +47,8 @@ import {
 } from '#copilot/mcp/public/workspace/repository/write';
 import { z } from 'zod';
 
+import { normalizePatchBatchWireInput } from './repo-write/patch-input.js';
+
 /** @typedef {import('#copilot/mcp/public/workspace/repository/write').RepoWriteQuarantineMetadataInterceptor} RepoWriteQuarantineMetadataInterceptor */
 /** @typedef {import('#copilot/mcp/public/workspace/repository/write').RepoWriteQuarantineMetadataWriter} RepoWriteQuarantineMetadataWriter */
 
@@ -72,21 +75,6 @@ function resolveBatchDryRun(dryRun, confirmBatch) {
     return confirmBatch !== true;
 }
 
-/**
- * Copy one top-level patch-batch durability policy into every operation before the domain workflow groups targets.
- * Keeping this normalization explicit guarantees that same-file groups cannot accidentally derive a different durability
- * from whichever operation happens to become the first group member.
- *
- * @param {Record<string, unknown>[]} operations
- * @param {'file-and-directory' | 'file' | 'none' | undefined} durability
- */
-export function normalizePatchBatchOperationsForExecution(operations, durability) {
-    return operations.map((operation) => ({
-        ...operation,
-        ...(durability === undefined ? {} : { durability }),
-    }));
-}
-
 /** @param {Record<string, unknown>[]} failures */
 function countPatchFailuresWithInlineNextAction(failures) {
     return failures.filter((failure) => typeof failure['nextAction'] === 'string' && failure['nextAction'].length > 0)
@@ -104,6 +92,13 @@ function hasPatchRecoveryAnchor(details) {
     return /** @type {Record<string, unknown>} */ (details)['recoveryExactAnchor'] === true;
 }
 
+/** @param {unknown} recipe */
+function readRecoveryRecipeDisposition(recipe) {
+    if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe)) return null;
+    const disposition = /** @type {Record<string, unknown>} */ (recipe)['disposition'];
+    return typeof disposition === 'string' ? disposition : null;
+}
+
 const durabilitySchema = z
     .enum(['file-and-directory', 'file', 'none'])
     .optional()
@@ -119,9 +114,8 @@ const postPatchValidationRequestSchema = z.object({
     failureTailBytes: z.number().int().min(1_000).max(12_000).optional(),
 });
 
-const patchBatchOperationSchema = z.object({
-    path: z.string().min(1)['describe']('Workspace-relative file path.'),
-    old_string: z.string().min(1)['describe']('Exact text to replace.'),
+const patchBatchRelativeOperationSchema = z.object({
+    old_string: z.string().min(1)['describe']('Exact text to replace within this target.'),
     new_string: z.string()['describe']('Replacement text. Use an empty string to delete matched text.'),
     replace_all: z.boolean().optional()['describe']('Replace every occurrence of old_string. Default: false.'),
     expected_occurrences: z
@@ -136,19 +130,27 @@ const patchBatchOperationSchema = z.object({
         .min(1)
         .optional()
         ['describe']('1-based occurrence index to replace when old_string appears more than once.'),
-    expectedHash: z
-        .string()
-        .optional()
-        ['describe'](
-            'Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.',
-        ),
     allowNoop: z.boolean().optional()['describe']('Allow old_string and new_string to be identical. Default: false.'),
     diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
     maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
     includeDiffPreview: z
         .boolean()
         .optional()
-        ['describe']('Include textual diffPreview in each operation result. Default: false.'),
+        ['describe']('Include textual diffPreview in this operation result. Default: false.'),
+});
+
+const patchBatchTargetSchema = z.object({
+    path: z.string().min(1)['describe']('Unique workspace-relative target file path.'),
+    expectedHash: z
+        .string()
+        .optional()
+        ['describe']('Optional SHA-256 baseline precondition for the target initial snapshot.'),
+    durability: durabilitySchema,
+    operations: z
+        .array(patchBatchRelativeOperationSchema)
+        .min(1)
+        .max(MAX_PATCH_BATCH_OPERATIONS)
+        ['describe']('Ordered exact-string edits relative to this target; path/hash/durability are target-owned.'),
 });
 
 const batchOperationSchema = z['discriminatedUnion']('type', [
@@ -212,11 +214,13 @@ function maybeDiffPreview(include, diff) {
 
 /**
  * @param {Record<string, unknown>} args
- * @param {Record<string, unknown>[]} operations
+ * @param {import('#copilot/mcp/public/workspace/repository/patch').RepositoryPatchTarget[]} targets
  */
-function resolvePatchBatchResultMode(args, operations) {
+function resolvePatchBatchResultMode(args, targets) {
     const requestedResultMode = args['resultMode'] === 'detailed' ? 'detailed' : 'compact';
-    const forcedByDiffPreview = operations.some((operation) => operation['includeDiffPreview'] === true);
+    const forcedByDiffPreview = targets.some((target) =>
+        target.entries.some((entry) => entry.operation['includeDiffPreview'] === true),
+    );
     return {
         requestedResultMode,
         resultMode: forcedByDiffPreview ? 'detailed' : requestedResultMode,
@@ -224,8 +228,39 @@ function resolvePatchBatchResultMode(args, operations) {
     };
 }
 
+/** @param {unknown} value */
+function projectExactPatchSelfRepair(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const row = /** @type {Record<string, unknown>} */ (value);
+    if (row['attempted'] !== true || row['attemptCount'] !== 1) return null;
+    return {
+        attempted: true,
+        succeeded: row['succeeded'] === true,
+        failedClosed: row['failedClosed'] === true,
+        attemptCount: 1,
+        ...(typeof row['reasonCode'] === 'string' ? { reasonCode: row['reasonCode'] } : {}),
+        ...(typeof row['failureCode'] === 'string' ? { failureCode: row['failureCode'] } : {}),
+    };
+}
+
+/** @param {Record<string, unknown>[]} rows */
+function summarizeExactPatchSelfRepair(rows) {
+    let attemptedCount = 0;
+    let succeededCount = 0;
+    let failedClosedCount = 0;
+    for (const row of rows) {
+        const repair = projectExactPatchSelfRepair(row['exactSelfRepair']);
+        if (!repair) continue;
+        attemptedCount += 1;
+        if (repair.succeeded) succeededCount += 1;
+        if (repair.failedClosed) failedClosedCount += 1;
+    }
+    return { attemptedCount, succeededCount, failedClosedCount };
+}
+
 /** @param {Record<string, unknown>} row */
 function compactPatchBatchSuccessRow(row) {
+    const exactSelfRepair = projectExactPatchSelfRepair(row['exactSelfRepair']);
     return {
         index: row['index'],
         success: true,
@@ -233,6 +268,7 @@ function compactPatchBatchSuccessRow(row) {
         noop: row['noop'] === true,
         replacedOccurrences: row['replacedOccurrences'],
         ...(typeof row['expectedHashMode'] === 'string' ? { expectedHashMode: row['expectedHashMode'] } : {}),
+        ...(exactSelfRepair ? { exactSelfRepair } : {}),
     };
 }
 
@@ -277,28 +313,6 @@ function summarizePatchBatchTargets(rows, dryRun) {
     });
 }
 
-/** @param {Record<string, unknown>[]} operations */
-function inspectPatchBatchEnvelope(operations) {
-    /** @type {number} */
-    let inputBytes;
-    try {
-        inputBytes = Buffer.byteLength(JSON.stringify(operations), 'utf8');
-    } catch {
-        return { ok: false, code: 'ERR_PATCH_BATCH_INPUT_SERIALIZATION', inputBytes: null, targetCount: 0 };
-    }
-    const targetCount = new Set(operations.map((operation) => String(operation['path'] ?? ''))).size;
-    if (operations.length > MAX_PATCH_BATCH_OPERATIONS) {
-        return { ok: false, code: 'ERR_PATCH_BATCH_OPERATION_LIMIT', inputBytes, targetCount };
-    }
-    if (targetCount > MAX_PATCH_BATCH_TARGETS) {
-        return { ok: false, code: 'ERR_PATCH_BATCH_TARGET_LIMIT', inputBytes, targetCount };
-    }
-    if (inputBytes > MAX_PATCH_BATCH_INPUT_BYTES) {
-        return { ok: false, code: 'ERR_PATCH_BATCH_INPUT_BYTES_LIMIT', inputBytes, targetCount };
-    }
-    return { ok: true, code: null, inputBytes, targetCount };
-}
-
 /**
  * Project one domain write outcome into the MCP result envelope while keeping audit in the exposure layer.
  *
@@ -322,7 +336,7 @@ async function projectRepoWriteOutcome(runtime, outcome, includeDiffPreview = fa
  * @param {import('#copilot/mcp/public/workspace/repository/write').RepoWriteRuntime} runtime
  * @param {Awaited<ReturnType<typeof executeRepoPatchBatchWorkflow>>} workflow
  * @param {{
- *     operations: Record<string, unknown>[];
+ *     operationCount: number;
  *     targetCount: number;
  *     inputBytes: number | null;
  *     requestedResultMode: string;
@@ -332,8 +346,10 @@ async function projectRepoWriteOutcome(runtime, outcome, includeDiffPreview = fa
  * }} presentation
  */
 async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
-    const { operations, targetCount, inputBytes, requestedResultMode, resultMode, forcedByDiffPreview } = presentation;
+    const { operationCount, targetCount, inputBytes, requestedResultMode, resultMode, forcedByDiffPreview } =
+        presentation;
     if (workflow.kind === 'dry-run') {
+        const exactSelfRepair = summarizeExactPatchSelfRepair(workflow.run.operations);
         const outputFailures =
             resultMode === 'detailed' ? workflow.failed : compactRepositoryPatchFailureRows(workflow.failed);
         const outputOperations =
@@ -347,7 +363,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             dryRun: true,
             applyMode: workflow.effectiveApplyMode,
             executionId: workflow.run.execution.executionId,
-            operationCount: operations.length,
+            operationCount: operationCount,
             targetCount,
             inputBytes,
             failedCount: workflow.failed.length,
@@ -360,6 +376,14 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             resultMode,
             resultModeForcedByDiffPreview: forcedByDiffPreview,
             detailsAvailable: true,
+            ...(exactSelfRepair.attemptedCount > 0
+                ? {
+                      exactSelfRepair: {
+                          enabled: runtime.repositoryPatchConfig.exactSelfRepairEnabled,
+                          ...exactSelfRepair,
+                      },
+                  }
+                : {}),
             targetSummaries: summarizePatchBatchTargets(workflow.run.operations, true),
             postValidation: workflow.postValidation,
             operations: outputOperations,
@@ -368,7 +392,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         };
         const text =
             workflow.failed.length === 0
-                ? `Patch batch dry-run succeeded for ${operations.length} operation(s); no files modified.`
+                ? `Patch batch dry-run succeeded for ${operationCount} operation(s); no files modified.`
                 : `Patch batch dry-run found ${workflow.failureSummary.causalFailureCount} causal target failure(s) affecting ${workflow.failureSummary.failedOperationCount} operation(s); no files modified.`;
         const result = withResultSizeHint(okResult(structured, text), {
             bytes: estimateStructuredTextResultBytes(structured, text),
@@ -376,16 +400,17 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             source: 'repo_apply_patch_batch',
         });
         return withResultExecutionHint(result, {
-            logicalOperations: operations.length,
+            logicalOperations: operationCount,
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.run.execution.skippedCount + workflow.failureSummary.abortedOperationCount,
             mode: 'patch-dry-run:best-effort',
-            batchSize: operations.length,
+            batchSize: operationCount,
             batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
     }
 
     if (workflow.kind === 'preflight-blocked') {
+        const exactSelfRepair = summarizeExactPatchSelfRepair(workflow.preflight.operations);
         const outputFailures =
             resultMode === 'detailed'
                 ? workflow.failedPreflight
@@ -395,13 +420,21 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             dryRun: false,
             applyMode: workflow.effectiveApplyMode,
             preflightBlockedApply: true,
-            operationCount: operations.length,
+            operationCount: operationCount,
             targetCount,
             inputBytes,
             requestedResultMode,
             resultMode,
             resultModeForcedByDiffPreview: forcedByDiffPreview,
             detailsAvailable: true,
+            ...(exactSelfRepair.attemptedCount > 0
+                ? {
+                      exactSelfRepair: {
+                          enabled: runtime.repositoryPatchConfig.exactSelfRepairEnabled,
+                          ...exactSelfRepair,
+                      },
+                  }
+                : {}),
             failedCount: workflow.failedPreflight.length,
             reportedFailureCount: outputFailures.length,
             failureSummary: workflow.failureSummary,
@@ -422,13 +455,19 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             event: 'repo_apply_patch_batch_preflight_blocked',
             tool: 'repo_apply_patch_batch',
             applyMode: workflow.effectiveApplyMode,
-            operationCount: operations.length,
+            operationCount: operationCount,
             targetCount,
             causalFailureCount: workflow.failureSummary.causalFailureCount,
             failedTargetCount: workflow.failureSummary.failedTargetCount,
             abortedOperationCount: workflow.failureSummary.abortedOperationCount,
             recoveryRequiredTargetCount: workflow.failureSummary.recoveryRequiredTargetCount,
             convergenceCandidateCount: workflow.failureSummary.convergenceCandidateCount,
+            recoveryRecipeTargetCount: workflow.failureSummary.recoveryRecipeTargetCount,
+            retrySafeRecoveryRecipeTargetCount: workflow.failureSummary.retrySafeRecoveryRecipeTargetCount,
+            suggestedRecoveryRecipeTargetCount: workflow.failureSummary.suggestedRecoveryRecipeTargetCount,
+            exactSelfRepairAttemptedCount: exactSelfRepair.attemptedCount,
+            exactSelfRepairSucceededCount: exactSelfRepair.succeededCount,
+            exactSelfRepairFailedClosedCount: exactSelfRepair.failedClosedCount,
             inlineNextActionTargetCount: countPatchFailuresWithInlineNextAction(compactPreflightFailures),
             inlineRecoveryAnchorTargetCount: countPatchFailuresWithRecoveryAnchor(compactPreflightFailures),
             causalByCode: workflow.failureSummary.causalByCode,
@@ -445,15 +484,16 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             source: 'repo_apply_patch_batch',
         });
         return withResultExecutionHint(result, {
-            logicalOperations: operations.length,
+            logicalOperations: operationCount,
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.failureSummary.abortedOperationCount,
             mode: 'patch-apply:global-preflight-blocked',
-            batchSize: operations.length,
+            batchSize: operationCount,
             batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
     }
 
+    const exactSelfRepair = summarizeExactPatchSelfRepair(workflow.applied);
     const outputFailures =
         resultMode === 'detailed' ? workflow.failedApply : compactRepositoryPatchFailureRows(workflow.failedApply);
     const outputApplied =
@@ -480,7 +520,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         executionId: workflow.applyRun.execution.executionId,
         applyMode: workflow.effectiveApplyMode,
         failureMode: workflow.effectiveFailureMode,
-        operationCount: operations.length,
+        operationCount: operationCount,
         targetCount,
         resultMode,
         preflightElided: workflow.preflightElided,
@@ -495,6 +535,12 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         abortedOperationCount: workflow.failureSummary.abortedOperationCount,
         recoveryRequiredTargetCount: workflow.failureSummary.recoveryRequiredTargetCount,
         convergenceCandidateCount: workflow.failureSummary.convergenceCandidateCount,
+        recoveryRecipeTargetCount: workflow.failureSummary.recoveryRecipeTargetCount,
+        retrySafeRecoveryRecipeTargetCount: workflow.failureSummary.retrySafeRecoveryRecipeTargetCount,
+        suggestedRecoveryRecipeTargetCount: workflow.failureSummary.suggestedRecoveryRecipeTargetCount,
+        exactSelfRepairAttemptedCount: exactSelfRepair.attemptedCount,
+        exactSelfRepairSucceededCount: exactSelfRepair.succeededCount,
+        exactSelfRepairFailedClosedCount: exactSelfRepair.failedClosedCount,
         inlineNextActionTargetCount: countPatchFailuresWithInlineNextAction(compactApplyFailures),
         inlineRecoveryAnchorTargetCount: countPatchFailuresWithRecoveryAnchor(compactApplyFailures),
         causalByCode: workflow.failureSummary.causalByCode,
@@ -527,7 +573,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         applyMode: workflow.effectiveApplyMode,
         failureMode: workflow.effectiveFailureMode,
         executionId: workflow.applyRun.execution.executionId,
-        operationCount: operations.length,
+        operationCount: operationCount,
         targetCount,
         inputBytes,
         appliedCount: workflow.succeeded.length,
@@ -543,6 +589,14 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         resultMode,
         resultModeForcedByDiffPreview: forcedByDiffPreview,
         detailsAvailable: true,
+        ...(exactSelfRepair.attemptedCount > 0
+            ? {
+                  exactSelfRepair: {
+                      enabled: runtime.repositoryPatchConfig.exactSelfRepairEnabled,
+                      ...exactSelfRepair,
+                  },
+              }
+            : {}),
         targetSummaries: summarizePatchBatchTargets(workflow.succeeded, false),
         preflightElided: workflow.preflightElided,
         preflightElisionReason: workflow.preflightElisionReason,
@@ -579,8 +633,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         source: 'repo_apply_patch_batch',
     });
     return withResultExecutionHint(result, {
-        logicalOperations:
-            operations.length + (workflow.postValidation.ran ? workflow.postValidation.requestedCount : 0),
+        logicalOperations: operationCount + (workflow.postValidation.ran ? workflow.postValidation.requestedCount : 0),
         failedOperations:
             workflow.failureSummary.causalFailureCount +
             (workflow.postValidation.ran ? workflow.postValidation.failedCount : 0),
@@ -589,7 +642,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             workflow.failureSummary.abortedOperationCount +
             (workflow.postValidation.skipped ? workflow.postValidation.requestedCount : 0),
         mode: `patch-apply:${workflow.effectiveApplyMode}:${workflow.effectiveFailureMode}${workflow.postValidation.ran ? ':post-validated' : ''}`,
-        batchSize: operations.length,
+        batchSize: operationCount,
         batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
     });
 }
@@ -747,7 +800,10 @@ export function createRepoWriteTools(options = {}) {
             requireMcpToolAuditCapability(operationContext),
             quarantineMetadataWriter,
             operationContext?.signal,
-            options.quarantineDir ? { quarantineDir: options.quarantineDir } : {},
+            {
+                repositoryPatchConfig: requireMcpToolRepositoryPatchConfig(operationContext),
+                ...(options.quarantineDir ? { quarantineDir: options.quarantineDir } : {}),
+            },
         );
 
     return [
@@ -755,14 +811,14 @@ export function createRepoWriteTools(options = {}) {
             name: 'repo_patch_batch_plan',
             title: 'Plan repository patch batch',
             description:
-                'Plan a bounded batch of exact-string repository patches without modifying files. Repeated paths are evaluated sequentially against one virtual file state.',
+                'Plan a bounded target-grouped batch of exact-string repository patches without modifying files. Each unique target owns path, optional baseline hash/durability and ordered relative operations.',
             inputSchema: {
-                operations: z
-                    .array(patchBatchOperationSchema)
+                targets: z
+                    .array(patchBatchTargetSchema)
                     .min(1)
-                    .max(MAX_PATCH_BATCH_OPERATIONS)
+                    .max(MAX_PATCH_BATCH_TARGETS)
                     ['describe'](
-                        'Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.',
+                        'Canonical V3 target groups. Paths are unique; each target owns its baseline hash/durability and ordered relative operations.',
                     ),
                 targetConcurrency: z
                     .number()
@@ -770,21 +826,25 @@ export function createRepoWriteTools(options = {}) {
                     .min(1)
                     .max(MAX_PATCH_TARGET_CONCURRENCY)
                     .optional()
-                    ['describe'](
-                        'Parallel target groups during planning. Default: 4; same-file operations remain sequential.',
-                    ),
+                    ['describe']('Parallel target groups during planning. Default: 4.'),
             },
 
-            handler: async ({ operations, targetConcurrency }, operationContext) => {
-                const runtime = createRuntime(operationContext);
-                const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
-                const envelope = inspectPatchBatchEnvelope(normalizedOperations);
-                if (!envelope.ok) {
-                    return errorResult('Patch batch exceeds its bounded execution envelope.', {
-                        code: envelope.code,
-                        operationCount: normalizedOperations.length,
-                        targetCount: envelope.targetCount,
-                        inputBytes: envelope.inputBytes,
+            handler: async ({ targets, targetConcurrency }, operationContext) => {
+                const normalized = normalizePatchBatchWireInput(
+                    { targets, targetConcurrency },
+                    {
+                        maxOperations: MAX_PATCH_BATCH_OPERATIONS,
+                        maxTargets: MAX_PATCH_BATCH_TARGETS,
+                        maxInputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+                    },
+                );
+                if (!normalized.ok) {
+                    return errorResult('Patch batch input shape or bounded execution envelope is invalid.', {
+                        code: normalized.code,
+                        operationCount: normalized.operationCount,
+                        targetCount: normalized.targetCount,
+                        inputBytes: normalized.inputBytes,
+                        ...(normalized.duplicatePath ? { duplicatePath: normalized.duplicatePath } : {}),
                         limits: {
                             operations: MAX_PATCH_BATCH_OPERATIONS,
                             targets: MAX_PATCH_BATCH_TARGETS,
@@ -792,7 +852,8 @@ export function createRepoWriteTools(options = {}) {
                         },
                     });
                 }
-                const run = await runRepoWritePatchTargetGroups(runtime, normalizedOperations, true, {
+                const runtime = createRuntime(operationContext);
+                const run = await runRepoWritePatchTargetGroups(runtime, normalized.targets, true, {
                     failureMode: 'best-effort',
                     concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
                 });
@@ -802,53 +863,48 @@ export function createRepoWriteTools(options = {}) {
                 await runtime.audit.append({
                     event: 'repo_patch_batch_plan',
                     tool: 'repo_patch_batch_plan',
-                    operationCount: planned.length,
-                    targetCount: envelope.targetCount,
+                    operationCount: normalized.operationCount,
+                    targetCount: normalized.targetCount,
                     failedCount: failed.length,
                     executionId: run.execution.executionId,
                 });
+                const nextArgs = {
+                    targets,
+                    dryRun: false,
+                    confirmBatch: true,
+                    applyMode: 'per-target-fast',
+                    failureMode: 'best-effort',
+                };
                 const structured = {
                     success: failed.length === 0,
                     plannedTool: 'repo_apply_patch_batch',
                     dryRun: true,
                     executionId: run.execution.executionId,
-                    operationCount: planned.length,
-                    targetCount: envelope.targetCount,
-                    inputBytes: envelope.inputBytes,
+                    operationCount: normalized.operationCount,
+                    targetCount: normalized.targetCount,
+                    inputBytes: normalized.inputBytes,
                     failedCount: failed.length,
                     concurrency: run.execution.concurrency,
                     maxInFlight: run.execution.maxInFlight,
                     durationMs: run.execution.durationMs,
                     operations: planned,
-                    nextCall:
-                        failed.length === 0
-                            ? {
-                                  tool: 'repo_apply_patch_batch',
-                                  args: {
-                                      operations,
-                                      dryRun: false,
-                                      confirmBatch: true,
-                                      applyMode: 'per-target-fast',
-                                      failureMode: 'best-effort',
-                                  },
-                              }
-                            : null,
+                    nextCall: failed.length === 0 ? { tool: 'repo_apply_patch_batch', args: nextArgs } : null,
                 };
                 const text =
                     failed.length === 0
-                        ? `Planned ${planned.length} patch operation(s) across ${envelope.targetCount} target(s); no files modified.`
-                        : `Planned ${planned.length} patch operation(s) with ${failed.length} failure(s); no files modified.`;
+                        ? `Planned ${normalized.operationCount} patch operation(s) across ${normalized.targetCount} target(s); no files modified.`
+                        : `Planned ${normalized.operationCount} patch operation(s) with ${failureSummary.causalFailureCount} causal failure(s); no files modified.`;
                 const result = withResultSizeHint(okResult(structured, text), {
                     bytes: estimateStructuredTextResultBytes(structured, text),
                     strategy: 'conservative-estimate',
                     source: 'repo_patch_batch_plan',
                 });
                 return withResultExecutionHint(result, {
-                    logicalOperations: normalizedOperations.length,
+                    logicalOperations: normalized.operationCount,
                     failedOperations: failureSummary.causalFailureCount,
                     skippedOperations: failureSummary.abortedOperationCount,
                     mode: 'patch-plan:best-effort',
-                    batchSize: normalizedOperations.length,
+                    batchSize: normalized.operationCount,
                     batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
                 });
             },
@@ -857,14 +913,14 @@ export function createRepoWriteTools(options = {}) {
             name: 'repo_apply_patch_batch',
             title: 'Apply repository patch batch',
             description:
-                'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file. Direct apply defaults to independent per-target atomic progress without a duplicate global preview; global-preflight remains opt-in when all-target preview gating is desired.',
+                'Dry-run or apply bounded target-grouped exact-string patches. Each target is atomic, owns its baseline hash/durability, and independent targets can progress concurrently. Real writes require confirmBatch=true.',
             inputSchema: {
-                operations: z
-                    .array(patchBatchOperationSchema)
+                targets: z
+                    .array(patchBatchTargetSchema)
                     .min(1)
-                    .max(MAX_PATCH_BATCH_OPERATIONS)
+                    .max(MAX_PATCH_BATCH_TARGETS)
                     ['describe'](
-                        'Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.',
+                        'Canonical V3 target groups. Unique path + optional baseline hash/durability + ordered relative operations.',
                     ),
                 dryRun: z.boolean().optional()['describe']('Validate all operations without writing. Default: true.'),
                 confirmBatch: z
@@ -875,13 +931,13 @@ export function createRepoWriteTools(options = {}) {
                     .enum(['global-preflight', 'per-target-fast'])
                     .optional()
                     ['describe'](
-                        'Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.',
+                        'Apply policy. Default per-target-fast applies independent target groups directly; global-preflight blocks all writes when any preview target fails.',
                     ),
                 failureMode: z
                     .enum(['best-effort', 'fail-fast'])
                     .optional()
                     ['describe'](
-                        'Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.',
+                        'Target failure policy during apply. Default best-effort for per-target-fast; global-preflight defaults fail-fast after preview.',
                     ),
                 targetConcurrency: z
                     .number()
@@ -889,41 +945,34 @@ export function createRepoWriteTools(options = {}) {
                     .min(1)
                     .max(MAX_PATCH_TARGET_CONCURRENCY)
                     .optional()
-                    ['describe'](
-                        'Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.',
-                    ),
+                    ['describe']('Parallel independent targets. Default 4 in per-target-fast.'),
                 resultMode: z
                     .enum(['compact', 'detailed'])
                     .optional()
                     ['describe'](
-                        'Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.',
+                        'Successful operation result detail. Default compact; any nested includeDiffPreview forces detailed.',
                     ),
                 includePreflightDetails: z
                     .boolean()
                     .optional()
-                    ['describe'](
-                        'Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.',
-                    ),
+                    ['describe']('Echo full successful preflight rows in real apply output. Default false.'),
                 postValidate: z
                     .array(postPatchValidationRequestSchema)
                     .min(1)
                     .max(MAX_POST_PATCH_VALIDATORS)
                     .optional()
                     ['describe'](
-                        'Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.',
+                        'Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan.',
                     ),
                 postValidateOnPartial: z
                     .boolean()
                     .optional()
-                    ['describe'](
-                        'Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.',
-                    ),
-                durability: durabilitySchema,
+                    ['describe']('Run postValidate after partial apply. Default false.'),
             },
 
             handler: async (
                 {
-                    operations,
+                    targets,
                     dryRun,
                     confirmBatch,
                     applyMode,
@@ -933,7 +982,6 @@ export function createRepoWriteTools(options = {}) {
                     includePreflightDetails,
                     postValidate,
                     postValidateOnPartial,
-                    durability,
                 },
                 operationContext,
             ) => {
@@ -944,7 +992,6 @@ export function createRepoWriteTools(options = {}) {
                     if (failureMode !== undefined) inactiveOptions.push('failureMode');
                     if (includePreflightDetails !== undefined) inactiveOptions.push('includePreflightDetails');
                     if (postValidateOnPartial !== undefined) inactiveOptions.push('postValidateOnPartial');
-                    if (durability !== undefined) inactiveOptions.push('durability');
                 } else if (postValidateOnPartial !== undefined && postValidate === undefined) {
                     inactiveOptions.push('postValidateOnPartial');
                 }
@@ -954,6 +1001,48 @@ export function createRepoWriteTools(options = {}) {
                         mode: isDryRun ? 'dry-run' : 'apply',
                         invalidOptions: inactiveOptions,
                         hint: 'Remove inactive options or select the apply/postValidate configuration that makes them effective.',
+                    });
+                }
+                const normalized = normalizePatchBatchWireInput(
+                    {
+                        targets,
+                        dryRun,
+                        confirmBatch,
+                        applyMode,
+                        failureMode,
+                        targetConcurrency,
+                        resultMode,
+                        includePreflightDetails,
+                        postValidate,
+                        postValidateOnPartial,
+                    },
+                    {
+                        maxOperations: MAX_PATCH_BATCH_OPERATIONS,
+                        maxTargets: MAX_PATCH_BATCH_TARGETS,
+                        maxInputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+                    },
+                );
+                if (!normalized.ok) {
+                    return errorResult('Patch batch input shape or bounded execution envelope is invalid.', {
+                        code: normalized.code,
+                        operationCount: normalized.operationCount,
+                        targetCount: normalized.targetCount,
+                        inputBytes: normalized.inputBytes,
+                        ...(normalized.duplicatePath ? { duplicatePath: normalized.duplicatePath } : {}),
+                        limits: {
+                            operations: MAX_PATCH_BATCH_OPERATIONS,
+                            targets: MAX_PATCH_BATCH_TARGETS,
+                            inputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+                        },
+                    });
+                }
+                const resultSurface = resolvePatchBatchResultMode({ resultMode }, normalized.targets);
+                const effectiveApplyMode = applyMode ?? 'per-target-fast';
+                if (!isDryRun && confirmBatch !== true) {
+                    return errorResult('confirmBatch must be true when dryRun=false.', {
+                        code: 'ERR_PATCH_BATCH_CONFIRM_REQUIRED',
+                        operationCount: normalized.operationCount,
+                        applyMode: effectiveApplyMode,
                     });
                 }
                 const runtime = createRuntime(operationContext);
@@ -978,35 +1067,8 @@ export function createRepoWriteTools(options = {}) {
                         requestedCount: postValidationRequests.length,
                     });
                 }
-                const normalizedOperations = normalizePatchBatchOperationsForExecution(
-                    /** @type {Record<string, unknown>[]} */ (operations),
-                    durability,
-                );
-                const resultSurface = resolvePatchBatchResultMode({ resultMode }, normalizedOperations);
-                const envelope = inspectPatchBatchEnvelope(normalizedOperations);
-                if (!envelope.ok) {
-                    return errorResult('Patch batch exceeds its bounded execution envelope.', {
-                        code: envelope.code,
-                        operationCount: normalizedOperations.length,
-                        targetCount: envelope.targetCount,
-                        inputBytes: envelope.inputBytes,
-                        limits: {
-                            operations: MAX_PATCH_BATCH_OPERATIONS,
-                            targets: MAX_PATCH_BATCH_TARGETS,
-                            inputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
-                        },
-                    });
-                }
-                const effectiveApplyMode = applyMode ?? 'per-target-fast';
-                if (!isDryRun && confirmBatch !== true) {
-                    return errorResult('confirmBatch must be true when dryRun=false.', {
-                        code: 'ERR_PATCH_BATCH_CONFIRM_REQUIRED',
-                        operationCount: normalizedOperations.length,
-                        applyMode: effectiveApplyMode,
-                    });
-                }
-                const workflow = await executeRepoPatchBatchWorkflow(runtime, normalizedOperations, isDryRun, {
-                    targetCount: envelope.targetCount,
+                const workflow = await executeRepoPatchBatchWorkflow(runtime, normalized.targets, isDryRun, {
+                    targetCount: normalized.targetCount,
                     defaultPlanConcurrency: DEFAULT_PATCH_PLAN_CONCURRENCY,
                     defaultFastConcurrency: DEFAULT_PATCH_FAST_CONCURRENCY,
                     postValidationRequests,
@@ -1017,9 +1079,9 @@ export function createRepoWriteTools(options = {}) {
                     ...(postValidateOnPartial === undefined ? {} : { postValidateOnPartial }),
                 });
                 return projectRepoPatchBatchWorkflow(runtime, workflow, {
-                    operations: normalizedOperations,
-                    targetCount: envelope.targetCount,
-                    inputBytes: envelope.inputBytes,
+                    operationCount: normalized.operationCount,
+                    targetCount: normalized.targetCount,
+                    inputBytes: normalized.inputBytes,
                     requestedResultMode: resultSurface.requestedResultMode,
                     resultMode: resultSurface.resultMode,
                     forcedByDiffPreview: resultSurface.forcedByDiffPreview,
@@ -1306,21 +1368,27 @@ export function createRepoWriteTools(options = {}) {
                 }
                 const runtime = createRuntime(operationContext);
                 const operation = {
-                    path,
                     old_string,
                     new_string,
                     __toolName: 'repo_apply_patch',
                     ...(replace_all === undefined ? {} : { replace_all }),
                     ...(expected_occurrences === undefined ? {} : { expected_occurrences }),
                     ...(occurrence_index === undefined ? {} : { occurrence_index }),
-                    ...(expectedHash === undefined ? {} : { expectedHash }),
                     ...(allowNoop === undefined ? {} : { allowNoop }),
                     ...(diffContextLines === undefined ? {} : { diffContextLines }),
                     ...(maxDiffLines === undefined ? {} : { maxDiffLines }),
                     ...(includeDiffPreview === undefined ? {} : { includeDiffPreview }),
-                    ...(durability === undefined ? {} : { durability }),
                 };
-                const run = await runRepoWritePatchTargetGroups(runtime, [operation], dryRun === true, {
+                const target = {
+                    path,
+                    expectedHashMode: expectedHash
+                        ? /** @type {const} */ ('target-baseline')
+                        : /** @type {const} */ ('none'),
+                    ...(expectedHash === undefined ? {} : { expectedHash }),
+                    ...(durability === undefined ? {} : { durability }),
+                    entries: [{ index: 0, operation }],
+                };
+                const run = await runRepoWritePatchTargetGroups(runtime, [target], dryRun === true, {
                     failureMode: 'best-effort',
                     concurrency: 1,
                     maxTargets: 1,
@@ -1339,6 +1407,7 @@ export function createRepoWriteTools(options = {}) {
                             convergenceCandidate: false,
                         }
                     );
+                    const exactSelfRepair = projectExactPatchSelfRepair(failure['exactSelfRepair']);
                     await runtime.audit.append({
                         event: 'repo_apply_patch_failed',
                         tool: 'repo_apply_patch',
@@ -1351,6 +1420,12 @@ export function createRepoWriteTools(options = {}) {
                         convergenceCandidate: failure['convergenceCandidate'] === true,
                         inlineNextActionProvided: typeof failure['nextAction'] === 'string',
                         inlineRecoveryAnchorProvided: hasPatchRecoveryAnchor(failure['details']),
+                        recoveryRecipeProvided:
+                            failure['recoveryRecipe'] !== null && typeof failure['recoveryRecipe'] === 'object',
+                        recoveryRecipeDisposition: readRecoveryRecipeDisposition(failure['recoveryRecipe']),
+                        exactSelfRepairAttemptedCount: exactSelfRepair ? 1 : 0,
+                        exactSelfRepairSucceededCount: exactSelfRepair?.succeeded === true ? 1 : 0,
+                        exactSelfRepairFailedClosedCount: exactSelfRepair?.failedClosed === true ? 1 : 0,
                     });
                     return errorResult(String(failure['error'] ?? 'Patch failed.'), {
                         path: failure['path'] ?? path,
@@ -1364,10 +1439,15 @@ export function createRepoWriteTools(options = {}) {
                             ? { details: failure['details'] }
                             : {}),
                         ...(failure['nextAction'] ? { nextAction: failure['nextAction'] } : {}),
+                        ...(failure['recoveryRecipe'] && typeof failure['recoveryRecipe'] === 'object'
+                            ? { recoveryRecipe: failure['recoveryRecipe'] }
+                            : {}),
+                        ...(exactSelfRepair ? { exactSelfRepair } : {}),
                     });
                 }
                 const contentHash = row['contentHash'] ?? row['projectedHash'];
                 const io = row['io'] && typeof row['io'] === 'object' ? row['io'] : {};
+                const exactSelfRepair = projectExactPatchSelfRepair(row['exactSelfRepair']);
                 await runtime.audit.append({
                     event: row['dryRun'] === true ? 'repo_patch_dry_run' : 'repo_patch_applied',
                     tool: 'repo_apply_patch',
@@ -1377,6 +1457,9 @@ export function createRepoWriteTools(options = {}) {
                     previousHash: row['previousHash'],
                     contentHash,
                     traceId: /** @type {Record<string, unknown>} */ (io)['traceId'] ?? row['traceId'] ?? null,
+                    exactSelfRepairAttemptedCount: exactSelfRepair ? 1 : 0,
+                    exactSelfRepairSucceededCount: exactSelfRepair?.succeeded === true ? 1 : 0,
+                    exactSelfRepairFailedClosedCount: exactSelfRepair?.failedClosed === true ? 1 : 0,
                 });
                 const structured = {
                     success: true,
@@ -1397,6 +1480,7 @@ export function createRepoWriteTools(options = {}) {
                     noop: row['noop'] === true,
                     previousHash: row['previousHash'],
                     contentHash,
+                    ...(exactSelfRepair ? { exactSelfRepair } : {}),
                     ...(includeDiffPreview === true
                         ? {
                               diffPreview: row['diffPreview'],

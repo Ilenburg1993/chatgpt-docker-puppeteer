@@ -14,7 +14,7 @@
 
 import { readMcpWorkflowPolicy } from '#copilot/mcp/public/workflow-policy';
 
-export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.5.0';
+export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.7.0';
 
 const OPTION_CATEGORIES = Object.freeze(['semantic', 'tuning', 'result', 'safety', 'recovery']);
 const INACTIVE_POLICIES = Object.freeze(['reject']);
@@ -35,7 +35,8 @@ const INACTIVE_POLICIES = Object.freeze(['reject']);
  *           {kind:'dry-run-confirm'} |
  *           {kind:'constant'; mode:string}} McpToolOptionModeRule
  * @typedef {{kind:'alias-precedence'; primary:string; alias:string; divergencePolicy:'reject-divergence'} |
- *           {kind:'nested-boolean-forces-enum'; collection:string; nestedOption:string; option:string; forcedValue:string}} McpToolOptionNormalizationRule
+ *           {kind:'nested-boolean-forces-enum'; collection:string; nestedOption:string; option:string; forcedValue:string} |
+ *           {kind:'nested-collection-boolean-forces-enum'; collection:string; nestedCollection:string; nestedOption:string; option:string; forcedValue:string}} McpToolOptionNormalizationRule
  * @typedef {{source:string; target:string; precedence:'source'}} McpToolOptionInheritanceRule
  * @typedef {{domain:'patch'|'fileBatch'|'terminal'; defaults?:Readonly<Record<string,string|number|boolean>>}} McpToolOptionWorkflowBinding
  * @typedef {{
@@ -164,7 +165,7 @@ const OPTION_CONTRACTS = Object.freeze({
             defaults: Object.freeze({ defaultApplyMode: 'per-target-fast', defaultFailureMode: 'best-effort' }),
         }),
         options: Object.freeze({
-            operations: option('semantic'),
+            targets: option('semantic'),
             dryRun: option('safety', undefined, undefined, 'derived'),
             confirmBatch: option('safety', ['apply'], 'reject'),
             applyMode: option('semantic', undefined, undefined, 'literal'),
@@ -174,19 +175,16 @@ const OPTION_CONTRACTS = Object.freeze({
             includePreflightDetails: option('result', ['apply'], 'reject', 'literal'),
             postValidate: option('safety'),
             postValidateOnPartial: option('recovery', ['apply'], 'reject', 'literal', 'postValidate'),
-            durability: option('safety', ['apply'], 'reject', 'literal'),
         }),
         normalization: Object.freeze([
             Object.freeze({
-                kind: 'nested-boolean-forces-enum',
-                collection: 'operations',
+                kind: 'nested-collection-boolean-forces-enum',
+                collection: 'targets',
+                nestedCollection: 'operations',
                 nestedOption: 'includeDiffPreview',
                 option: 'resultMode',
                 forcedValue: 'detailed',
             }),
-        ]),
-        inheritance: Object.freeze([
-            Object.freeze({ source: 'durability', target: 'operations.*.durability', precedence: 'source' }),
         ]),
     }),
     repo_apply_patch: Object.freeze({
@@ -381,7 +379,15 @@ export function projectMcpToolOptionPolicy(toolName, args) {
         if (!isNamedOptionActive(contract, rule.option, mode, input)) continue;
         const collection = input[rule.collection];
         if (!Array.isArray(collection)) continue;
-        const forceRequested = collection.some((item) => asRecord(item)[rule.nestedOption] === true);
+        const forceRequested =
+            rule.kind === 'nested-collection-boolean-forces-enum'
+                ? collection.some((item) => {
+                      const nested = asRecord(item)[rule.nestedCollection];
+                      return (
+                          Array.isArray(nested) && nested.some((entry) => asRecord(entry)[rule.nestedOption] === true)
+                      );
+                  })
+                : collection.some((item) => asRecord(item)[rule.nestedOption] === true);
         if (!forceRequested) continue;
         const explicit = input[rule.option];
         if (explicit !== undefined && explicit !== rule.forcedValue) {

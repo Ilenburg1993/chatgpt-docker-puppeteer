@@ -1,4 +1,6 @@
 // @ts-check
+import { createMcpRecoveryRecipe } from '#copilot/mcp/public/protocol/tools/recovery';
+
 /**
  * Repository patch failure semantics.
  *
@@ -110,6 +112,143 @@ export function classifyRepositoryPatchFailure(code, details = {}, failureScope 
     };
 }
 
+/** @param {unknown} value */
+function isSha256(value) {
+    return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
+}
+
+/**
+ * Build a machine-readable recovery recipe without weakening the failed mutation preconditions.
+ * A retry-safe recipe is deliberately narrower than the textual nextAction guidance.
+ *
+ * @param {unknown} code
+ * @param {Record<string, unknown>} details
+ * @param {Record<string, unknown>} operation
+ * @param {{ dryRun?: boolean; failureScope?: 'operation' | 'target' | 'dependency-group' }} [options]
+ */
+export function buildRepositoryPatchRecoveryRecipe(code, details, operation, options = {}) {
+    const failureScope = options.failureScope ?? 'target';
+    const path = typeof operation['path'] === 'string' && operation['path'] ? operation['path'] : null;
+    const currentHash = isSha256(details['currentHash']) ? /** @type {string} */ (details['currentHash']) : null;
+    const recoveryOldString =
+        typeof details['recoveryOldString'] === 'string' && details['recoveryOldString'].length > 0
+            ? details['recoveryOldString']
+            : null;
+    const callerBoundHash = typeof operation['expectedHash'] === 'string' && operation['expectedHash'].length > 0;
+    const hasSelectorSemantics =
+        operation['replace_all'] === true ||
+        operation['expected_occurrences'] !== undefined ||
+        operation['occurrence_index'] !== undefined;
+
+    if (code === 'ERR_PATCH_NOOP' || details['convergenceCandidate'] === true) {
+        return createMcpRecoveryRecipe({
+            disposition: 'no-retry',
+            scope: failureScope,
+            reasonCode: 'patch-already-converged',
+            preconditions: ['Do not repeat the unchanged mutation.'],
+        });
+    }
+
+    if (code === 'ERR_PATCH_BATCH_GROUP_ABORTED' || failureScope === 'dependency-group') {
+        return createMcpRecoveryRecipe({
+            disposition: 'manual',
+            scope: 'dependency-group',
+            reasonCode: 'patch-dependent-group-requires-replan',
+            preconditions: ['Retrying one dependent same-file operation in isolation is not safe.'],
+        });
+    }
+
+    if (code === 'EEXPECTEDHASH' && path) {
+        return createMcpRecoveryRecipe({
+            disposition: 'suggested',
+            scope: failureScope,
+            reasonCode: 'patch-refresh-target-hash',
+            suggestedInvocation: {
+                tool: 'repo_file_stats',
+                args: { path, includeHash: true },
+            },
+            preconditions: ['A refreshed hash is diagnostic evidence, not permission to override caller intent.'],
+        });
+    }
+
+    if (code === 'ERR_PATCH_NOT_FOUND' && details['currentStateKind'] === 'virtual-batch') {
+        return createMcpRecoveryRecipe({
+            disposition: 'manual',
+            scope: 'dependency-group',
+            reasonCode: 'patch-virtual-state-requires-group-replan',
+            preconditions: ['Preserve same-file operation ordering and virtual-state semantics.'],
+        });
+    }
+
+    const exactRecoveryProven =
+        code === 'ERR_PATCH_NOT_FOUND' &&
+        details['recoveryExactAnchor'] === true &&
+        details['recoveryRereadRequired'] !== true &&
+        recoveryOldString !== null &&
+        currentHash !== null &&
+        path !== null &&
+        typeof operation['new_string'] === 'string';
+
+    if (exactRecoveryProven && !callerBoundHash && !hasSelectorSemantics && failureScope === 'target') {
+        const args = {
+            path,
+            old_string: recoveryOldString,
+            new_string: operation['new_string'],
+            expectedHash: currentHash,
+            dryRun: options.dryRun === true,
+            ...(operation['allowNoop'] === true ? { allowNoop: true } : {}),
+            ...(Number.isInteger(operation['diffContextLines'])
+                ? { diffContextLines: operation['diffContextLines'] }
+                : {}),
+            ...(Number.isInteger(operation['maxDiffLines']) ? { maxDiffLines: operation['maxDiffLines'] } : {}),
+            ...(operation['includeDiffPreview'] === true ? { includeDiffPreview: true } : {}),
+            ...(options.dryRun !== true && typeof operation['durability'] === 'string'
+                ? { durability: operation['durability'] }
+                : {}),
+        };
+        return createMcpRecoveryRecipe({
+            disposition: 'retry-safe',
+            scope: 'target',
+            reasonCode: 'patch-exact-anchor-same-snapshot',
+            retryInvocation: { tool: 'repo_apply_patch', args },
+            preconditions: [
+                'The recovery anchor was proven unique against the same failed snapshot.',
+                'The retry is hash-bound to that snapshot.',
+                'No caller-supplied expectedHash or cardinality selector is being replaced.',
+            ],
+        });
+    }
+
+    if (exactRecoveryProven) {
+        return createMcpRecoveryRecipe({
+            disposition: 'manual',
+            scope: failureScope,
+            reasonCode: callerBoundHash
+                ? 'patch-caller-hash-must-not-be-overridden'
+                : hasSelectorSemantics
+                  ? 'patch-selector-semantics-must-be-preserved'
+                  : 'patch-recovery-scope-not-independent',
+            preconditions: [
+                'Exact recovery evidence exists, but automatic invocation reconstruction would change caller semantics.',
+            ],
+        });
+    }
+
+    if (
+        code === 'ERR_PATCH_AMBIGUOUS_MATCH' ||
+        code === 'ERR_PATCH_EXPECTED_OCCURRENCES' ||
+        code === 'ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE'
+    ) {
+        return createMcpRecoveryRecipe({
+            disposition: 'manual',
+            scope: failureScope,
+            reasonCode: 'patch-ambiguous-selection-requires-choice',
+        });
+    }
+
+    return null;
+}
+
 /** @param {unknown} code @param {Record<string, unknown>} [details] */
 export function buildRepositoryPatchNextAction(code, details = {}) {
     if (code === 'ERR_PATCH_AMBIGUOUS_MATCH') {
@@ -217,6 +356,12 @@ export function compactRepositoryPatchFailureRows(rows) {
             affectedOperationCount: ordered.length,
             abortedOperationCount: ordered.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
             ...(Object.keys(details).length > 0 ? { details } : {}),
+            ...(causal['recoveryRecipe'] && typeof causal['recoveryRecipe'] === 'object'
+                ? { recoveryRecipe: causal['recoveryRecipe'] }
+                : {}),
+            ...(causal['exactSelfRepair'] && typeof causal['exactSelfRepair'] === 'object'
+                ? { exactSelfRepair: causal['exactSelfRepair'] }
+                : {}),
             nextAction:
                 typeof causal['nextAction'] === 'string'
                     ? causal['nextAction']
@@ -236,6 +381,9 @@ export function summarizeRepositoryPatchFailures(rows) {
     const retryabilityCounts = {};
     let recoveryRequiredTargetCount = 0;
     let convergenceCandidateCount = 0;
+    let recoveryRecipeTargetCount = 0;
+    let retrySafeRecoveryRecipeTargetCount = 0;
+    let suggestedRecoveryRecipeTargetCount = 0;
     for (const row of reported) {
         const code = String(row['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION');
         causalByCode[code] = (causalByCode[code] ?? 0) + 1;
@@ -245,6 +393,13 @@ export function summarizeRepositoryPatchFailures(rows) {
         retryabilityCounts[retryability] = (retryabilityCounts[retryability] ?? 0) + 1;
         if (row['recoveryRequired'] !== false) recoveryRequiredTargetCount += 1;
         if (row['convergenceCandidate'] === true) convergenceCandidateCount += 1;
+        const recipe = row['recoveryRecipe'];
+        if (recipe && typeof recipe === 'object' && !Array.isArray(recipe)) {
+            recoveryRecipeTargetCount += 1;
+            const disposition = /** @type {Record<string, unknown>} */ (recipe)['disposition'];
+            if (disposition === 'retry-safe') retrySafeRecoveryRecipeTargetCount += 1;
+            if (disposition === 'suggested') suggestedRecoveryRecipeTargetCount += 1;
+        }
     }
     return {
         failedOperationCount: rows.length,
@@ -256,5 +411,8 @@ export function summarizeRepositoryPatchFailures(rows) {
         retryabilityCounts,
         recoveryRequiredTargetCount,
         convergenceCandidateCount,
+        recoveryRecipeTargetCount,
+        retrySafeRecoveryRecipeTargetCount,
+        suggestedRecoveryRecipeTargetCount,
     };
 }

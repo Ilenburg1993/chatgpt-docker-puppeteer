@@ -116,7 +116,7 @@ export function buildMcpSessionWorkflowProjection() {
             {
                 task: 'patch',
                 flow: [
-                    'repo_apply_patch_batch dryRun=false confirmBatch=true when anchors/intent are already known; default per-target-fast+best-effort preserves atomicity per target and independent progress',
+                    'repo_apply_patch_batch with canonical targets[] and dryRun=false confirmBatch=true when anchors/intent are already known; path/hash/durability are target-owned and default per-target-fast+best-effort preserves atomicity per target and independent progress',
                     'repo_patch_batch_plan only when an explicit preview or separate approval boundary adds information',
                 ],
             },
@@ -160,7 +160,7 @@ export function buildMcpSessionWorkflowProjection() {
  */
 export function buildMcpWorkflowGuidance() {
     return [
-        'Prefer repo_apply_patch_batch directly when exact-string anchors and intent are already known; use repo_patch_batch_plan only when a separate read-only preview or approval boundary adds information.',
+        'Prefer repo_apply_patch_batch with canonical targets[] directly when exact-string anchors and intent are already known; each target owns path/baseline hash/durability and its operations are path-relative. Use repo_patch_batch_plan only when a separate read-only preview or approval boundary adds information.',
         'Use repo_apply_file_batch directly for ordered filesystem workflows; use repo_apply_file_batch_plan only when a separate read-only preview or approval boundary adds information.',
         `Use run_copilot_validator directly for validation. For several already-known causal gates, use run_copilot_validator.batch so up to ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchRequests} focused/shell/typecheck/lint gates share one MCP call. mcp_validation_plan is escalation/preview-only, never a happy-path prerequisite. Inline completion means stop: use job_get_summary/job_get_output only when the validator explicitly returns running after its bounded wait. Escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.`,
         'When several independent terminal commands are already known before execution, send one terminal_exec.batch call. For deterministic sequential execution use batchConcurrency=1 and batchFailureMode=fail-fast instead of multiple terminal_exec calls.',

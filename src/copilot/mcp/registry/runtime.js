@@ -1611,6 +1611,94 @@ function elapsedMs(startedAt) {
 }
 
 /**
+ * Project only bounded recovery-recipe counts. Invocation tool names, arguments, paths, source text and Git state are
+ * deliberately excluded from audit persistence.
+ *
+ * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
+ */
+function projectMcpRecoveryRecipeAuditMetadata(result) {
+    const structured =
+        result.structuredContent && typeof result.structuredContent === 'object'
+            ? /** @type {Record<string, unknown>} */ (result.structuredContent)
+            : {};
+    const details =
+        structured['details'] && typeof structured['details'] === 'object' && !Array.isArray(structured['details'])
+            ? /** @type {Record<string, unknown>} */ (structured['details'])
+            : {};
+    const candidates = [structured['recoveryRecipe'], details['recoveryRecipe']];
+    const failures = Array.isArray(structured['failures']) ? structured['failures'] : [];
+    for (const failure of failures) {
+        if (failure && typeof failure === 'object' && !Array.isArray(failure)) {
+            candidates.push(/** @type {Record<string, unknown>} */ (failure)['recoveryRecipe']);
+        }
+    }
+    let recoveryRecipeCount = 0;
+    let retrySafeRecoveryRecipeCount = 0;
+    let suggestedRecoveryRecipeCount = 0;
+    let manualRecoveryRecipeCount = 0;
+    let noRetryRecoveryRecipeCount = 0;
+    for (const candidate of candidates) {
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
+        const recipe = /** @type {Record<string, unknown>} */ (candidate);
+        if (recipe['version'] !== 1) continue;
+        const disposition = recipe['disposition'];
+        if (!['retry-safe', 'suggested', 'manual', 'no-retry'].includes(String(disposition))) continue;
+        recoveryRecipeCount += 1;
+        if (disposition === 'retry-safe') retrySafeRecoveryRecipeCount += 1;
+        if (disposition === 'suggested') suggestedRecoveryRecipeCount += 1;
+        if (disposition === 'manual') manualRecoveryRecipeCount += 1;
+        if (disposition === 'no-retry') noRetryRecoveryRecipeCount += 1;
+    }
+    return recoveryRecipeCount > 0
+        ? {
+              recoveryRecipeCount,
+              retrySafeRecoveryRecipeCount,
+              suggestedRecoveryRecipeCount,
+              manualRecoveryRecipeCount,
+              noRetryRecoveryRecipeCount,
+          }
+        : {};
+}
+
+/**
+ * Project only bounded exact-self-repair counters from the already-sanitized wire envelope. Source anchors, hashes,
+ * paths, reason text and retry arguments are deliberately excluded from audit persistence.
+ *
+ * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
+ */
+function projectMcpExactSelfRepairAuditMetadata(result) {
+    const structured =
+        result.structuredContent && typeof result.structuredContent === 'object'
+            ? /** @type {Record<string, unknown>} */ (result.structuredContent)
+            : {};
+    const details =
+        structured['details'] && typeof structured['details'] === 'object' && !Array.isArray(structured['details'])
+            ? /** @type {Record<string, unknown>} */ (structured['details'])
+            : {};
+    const candidate =
+        structured['exactSelfRepair'] && typeof structured['exactSelfRepair'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (structured['exactSelfRepair'])
+            : details['exactSelfRepair'] && typeof details['exactSelfRepair'] === 'object'
+              ? /** @type {Record<string, unknown>} */ (details['exactSelfRepair'])
+              : null;
+    if (!candidate) return {};
+
+    const attemptedCount =
+        nonNegativeSafeInteger(candidate['attemptedCount']) ?? (candidate['attempted'] === true ? 1 : 0);
+    if (attemptedCount <= 0) return {};
+    const succeededCount =
+        nonNegativeSafeInteger(candidate['succeededCount']) ?? (candidate['succeeded'] === true ? 1 : 0);
+    const failedClosedCount =
+        nonNegativeSafeInteger(candidate['failedClosedCount']) ?? (candidate['failedClosed'] === true ? 1 : 0);
+    if (succeededCount > attemptedCount || failedClosedCount > attemptedCount) return {};
+    return {
+        exactSelfRepairAttemptedCount: attemptedCount,
+        exactSelfRepairSucceededCount: succeededCount,
+        exactSelfRepairFailedClosedCount: failedClosedCount,
+    };
+}
+
+/**
  * Persist only bounded numeric/enum facts about a tool result. This is intentionally not a generic structuredContent
  * serializer: source text, terminal output and arbitrary nested result fields never enter the audit through this path.
  *
@@ -1624,8 +1712,12 @@ function buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, exe
     const textResultBytes = countMcpResultTextBytes(result);
     const duplicateTextBytes = estimateKnownDuplicateTextBytes(toolName, result, textResultBytes);
     const resultOutcome = projectMcpToolResultOutcome(result);
+    const recoveryRecipeMetadata = projectMcpRecoveryRecipeAuditMetadata(result);
+    const exactSelfRepairMetadata = projectMcpExactSelfRepairAuditMetadata(result);
     return {
         ...resultOutcome,
+        ...recoveryRecipeMetadata,
+        ...exactSelfRepairMetadata,
         ...(executionMetric
             ? {
                   logicalOperations: executionMetric.logicalOperations,

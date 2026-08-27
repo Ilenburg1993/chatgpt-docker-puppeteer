@@ -684,6 +684,96 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.match(summary.resultOutcomes.caveat, /unobserved/u);
     });
 
+    it('aggregates v8 recovery-recipe disposition counts without storing invocation data', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_completed', 'repo_apply_patch', 'a', {
+                    recovery_recipe_count: 1,
+                    retry_safe_recovery_recipe_count: 1,
+                    suggested_recovery_recipe_count: 0,
+                    manual_recovery_recipe_count: 0,
+                    no_retry_recovery_recipe_count: 0,
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_apply_patch', 'b', {
+                    recovery_recipe_count: 2,
+                    retry_safe_recovery_recipe_count: 0,
+                    suggested_recovery_recipe_count: 1,
+                    manual_recovery_recipe_count: 1,
+                    no_retry_recovery_recipe_count: 0,
+                }),
+                row(3, 1_200, 'tool_call_completed', 'git_publish_changes', 'c', {
+                    recovery_recipe_count: 1,
+                    retry_safe_recovery_recipe_count: 1,
+                    suggested_recovery_recipe_count: 0,
+                    manual_recovery_recipe_count: 0,
+                    no_retry_recovery_recipe_count: 0,
+                }),
+                row(4, 1_300, 'tool_call_completed', 'repo_apply_patch', 'legacy', {}),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.recoveryRecipes.callsWithRecipe, 3);
+        assert.equal(summary.recoveryRecipes.recipeCount, 4);
+        assert.equal(summary.recoveryRecipes.retrySafeCount, 2);
+        assert.equal(summary.recoveryRecipes.suggestedCount, 1);
+        assert.equal(summary.recoveryRecipes.manualCount, 1);
+        assert.equal(summary.recoveryRecipes.noRetryCount, 0);
+        assert.deepEqual(summary.recoveryRecipes.byTool[0], {
+            tool: 'repo_apply_patch',
+            callsWithRecipe: 2,
+            recipeCount: 3,
+            retrySafeCount: 1,
+            suggestedCount: 1,
+            manualCount: 1,
+            noRetryCount: 0,
+        });
+        assert.equal(JSON.stringify(summary.recoveryRecipes).includes('old_string'), false);
+    });
+
+    it('aggregates v9 exact self-repair counts without storing recovery content', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_completed', 'repo_apply_patch', 'a', {
+                    exact_self_repair_attempted_count: 1,
+                    exact_self_repair_succeeded_count: 1,
+                    exact_self_repair_failed_closed_count: 0,
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_apply_patch', 'b', {
+                    exact_self_repair_attempted_count: 1,
+                    exact_self_repair_succeeded_count: 0,
+                    exact_self_repair_failed_closed_count: 1,
+                }),
+                row(3, 1_200, 'tool_call_completed', 'repo_apply_patch_batch', 'c', {
+                    exact_self_repair_attempted_count: 4,
+                    exact_self_repair_succeeded_count: 3,
+                    exact_self_repair_failed_closed_count: 1,
+                }),
+                row(4, 1_300, 'tool_call_completed', 'repo_apply_patch', 'legacy', {}),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+
+        assert.equal(summary.exactSelfRepair.callsWithAttempt, 3);
+        assert.equal(summary.exactSelfRepair.attemptedCount, 6);
+        assert.equal(summary.exactSelfRepair.succeededCount, 4);
+        assert.equal(summary.exactSelfRepair.failedClosedCount, 2);
+        assert.equal(summary.exactSelfRepair.successRate, 0.6667);
+        assert.equal(summary.exactSelfRepair.failedClosedRate, 0.3333);
+        assert.deepEqual(summary.exactSelfRepair.byTool[0], {
+            tool: 'repo_apply_patch_batch',
+            callsWithAttempt: 1,
+            attemptedCount: 4,
+            succeededCount: 3,
+            failedClosedCount: 1,
+            successRate: 0.75,
+            failedClosedRate: 0.25,
+        });
+        const serialized = JSON.stringify(summary.exactSelfRepair);
+        assert.equal(serialized.includes('old_string'), false);
+        assert.equal(serialized.includes('expectedHash'), false);
+        assert.equal(serialized.includes('reasonCode'), false);
+    });
+
     it('aggregates v6 Option Contract policy telemetry with explicit call and option denominators', () => {
         const sourceA = 'a'.repeat(64);
         const sourceB = 'b'.repeat(64);
@@ -888,6 +978,14 @@ describe('MCP incremental round-trip analytics v6', () => {
             'result_code',
             'result_state',
             'result_class',
+            'recovery_recipe_count',
+            'retry_safe_recovery_recipe_count',
+            'suggested_recovery_recipe_count',
+            'manual_recovery_recipe_count',
+            'no_retry_recovery_recipe_count',
+            'exact_self_repair_attempted_count',
+            'exact_self_repair_succeeded_count',
+            'exact_self_repair_failed_closed_count',
             'option_contract_version',
             'option_policy_coverage',
             'option_mode',
@@ -923,7 +1021,7 @@ describe('MCP incremental round-trip analytics v6', () => {
         }
     });
 
-    it('replays from zero when only the v6 normalizer cursor exists and materializes the v7 cursor', async () => {
+    it('replays from zero when only the v8 normalizer cursor exists and materializes the v9 cursor', async () => {
         const db = createDb();
         const nowMs = 100_000;
         const analytics = createMcpRoundTripAnalytics({
@@ -961,14 +1059,14 @@ describe('MCP incremental round-trip analytics v6', () => {
         db.prepare(
             `INSERT OR REPLACE INTO copilot_mcp_round_trip_cursor
              (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
-             VALUES ('mcp-audit:v6', 'dev:ino-a', 900, 900, ?)`,
+             VALUES ('mcp-audit:v8', 'dev:ino-a', 900, 900, ?)`,
         ).run(nowMs - 1_000);
         const report = await analytics.summarize({ windowMs: 20_000 });
-        assert.equal(report.schemaVersion, 7);
-        assert.equal(report.normalizerVersion, 7);
+        assert.equal(report.schemaVersion, 9);
+        assert.equal(report.normalizerVersion, 9);
         assert.deepEqual(report.failures.byClass, { 'stale-context': 1 });
         const cursor = db
-            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v7'")
+            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v9'")
             .get();
         assert.ok(cursor && typeof cursor === 'object');
         assert.equal(Number(/** @type {Record<string, unknown>} */ (cursor)['byte_offset']), 100);

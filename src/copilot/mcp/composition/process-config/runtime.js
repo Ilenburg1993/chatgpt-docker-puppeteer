@@ -39,6 +39,7 @@ import { readCopilotMcpServerProfile } from '#copilot/mcp/public/server';
 import { readMcpHttpStatefulProcessConfig } from '#copilot/mcp/public/transport/http/stateful/config';
 import { readMcpValidationProcessConfig } from '#copilot/mcp/public/validation';
 import { createMcpGitProcessConfig } from '#copilot/mcp/public/workspace/git';
+import { readMcpRepositoryPatchConfig } from '#copilot/mcp/public/workspace/repository/patch/config';
 import { readMcpRepoReadCacheConfig } from '#copilot/mcp/public/workspace/repository/read-cache';
 
 export const MCP_PROCESS_CONFIG_SCHEMA_VERSION = 1;
@@ -75,6 +76,7 @@ export const MCP_PROCESS_CONFIG_SCHEMA_VERSION = 1;
  *     }>;
  *     validation: ReturnType<typeof readMcpValidationProcessConfig>;
  *     git: ReturnType<typeof createMcpGitProcessConfig>;
+ *     repositoryPatch: ReturnType<typeof readMcpRepositoryPatchConfig>;
  *     repositoryReadCache: ReturnType<typeof readMcpRepoReadCacheConfig>;
  *     terminal: ReturnType<typeof readMcpTerminalProcessConfig>;
  *     toolCapabilities: Readonly<{
@@ -96,6 +98,7 @@ export const MCP_PROCESS_CONFIG_SCHEMA_VERSION = 1;
  *         toolPayload: ReturnType<typeof readMcpToolPayloadAuditConfig>;
  *         validation: ReturnType<typeof readMcpValidationProcessConfig>;
  *         git: ReturnType<typeof createMcpGitProcessConfig>;
+ *         repositoryPatch: ReturnType<typeof readMcpRepositoryPatchConfig>;
  *         repositoryReadCache: ReturnType<typeof readMcpRepoReadCacheConfig>;
  *         terminal: ReturnType<typeof readMcpTerminalProcessConfig>;
  *     }>;
@@ -145,6 +148,7 @@ export function createMcpProcessConfig(env = process.env) {
     const stateful = readMcpHttpStatefulProcessConfig(env);
     const validation = readMcpValidationProcessConfig(env);
     const git = createMcpGitProcessConfig(env);
+    const repositoryPatch = readMcpRepositoryPatchConfig(env);
     const repositoryReadCache = readMcpRepoReadCacheConfig(env);
     const terminal = readMcpTerminalProcessConfig(env);
     const modelGatewayLiveRuns = createModelGatewayLiveRunEnvironmentAuthority(env);
@@ -166,6 +170,7 @@ export function createMcpProcessConfig(env = process.env) {
             runtime: { reload, sourceGeneration, startupMaintenance },
             validation,
             git,
+            repositoryPatch,
             repositoryReadCache,
             terminal,
             toolCapabilities: { cloudflare: cloudflareAuthority, modelGatewayLiveRuns },
@@ -184,6 +189,7 @@ export function createMcpProcessConfig(env = process.env) {
                 toolPayload,
                 validation,
                 git,
+                repositoryPatch,
                 repositoryReadCache,
                 terminal,
             },

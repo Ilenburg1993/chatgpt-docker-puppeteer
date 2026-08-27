@@ -141,7 +141,7 @@ describe('MCP Option Contract generated matrix', () => {
 
     it('covers the critical patch mode/result/post-validation combinations from the roadmap', () => {
         const dryRunConfirm = policy('repo_apply_patch_batch', {
-            operations: [{}],
+            targets: [{ path: 'a', operations: [{}] }],
             dryRun: true,
             confirmBatch: true,
         });
@@ -149,7 +149,7 @@ describe('MCP Option Contract generated matrix', () => {
         assert.equal(dryRunConfirm.optionRejectedCount, 1);
 
         const applyExecution = policy('repo_apply_patch_batch', {
-            operations: [{}],
+            targets: [{ path: 'a', operations: [{}] }],
             dryRun: false,
             confirmBatch: true,
             applyMode: 'global-preflight',
@@ -161,13 +161,13 @@ describe('MCP Option Contract generated matrix', () => {
         assert.equal(applyExecution.optionIgnoredCount, 0);
 
         const coercedResult = policy('repo_apply_patch_batch', {
-            operations: [{ includeDiffPreview: true }],
+            targets: [{ path: 'a', operations: [{ includeDiffPreview: true }] }],
             resultMode: 'compact',
         });
         assert.equal(coercedResult.optionCoercedCount, 1);
 
         const partialWithoutValidator = policy('repo_apply_patch_batch', {
-            operations: [{}],
+            targets: [{ path: 'a', operations: [{}] }],
             dryRun: false,
             confirmBatch: true,
             postValidateOnPartial: true,
@@ -175,7 +175,7 @@ describe('MCP Option Contract generated matrix', () => {
         assert.equal(partialWithoutValidator.optionRejectedCount, 1);
 
         const partialWithValidator = policy('repo_apply_patch_batch', {
-            operations: [{}],
+            targets: [{ path: 'a', operations: [{}] }],
             dryRun: false,
             confirmBatch: true,
             postValidate: [{ validator: 'typecheck' }],

@@ -42,7 +42,11 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_WORKSPACE, capabilities: TEST_PROCESS_HOST.toolCapabilities },
+    {
+        workspace: TEST_WORKSPACE,
+        config: TEST_PROCESS_HOST.processConfig.toolConfig,
+        capabilities: TEST_PROCESS_HOST.toolCapabilities,
+    },
 );
 
 /** @param {AbortSignal} signal */
@@ -57,7 +61,11 @@ function createRepoWriteOperationContext(signal) {
                 envelope: { protocol: '2026' },
             },
         },
-        { workspace: TEST_WORKSPACE, capabilities: TEST_PROCESS_HOST.toolCapabilities },
+        {
+            workspace: TEST_WORKSPACE,
+            config: TEST_PROCESS_HOST.processConfig.toolConfig,
+            capabilities: TEST_PROCESS_HOST.toolCapabilities,
+        },
     );
 }
 
@@ -929,9 +937,14 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(filePath, '{\n  "a": 1,\n  "b": 2\n}\n', 'utf8');
 
         const result = await applyPatchBatchTool.handler({
-            operations: [
-                { path: filePath, old_string: '"a": 1,', new_string: '"a":,' },
-                { path: filePath, old_string: '"a":,', new_string: '"a": 3,' },
+            targets: [
+                {
+                    path: filePath,
+                    operations: [
+                        { old_string: '"a": 1,', new_string: '"a":,' },
+                        { old_string: '"a":,', new_string: '"a": 3,' },
+                    ],
+                },
             ],
             dryRun: false,
             confirmBatch: true,

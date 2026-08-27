@@ -63,6 +63,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
  *     toolPayload?: import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig;
  *     validation?: import('#copilot/mcp/public/validation').McpValidationProcessConfig;
  *     git?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig;
+ *     repositoryPatch?: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
  *     repositoryReadCache?: import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig;
  *     terminal?: import('#copilot/mcp/public/process/terminal').McpTerminalProcessConfig;
  * }>} McpToolConfigProjection
@@ -280,6 +281,16 @@ export function requireMcpToolGitConfig(operationContext) {
 
 /**
  * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig}
+ */
+export function requireMcpToolRepositoryPatchConfig(operationContext) {
+    const config = operationContext?.config.repositoryPatch;
+    if (!config) throw new TypeError('MCP tool execution requires a repository patch config projection.');
+    return config;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
  * @returns {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig}
  */
 export function requireMcpToolRepositoryReadCacheConfig(operationContext) {
@@ -480,6 +491,7 @@ function freezeToolConfig(config) {
         ...(config?.toolPayload ? { toolPayload: config.toolPayload } : {}),
         ...(config?.validation ? { validation: config.validation } : {}),
         ...(config?.git ? { git: config.git } : {}),
+        ...(config?.repositoryPatch ? { repositoryPatch: config.repositoryPatch } : {}),
         ...(config?.repositoryReadCache ? { repositoryReadCache: config.repositoryReadCache } : {}),
         ...(config?.terminal ? { terminal: config.terminal } : {}),
     });

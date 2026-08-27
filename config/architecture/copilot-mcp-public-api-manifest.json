@@ -335,6 +335,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/protocol/tools/recovery",
+      "target": "./src/copilot/mcp/protocol/tools/public/recovery.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/protocol/version",
       "target": "./src/copilot/mcp/protocol/version/public/index.js",
       "costTier": "micro",
@@ -475,6 +481,12 @@
     {
       "alias": "#copilot/mcp/public/workspace/repository/patch",
       "target": "./src/copilot/mcp/workspace/repository/patch/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/patch/config",
+      "target": "./src/copilot/mcp/workspace/repository/patch/public/config.js",
       "costTier": "micro",
       "coldImport": false
     },

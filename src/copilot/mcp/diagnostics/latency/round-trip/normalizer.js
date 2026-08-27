@@ -1,7 +1,7 @@
 // @ts-check
 /** Sanitized MCP audit-event normalizer for the rebuildable round-trip index. */
 
-export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 7;
+export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 9;
 
 export const MCP_TOOL_CALL_TERMINAL_EVENTS = Object.freeze([
     'tool_call_completed',
@@ -52,6 +52,14 @@ export function normalizeMcpRoundTripAuditEvent(event) {
             'domain-or-unknown',
             'uncoded-failure',
         ]),
+        recoveryRecipeCount: nonNegativeIntegerOrNull(event['recoveryRecipeCount']),
+        retrySafeRecoveryRecipeCount: nonNegativeIntegerOrNull(event['retrySafeRecoveryRecipeCount']),
+        suggestedRecoveryRecipeCount: nonNegativeIntegerOrNull(event['suggestedRecoveryRecipeCount']),
+        manualRecoveryRecipeCount: nonNegativeIntegerOrNull(event['manualRecoveryRecipeCount']),
+        noRetryRecoveryRecipeCount: nonNegativeIntegerOrNull(event['noRetryRecoveryRecipeCount']),
+        exactSelfRepairAttemptedCount: nonNegativeIntegerOrNull(event['exactSelfRepairAttemptedCount']),
+        exactSelfRepairSucceededCount: nonNegativeIntegerOrNull(event['exactSelfRepairSucceededCount']),
+        exactSelfRepairFailedClosedCount: nonNegativeIntegerOrNull(event['exactSelfRepairFailedClosedCount']),
         optionContractVersion: boundedStringOrNull(event['optionContractVersion'], 32),
         optionPolicyCoverage: enumOrNull(event['optionPolicyCoverage'], ['complete']),
         optionMode: boundedStringOrNull(event['optionMode'], 48),

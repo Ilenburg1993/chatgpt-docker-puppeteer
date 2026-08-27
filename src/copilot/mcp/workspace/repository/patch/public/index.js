@@ -3,6 +3,7 @@
 
 export {
     buildRepositoryPatchNextAction,
+    buildRepositoryPatchRecoveryRecipe,
     classifyRepositoryPatchFailure,
     compactRepositoryPatchFailureRows,
     readRepositoryPatchErrorDetails,
@@ -10,3 +11,8 @@ export {
 } from '../failure-semantics.js';
 export { createRepositoryPatchResultValidationOption } from '../result-validation.js';
 export { runRepositoryPatchTargetGroups } from '../operations.js';
+
+/** @typedef {import('../contracts.js').RepositoryPatchDurability} RepositoryPatchDurability */
+/** @typedef {import('../contracts.js').RepositoryPatchExpectedHashMode} RepositoryPatchExpectedHashMode */
+/** @typedef {import('../contracts.js').RepositoryPatchTargetEntry} RepositoryPatchTargetEntry */
+/** @typedef {import('../contracts.js').RepositoryPatchTarget} RepositoryPatchTarget */

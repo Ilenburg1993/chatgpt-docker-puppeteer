@@ -73,6 +73,8 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
                 sequenceEvidence: report.sequenceEvidence,
                 failures: report.failures,
                 resultOutcomes: report.resultOutcomes,
+                recoveryRecipes: report.recoveryRecipes,
+                exactSelfRepair: report.exactSelfRepair,
                 optionPolicies: report.optionPolicies,
                 retryTax: report.retryTax,
                 recovery: report.recovery,

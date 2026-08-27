@@ -13,21 +13,22 @@ import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 /** @type {string[]} */
 const tempDirs = [];
 const TEST_PROCESS_HOST = createComposedMcpProcessHost({
-    hostId: 'mcp-patch-batch-v2-unit-process-host',
+    hostId: 'mcp-patch-target-groups-unit-process-host',
     backgroundServices: false,
 });
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
-            id: 'mcp-patch-batch-v2-unit',
+            id: 'mcp-patch-target-groups-unit',
             method: 'tools/call',
             signal: new AbortController().signal,
-            _meta: { caller: 'test_mcp_patch_batch_v2' },
+            _meta: { caller: 'test_mcp_patch_target_groups' },
             envelope: { protocol: '2026' },
         },
     },
     {
         workspace: TEST_PROCESS_HOST.workspace,
+        config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_PROCESS_HOST.toolCapabilities,
     },
 );
@@ -54,7 +55,7 @@ function findTool(name) {
 async function createRepoFile(name, content) {
     const root = join(process.cwd(), 'src/copilot/.ai/jobs');
     await mkdir(root, { recursive: true });
-    const dir = await mkdtemp(join(root, 'patch-batch-v2-'));
+    const dir = await mkdtemp(join(root, 'patch-target-groups-'));
     tempDirs.push(dir);
     const absolutePath = join(dir, name);
     await writeFile(absolutePath, content, 'utf8');
@@ -72,19 +73,19 @@ afterAll(async () => {
     await TEST_PROCESS_HOST.dispose();
 });
 
-describe('repo_apply_patch_batch V2', () => {
+describe('repo_apply_patch_batch target groups', () => {
     it('reuses one baseline hash across sequential same-file operations and elides duplicate preflight', async () => {
         const initial = 'alpha beta gamma';
         const { absolutePath, repoPath } = await createRepoFile('baseline.txt', initial);
         const baseline = sha256(initial);
         const operations = [
-            { path: repoPath, old_string: 'alpha', new_string: 'ALPHA', expectedHash: baseline },
-            { path: repoPath, old_string: 'beta', new_string: 'BETA', expectedHash: baseline },
-            { path: repoPath, old_string: 'gamma', new_string: 'GAMMA', expectedHash: baseline },
+            { old_string: 'alpha', new_string: 'ALPHA' },
+            { old_string: 'beta', new_string: 'BETA' },
+            { old_string: 'gamma', new_string: 'GAMMA' },
         ];
 
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations,
+            targets: [{ path: repoPath, expectedHash: baseline, operations }],
             dryRun: false,
             confirmBatch: true,
         });
@@ -100,7 +101,7 @@ describe('repo_apply_patch_batch V2', () => {
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['applied']);
         assert.equal(rows.length, 3);
         assert.equal(
-            rows.every((row) => row['expectedHashMode'] === 'group-baseline'),
+            rows.every((row) => row['expectedHashMode'] === 'target-baseline'),
             true,
         );
         assert.equal(
@@ -124,9 +125,15 @@ describe('repo_apply_patch_batch V2', () => {
         const { absolutePath, repoPath } = await createRepoFile('detailed.txt', initial);
         const baseline = sha256(initial);
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations: [
-                { path: repoPath, old_string: 'alpha', new_string: 'ALPHA', expectedHash: baseline },
-                { path: repoPath, old_string: 'beta', new_string: 'BETA', expectedHash: baseline },
+            targets: [
+                {
+                    path: repoPath,
+                    expectedHash: baseline,
+                    operations: [
+                        { old_string: 'alpha', new_string: 'ALPHA' },
+                        { old_string: 'beta', new_string: 'BETA' },
+                    ],
+                },
             ],
             dryRun: false,
             confirmBatch: true,
@@ -162,12 +169,10 @@ describe('repo_apply_patch_batch V2', () => {
         const initial = 'alpha beta';
         const { repoPath } = await createRepoFile('diff-preview.txt', initial);
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations: [
+            targets: [
                 {
                     path: repoPath,
-                    old_string: 'alpha',
-                    new_string: 'ALPHA',
-                    includeDiffPreview: true,
+                    operations: [{ old_string: 'alpha', new_string: 'ALPHA', includeDiffPreview: true }],
                 },
             ],
             resultMode: 'compact',
@@ -189,13 +194,13 @@ describe('repo_apply_patch_batch V2', () => {
         const { absolutePath, repoPath } = await createRepoFile('failure.txt', initial);
         const baseline = sha256(initial);
         const operations = [
-            { path: repoPath, old_string: 'alpha', new_string: 'ALPHA', expectedHash: baseline },
-            { path: repoPath, old_string: 'missing', new_string: 'MISSING', expectedHash: baseline },
-            { path: repoPath, old_string: 'gamma', new_string: 'GAMMA', expectedHash: baseline },
+            { old_string: 'alpha', new_string: 'ALPHA' },
+            { old_string: 'missing', new_string: 'MISSING' },
+            { old_string: 'gamma', new_string: 'GAMMA' },
         ];
 
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations,
+            targets: [{ path: repoPath, expectedHash: baseline, operations }],
             dryRun: false,
             confirmBatch: true,
         });
@@ -217,6 +222,9 @@ describe('repo_apply_patch_batch V2', () => {
             retryabilityCounts: { 'manual-decision': 1 },
             recoveryRequiredTargetCount: 0,
             convergenceCandidateCount: 0,
+            recoveryRecipeTargetCount: 1,
+            retrySafeRecoveryRecipeTargetCount: 0,
+            suggestedRecoveryRecipeTargetCount: 0,
         });
         const causal = failures[0];
         assert.equal(causal?.['index'], 1);
@@ -234,7 +242,7 @@ describe('repo_apply_patch_batch V2', () => {
     it('returns bounded occurrence-line evidence for ambiguous retries without another file read', async () => {
         const { repoPath } = await createRepoFile('ambiguous.txt', 'same\nmiddle\nsame\n');
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations: [{ path: repoPath, old_string: 'same', new_string: 'other' }],
+            targets: [{ path: repoPath, operations: [{ old_string: 'same', new_string: 'other' }] }],
         });
 
         assert.equal(result.isError, undefined);
@@ -253,13 +261,13 @@ describe('repo_apply_patch_batch V2', () => {
         const { repoPath } = await createRepoFile('compact-payload.txt', initial);
         const baseline = sha256(initial);
         const operations = Array.from({ length: 12 }, () => ({
-            path: repoPath,
             old_string: 'alpha',
             new_string: 'alpha',
             allowNoop: true,
-            expectedHash: baseline,
         }));
-        const result = await findTool('repo_apply_patch_batch').handler({ operations });
+        const result = await findTool('repo_apply_patch_batch').handler({
+            targets: [{ path: repoPath, expectedHash: baseline, operations }],
+        });
 
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
@@ -273,9 +281,9 @@ describe('repo_apply_patch_batch V2', () => {
         const first = await createRepoFile('fast-first.txt', 'alpha');
         const second = await createRepoFile('fast-second.txt', 'beta');
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations: [
-                { path: first.repoPath, old_string: 'alpha', new_string: 'ALPHA' },
-                { path: second.repoPath, old_string: 'missing', new_string: 'BETA' },
+            targets: [
+                { path: first.repoPath, operations: [{ old_string: 'alpha', new_string: 'ALPHA' }] },
+                { path: second.repoPath, operations: [{ old_string: 'missing', new_string: 'BETA' }] },
             ],
             dryRun: false,
             confirmBatch: true,
@@ -298,9 +306,9 @@ describe('repo_apply_patch_batch V2', () => {
         const first = await createRepoFile('first.txt', 'alpha');
         const second = await createRepoFile('second.txt', 'beta');
         const result = await findTool('repo_apply_patch_batch').handler({
-            operations: [
-                { path: first.repoPath, old_string: 'alpha', new_string: 'ALPHA' },
-                { path: second.repoPath, old_string: 'beta', new_string: 'BETA' },
+            targets: [
+                { path: first.repoPath, operations: [{ old_string: 'alpha', new_string: 'ALPHA' }] },
+                { path: second.repoPath, operations: [{ old_string: 'beta', new_string: 'BETA' }] },
             ],
             dryRun: false,
             confirmBatch: true,

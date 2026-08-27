@@ -1585,24 +1585,26 @@ describe('copilot MCP tools', () => {
         try {
             const planTool = findTool('repo_patch_batch_plan');
             const twelveNoops = Array.from({ length: 12 }, () => ({
-                path: relativeA,
                 old_string: 'alpha',
                 new_string: 'alpha',
                 allowNoop: true,
             }));
-            const largePlan = await planTool.handler({ operations: twelveNoops, targetConcurrency: 4 });
+            const largePlan = await planTool.handler({
+                targets: [{ path: relativeA, operations: twelveNoops }],
+                targetConcurrency: 4,
+            });
             assert.equal(largePlan.isError, undefined);
             assert.equal(largePlan.structuredContent?.['success'], true);
             assert.equal(largePlan.structuredContent?.['operationCount'], 12);
             assert.equal(largePlan.structuredContent?.['targetCount'], 1);
 
             const applyTool = findTool('repo_apply_patch_batch');
-            const mixedOperations = [
-                { path: relativeA, old_string: 'alpha', new_string: 'ALPHA' },
-                { path: relativeB, old_string: 'does-not-exist', new_string: 'BETA' },
+            const mixedTargets = [
+                { path: relativeA, operations: [{ old_string: 'alpha', new_string: 'ALPHA' }] },
+                { path: relativeB, operations: [{ old_string: 'does-not-exist', new_string: 'BETA' }] },
             ];
             const conservative = await applyTool.handler({
-                operations: mixedOperations,
+                targets: mixedTargets,
                 dryRun: false,
                 confirmBatch: true,
                 applyMode: 'global-preflight',
@@ -1614,7 +1616,7 @@ describe('copilot MCP tools', () => {
             assert.equal(await readFile(fileB, 'utf8'), 'beta\n');
 
             const fast = await applyTool.handler({
-                operations: mixedOperations,
+                targets: mixedTargets,
                 dryRun: false,
                 confirmBatch: true,
                 targetConcurrency: 2,
@@ -1677,7 +1679,7 @@ describe('copilot MCP tools', () => {
         try {
             const applyTool = findTool('repo_apply_patch_batch');
             const invalid = await applyTool.handler({
-                operations: [{ path: relativeFile, old_string: 'alpha', new_string: 'ALPHA' }],
+                targets: [{ path: relativeFile, operations: [{ old_string: 'alpha', new_string: 'ALPHA' }] }],
                 confirmBatch: true,
                 postValidate: [
                     {
@@ -1691,7 +1693,7 @@ describe('copilot MCP tools', () => {
             assert.equal(await readFile(file, 'utf8'), 'alpha\n');
 
             const recursive = await applyTool.handler({
-                operations: [{ path: relativeFile, old_string: 'alpha', new_string: 'ALPHA' }],
+                targets: [{ path: relativeFile, operations: [{ old_string: 'alpha', new_string: 'ALPHA' }] }],
                 confirmBatch: true,
                 postValidate: [
                     {
@@ -1722,12 +1724,16 @@ describe('copilot MCP tools', () => {
 
         const patchBatchPlanTool = findTool('repo_patch_batch_plan');
         const patchBatchPlan = await patchBatchPlanTool.handler({
-            operations: [
+            targets: [
                 {
                     path: 'src/copilot/mcp/README.md',
-                    old_string: 'Copilot MCP Server',
-                    new_string: 'Copilot MCP Server',
-                    allowNoop: true,
+                    operations: [
+                        {
+                            old_string: 'Copilot MCP Server',
+                            new_string: 'Copilot MCP Server',
+                            allowNoop: true,
+                        },
+                    ],
                 },
             ],
         });
@@ -1739,12 +1745,16 @@ describe('copilot MCP tools', () => {
 
         const applyPatchBatchTool = findTool('repo_apply_patch_batch');
         const applyPatchBatchDryRun = await applyPatchBatchTool.handler({
-            operations: [
+            targets: [
                 {
                     path: 'src/copilot/mcp/README.md',
-                    old_string: 'Copilot MCP Server',
-                    new_string: 'Copilot MCP Server',
-                    allowNoop: true,
+                    operations: [
+                        {
+                            old_string: 'Copilot MCP Server',
+                            new_string: 'Copilot MCP Server',
+                            allowNoop: true,
+                        },
+                    ],
                 },
             ],
         });
@@ -1755,12 +1765,16 @@ describe('copilot MCP tools', () => {
         assert.deepEqual(applyPatchBatchDryRun.structuredContent?.['applied'], []);
 
         const applyPatchBatchWithoutConfirm = await applyPatchBatchTool.handler({
-            operations: [
+            targets: [
                 {
                     path: 'src/copilot/mcp/README.md',
-                    old_string: 'Copilot MCP Server',
-                    new_string: 'Copilot MCP Server',
-                    allowNoop: true,
+                    operations: [
+                        {
+                            old_string: 'Copilot MCP Server',
+                            new_string: 'Copilot MCP Server',
+                            allowNoop: true,
+                        },
+                    ],
                 },
             ],
             dryRun: false,
@@ -1769,12 +1783,16 @@ describe('copilot MCP tools', () => {
         assert.equal(applyPatchBatchWithoutConfirm.structuredContent?.['code'], 'ERR_PATCH_BATCH_CONFIRM_REQUIRED');
 
         const applyPatchBatchConfirmedWithoutExplicitFalse = await applyPatchBatchTool.handler({
-            operations: [
+            targets: [
                 {
                     path: 'src/copilot/mcp/README.md',
-                    old_string: 'Copilot MCP Server',
-                    new_string: 'Copilot MCP Server',
-                    allowNoop: true,
+                    operations: [
+                        {
+                            old_string: 'Copilot MCP Server',
+                            new_string: 'Copilot MCP Server',
+                            allowNoop: true,
+                        },
+                    ],
                 },
             ],
             confirmBatch: true,
@@ -1821,10 +1839,11 @@ describe('copilot MCP tools', () => {
         try {
             const tool = findTool('repo_apply_patch_batch');
             const operations = [
-                { path: repoPath, old_string: 'alpha', new_string: 'beta' },
-                { path: repoPath, old_string: 'beta', new_string: 'gamma' },
+                { old_string: 'alpha', new_string: 'beta' },
+                { old_string: 'beta', new_string: 'gamma' },
             ];
-            const dryRun = await tool.handler({ operations, resultMode: 'detailed' });
+            const targets = [{ path: repoPath, operations }];
+            const dryRun = await tool.handler({ targets, resultMode: 'detailed' });
             assert.equal(dryRun.isError, undefined);
             assert.equal(dryRun.structuredContent?.['success'], true);
             const planned = /** @type {Record<string, unknown>[]} */ (dryRun.structuredContent?.['operations']);
@@ -1833,7 +1852,7 @@ describe('copilot MCP tools', () => {
             assert.equal(planned[1]?.['groupedSameFile'], true);
 
             const applied = await tool.handler({
-                operations,
+                targets,
                 dryRun: false,
                 confirmBatch: true,
                 resultMode: 'detailed',
@@ -1861,9 +1880,14 @@ describe('copilot MCP tools', () => {
         try {
             const tool = findTool('repo_apply_patch_batch');
             const result = await tool.handler({
-                operations: [
-                    { path: repoPath, old_string: 'alpha', new_string: 'ALPHA' },
-                    { path: repoPath, old_string: 'missing', new_string: 'MISSING' },
+                targets: [
+                    {
+                        path: repoPath,
+                        operations: [
+                            { old_string: 'alpha', new_string: 'ALPHA' },
+                            { old_string: 'missing', new_string: 'MISSING' },
+                        ],
+                    },
                 ],
                 dryRun: false,
                 confirmBatch: true,

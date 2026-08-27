@@ -1,63 +1,60 @@
 // @ts-check
 
 import { resolveRepoPatchPostValidationPolicy } from '#copilot/mcp/public/workspace/repository/write';
-import { normalizePatchBatchOperationsForExecution } from '#copilot/testing/mcp/tools/repo-write';
+import { normalizePatchBatchWireInput } from '#copilot/testing/mcp/tools/repo-write';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+const LIMITS = Object.freeze({ maxOperations: 128, maxTargets: 64, maxInputBytes: 3 * 1024 * 1024 });
+
 describe('MCP patch-batch option semantics', () => {
     it('runs post-validation only when there is mutated state worth validating', () => {
-        assert.deepEqual(resolveRepoPatchPostValidationPolicy(0, 0, false, false), {
-            action: 'none',
-            reason: null,
-        });
-        assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 2, true, false), {
-            action: 'run',
-            reason: null,
-        });
+        assert.deepEqual(resolveRepoPatchPostValidationPolicy(0, 0, false, false), { action: 'none', reason: null });
+        assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 2, true, false), { action: 'run', reason: null });
         assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 1, false, false), {
             action: 'skip',
             reason: 'partial-patch-apply',
         });
-        assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 1, false, true), {
-            action: 'run',
-            reason: null,
-        });
+        assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 1, false, true), { action: 'run', reason: null });
         assert.deepEqual(resolveRepoPatchPostValidationPolicy(1, 0, false, true), {
             action: 'skip',
             reason: 'patch-not-applied',
         });
     });
 
-    it('propagates one top-level durability policy uniformly without mutating caller operations', () => {
-        const original = [
-            { path: 'a.txt', old_string: 'a', new_string: 'A' },
-            { path: 'a.txt', old_string: 'b', new_string: 'B' },
-            { path: 'b.txt', old_string: 'c', new_string: 'C' },
-        ];
-        const normalized = normalizePatchBatchOperationsForExecution(original, 'none');
+    it('keeps durability target-owned and rejects a top-level override', () => {
+        const normalized = normalizePatchBatchWireInput(
+            {
+                targets: [
+                    {
+                        path: 'a.txt',
+                        durability: 'file',
+                        operations: [
+                            { old_string: 'a', new_string: 'A' },
+                            { old_string: 'b', new_string: 'B' },
+                        ],
+                    },
+                ],
+            },
+            LIMITS,
+        );
+        assert.equal(normalized.ok, true);
+        if (normalized.ok) {
+            assert.equal(normalized.targets[0]?.durability, 'file');
+            assert.equal(
+                normalized.targets[0]?.entries.every((entry) => !('durability' in entry.operation)),
+                true,
+            );
+        }
 
-        assert.deepEqual(
-            normalized.map((operation) => operation.durability),
-            ['none', 'none', 'none'],
+        const rejected = normalizePatchBatchWireInput(
+            {
+                targets: [{ path: 'a.txt', operations: [{ old_string: 'a', new_string: 'A' }] }],
+                durability: 'none',
+            },
+            LIMITS,
         );
-        assert.equal('durability' in original[0], false);
-        assert.equal('durability' in original[1], false);
-        assert.equal('durability' in original[2], false);
-        assert.notEqual(normalized[0], original[0]);
-    });
-
-    it('overrides any non-wire per-operation durability with the explicit top-level policy', () => {
-        const normalized = normalizePatchBatchOperationsForExecution(
-            [
-                { path: 'a.txt', old_string: 'a', new_string: 'A', durability: 'file' },
-                { path: 'a.txt', old_string: 'b', new_string: 'B', durability: 'file-and-directory' },
-            ],
-            'none',
-        );
-        assert.deepEqual(
-            normalized.map((operation) => operation.durability),
-            ['none', 'none'],
-        );
+        assert.equal(rejected.ok, false);
+        if (!rejected.ok) assert.equal(rejected.code, 'ERR_PATCH_BATCH_INPUT_SHAPE');
     });
 });

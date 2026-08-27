@@ -87,6 +87,21 @@ describe('MCP audit correlation boundary', () => {
         assert.equal(serialized.includes('src/copilot'), false);
     });
 
+    it('derives exact patch-batch target identities from canonical V3 targets without persisting raw paths', () => {
+        const targets = readMcpToolTargetCorrelation('repo_apply_patch_batch', {
+            targets: [
+                { path: 'src/copilot/a.js', operations: [{ old_string: 'a', new_string: 'aa' }] },
+                { path: './src/copilot/b.js', operations: [{ old_string: 'b', new_string: 'bb' }] },
+            ],
+        });
+        assert.equal(targets.precision, 'exact-set');
+        assert.equal(targets.keys.length, 2);
+        const serialized = JSON.stringify(targets);
+        assert.equal(serialized.includes('a.js'), false);
+        assert.equal(serialized.includes('b.js'), false);
+        assert.equal(serialized.includes('src/copilot'), false);
+    });
+
     it('narrows partial-batch child events to a proven invocation target subset without persisting raw paths', async () => {
         const pathA = 'src/copilot/a.js';
         const pathB = 'src/copilot/b.js';
@@ -94,9 +109,9 @@ describe('MCP audit correlation boundary', () => {
             callId: 'batch-call',
             toolName: 'repo_apply_patch_batch',
             args: {
-                operations: [
-                    { path: pathA, old_string: 'a', new_string: 'aa' },
-                    { path: pathB, old_string: 'b', new_string: 'bb' },
+                targets: [
+                    { path: pathA, operations: [{ old_string: 'a', new_string: 'aa' }] },
+                    { path: pathB, operations: [{ old_string: 'b', new_string: 'bb' }] },
                 ],
             },
         });
@@ -171,6 +186,108 @@ describe('MCP audit correlation boundary', () => {
         assert.equal(metadata['continuationRecommendedOperations'], 2);
         assert.equal(metadata['continuationRequired'], undefined);
         assert.equal(JSON.stringify(metadata).includes(sensitive), false);
+    });
+
+    it('persists only recovery-recipe disposition counts and never invocation arguments', () => {
+        const sensitivePath = 'src/copilot/private-target.js';
+        const sensitiveOld = 'sensitive old source';
+        const sensitiveNew = 'sensitive new source';
+        const metadata = buildMcpToolResultAuditMetadataForTests(
+            'repo_apply_patch',
+            {
+                isError: true,
+                content: [{ type: 'text', text: 'patch failed' }],
+                structuredContent: {
+                    success: false,
+                    code: 'ERR_PATCH_NOT_FOUND',
+                    error: 'patch failed',
+                    details: {
+                        recoveryRecipe: {
+                            version: 1,
+                            disposition: 'retry-safe',
+                            scope: 'target',
+                            reasonCode: 'patch-exact-anchor-same-snapshot',
+                            retryInvocation: {
+                                tool: 'repo_apply_patch',
+                                args: { path: sensitivePath, old_string: sensitiveOld, new_string: sensitiveNew },
+                            },
+                        },
+                    },
+                },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(metadata['recoveryRecipeCount'], 1);
+        assert.equal(metadata['retrySafeRecoveryRecipeCount'], 1);
+        assert.equal(metadata['suggestedRecoveryRecipeCount'], 0);
+        assert.equal(metadata['manualRecoveryRecipeCount'], 0);
+        assert.equal(metadata['noRetryRecoveryRecipeCount'], 0);
+        const serialized = JSON.stringify(metadata);
+        assert.equal(serialized.includes(sensitivePath), false);
+        assert.equal(serialized.includes(sensitiveOld), false);
+        assert.equal(serialized.includes(sensitiveNew), false);
+        assert.equal(serialized.includes('repo_apply_patch'), false);
+    });
+
+    it('persists only exact self-repair counters and excludes anchors, hashes, paths and reason text', () => {
+        const sensitivePath = 'src/copilot/private-self-repair-target.js';
+        const sensitiveAnchor = 'const secret = "anchor";\r\n';
+        const sensitiveHash = 'a'.repeat(64);
+        const sensitiveReason = 'private-recovery-reason-text';
+        const single = buildMcpToolResultAuditMetadataForTests(
+            'repo_apply_patch',
+            {
+                content: [{ type: 'text', text: 'patch repaired' }],
+                structuredContent: {
+                    success: true,
+                    path: sensitivePath,
+                    exactSelfRepair: {
+                        attempted: true,
+                        succeeded: true,
+                        failedClosed: false,
+                        attemptCount: 1,
+                        reasonCode: sensitiveReason,
+                        path: sensitivePath,
+                        old_string: sensitiveAnchor,
+                        expectedHash: sensitiveHash,
+                    },
+                },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(single['exactSelfRepairAttemptedCount'], 1);
+        assert.equal(single['exactSelfRepairSucceededCount'], 1);
+        assert.equal(single['exactSelfRepairFailedClosedCount'], 0);
+
+        const batch = buildMcpToolResultAuditMetadataForTests(
+            'repo_apply_patch_batch',
+            {
+                content: [{ type: 'text', text: 'batch repaired' }],
+                structuredContent: {
+                    success: true,
+                    exactSelfRepair: {
+                        attemptedCount: 4,
+                        succeededCount: 3,
+                        failedClosedCount: 1,
+                        anchor: sensitiveAnchor,
+                        expectedHash: sensitiveHash,
+                    },
+                },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(batch['exactSelfRepairAttemptedCount'], 4);
+        assert.equal(batch['exactSelfRepairSucceededCount'], 3);
+        assert.equal(batch['exactSelfRepairFailedClosedCount'], 1);
+
+        const serialized = JSON.stringify({ single, batch });
+        assert.equal(serialized.includes(sensitivePath), false);
+        assert.equal(serialized.includes(sensitiveAnchor), false);
+        assert.equal(serialized.includes(sensitiveHash), false);
+        assert.equal(serialized.includes(sensitiveReason), false);
     });
 
     it('classifies errorResult-style and okResult-style logical failures without serializing failure payloads', () => {

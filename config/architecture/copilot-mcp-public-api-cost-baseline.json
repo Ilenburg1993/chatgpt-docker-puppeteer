@@ -526,6 +526,14 @@
       "externalPackages": []
     },
     {
+      "alias": "#copilot/mcp/public/protocol/tools/recovery",
+      "moduleCount": 2,
+      "maxModuleCount": 3,
+      "sourceBytes": 4222,
+      "maxSourceBytes": 6333,
+      "externalPackages": []
+    },
+    {
       "alias": "#copilot/mcp/public/protocol/version",
       "moduleCount": 2,
       "maxModuleCount": 3,
@@ -752,6 +760,14 @@
       "sourceBytes": 80156,
       "maxSourceBytes": 120234,
       "externalPackages": ["jsonc-parser"]
+    },
+    {
+      "alias": "#copilot/mcp/public/workspace/repository/patch/config",
+      "moduleCount": 2,
+      "maxModuleCount": 3,
+      "sourceBytes": 1911,
+      "maxSourceBytes": 2867,
+      "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/read",

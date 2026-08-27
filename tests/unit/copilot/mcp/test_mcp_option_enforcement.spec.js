@@ -77,7 +77,7 @@ describe('MCP option enforcement before side effects', () => {
 
     it('rejects postValidateOnPartial in apply mode when postValidate is absent before repository runtime', async () => {
         const result = await tool('repo_apply_patch_batch').handler({
-            operations: [{ path: 'never-read.txt', old_string: 'x', new_string: 'y' }],
+            targets: [{ path: 'never-read.txt', operations: [{ old_string: 'x', new_string: 'y' }] }],
             dryRun: false,
             confirmBatch: true,
             postValidateOnPartial: true,
@@ -90,15 +90,15 @@ describe('MCP option enforcement before side effects', () => {
 
     it('rejects patch-batch apply-only options in dry-run before acquiring repository runtime', async () => {
         const result = await tool('repo_apply_patch_batch').handler({
-            operations: [{ path: 'never-read.txt', old_string: 'x', new_string: 'y' }],
+            targets: [{ path: 'never-read.txt', operations: [{ old_string: 'x', new_string: 'y' }] }],
             dryRun: true,
             failureMode: 'fail-fast',
-            durability: 'none',
+            includePreflightDetails: true,
         });
         assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['code'], 'ERR_PATCH_BATCH_OPTION_INACTIVE');
         const details = /** @type {Record<string, unknown>} */ (result.structuredContent?.['details']);
-        assert.deepEqual(details['invalidOptions'], ['failureMode', 'durability']);
+        assert.deepEqual(details['invalidOptions'], ['failureMode', 'includePreflightDetails']);
     });
 
     it('rejects durability on a single patch dry-run before acquiring repository runtime', async () => {

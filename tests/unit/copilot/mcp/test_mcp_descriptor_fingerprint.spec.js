@@ -70,7 +70,9 @@ describe('MCP wire descriptor fingerprint authority', () => {
         const snapshot = buildMcpToolWireDescriptorSnapshot(getCanonicalMcpTools());
         assert.equal(snapshot.schemaVersion, 2);
         assert.equal(snapshot.fingerprintKind, 'tools-list-wire-sha256-v1');
-        assert.equal(snapshot.fingerprint, 'fd05bd239f57334c15934f9273f05ae610242e6118279c460d9e98225bb96512');
+        assert.equal(snapshot.fingerprint, '2449c418de55b14c51ac8760fe42612d521bc62d7c2e461a8a356942f739cfa7');
+        assert.equal(snapshot.toolRevisionTokens['repo_apply_patch_batch'], 'wire-v1:345553b0bc26ad02');
+        assert.equal(snapshot.toolRevisionTokens['repo_patch_batch_plan'], 'wire-v1:5394ee0968c76fdc');
         assert.equal(Object.keys(snapshot.toolFingerprints).length, snapshot.descriptors.length);
         assert.equal(Object.keys(snapshot.toolRevisionTokens).length, snapshot.descriptors.length);
         for (const descriptor of snapshot.descriptors.slice(0, 5)) {

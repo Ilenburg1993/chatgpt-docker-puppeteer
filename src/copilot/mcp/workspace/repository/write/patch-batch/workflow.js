@@ -75,11 +75,11 @@ export function resolveRepoPatchPostValidationPolicy(
  * Presentation choices such as compact rows, echoed preflight details and text remain in the wire adapter.
  *
  * @param {RepoWriteRuntime} runtime
- * @param {Record<string, unknown>[]} operations
+ * @param {import('#copilot/mcp/public/workspace/repository/patch').RepositoryPatchTarget[]} targets
  * @param {boolean} dryRun
  * @param {RepoPatchBatchWorkflowOptions} options
  */
-export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun, options) {
+export async function executeRepoPatchBatchWorkflow(runtime, targets, dryRun, options) {
     const effectiveApplyMode = options.applyMode ?? 'per-target-fast';
     const effectiveFailureMode =
         options.failureMode ?? (effectiveApplyMode === 'per-target-fast' ? 'best-effort' : 'fail-fast');
@@ -87,7 +87,7 @@ export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun,
         options.targetConcurrency ?? (effectiveApplyMode === 'per-target-fast' ? options.defaultFastConcurrency : 1);
 
     if (dryRun) {
-        const run = await runRepoWritePatchTargetGroups(runtime, operations, true, {
+        const run = await runRepoWritePatchTargetGroups(runtime, targets, true, {
             failureMode: 'best-effort',
             concurrency: options.targetConcurrency ?? options.defaultPlanConcurrency,
         });
@@ -122,7 +122,7 @@ export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun,
 
     let preflight = null;
     if (effectiveApplyMode === 'global-preflight' && !singleTargetAtomicPreflightElision) {
-        preflight = await runRepoWritePatchTargetGroups(runtime, operations, true, {
+        preflight = await runRepoWritePatchTargetGroups(runtime, targets, true, {
             failureMode: 'best-effort',
             concurrency: options.targetConcurrency ?? options.defaultPlanConcurrency,
         });
@@ -142,7 +142,7 @@ export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun,
         }
     }
 
-    const applyRun = await runRepoWritePatchTargetGroups(runtime, operations, false, {
+    const applyRun = await runRepoWritePatchTargetGroups(runtime, targets, false, {
         failureMode: effectiveFailureMode,
         concurrency: effectiveConcurrency,
     });

@@ -12,6 +12,7 @@ import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk
 import { clearRepoReadFileResultCacheForResolvedPath } from '#copilot/mcp/public/workspace/repository/read-cache';
 import {
     buildRepositoryPatchNextAction,
+    buildRepositoryPatchRecoveryRecipe,
     classifyRepositoryPatchFailure,
     readRepositoryPatchErrorDetails,
 } from './failure-semantics.js';
@@ -21,11 +22,21 @@ const MAX_REPOSITORY_PATCH_TARGETS = 64;
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} RepositoryPatchWorkspace */
 /** @typedef {RepositoryPatchWorkspace['io']} RepositoryPatchIo */
-/** @typedef {Readonly<{workspace: RepositoryPatchWorkspace; io: RepositoryPatchIo; signal?: AbortSignal}>} RepositoryPatchRuntime */
+/** @typedef {Readonly<{
+ * workspace: RepositoryPatchWorkspace;
+ * io: RepositoryPatchIo;
+ * config: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
+ * signal?: AbortSignal;
+ * }>} RepositoryPatchRuntime */
 
-/** @param {RepositoryPatchWorkspace} workspace @param {AbortSignal | undefined} signal @returns {RepositoryPatchRuntime} */
-function createRepositoryPatchRuntime(workspace, signal) {
-    return Object.freeze({ workspace, io: workspace.io, ...(signal ? { signal } : {}) });
+/**
+ * @param {RepositoryPatchWorkspace} workspace
+ * @param {import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig} config
+ * @param {AbortSignal | undefined} signal
+ * @returns {RepositoryPatchRuntime}
+ */
+function createRepositoryPatchRuntime(workspace, config, signal) {
+    return Object.freeze({ workspace, io: workspace.io, config, ...(signal ? { signal } : {}) });
 }
 
 /** @param {RepositoryPatchRuntime} runtime */
@@ -96,6 +107,257 @@ function maybeDiffPreview(include, diff) {
           };
 }
 
+/** @param {unknown} value @returns {Record<string, unknown> | null} */
+function recordOrNull(value) {
+    return value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/** @param {unknown} value */
+function isSha256(value) {
+    return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
+}
+
+/** @param {unknown} error */
+function readPatchFailureCode(error) {
+    return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+        ? error.code
+        : undefined;
+}
+
+/**
+ * Consume only the exact B1 retry-safe recipe shape. This is intentionally stricter than the generic recipe contract:
+ * B2 never dispatches arbitrary tools and never reconstructs selector semantics.
+ *
+ * @param {unknown} recoveryRecipe
+ * @param {Record<string, unknown>} operation
+ * @param {boolean} dryRun
+ * @param {Record<string, unknown>} details
+ */
+function readExactPatchSelfRepairArgs(recoveryRecipe, operation, dryRun, details) {
+    const recipe = recordOrNull(recoveryRecipe);
+    if (
+        !recipe ||
+        recipe['version'] !== 1 ||
+        recipe['disposition'] !== 'retry-safe' ||
+        recipe['scope'] !== 'target' ||
+        recipe['reasonCode'] !== 'patch-exact-anchor-same-snapshot'
+    ) {
+        return null;
+    }
+    const invocation = recordOrNull(recipe['retryInvocation']);
+    const args = recordOrNull(invocation?.['args']);
+    if (!invocation || invocation['tool'] !== 'repo_apply_patch' || !args) return null;
+    if (args['path'] !== operation['path'] || args['new_string'] !== operation['new_string']) return null;
+    if (args['dryRun'] !== dryRun) return null;
+    if (typeof args['old_string'] !== 'string' || args['old_string'].length === 0) return null;
+    if (typeof args['new_string'] !== 'string') return null;
+    if (!isSha256(args['expectedHash']) || args['expectedHash'] !== details['currentHash']) return null;
+    if (
+        'replace_all' in args ||
+        'expected_occurrences' in args ||
+        'occurrence_index' in args ||
+        operation['expectedHash'] !== undefined ||
+        operation['replace_all'] === true ||
+        operation['expected_occurrences'] !== undefined ||
+        operation['occurrence_index'] !== undefined
+    ) {
+        return null;
+    }
+    return args;
+}
+
+/**
+ * Attempt at most one hash-bound exact self-repair. A second resource lock is intentionally reacquired; the recipe's
+ * same-snapshot hash becomes the expectedHash precondition, so any intervening mutation fails closed as EEXPECTEDHASH.
+ *
+ * @param {RepositoryPatchRuntime} runtime
+ * @param {{ resolved: string; relative: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
+ * @param {Record<string, unknown>} operation
+ * @param {number} index
+ * @param {boolean} dryRun
+ * @param {Record<string, unknown>} details
+ * @param {unknown} recoveryRecipe
+ */
+async function attemptExactPatchSelfRepair(runtime, resolved, operation, index, dryRun, details, recoveryRecipe) {
+    if (!runtime.config.exactSelfRepairEnabled || runtime.config.exactSelfRepairMaxAttempts !== 1) return null;
+    const args = readExactPatchSelfRepairArgs(recoveryRecipe, operation, dryRun, details);
+    if (!args) return null;
+    const retryOperation = {
+        path: args['path'],
+        old_string: args['old_string'],
+        new_string: args['new_string'],
+        expectedHash: args['expectedHash'],
+        ...(args['allowNoop'] === true ? { allowNoop: true } : {}),
+        ...(Number.isInteger(args['diffContextLines']) ? { diffContextLines: args['diffContextLines'] } : {}),
+        ...(Number.isInteger(args['maxDiffLines']) ? { maxDiffLines: args['maxDiffLines'] } : {}),
+        ...(args['includeDiffPreview'] === true ? { includeDiffPreview: true } : {}),
+        ...(!dryRun && typeof args['durability'] === 'string' ? { durability: args['durability'] } : {}),
+    };
+    try {
+        const patch = await patchResolvedTarget(runtime, resolved, {
+            oldString: /** @type {string} */ (args['old_string']),
+            newString: /** @type {string} */ (args['new_string']),
+            expectedHash: /** @type {string} */ (args['expectedHash']),
+            dryRun,
+            allowNoop: args['allowNoop'] === true,
+            diffContextLines: optionalInteger(args['diffContextLines']) ?? 3,
+            maxDiffLines: optionalInteger(args['maxDiffLines']) ?? 160,
+            computeDiff: args['includeDiffPreview'] === true,
+            ...createRepositoryPatchResultValidationOption(resolved.relative),
+            ...(!dryRun ? durabilityOption(args['durability']) : {}),
+            advisoryLimits: {
+                tool: typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_apply_patch_batch',
+                index,
+                exactSelfRepair: true,
+                exactSelfRepairAttempt: 1,
+                exactSelfRepairReasonCode: 'patch-exact-anchor-same-snapshot',
+                expectedHash: args['expectedHash'],
+                dryRun,
+            },
+        });
+        return {
+            attempted: /** @type {const} */ (true),
+            succeeded: /** @type {const} */ (true),
+            patch,
+            retryOperation,
+            reasonCode: 'patch-exact-anchor-same-snapshot',
+        };
+    } catch (error) {
+        return {
+            attempted: /** @type {const} */ (true),
+            succeeded: /** @type {const} */ (false),
+            error,
+            retryOperation,
+            reasonCode: 'patch-exact-anchor-same-snapshot',
+        };
+    }
+}
+
+/** @param {{ attempted: true; succeeded: boolean; reasonCode: string; error?: unknown }} repair */
+function projectExactPatchSelfRepair(repair) {
+    const failureCode = repair.succeeded ? undefined : readPatchFailureCode(repair.error);
+    return {
+        attempted: true,
+        succeeded: repair.succeeded,
+        failedClosed: repair.succeeded !== true,
+        attemptCount: 1,
+        reasonCode: repair.reasonCode,
+        ...(failureCode ? { failureCode } : {}),
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} operation
+ * @param {number} index
+ * @param {boolean} dryRun
+ * @param {string} relativePath
+ */
+function buildIndependentPatchAttemptOptions(operation, index, dryRun, relativePath) {
+    return {
+        oldString: String(operation['old_string'] ?? ''),
+        newString: String(operation['new_string'] ?? ''),
+        replaceAll: operation['replace_all'] === true,
+        ...(optionalInteger(operation['expected_occurrences']) !== undefined
+            ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
+            : {}),
+        ...(optionalInteger(operation['occurrence_index']) !== undefined
+            ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
+            : {}),
+        dryRun,
+        ...(!dryRun ? { captureRollback: false } : {}),
+        allowNoop: operation['allowNoop'] === true,
+        diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
+        maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
+        computeDiff: operation['includeDiffPreview'] === true,
+        ...createRepositoryPatchResultValidationOption(relativePath),
+        ...(!dryRun ? durabilityOption(operation['durability']) : {}),
+        advisoryLimits: {
+            tool:
+                typeof operation['__toolName'] === 'string'
+                    ? operation['__toolName']
+                    : dryRun
+                      ? 'repo_patch_batch_plan'
+                      : 'repo_apply_patch_batch',
+            index,
+            oldStringChars: String(operation['old_string'] ?? '').length,
+            newStringChars: String(operation['new_string'] ?? '').length,
+            replaceAll: operation['replace_all'] === true,
+            occurrenceIndex: operation['occurrence_index'] ?? null,
+            expectedHash: operation['expectedHash'] ?? null,
+            dryRun,
+        },
+    };
+}
+
+/**
+ * Execute one independent exact target and, only when B1 declares the failure retry-safe, perform one hash-bound local
+ * retry. Failure projection always describes the final attempt; the original recipe is retained only when no local
+ * retry was attempted.
+ *
+ * @param {RepositoryPatchRuntime} runtime
+ * @param {{ resolved: string; relative: string; validatedWritePath?: import('#copilot/infra/public/composition/workspace/authority').ValidatedMutableWorkspacePath }} resolved
+ * @param {Record<string, unknown>} operation
+ * @param {number} index
+ * @param {boolean} dryRun
+ */
+async function executeIndependentPatchTarget(runtime, resolved, operation, index, dryRun) {
+    try {
+        return {
+            success: /** @type {const} */ (true),
+            patch: await patchResolvedTarget(
+                runtime,
+                resolved,
+                buildIndependentPatchAttemptOptions(operation, index, dryRun, resolved.relative),
+            ),
+            exactSelfRepair: null,
+        };
+    } catch (initialError) {
+        const initialCode = readPatchFailureCode(initialError);
+        const initialDetails = readRepositoryPatchErrorDetails(initialError);
+        const initialRecipe = buildRepositoryPatchRecoveryRecipe(initialCode, initialDetails, operation, {
+            dryRun,
+            failureScope: 'target',
+        });
+        const repair = await attemptExactPatchSelfRepair(
+            runtime,
+            resolved,
+            operation,
+            index,
+            dryRun,
+            initialDetails,
+            initialRecipe,
+        );
+        if (repair?.succeeded === true) {
+            return {
+                success: /** @type {const} */ (true),
+                patch: repair.patch,
+                exactSelfRepair: projectExactPatchSelfRepair(repair),
+            };
+        }
+        const finalError = repair?.error ?? initialError;
+        const finalOperation = repair?.retryOperation ?? operation;
+        const code = readPatchFailureCode(finalError);
+        const details = readRepositoryPatchErrorDetails(finalError);
+        const semantics = classifyRepositoryPatchFailure(code, details, 'target');
+        const recoveryRecipe = repair
+            ? buildRepositoryPatchRecoveryRecipe(code, details, finalOperation, {
+                  dryRun,
+                  failureScope: 'target',
+              })
+            : initialRecipe;
+        return {
+            success: /** @type {const} */ (false),
+            error: finalError instanceof Error ? finalError.message : String(finalError),
+            code,
+            details,
+            semantics,
+            recoveryRecipe,
+            nextAction: buildRepositoryPatchNextAction(code, details),
+            exactSelfRepair: repair ? projectExactPatchSelfRepair(repair) : null,
+        };
+    }
+}
+
 /**
  * Project workspace path-resolution failures through the same stable semantics used by patch-engine failures.
  *
@@ -136,85 +398,56 @@ async function planPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ run
             code: 'ERR_PATCH_CONFLICTING_MODE',
         };
     }
-    try {
-        const patch = await patchResolvedTarget(runtime, resolved, {
-            oldString: String(operation['old_string'] ?? ''),
-            newString: String(operation['new_string'] ?? ''),
-            replaceAll: operation['replace_all'] === true,
-            ...(optionalInteger(operation['expected_occurrences']) !== undefined
-                ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
-                : {}),
-            ...(optionalInteger(operation['occurrence_index']) !== undefined
-                ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
-                : {}),
-            ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-                ? { expectedHash: operation['expectedHash'] }
-                : {}),
-            dryRun: true,
-            allowNoop: operation['allowNoop'] === true,
-            diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
-            maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
-            computeDiff: operation['includeDiffPreview'] === true,
-            ...createRepositoryPatchResultValidationOption(resolved.relative),
-            advisoryLimits: {
-                tool: typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_patch_batch_plan',
-                index,
-                oldStringChars: String(operation['old_string'] ?? '').length,
-                newStringChars: String(operation['new_string'] ?? '').length,
-                replaceAll: operation['replace_all'] === true,
-                occurrenceIndex: operation['occurrence_index'] ?? null,
-                expectedHash: operation['expectedHash'] ?? null,
-                dryRun: true,
-            },
-        });
-        return {
-            index,
-            success: true,
-            path: resolved.relative,
-            dryRun: true,
-            occurrences: patch.occurrences,
-            replacedOccurrences: patch.replacedOccurrences,
-            previousBytes: patch.previousBytes,
-            projectedBytes: patch.projectedBytes,
-            byteDelta: patch.byteDelta,
-            firstMatchLine: patch.firstMatchLine,
-            lastMatchLine: patch.lastMatchLine,
-            lineDelta: patch.lineDelta,
-            occurrenceIndex: patch.occurrenceIndex,
-            previousHash: patch.previousHash,
-            projectedHash: patch.contentHash,
-            noop: patch.noop,
-            io: {
-                operation: patch.io.operation,
-                targetKind: patch.io.targetKind,
-                bytesWritten: patch.io.bytesWritten,
-                durationMs: patch.io.durationMs,
-                engine: patch.io.engine,
-                traceId: patch.io.traceId ?? null,
-            },
-            ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
-                diff: patch.diffPreview,
-                truncated: patch.diffPreviewTruncated,
-                lines: patch.diffPreviewLines,
-                bytes: patch.diffPreviewBytes,
-                contextLines: patch.diffContextLines,
-            }),
-        };
-    } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-        const details = readRepositoryPatchErrorDetails(error);
-        const semantics = classifyRepositoryPatchFailure(code, details, 'target');
+    const outcome = await executeIndependentPatchTarget(runtime, resolved, operation, index, true);
+    if (!outcome.success) {
         return {
             index,
             success: false,
             path: resolved.relative,
-            error: error instanceof Error ? error.message : String(error),
-            code,
-            ...semantics,
-            ...(Object.keys(details).length > 0 ? { details } : {}),
-            nextAction: buildRepositoryPatchNextAction(code, details),
+            error: outcome.error,
+            code: outcome.code,
+            ...outcome.semantics,
+            ...(Object.keys(outcome.details).length > 0 ? { details: outcome.details } : {}),
+            ...(outcome.recoveryRecipe ? { recoveryRecipe: outcome.recoveryRecipe } : {}),
+            ...(outcome.exactSelfRepair ? { exactSelfRepair: outcome.exactSelfRepair } : {}),
+            nextAction: outcome.nextAction,
         };
     }
+    const patch = outcome.patch;
+    return {
+        index,
+        success: true,
+        path: resolved.relative,
+        dryRun: true,
+        occurrences: patch.occurrences,
+        replacedOccurrences: patch.replacedOccurrences,
+        previousBytes: patch.previousBytes,
+        projectedBytes: patch.projectedBytes,
+        byteDelta: patch.byteDelta,
+        firstMatchLine: patch.firstMatchLine,
+        lastMatchLine: patch.lastMatchLine,
+        lineDelta: patch.lineDelta,
+        occurrenceIndex: patch.occurrenceIndex,
+        previousHash: patch.previousHash,
+        projectedHash: patch.contentHash,
+        noop: patch.noop,
+        ...(outcome.exactSelfRepair ? { exactSelfRepair: outcome.exactSelfRepair } : {}),
+        io: {
+            operation: patch.io.operation,
+            targetKind: patch.io.targetKind,
+            bytesWritten: patch.io.bytesWritten,
+            durationMs: patch.io.durationMs,
+            engine: patch.io.engine,
+            traceId: patch.io.traceId ?? null,
+        },
+        ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
+            diff: patch.diffPreview,
+            truncated: patch.diffPreviewTruncated,
+            lines: patch.diffPreviewLines,
+            bytes: patch.diffPreviewBytes,
+            contextLines: patch.diffContextLines,
+        }),
+    };
 }
 
 /**
@@ -227,104 +460,68 @@ async function applyPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ ru
         issueMutableCapability: true,
     });
     if (!resolved.ok) return buildPatchPathResolutionFailure(index, operation['path'], resolved);
-    try {
-        const patch = await patchResolvedTarget(runtime, resolved, {
-            oldString: String(operation['old_string'] ?? ''),
-            newString: String(operation['new_string'] ?? ''),
-            replaceAll: operation['replace_all'] === true,
-            ...(optionalInteger(operation['expected_occurrences']) !== undefined
-                ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
-                : {}),
-            ...(optionalInteger(operation['occurrence_index']) !== undefined
-                ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
-                : {}),
-            ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-                ? { expectedHash: operation['expectedHash'] }
-                : {}),
-            dryRun: false,
-            captureRollback: false,
-            allowNoop: operation['allowNoop'] === true,
-            diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
-            maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
-            computeDiff: operation['includeDiffPreview'] === true,
-            ...createRepositoryPatchResultValidationOption(resolved.relative),
-            ...durabilityOption(operation['durability']),
-            advisoryLimits: {
-                tool: typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_apply_patch_batch',
-                index,
-                oldStringChars: String(operation['old_string'] ?? '').length,
-                newStringChars: String(operation['new_string'] ?? '').length,
-                replaceAll: operation['replace_all'] === true,
-                occurrenceIndex: operation['occurrence_index'] ?? null,
-                expectedHash: operation['expectedHash'] ?? null,
-                dryRun: false,
-            },
-        });
-        clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
-        return {
-            index,
-            success: true,
-            path: resolved.relative,
-            dryRun: false,
-            occurrences: patch.occurrences,
-            replacedOccurrences: patch.replacedOccurrences,
-            previousBytes: patch.previousBytes,
-            projectedBytes: patch.projectedBytes,
-            bytesWritten: patch.bytesWritten,
-            byteDelta: patch.byteDelta,
-            firstMatchLine: patch.firstMatchLine,
-            lastMatchLine: patch.lastMatchLine,
-            lineDelta: patch.lineDelta,
-            occurrenceIndex: patch.occurrenceIndex,
-            previousHash: patch.previousHash,
-            contentHash: patch.contentHash,
-            noop: patch.noop,
-            traceId: patch.io.traceId ?? null,
-            io: {
-                operation: patch.io.operation,
-                targetKind: patch.io.targetKind,
-                bytesWritten: patch.io.bytesWritten,
-                durationMs: patch.io.durationMs,
-                engine: patch.io.engine,
-                traceId: patch.io.traceId ?? null,
-            },
-            ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
-                diff: patch.diffPreview,
-                truncated: patch.diffPreviewTruncated,
-                lines: patch.diffPreviewLines,
-                bytes: patch.diffPreviewBytes,
-                contextLines: patch.diffContextLines,
-            }),
-        };
-    } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-        const details = readRepositoryPatchErrorDetails(error);
-        const semantics = classifyRepositoryPatchFailure(code, details, 'target');
+    const outcome = await executeIndependentPatchTarget(runtime, resolved, operation, index, false);
+    if (!outcome.success) {
         return {
             index,
             success: false,
             path: resolved.relative,
-            error: error instanceof Error ? error.message : String(error),
-            code,
-            ...semantics,
-            ...(Object.keys(details).length > 0 ? { details } : {}),
-            nextAction: buildRepositoryPatchNextAction(code, details),
+            error: outcome.error,
+            code: outcome.code,
+            ...outcome.semantics,
+            ...(Object.keys(outcome.details).length > 0 ? { details: outcome.details } : {}),
+            ...(outcome.recoveryRecipe ? { recoveryRecipe: outcome.recoveryRecipe } : {}),
+            ...(outcome.exactSelfRepair ? { exactSelfRepair: outcome.exactSelfRepair } : {}),
+            nextAction: outcome.nextAction,
         };
     }
-}
-
-/** @param {Record<string, unknown>} operation */
-function readPatchExpectedHash(operation) {
-    return typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-        ? operation['expectedHash']
-        : null;
+    const patch = outcome.patch;
+    clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
+    return {
+        index,
+        success: true,
+        path: resolved.relative,
+        dryRun: false,
+        occurrences: patch.occurrences,
+        replacedOccurrences: patch.replacedOccurrences,
+        previousBytes: patch.previousBytes,
+        projectedBytes: patch.projectedBytes,
+        bytesWritten: patch.bytesWritten,
+        byteDelta: patch.byteDelta,
+        firstMatchLine: patch.firstMatchLine,
+        lastMatchLine: patch.lastMatchLine,
+        lineDelta: patch.lineDelta,
+        occurrenceIndex: patch.occurrenceIndex,
+        previousHash: patch.previousHash,
+        contentHash: patch.contentHash,
+        noop: patch.noop,
+        traceId: patch.io.traceId ?? null,
+        ...(outcome.exactSelfRepair ? { exactSelfRepair: outcome.exactSelfRepair } : {}),
+        io: {
+            operation: patch.io.operation,
+            targetKind: patch.io.targetKind,
+            bytesWritten: patch.io.bytesWritten,
+            durationMs: patch.io.durationMs,
+            engine: patch.io.engine,
+            traceId: patch.io.traceId ?? null,
+        },
+        ...maybeDiffPreview(operation['includeDiffPreview'] === true, {
+            diff: patch.diffPreview,
+            truncated: patch.diffPreviewTruncated,
+            lines: patch.diffPreviewLines,
+            bytes: patch.diffPreviewBytes,
+            contextLines: patch.diffContextLines,
+        }),
+    };
 }
 
 /**
+ * Convert one target-relative wire operation to the canonical locked batch operation shape. Baseline hash ownership is
+ * exclusively target-scoped and therefore never appears inside a relative operation.
+ *
  * @param {Record<string, unknown>} operation
- * @param {{ omitExpectedHash?: boolean }} [options]
  */
-function toLockedPatchBatchOperation(operation, options = {}) {
+function toLockedPatchBatchOperation(operation) {
     return {
         oldString: String(operation['old_string'] ?? ''),
         newString: String(operation['new_string'] ?? ''),
@@ -335,8 +532,8 @@ function toLockedPatchBatchOperation(operation, options = {}) {
         ...(optionalInteger(operation['occurrence_index']) !== undefined
             ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
             : {}),
-        ...(!options.omitExpectedHash && readPatchExpectedHash(operation)
-            ? { expectedHash: /** @type {string} */ (readPatchExpectedHash(operation)) }
+        ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
+            ? { expectedHash: operation['expectedHash'] }
             : {}),
         allowNoop: operation['allowNoop'] === true,
         diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
@@ -346,263 +543,205 @@ function toLockedPatchBatchOperation(operation, options = {}) {
 }
 
 /**
- * Infer a target-baseline hash only when the first operation supplies a hash and every supplied hash in the group is
- * identical. Distinct hashes preserve the advanced per-operation virtual-state contract.
+ * Materialize target-owned fields only at the point where the existing independent single-patch engine needs its flat
+ * operation contract. This is projection, not grouping/inference: path/hash/durability already belong to the target.
  *
- * @param {{ operation: Record<string, unknown>; index: number }[]} group
+ * @param {import('./contracts.js').RepositoryPatchTarget} target
+ * @param {Record<string, unknown>} operation
  */
-function buildLockedPatchBatchGroup(group) {
-    const firstHash = readPatchExpectedHash(group[0]?.operation ?? {});
-    const providedHashes = group
-        .map(({ operation }) => readPatchExpectedHash(operation))
-        .filter((value) => value !== null);
-    const baselineExpectedHash = firstHash && providedHashes.every((value) => value === firstHash) ? firstHash : null;
+function materializeTargetOperation(target, operation) {
     return {
-        expectedHashMode: baselineExpectedHash ? 'group-baseline' : 'per-operation',
-        ...(baselineExpectedHash ? { baselineExpectedHash } : {}),
-        operations: group.map(({ operation }) =>
-            toLockedPatchBatchOperation(operation, { omitExpectedHash: Boolean(baselineExpectedHash) }),
-        ),
+        ...operation,
+        path: target.path,
+        ...(target.expectedHash ? { expectedHash: target.expectedHash } : {}),
+        ...(target.durability ? { durability: target.durability } : {}),
     };
 }
 
 /**
- * Run patch-batch planning/application while collapsing repeated same-file operations into one lock/read/write cycle.
- * Same-file operations are sequential and atomic; distinct files preserve the existing partial-batch behavior.
+ * Execute one explicit repository patch target. Same-target operations are sequential and atomic in one
+ * patchTextBatchLocked cycle; a single operation continues to use the B2 independent-target path so bounded exact
+ * self-repair remains available without duplicating that policy.
  *
- * @param {Record<string, unknown>[]} operations
+ * @param {RepositoryPatchRuntime} runtime
+ * @param {import('./contracts.js').RepositoryPatchTarget} target
  * @param {boolean} dryRun
  * @returns {Promise<Record<string, unknown>[]>}
  */
-async function runPatchBatchOperations(/** @type {RepositoryPatchRuntime} */ runtime, operations, dryRun) {
-    /** @type {Map<string, { operation: Record<string, unknown>; index: number }[]>} */
-    const groups = new Map();
-    for (const [index, operation] of operations.entries()) {
-        const key = String(operation['path'] ?? '');
-        const group = groups.get(key) ?? [];
-        group.push({ operation, index });
-        groups.set(key, group);
+async function runPatchTarget(runtime, target, dryRun) {
+    throwIfRepositoryPatchAborted(runtime);
+    if (target.entries.length === 1) {
+        const entry = /** @type {import('./contracts.js').RepositoryPatchTargetEntry} */ (target.entries[0]);
+        const operation = materializeTargetOperation(target, entry.operation);
+        const row = dryRun
+            ? await planPatchBatchOperation(runtime, operation, entry.index)
+            : await applyPatchBatchOperation(runtime, operation, entry.index);
+        return [{ ...row, expectedHashMode: target.expectedHashMode }];
     }
 
-    /** @type {Record<string, unknown>[]} */
-    const results = [];
-    for (const group of groups.values()) {
-        throwIfRepositoryPatchAborted(runtime);
-        if (group.length === 1) {
-            const entry = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-            results.push(
-                dryRun
-                    ? await planPatchBatchOperation(runtime, entry.operation, entry.index)
-                    : await applyPatchBatchOperation(runtime, entry.operation, entry.index),
-            );
-            if (results.at(-1)?.['success'] !== true && !dryRun) break;
-            continue;
-        }
+    const resolved = await runtime.workspace.resolveWritePath(target.path, { issueMutableCapability: true });
+    if (!resolved.ok) {
+        return target.entries.map((entry) => buildPatchPathResolutionFailure(entry.index, target.path, resolved));
+    }
+    const conflicting = target.entries.find(
+        ({ operation }) => operation['replace_all'] === true && operation['occurrence_index'] !== undefined,
+    );
+    if (conflicting) {
+        return target.entries.map((entry) => ({
+            index: entry.index,
+            success: false,
+            path: resolved.relative,
+            error: 'Same-file patch group aborted because one operation mixes replace_all and occurrence_index.',
+            code: entry.index === conflicting.index ? 'ERR_PATCH_CONFLICTING_MODE' : 'ERR_PATCH_BATCH_GROUP_ABORTED',
+            groupedSameFile: true,
+            expectedHashMode: target.expectedHashMode,
+        }));
+    }
 
-        const first = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-        const resolved = await runtime.workspace.resolveWritePath(String(first.operation['path'] ?? ''), {
-            issueMutableCapability: true,
+    const baselineExpectedHash = target.expectedHashMode === 'target-baseline' ? target.expectedHash : undefined;
+    try {
+        const patch = await patchResolvedTargetBatch(runtime, resolved, {
+            operations: target.entries.map((entry) => toLockedPatchBatchOperation(entry.operation)),
+            ...(baselineExpectedHash ? { baselineExpectedHash } : {}),
+            dryRun,
+            captureRollback: false,
+            ...createRepositoryPatchResultValidationOption(resolved.relative),
+            ...durabilityOption(target.durability),
+            advisoryLimits: {
+                tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
+                groupedSameFile: true,
+                operationCount: target.entries.length,
+            },
         });
-        if (!resolved.ok) {
-            for (const entry of group) {
-                results.push(buildPatchPathResolutionFailure(entry.index, entry.operation['path'], resolved));
-            }
-            if (!dryRun) break;
-            continue;
-        }
-        const conflicting = group.find(
-            ({ operation }) => operation['replace_all'] === true && operation['occurrence_index'] !== undefined,
-        );
-        if (conflicting) {
-            for (const entry of group) {
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: resolved.relative,
-                    error: 'Same-file patch group aborted because one operation mixes replace_all and occurrence_index.',
-                    code:
-                        entry.index === conflicting.index
-                            ? 'ERR_PATCH_CONFLICTING_MODE'
-                            : 'ERR_PATCH_BATCH_GROUP_ABORTED',
-                    groupedSameFile: true,
-                });
-            }
-            if (!dryRun) break;
-            continue;
-        }
-
-        const lockedGroup = buildLockedPatchBatchGroup(group);
-        try {
-            const patch = await patchResolvedTargetBatch(runtime, resolved, {
-                operations: lockedGroup.operations,
-                ...(lockedGroup.baselineExpectedHash ? { baselineExpectedHash: lockedGroup.baselineExpectedHash } : {}),
+        if (!dryRun) clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
+        return target.entries.map((entry, groupIndex) => {
+            const operationResult = /** @type {Record<string, unknown>} */ (patch.operations[groupIndex] ?? {});
+            const includeDiffPreview = entry.operation['includeDiffPreview'] === true;
+            return {
+                index: entry.index,
+                success: true,
+                path: resolved.relative,
                 dryRun,
-                captureRollback: false,
-                ...createRepositoryPatchResultValidationOption(resolved.relative),
-                ...durabilityOption(first.operation['durability']),
-                advisoryLimits: {
-                    tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
-                    groupedSameFile: true,
-                    operationCount: group.length,
-                },
-            });
-            if (!dryRun) clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
-            for (const [groupIndex, entry] of group.entries()) {
-                const operationResult = /** @type {Record<string, unknown>} */ (patch.operations[groupIndex] ?? {});
-                const includeDiffPreview = entry.operation['includeDiffPreview'] === true;
-                results.push({
-                    index: entry.index,
-                    success: true,
-                    path: resolved.relative,
-                    dryRun,
-                    occurrences: operationResult['occurrences'],
-                    replacedOccurrences: operationResult['replacedOccurrences'],
-                    previousBytes: operationResult['previousBytes'],
-                    projectedBytes: operationResult['projectedBytes'],
-                    ...(dryRun
-                        ? { projectedHash: operationResult['contentHash'] }
-                        : {
-                              bytesWritten: groupIndex === group.length - 1 ? patch.bytesWritten : 0,
-                              batchBytesWritten: patch.bytesWritten,
-                              contentHash: operationResult['contentHash'],
-                              traceId: patch.io.traceId ?? null,
-                          }),
-                    byteDelta: operationResult['byteDelta'],
-                    firstMatchLine: operationResult['firstMatchLine'],
-                    lastMatchLine: operationResult['lastMatchLine'],
-                    lineDelta: operationResult['lineDelta'],
-                    occurrenceIndex: operationResult['occurrenceIndex'],
-                    previousHash: operationResult['previousHash'],
-                    noop: operationResult['noop'],
-                    groupedSameFile: true,
-                    expectedHashMode: lockedGroup.expectedHashMode,
-                    ...maybeDiffPreview(includeDiffPreview, {
-                        diff: String(operationResult['diffPreview'] ?? ''),
-                        truncated: operationResult['diffPreviewTruncated'] === true,
-                        lines: Number(operationResult['diffPreviewLines'] ?? 0),
-                        bytes: Number(operationResult['diffPreviewBytes'] ?? 0),
-                        contextLines: Number(operationResult['diffContextLines'] ?? 3),
-                    }),
-                });
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const errorRecord = /** @type {Record<string, unknown>} */ (
-                error && typeof error === 'object' ? error : {}
-            );
-            const originalCode = typeof errorRecord['code'] === 'string' ? errorRecord['code'] : undefined;
-            const failedGroupOperationIndex = Number.isInteger(errorRecord['operationIndex'])
-                ? Number(errorRecord['operationIndex'])
-                : null;
-            const failedEntry =
-                failedGroupOperationIndex !== null && failedGroupOperationIndex >= 0
-                    ? group[failedGroupOperationIndex]
-                    : undefined;
-            const failedOperationIndex = failedEntry?.index ?? null;
-            const completedOperationCount = Number.isInteger(errorRecord['completedOperationCount'])
-                ? Number(errorRecord['completedOperationCount'])
-                : null;
-            const failurePhase = typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
-            const details = readRepositoryPatchErrorDetails(error);
-            for (const [groupIndex, entry] of group.entries()) {
-                const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
-                const rowCode = causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED';
-                const semantics = classifyRepositoryPatchFailure(
-                    rowCode,
-                    causal ? details : {},
-                    group.length > 1 ? 'dependency-group' : 'target',
-                );
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: resolved.relative,
-                    error: causal ? message : 'Same-file patch group aborted because another operation failed.',
-                    code: rowCode,
-                    ...semantics,
-                    ...(causal || originalCode === undefined ? {} : { originalCode }),
-                    groupedSameFile: true,
-                    groupAborted: true,
-                    expectedHashMode: lockedGroup.expectedHashMode,
-                    failedOperationIndex,
-                    failedGroupOperationIndex,
-                    completedOperationCount,
-                    failurePhase,
-                    causalFailure: causal,
-                    ...(causal && Object.keys(details).length > 0 ? { details } : {}),
-                    ...(causal ? { nextAction: buildRepositoryPatchNextAction(originalCode, details) } : {}),
-                });
-            }
-            if (!dryRun) break;
-        }
+                occurrences: operationResult['occurrences'],
+                replacedOccurrences: operationResult['replacedOccurrences'],
+                previousBytes: operationResult['previousBytes'],
+                projectedBytes: operationResult['projectedBytes'],
+                ...(dryRun
+                    ? { projectedHash: operationResult['contentHash'] }
+                    : {
+                          bytesWritten: groupIndex === target.entries.length - 1 ? patch.bytesWritten : 0,
+                          batchBytesWritten: patch.bytesWritten,
+                          contentHash: operationResult['contentHash'],
+                          traceId: patch.io.traceId ?? null,
+                      }),
+                byteDelta: operationResult['byteDelta'],
+                firstMatchLine: operationResult['firstMatchLine'],
+                lastMatchLine: operationResult['lastMatchLine'],
+                lineDelta: operationResult['lineDelta'],
+                occurrenceIndex: operationResult['occurrenceIndex'],
+                previousHash: operationResult['previousHash'],
+                noop: operationResult['noop'],
+                groupedSameFile: true,
+                expectedHashMode: target.expectedHashMode,
+                ...maybeDiffPreview(includeDiffPreview, {
+                    diff: String(operationResult['diffPreview'] ?? ''),
+                    truncated: operationResult['diffPreviewTruncated'] === true,
+                    lines: Number(operationResult['diffPreviewLines'] ?? 0),
+                    bytes: Number(operationResult['diffPreviewBytes'] ?? 0),
+                    contextLines: Number(operationResult['diffContextLines'] ?? 3),
+                }),
+            };
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const errorRecord = /** @type {Record<string, unknown>} */ (error && typeof error === 'object' ? error : {});
+        const originalCode = typeof errorRecord['code'] === 'string' ? errorRecord['code'] : undefined;
+        const failedGroupOperationIndex = Number.isInteger(errorRecord['operationIndex'])
+            ? Number(errorRecord['operationIndex'])
+            : null;
+        const failedEntry =
+            failedGroupOperationIndex !== null && failedGroupOperationIndex >= 0
+                ? target.entries[failedGroupOperationIndex]
+                : undefined;
+        const failedOperationIndex = failedEntry?.index ?? null;
+        const completedOperationCount = Number.isInteger(errorRecord['completedOperationCount'])
+            ? Number(errorRecord['completedOperationCount'])
+            : null;
+        const failurePhase = typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
+        const details = readRepositoryPatchErrorDetails(error);
+        const failedMaterializedOperation = failedEntry
+            ? materializeTargetOperation(target, failedEntry.operation)
+            : null;
+        const groupRecoveryRecipe = failedMaterializedOperation
+            ? buildRepositoryPatchRecoveryRecipe(originalCode, details, failedMaterializedOperation, {
+                  dryRun,
+                  failureScope: 'dependency-group',
+              })
+            : null;
+        return target.entries.map((entry, groupIndex) => {
+            const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
+            const rowCode = causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED';
+            const semantics = classifyRepositoryPatchFailure(rowCode, causal ? details : {}, 'dependency-group');
+            return {
+                index: entry.index,
+                success: false,
+                path: resolved.relative,
+                error: causal ? message : 'Same-file patch group aborted because another operation failed.',
+                code: rowCode,
+                ...semantics,
+                ...(causal || originalCode === undefined ? {} : { originalCode }),
+                groupedSameFile: true,
+                groupAborted: true,
+                expectedHashMode: target.expectedHashMode,
+                failedOperationIndex,
+                failedGroupOperationIndex,
+                completedOperationCount,
+                failurePhase,
+                causalFailure: causal,
+                ...(causal && Object.keys(details).length > 0 ? { details } : {}),
+                ...(causal && groupRecoveryRecipe ? { recoveryRecipe: groupRecoveryRecipe } : {}),
+                ...(causal ? { nextAction: buildRepositoryPatchNextAction(originalCode, details) } : {}),
+            };
+        });
     }
-    return results.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
 }
 
 /**
- * Execute independent patch targets through the shared bulk scheduler. Same-path operations continue to use
- * runPatchBatchOperations, which collapses them into one patchTextBatchLocked lock/read/write cycle.
+ * Execute explicit independent targets through the shared bounded scheduler. No path regrouping occurs here: target
+ * identity, baseline hash and durability were already canonicalized at the MCP boundary.
  *
- * @param {Record<string, unknown>[]} operations
+ * @param {RepositoryPatchRuntime} runtime
+ * @param {import('./contracts.js').RepositoryPatchTarget[]} targets
  * @param {boolean} dryRun
  * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number; signal?: AbortSignal }} [options]
  */
-async function runPatchBatchTargetGroups(
-    /** @type {RepositoryPatchRuntime} */ runtime,
-    operations,
-    dryRun,
-    options = {},
-) {
-    /** @type {{ path: string; entries: { operation: Record<string, unknown>; index: number }[] }[]} */
-    const groups = [];
-    /** @type {Map<string, (typeof groups)[number]>} */
-    const byPath = new Map();
-    for (const [index, operation] of operations.entries()) {
-        const pathKey = String(operation['path'] ?? '');
-        let group = byPath.get(pathKey);
-        if (!group) {
-            group = { path: pathKey, entries: [] };
-            byPath.set(pathKey, group);
-            groups.push(group);
-        }
-        group.entries.push({ operation, index });
-    }
-
+async function runPatchTargetGroups(runtime, targets, dryRun, options = {}) {
     const execution = await runBoundedOperationBatch(
-        groups,
-        async (group) => {
-            throwIfRepositoryPatchAborted(runtime);
-            const local = await runPatchBatchOperations(
-                runtime,
-                group.entries.map((entry) => entry.operation),
-                dryRun,
-            );
-            const rows = local.map((row) => {
-                const localIndex = Number(row['index'] ?? 0);
-                const originalIndex = group.entries[localIndex]?.index ?? localIndex;
-                return /** @type {Record<string, unknown>} */ ({ ...row, index: originalIndex });
-            });
-            return { path: group.path, success: rows.every((row) => row['success'] === true), rows };
+        targets,
+        async (target) => {
+            const rows = await runPatchTarget(runtime, target, dryRun);
+            return { path: target.path, success: rows.every((row) => row['success'] === true), rows };
         },
         {
             concurrency: options.concurrency ?? 1,
             failureMode: options.failureMode ?? 'best-effort',
             maxItems: resolveRepositoryPatchTargetLimit(options.maxTargets),
-            isFailure: (group) => group.success !== true,
+            isFailure: (target) => target.success !== true,
         },
     );
 
     /** @type {Record<string, unknown>[]} */
     const rows = [];
     for (const executionRow of execution.results) {
-        const group = groups[executionRow.index];
-        if (!group) continue;
+        const target = targets[executionRow.index];
+        if (!target) continue;
         if (executionRow.status === 'skipped') {
-            for (const entry of group.entries) {
+            for (const entry of target.entries) {
                 rows.push({
                     index: entry.index,
                     success: false,
                     skipped: true,
-                    path: entry.operation['path'] ?? null,
+                    path: target.path,
                     code: 'ERR_PATCH_BATCH_SKIPPED',
                     reason: executionRow.reason,
                 });
@@ -617,11 +756,11 @@ async function runPatchBatchTargetGroups(
             rows.push(...executionRow.value.rows);
             continue;
         }
-        for (const entry of group.entries) {
+        for (const entry of target.entries) {
             rows.push({
                 index: entry.index,
                 success: false,
-                path: entry.operation['path'] ?? null,
+                path: target.path,
                 code: executionRow.code ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
                 error: executionRow.error ?? 'Patch target execution failed.',
             });
@@ -637,16 +776,25 @@ async function runPatchBatchTargetGroups(
  * Execute repository patch target groups using one explicit workspace capability.
  *
  * @param {RepositoryPatchWorkspace} workspace
- * @param {Record<string, unknown>[]} operations
+ * @param {import('./contracts.js').RepositoryPatchTarget[]} targets
  * @param {boolean} dryRun
- * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number; maxTargets?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     failureMode?: 'best-effort' | 'fail-fast';
+ *     concurrency?: number;
+ *     maxTargets?: number;
+ *     repositoryPatchConfig: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
+ *     signal?: AbortSignal;
+ * }} options
  */
-export function runRepositoryPatchTargetGroups(workspace, operations, dryRun, options = {}) {
+export function runRepositoryPatchTargetGroups(workspace, targets, dryRun, options) {
     if (!workspace) throw new TypeError('Repository patch execution requires a workspace capability.');
+    if (!options?.repositoryPatchConfig) {
+        throw new TypeError('Repository patch execution requires a repository patch config projection.');
+    }
     resolveRepositoryPatchTargetLimit(options.maxTargets);
-    return runPatchBatchTargetGroups(
-        createRepositoryPatchRuntime(workspace, options.signal),
-        operations,
+    return runPatchTargetGroups(
+        createRepositoryPatchRuntime(workspace, options.repositoryPatchConfig, options.signal),
+        targets,
         dryRun,
         options,
     );

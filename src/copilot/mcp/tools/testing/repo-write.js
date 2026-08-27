@@ -1,4 +1,5 @@
 // @ts-check
 /** Testing-only membrane for MCP wire module: repo-write. */
 
-export { createRepoWriteTools, normalizePatchBatchOperationsForExecution, repoWriteTools } from '../repo-write.js';
+export { createRepoWriteTools, repoWriteTools } from '../repo-write.js';
+export { normalizePatchBatchWireInput } from '../repo-write/patch-input.js';

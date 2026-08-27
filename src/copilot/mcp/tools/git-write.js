@@ -20,6 +20,7 @@
 
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
+    createMcpRecoveryRecipe,
     errorResult,
     okResult,
     requireMcpToolAuditCapability,
@@ -297,6 +298,76 @@ async function buildPushState(runtime) {
         }
     }
     return { head, branch, upstream, ahead, behind };
+}
+
+/**
+ * Build a workflow-scoped recovery recipe only after a commit has already succeeded.
+ * The recipe never restages or recommits; safe recovery can only use the governed git_push tool with exact state.
+ *
+ * @param {string} code
+ * @param {{ committedHead?: unknown; state?: Record<string, unknown> | null; pushDryRunFirst?: boolean }} [input]
+ */
+export function buildGitPublishRecoveryRecipe(code, input = {}) {
+    const committedHead =
+        typeof input.committedHead === 'string' && HEAD_RE.test(input.committedHead) ? input.committedHead : null;
+    if (!committedHead) return null;
+    const state = input.state && typeof input.state === 'object' ? input.state : null;
+    const upstream = state && typeof state['upstream'] === 'string' && state['upstream'] ? state['upstream'] : null;
+
+    if (code === 'ERR_GIT_PUSH_DRY_RUN_FAILED_AFTER_COMMIT' || code === 'ERR_GIT_PUSH_FAILED_AFTER_COMMIT') {
+        if (!upstream) {
+            return createMcpRecoveryRecipe({
+                disposition: 'manual',
+                scope: 'workflow',
+                reasonCode: 'git-committed-upstream-unavailable',
+                preconditions: ['The local commit exists; do not stage or commit it again.'],
+            });
+        }
+        return createMcpRecoveryRecipe({
+            disposition: 'retry-safe',
+            scope: 'workflow',
+            reasonCode:
+                code === 'ERR_GIT_PUSH_DRY_RUN_FAILED_AFTER_COMMIT'
+                    ? 'git-retry-push-after-dry-run-failure'
+                    : 'git-retry-push-after-commit',
+            retryInvocation: {
+                tool: 'git_push',
+                args: {
+                    expectedHead: committedHead,
+                    expectedUpstream: upstream,
+                    ...(code === 'ERR_GIT_PUSH_DRY_RUN_FAILED_AFTER_COMMIT' || input.pushDryRunFirst === true
+                        ? { pushDryRunFirst: true }
+                        : {}),
+                    confirmPush: true,
+                },
+            },
+            preconditions: [
+                'HEAD must still equal the committed head.',
+                'The configured upstream must still equal the captured upstream.',
+                'Do not restage or recommit the already-created commit.',
+            ],
+        });
+    }
+
+    if (
+        code === 'ERR_GIT_DETACHED_HEAD_AFTER_COMMIT' ||
+        code === 'ERR_GIT_UPSTREAM_MISSING_AFTER_COMMIT' ||
+        code === 'ERR_GIT_PUBLISH_SOURCE_DRIFT_AFTER_COMMIT'
+    ) {
+        return createMcpRecoveryRecipe({
+            disposition: 'manual',
+            scope: 'workflow',
+            reasonCode:
+                code === 'ERR_GIT_PUBLISH_SOURCE_DRIFT_AFTER_COMMIT'
+                    ? 'git-committed-source-drift-requires-review'
+                    : 'git-committed-push-precondition-missing',
+            preconditions: [
+                'The local commit already exists; do not create a duplicate commit while resolving publication.',
+            ],
+        });
+    }
+
+    return null;
 }
 
 /** @param {string} file @param {string[]} selected */
@@ -669,13 +740,15 @@ export const gitWriteTools = [
                 });
             } catch (error) {
                 const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                const code = candidate.code ?? 'ERR_GIT_PUBLISH_SOURCE_DRIFT_AFTER_COMMIT';
                 return errorResult(candidate.message, {
-                    code: candidate.code ?? 'ERR_GIT_PUBLISH_SOURCE_DRIFT_AFTER_COMMIT',
+                    code,
                     committed: true,
                     committedHead,
                     pushed: false,
                     sourceBarrierFingerprint: sourceBarrier.fingerprint,
                     details: candidate.details ?? null,
+                    recoveryRecipe: buildGitPublishRecoveryRecipe(code, { committedHead }),
                 });
             }
             const shouldPush = push !== false;
@@ -690,6 +763,10 @@ export const gitWriteTools = [
                         code: 'ERR_GIT_DETACHED_HEAD_AFTER_COMMIT',
                         committedHead,
                         committed: true,
+                        recoveryRecipe: buildGitPublishRecoveryRecipe('ERR_GIT_DETACHED_HEAD_AFTER_COMMIT', {
+                            committedHead,
+                            state: beforePush,
+                        }),
                     });
                 }
                 if (!beforePush['upstream']) {
@@ -697,6 +774,10 @@ export const gitWriteTools = [
                         code: 'ERR_GIT_UPSTREAM_MISSING_AFTER_COMMIT',
                         committedHead,
                         committed: true,
+                        recoveryRecipe: buildGitPublishRecoveryRecipe('ERR_GIT_UPSTREAM_MISSING_AFTER_COMMIT', {
+                            committedHead,
+                            state: beforePush,
+                        }),
                     });
                 }
                 if (pushDryRunFirst === true) {
@@ -711,6 +792,11 @@ export const gitWriteTools = [
                             committedHead,
                             state: beforePush,
                             stderr: dryRun.stderr,
+                            recoveryRecipe: buildGitPublishRecoveryRecipe('ERR_GIT_PUSH_DRY_RUN_FAILED_AFTER_COMMIT', {
+                                committedHead,
+                                state: beforePush,
+                                pushDryRunFirst: true,
+                            }),
                         });
                     }
                 }
@@ -732,6 +818,11 @@ export const gitWriteTools = [
                         committedHead,
                         state: beforePush,
                         stderr: pushed.stderr,
+                        recoveryRecipe: buildGitPublishRecoveryRecipe('ERR_GIT_PUSH_FAILED_AFTER_COMMIT', {
+                            committedHead,
+                            state: beforePush,
+                            pushDryRunFirst: pushDryRunFirst === true,
+                        }),
                     });
                 }
                 afterPush = await buildPushState(runtime);

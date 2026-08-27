@@ -12,11 +12,17 @@ import path from 'node:path';
  * @param {RepoWriteWorkspaceCapability} workspace
  * @param {NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']>} audit
  * @param {RepoWriteQuarantineMetadataWriter} quarantineMetadataWriter
- * @param {AbortSignal} [signal]
- * @param {{ quarantineDir?: string }} [options]
+ * @param {AbortSignal | undefined} signal
+ * @param {{
+ *     quarantineDir?: string;
+ *     repositoryPatchConfig: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
+ * }} options
  * @returns {RepoWriteRuntime}
  */
-export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWriter, signal, options = {}) {
+export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWriter, signal, options) {
+    if (!options?.repositoryPatchConfig) {
+        throw new TypeError('Repo write runtime requires a repository patch config projection.');
+    }
     const quarantineDir = resolveRepoWriteQuarantineDir(workspace.workspaceRoot, options.quarantineDir);
     return Object.freeze({
         workspace,
@@ -25,6 +31,7 @@ export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWrite
         quarantineDir,
         quarantineMetadataWriter,
         audit,
+        repositoryPatchConfig: options.repositoryPatchConfig,
         ...(signal ? { signal } : {}),
     });
 }
