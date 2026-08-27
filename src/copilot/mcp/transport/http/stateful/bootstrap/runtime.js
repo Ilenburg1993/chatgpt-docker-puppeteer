@@ -11,6 +11,7 @@
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { projectMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -172,6 +173,7 @@ export async function buildStatefulProcessEnv(relativePath, options) {
     return buildMcpChildEnvironment({
         parentEnv,
         overrides: {
+            ...projectMcpRuntimeSourcePromotionEnvironment(parentEnv),
             COPILOT_MCP_STATEFUL_ENV_FILE: store.envFile,
             COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true',
             COPILOT_MCP_HTTP_STATELESS_COMPAT: 'false',

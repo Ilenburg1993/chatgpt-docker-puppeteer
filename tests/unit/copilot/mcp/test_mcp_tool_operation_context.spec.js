@@ -81,6 +81,10 @@ describe('MCP tool operation context', () => {
         assert.equal(context.config.indexAutoBuild, TEST_PROCESS_HOST.processConfig.toolConfig.indexAutoBuild);
         assert.equal(context.config.latencyDashboard, TEST_PROCESS_HOST.processConfig.toolConfig.latencyDashboard);
         assert.equal(context.config.reload, TEST_PROCESS_HOST.processConfig.toolConfig.reload);
+        assert.equal(
+            context.config.runtimeSourceGeneration,
+            TEST_PROCESS_HOST.processConfig.toolConfig.runtimeSourceGeneration,
+        );
         assert.equal(context.config.toolPayload, TEST_PROCESS_HOST.processConfig.toolConfig.toolPayload);
         assert.equal(context.config.validation, TEST_PROCESS_HOST.processConfig.toolConfig.validation);
         assert.equal(
@@ -107,6 +111,7 @@ describe('MCP tool operation context', () => {
         assert.equal(Object.isFrozen(context.config.latencyDashboard ?? {}), true);
         assert.equal(Object.isFrozen(context.config.reload ?? {}), true);
         assert.equal(Object.isFrozen(context.config.reload?.runnerEnvironment ?? {}), true);
+        assert.equal(Object.isFrozen(context.config.runtimeSourceGeneration ?? {}), true);
         assert.equal(Object.isFrozen(context.config.toolPayload ?? {}), true);
         assert.equal(Object.isFrozen(context.config.validation ?? {}), true);
         assert.equal(Object.isFrozen(context.config.validation?.childEnvironment ?? {}), true);

@@ -233,6 +233,7 @@
     "#copilot/mcp/public/protocol/version": "./src/copilot/mcp/protocol/version/public/index.js",
     "#copilot/mcp/public/registry": "./src/copilot/mcp/registry/public/index.js",
     "#copilot/mcp/public/runtime/reload": "./src/copilot/mcp/runtime/reload/public/index.js",
+    "#copilot/mcp/public/runtime/source-generation": "./src/copilot/mcp/runtime/source-generation/public/index.js",
     "#copilot/mcp/public/runtime/startup-maintenance": "./src/copilot/mcp/runtime/startup-maintenance/public/index.js",
     "#copilot/mcp/public/server": "./src/copilot/mcp/server/public/index.js",
     "#copilot/mcp/public/tools/catalog": "./src/copilot/mcp/tools/catalog/public/index.js",

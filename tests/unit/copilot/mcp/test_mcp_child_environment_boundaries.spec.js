@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
+import { MCP_RUNTIME_SOURCE_PROMOTION_ENV } from '#copilot/mcp/public/runtime/source-generation';
 import {
     buildTransportBenchmarkLaunchEnvironment,
     buildTransportBenchmarkSmokeEnvironment,
@@ -12,6 +13,12 @@ import {
     buildControlledReloadRunnerEnvironment,
     readMcpReloadProcessConfig,
 } from '#copilot/testing/mcp/runtime/reload';
+
+const PROMOTION = Object.freeze({
+    requestId: 'mcp-reload-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    sourceBarrierFingerprint: 'b'.repeat(64),
+    sourceBarrierManifestPath: 'src/copilot/.ai/mcp/promotion/source-barrier.json',
+});
 
 const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
     PATH: '/usr/local/bin:/usr/bin:/bin',
@@ -22,6 +29,9 @@ const parentEnv = /** @type {NodeJS.ProcessEnv} */ ({
     COPILOT_MCP_OAUTH_EXPECTED_ISSUER: 'https://mcp.example.test',
     COPILOT_MCP_PROTOCOL_VERSION: '2026-07-28',
     COPILOT_MCP_STATEFUL_ENV_FILE: 'src/copilot/.ai/mcp/custom-stateful.env',
+    [MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId]: PROMOTION.requestId,
+    [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint]: PROMOTION.sourceBarrierFingerprint,
+    [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath]: PROMOTION.sourceBarrierManifestPath,
     COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
     COPILOT_MCP_STATIC_BEARER_TOKEN: 'ambient-static-bearer-secret',
     CLOUDFLARE_TUNNEL_TOKEN: 'ambient-cloudflare-secret',
@@ -85,10 +95,27 @@ describe('MCP child environment authority boundaries', () => {
         assert.equal(env['PATH'], parentEnv['PATH']);
         assert.equal(env['LANG'], parentEnv['LANG']);
         assert.equal(env['COPILOT_MCP_STATEFUL_ENV_FILE'], 'src/copilot/.ai/mcp/custom-stateful.env');
+        assert.equal(env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId], undefined);
+        assert.equal(env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint], undefined);
+        assert.equal(env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath], undefined);
         assert.equal(env['COPILOT_MCP_PUBLIC_URL'], undefined);
         assert.equal(env['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
         assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
         assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN_FILE'], undefined);
         assert.equal(env['FUTURE_PROVIDER_SUPER_SECRET'], undefined);
+
+        const promoted = buildControlledReloadRunnerEnvironment(parentEnv, PROMOTION);
+        assert.equal(promoted[MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId], PROMOTION.requestId);
+        assert.equal(
+            promoted[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint],
+            PROMOTION.sourceBarrierFingerprint,
+        );
+        assert.equal(
+            promoted[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath],
+            PROMOTION.sourceBarrierManifestPath,
+        );
+        assert.equal(promoted['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
+        assert.equal(promoted['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
+        assert.equal(promoted['FUTURE_PROVIDER_SUPER_SECRET'], undefined);
     });
 });

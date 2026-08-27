@@ -37,8 +37,8 @@ describe('MCP public API cost governance', () => {
     it('keeps the manifest in exact bijection with package public aliases', async () => {
         const configuration = await loadMcpPublicApiCostConfiguration();
         const packageAliases = packageMcpPublicAliases(configuration.packageJson);
-        assert.equal(configuration.manifest.length, 76);
-        assert.equal(packageAliases.length, 76);
+        assert.equal(configuration.manifest.length, 77);
+        assert.equal(packageAliases.length, 77);
         assert.deepEqual(validateMcpPublicApiManifestBijection(packageAliases, configuration.manifest), []);
     });
 

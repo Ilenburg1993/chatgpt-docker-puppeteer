@@ -12,6 +12,7 @@
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
 import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { buildMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { verifyRepositorySourceBarrierManifest } from '#copilot/mcp/public/workspace/repository/integrity';
 import { spawn } from 'node:child_process';
@@ -96,12 +97,14 @@ function parseArgs(argv) {
  * ambient inheritance from the calling MCP process.
  *
  * @param {NodeJS.ProcessEnv} parentEnv
+ * @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourcePromotionBinding | undefined} [promotionBinding]
  */
-export function buildControlledReloadRunnerEnvironment(parentEnv) {
+export function buildControlledReloadRunnerEnvironment(parentEnv, promotionBinding) {
     /** @type {Record<string, string | null>} */
     const overrides = {};
     const statefulEnvFile = parentEnv['COPILOT_MCP_STATEFUL_ENV_FILE'];
     if (statefulEnvFile !== undefined) overrides['COPILOT_MCP_STATEFUL_ENV_FILE'] = statefulEnvFile;
+    if (promotionBinding) Object.assign(overrides, buildMcpRuntimeSourcePromotionEnvironment(promotionBinding));
     return buildMcpChildEnvironment({ parentEnv, overrides }).env;
 }
 
@@ -305,10 +308,15 @@ export function buildControlledReloadRestartInvocation(target, sourceBarrier) {
  * @param {string} target
  * @param {NodeJS.ProcessEnv} parentEnv
  * @param {{ manifestPath: string; fingerprint: string }} sourceBarrier
+ * @param {string} promotionRequestId
  * @returns {Promise<{ exitCode: number; timedOut: boolean; error: string | null }>}
  */
-async function runRestart(target, parentEnv, sourceBarrier) {
-    const env = buildControlledReloadRunnerEnvironment(parentEnv);
+async function runRestart(target, parentEnv, sourceBarrier, promotionRequestId) {
+    const env = buildControlledReloadRunnerEnvironment(parentEnv, {
+        requestId: promotionRequestId,
+        sourceBarrierFingerprint: sourceBarrier.fingerprint,
+        sourceBarrierManifestPath: sourceBarrier.manifestPath,
+    });
     const invocation = buildControlledReloadRestartInvocation(target, sourceBarrier);
     let child;
     try {
@@ -383,10 +391,15 @@ async function executeControlledReload(input) {
         runnerPid: process.pid,
         ...sourceBarrierState,
     });
-    const result = await runRestart(input.target, input.parentEnv, {
-        manifestPath: input.sourceBarrierManifestPath,
-        fingerprint: input.expectedSourceFingerprint,
-    });
+    const result = await runRestart(
+        input.target,
+        input.parentEnv,
+        {
+            manifestPath: input.sourceBarrierManifestPath,
+            fingerprint: input.expectedSourceFingerprint,
+        },
+        input.requestId,
+    );
     await writeState({
         schemaVersion: 1,
         status: result.exitCode === 0 ? 'completed' : 'failed',

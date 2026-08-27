@@ -33,6 +33,7 @@ import { readMcpAuditProcessConfig } from '#copilot/mcp/public/observability';
 import { readMcpTerminalProcessConfig } from '#copilot/mcp/public/process/terminal';
 import { readMcpRegistryPolicy, readMcpToolSurfacePolicy } from '#copilot/mcp/public/registry';
 import { readMcpReloadProcessConfig } from '#copilot/mcp/public/runtime/reload';
+import { createMcpRuntimeSourceGeneration } from '#copilot/mcp/public/runtime/source-generation';
 import { readMcpStartupMaintenanceConfig } from '#copilot/mcp/public/runtime/startup-maintenance';
 import { readCopilotMcpServerProfile } from '#copilot/mcp/public/server';
 import { readMcpHttpStatefulProcessConfig } from '#copilot/mcp/public/transport/http/stateful/config';
@@ -69,6 +70,7 @@ export const MCP_PROCESS_CONFIG_SCHEMA_VERSION = 1;
  *     }>;
  *     runtime: Readonly<{
  *         reload: ReturnType<typeof readMcpReloadProcessConfig>;
+ *         sourceGeneration: ReturnType<typeof createMcpRuntimeSourceGeneration>;
  *         startupMaintenance: ReturnType<typeof readMcpStartupMaintenanceConfig>;
  *     }>;
  *     validation: ReturnType<typeof readMcpValidationProcessConfig>;
@@ -90,6 +92,7 @@ export const MCP_PROCESS_CONFIG_SCHEMA_VERSION = 1;
  *         indexAutoBuild: ReturnType<typeof readMcpIndexAutoBuildConfig>;
  *         latencyDashboard: ReturnType<typeof readMcpLatencyProcessConfig>['dashboard'];
  *         reload: ReturnType<typeof readMcpReloadProcessConfig>;
+ *         runtimeSourceGeneration: ReturnType<typeof createMcpRuntimeSourceGeneration>;
  *         toolPayload: ReturnType<typeof readMcpToolPayloadAuditConfig>;
  *         validation: ReturnType<typeof readMcpValidationProcessConfig>;
  *         git: ReturnType<typeof createMcpGitProcessConfig>;
@@ -136,6 +139,7 @@ export function createMcpProcessConfig(env = process.env) {
     const latencyRuntime = createMcpLatencyRuntimeConfig(latency, cloudflare);
     const audit = readMcpAuditProcessConfig(env);
     const reload = readMcpReloadProcessConfig(env);
+    const sourceGeneration = createMcpRuntimeSourceGeneration(env);
     const toolPayload = readMcpToolPayloadAuditConfig(env);
     const startupMaintenance = readMcpStartupMaintenanceConfig(env);
     const stateful = readMcpHttpStatefulProcessConfig(env);
@@ -159,7 +163,7 @@ export function createMcpProcessConfig(env = process.env) {
             diagnostics: { devcontainerNetwork, ioCache, latency: latencyRuntime },
             indexing: { autoBuild: indexAutoBuild },
             observability: { audit },
-            runtime: { reload, startupMaintenance },
+            runtime: { reload, sourceGeneration, startupMaintenance },
             validation,
             git,
             repositoryReadCache,
@@ -176,6 +180,7 @@ export function createMcpProcessConfig(env = process.env) {
                 indexAutoBuild,
                 latencyDashboard: latency.dashboard,
                 reload,
+                runtimeSourceGeneration: sourceGeneration,
                 toolPayload,
                 validation,
                 git,

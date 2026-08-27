@@ -243,6 +243,7 @@
         "mcp.process",
         "mcp.registry",
         "mcp.runtime.reload",
+        "mcp.runtime.source-generation",
         "mcp.runtime.startup-maintenance",
         "mcp.server",
         "mcp.transport",
@@ -760,7 +761,24 @@
       "audiences": ["public", "testing"],
       "authorityClasses": ["config-authority", "process-launcher", "public-surface", "testing-surface"],
       "policyHooks": ["config", "cost", "process", "surface"],
-      "allowedDependencies": ["mcp.process", "mcp.workspace", "mcp.workspace.repository"]
+      "allowedDependencies": [
+        "mcp.process",
+        "mcp.runtime.source-generation",
+        "mcp.workspace",
+        "mcp.workspace.repository"
+      ]
+    },
+    {
+      "ownerId": "mcp.runtime.source-generation",
+      "path": "src/copilot/mcp/runtime/source-generation",
+      "parentOwnerId": "mcp.runtime",
+      "kind": "owner",
+      "protectedBoundary": true,
+      "role": "Immutable runtime source-generation identity and controlled-promotion metadata",
+      "audiences": ["public"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": []
     },
     {
       "ownerId": "mcp.runtime.startup-maintenance",
@@ -802,6 +820,7 @@
         "mcp.process",
         "mcp.registry",
         "mcp.runtime.reload",
+        "mcp.runtime.source-generation",
         "mcp.transport",
         "mcp.validation",
         "mcp.workspace",
@@ -882,7 +901,14 @@
         "testing-surface"
       ],
       "policyHooks": ["config", "cost", "process", "state", "surface"],
-      "allowedDependencies": ["mcp.auth", "mcp.observability", "mcp.process", "mcp.protocol", "mcp.workspace"]
+      "allowedDependencies": [
+        "mcp.auth",
+        "mcp.observability",
+        "mcp.process",
+        "mcp.protocol",
+        "mcp.runtime.source-generation",
+        "mcp.workspace"
+      ]
     },
     {
       "ownerId": "mcp.validation",

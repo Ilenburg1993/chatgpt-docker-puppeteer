@@ -8,6 +8,7 @@ import { existsSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync 
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
+import { MCP_RUNTIME_SOURCE_PROMOTION_ENV } from '#copilot/mcp/public/runtime/source-generation';
 import { buildStatefulProcessEnv, ensureStatefulEnvFile } from '#copilot/testing/mcp/transport/http/stateful/bootstrap';
 
 const testEnvPath = 'src/copilot/.ai/mcp/unit-stateful-session.env';
@@ -64,6 +65,10 @@ describe('MCP stateful env manager', () => {
             PATH: process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin',
             LANG: 'C.UTF-8',
             COPILOT_MCP_HTTP_SESSION_TTL_MS: '123456',
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId]: 'mcp-reload-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint]: 'c'.repeat(64),
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath]:
+                'src/copilot/.ai/mcp/promotion/source-barrier.json',
             COPILOT_MCP_STATIC_BEARER_TOKEN: 'parent-static-secret',
             CLOUDFLARE_TUNNEL_TOKEN: 'parent-cloudflare-secret',
             FUTURE_PROVIDER_SUPER_SECRET: 'parent-future-secret',
@@ -76,6 +81,15 @@ describe('MCP stateful env manager', () => {
         assert.equal(env['COPILOT_MCP_HTTP_SESSION_TTL_MS'], '123456');
         assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
         assert.equal(typeof env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'], 'string');
+        assert.equal(
+            env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId],
+            'mcp-reload-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        );
+        assert.equal(env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint], 'c'.repeat(64));
+        assert.equal(
+            env[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath],
+            'src/copilot/.ai/mcp/promotion/source-barrier.json',
+        );
         assert.equal(env['COPILOT_MCP_STATIC_BEARER_TOKEN'], undefined);
         assert.equal(env['CLOUDFLARE_TUNNEL_TOKEN'], undefined);
         assert.equal(env['FUTURE_PROVIDER_SUPER_SECRET'], undefined);

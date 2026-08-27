@@ -546,6 +546,14 @@
       "externalPackages": []
     },
     {
+      "alias": "#copilot/mcp/public/runtime/source-generation",
+      "moduleCount": 2,
+      "maxModuleCount": 3,
+      "sourceBytes": 8914,
+      "maxSourceBytes": 13371,
+      "externalPackages": []
+    },
+    {
       "alias": "#copilot/mcp/public/runtime/startup-maintenance",
       "moduleCount": 687,
       "maxModuleCount": 1031,

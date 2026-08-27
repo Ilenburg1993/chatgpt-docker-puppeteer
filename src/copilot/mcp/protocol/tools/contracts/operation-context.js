@@ -58,6 +58,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
  *     indexAutoBuild?: import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig;
  *     latencyDashboard?: import('#copilot/mcp/public/diagnostics/latency').McpLatencyDashboardPolicy;
  *     reload?: import('#copilot/mcp/public/runtime/reload').McpReloadProcessConfig;
+ *     runtimeSourceGeneration?: import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration;
  *     toolPayload?: import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig;
  *     validation?: import('#copilot/mcp/public/validation').McpValidationProcessConfig;
  *     git?: import('#copilot/mcp/public/workspace/git').McpGitProcessConfig;
@@ -312,6 +313,16 @@ export function requireMcpToolReloadConfig(operationContext) {
 
 /**
  * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration}
+ */
+export function requireMcpToolRuntimeSourceGeneration(operationContext) {
+    const generation = operationContext?.config.runtimeSourceGeneration;
+    if (!generation) throw new TypeError('MCP tool execution requires a runtime source-generation projection.');
+    return generation;
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
  * @returns {import('#copilot/mcp/public/diagnostics/tool-payload').McpToolPayloadAuditConfig}
  */
 export function requireMcpToolPayloadAuditConfig(operationContext) {
@@ -438,6 +449,7 @@ function freezeToolConfig(config) {
         ...(config?.indexAutoBuild ? { indexAutoBuild: config.indexAutoBuild } : {}),
         ...(config?.latencyDashboard ? { latencyDashboard: config.latencyDashboard } : {}),
         ...(config?.reload ? { reload: config.reload } : {}),
+        ...(config?.runtimeSourceGeneration ? { runtimeSourceGeneration: config.runtimeSourceGeneration } : {}),
         ...(config?.toolPayload ? { toolPayload: config.toolPayload } : {}),
         ...(config?.validation ? { validation: config.validation } : {}),
         ...(config?.git ? { git: config.git } : {}),

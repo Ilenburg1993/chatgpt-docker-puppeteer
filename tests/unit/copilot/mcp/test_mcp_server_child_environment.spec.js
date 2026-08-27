@@ -1,5 +1,6 @@
 // @ts-check
 
+import { MCP_RUNTIME_SOURCE_PROMOTION_ENV } from '#copilot/mcp/public/runtime/source-generation';
 import { buildMcpServerChildEnvironment } from '#copilot/testing/mcp/composition/cloudflare-cli';
 import { describe, expect, it } from 'vitest';
 
@@ -11,6 +12,10 @@ describe('MCP server child environment composition', () => {
             COPILOT_MCP_AUTH_MODE: 'oauth',
             COPILOT_MCP_STATIC_BEARER_TOKEN: 'mcp-server-secret',
             COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET: 'session-hash-secret',
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId]: 'mcp-reload-cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint]: 'd'.repeat(64),
+            [MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath]:
+                'src/copilot/.ai/mcp/promotion/source-barrier.json',
             OPENAI_API_KEY: 'openai-provider-secret',
             ANTHROPIC_API_KEY: 'anthropic-provider-secret',
             COPILOT_CONNECTION_TOKEN: 'copilot-model-secret',
@@ -32,6 +37,13 @@ describe('MCP server child environment composition', () => {
         expect(child['COPILOT_MCP_AUTH_MODE']).toBe('oauth');
         expect(child['COPILOT_MCP_STATIC_BEARER_TOKEN']).toBe('mcp-server-secret');
         expect(child['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET']).toBe('session-hash-secret');
+        expect(child[MCP_RUNTIME_SOURCE_PROMOTION_ENV.requestId]).toBe(
+            'mcp-reload-cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        );
+        expect(child[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierFingerprint]).toBe('d'.repeat(64));
+        expect(child[MCP_RUNTIME_SOURCE_PROMOTION_ENV.sourceBarrierManifestPath]).toBe(
+            'src/copilot/.ai/mcp/promotion/source-barrier.json',
+        );
         expect(child['OPENAI_API_KEY']).toBe('openai-provider-secret');
         expect(child['ANTHROPIC_API_KEY']).toBe('anthropic-provider-secret');
         expect(child['COPILOT_CONNECTION_TOKEN']).toBe('copilot-model-secret');

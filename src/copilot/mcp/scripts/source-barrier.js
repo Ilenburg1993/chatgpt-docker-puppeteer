@@ -4,6 +4,7 @@
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
+import { buildMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import {
     captureRepositorySourceBarrier,
     parseRepositorySourceBarrierJson,
@@ -148,11 +149,32 @@ async function verifyExpectedBarrier(host, manifestPath, expectedFingerprint) {
     return { barrier, result };
 }
 
-/** @param {string[]} commandArgs @param {string} workspaceRoot */
-async function runDirectCommand(commandArgs, workspaceRoot) {
+/**
+ * Derive promotion transport from the immutable process-config snapshot rather than re-reading ambient environment.
+ *
+ * @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration} generation
+ */
+function promotionEnvironmentForGeneration(generation) {
+    if (generation.sourceBinding !== 'controlled-promotion') return Object.freeze({});
+    if (
+        !generation.promotionRequestId ||
+        !generation.sourceBarrierFingerprint ||
+        !generation.sourceBarrierManifestPath
+    ) {
+        throw new Error('Controlled MCP source generation is missing its immutable promotion binding.');
+    }
+    return buildMcpRuntimeSourcePromotionEnvironment({
+        requestId: generation.promotionRequestId,
+        sourceBarrierFingerprint: generation.sourceBarrierFingerprint,
+        sourceBarrierManifestPath: generation.sourceBarrierManifestPath,
+    });
+}
+
+/** @param {string[]} commandArgs @param {string} workspaceRoot @param {Readonly<Record<string, string>>} promotionEnvironment */
+async function runDirectCommand(commandArgs, workspaceRoot, promotionEnvironment) {
     const executable = /** @type {string} */ (commandArgs[0]);
     const args = commandArgs.slice(1);
-    const childEnvironment = buildMcpChildEnvironment();
+    const childEnvironment = buildMcpChildEnvironment({ overrides: promotionEnvironment });
     return await new Promise((resolvePromise, rejectPromise) => {
         const child = spawn(executable, args, {
             cwd: workspaceRoot,
@@ -198,7 +220,11 @@ async function main() {
         return;
     }
 
-    const child = await runDirectCommand(input.commandArgs, host.workspace.workspaceRoot);
+    const child = await runDirectCommand(
+        input.commandArgs,
+        host.workspace.workspaceRoot,
+        promotionEnvironmentForGeneration(host.processConfig.runtime.sourceGeneration),
+    );
     const after = await verifyExpectedBarrier(host, input.manifest, expectedFingerprint);
     process.stdout.write(
         `${JSON.stringify({

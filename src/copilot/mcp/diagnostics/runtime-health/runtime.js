@@ -181,6 +181,25 @@ function summarizeIndexStats(stats) {
 }
 
 /**
+ * Keep the default wire projection small while preserving the process epoch and exact controlled-promotion identity.
+ * The detailed runtime-health view exposes the full immutable generation including process timestamps and manifest path.
+ *
+ * @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration} generation
+ */
+function summarizeRuntimeSourceGeneration(generation) {
+    return {
+        runtimeEpochId: generation.runtimeEpochId,
+        sourceBinding: generation.sourceBinding,
+        ...(generation.sourceBinding === 'controlled-promotion'
+            ? {
+                  promotionRequestId: generation.promotionRequestId,
+                  sourceBarrierFingerprint: generation.sourceBarrierFingerprint,
+              }
+            : {}),
+    };
+}
+
+/**
  * @param {Record<string, Record<string, unknown>>} tools
  * @returns {{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }[]}
  */
@@ -303,7 +322,6 @@ function summarizeRuntimeSourceDrift(drift) {
         missingCount: drift['missingCount'] ?? 0,
         newestSourceMtime: drift['newestSourceMtime'] ?? null,
         changedPaths: Array.isArray(drift['changedPaths']) ? drift['changedPaths'] : [],
-        interpretation: drift['interpretation'] ?? null,
     };
 }
 
@@ -617,6 +635,7 @@ function buildEvidenceAwareIoCachePlan(ioRuntime, benchmarkState) {
  * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} repositoryReadCacheConfig
  * @param {import('#copilot/mcp/public/indexing/auto-build').McpIndexAutoBuildConfig} indexAutoBuildConfig
  * @param {import('#copilot/mcp/public/workspace/git').McpGitProcessConfig} gitConfig
+ * @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration} runtimeSourceGeneration
  * @param {import('#copilot/mcp/public/diagnostics/infra-health').McpInfraHealthCapability} infraHealthCapability
  * @param {Readonly<{ readState: () => Record<string, unknown> }> | undefined} httpSessionRuntimeCapability
  * @param {ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>} aiArtifactsCapability
@@ -629,6 +648,7 @@ export async function readMcpRuntimeHealth(
     repositoryReadCacheConfig,
     indexAutoBuildConfig,
     gitConfig,
+    runtimeSourceGeneration,
     infraHealthCapability,
     httpSessionRuntimeCapability,
     aiArtifactsCapability,
@@ -638,6 +658,8 @@ export async function readMcpRuntimeHealth(
     if (!repositoryReadCacheConfig) throw new TypeError('MCP runtime health requires repository read-cache config.');
     if (!indexAutoBuildConfig) throw new TypeError('MCP runtime health requires index auto-build config.');
     if (!gitConfig) throw new TypeError('MCP runtime health requires an explicit Git process config.');
+    if (!runtimeSourceGeneration)
+        throw new TypeError('MCP runtime health requires runtime source-generation identity.');
     if (!infraHealthCapability)
         throw new TypeError('MCP runtime health requires the composed Infra health capability.');
     if (!aiArtifactsCapability)
@@ -771,6 +793,7 @@ export async function readMcpRuntimeHealth(
                 index,
                 indexAutoBuild: summarizeIndexAutoBuild(indexAutoBuild),
                 startupMaintenance,
+                runtimeSourceGeneration: summarizeRuntimeSourceGeneration(runtimeSourceGeneration),
                 runtimeSourceDrift: summarizeRuntimeSourceDrift(runtimeSourceDrift),
                 tunnel: {
                     mode: tunnelConfig.mode,
@@ -852,6 +875,7 @@ export async function readMcpRuntimeHealth(
             indexAutoBuild,
             startupMaintenance,
             lastWorkspaceSmoke,
+            runtimeSourceGeneration,
             runtimeSourceDrift,
             tunnel: {
                 mode: tunnelConfig.mode,

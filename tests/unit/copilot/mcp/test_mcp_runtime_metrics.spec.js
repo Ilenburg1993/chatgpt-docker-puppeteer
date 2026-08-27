@@ -14,6 +14,7 @@ import {
 } from '#copilot/mcp/public/indexing/auto-build';
 import { readMcpMetricsSnapshot, recordMcpToolMetric } from '#copilot/mcp/public/observability';
 import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { buildMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import { resetMcpWorkspaceSmokeSummaryForTests } from '#copilot/testing/mcp/diagnostics/workspace-smoke';
 import { resetMcpIndexAutoBuildStateForTests } from '#copilot/testing/mcp/indexing/auto-build';
 import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
@@ -71,6 +72,59 @@ describe('copilot MCP runtime metrics', () => {
         });
         assert.equal(single.execution.logicalOperations, 1);
         assert.equal(single.execution.batchCalls, 0);
+    });
+
+    it('projects controlled source-generation identity through compact and detailed runtime health', async () => {
+        const promotion = Object.freeze({
+            requestId: 'mcp-reload-22222222-2222-4222-8222-222222222222',
+            sourceBarrierFingerprint: 'c'.repeat(64),
+            sourceBarrierManifestPath: 'src/copilot/.ai/jobs/mcp-promotion-runtime-health.source-barrier.json',
+        });
+        const processHost = createComposedMcpProcessHost({
+            hostId: 'runtime-health-controlled-promotion-process-host',
+            backgroundServices: false,
+            env: {
+                PATH: process.env['PATH'] ?? '/usr/bin',
+                ...buildMcpRuntimeSourcePromotionEnvironment(promotion),
+            },
+        });
+        await processHost.prepare();
+        const operationContext = createMcpToolOperationContext(
+            {
+                mcpReq: {
+                    id: 'runtime-health-controlled-promotion',
+                    method: 'tools/call',
+                    signal: new AbortController().signal,
+                    envelope: { protocol: '2026' },
+                },
+            },
+            {
+                workspace: processHost.workspace,
+                config: processHost.processConfig.toolConfig,
+                capabilities: processHost.toolCapabilities,
+            },
+        );
+        try {
+            const compact = await mcpRuntimeHealthTool.handler({}, operationContext);
+            assert.deepEqual(compact.structuredContent['operationalSignals']?.runtimeSourceGeneration, {
+                runtimeEpochId: processHost.processConfig.runtime.sourceGeneration.runtimeEpochId,
+                sourceBinding: 'controlled-promotion',
+                promotionRequestId: promotion.requestId,
+                sourceBarrierFingerprint: promotion.sourceBarrierFingerprint,
+            });
+
+            const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true }, operationContext);
+            assert.deepEqual(
+                detailed.structuredContent['operationalSignals']?.runtimeSourceGeneration,
+                processHost.processConfig.runtime.sourceGeneration,
+            );
+            assert.equal(
+                detailed.structuredContent['operationalSignals']?.runtimeSourceGeneration?.sourceBarrierManifestPath,
+                promotion.sourceBarrierManifestPath,
+            );
+        } finally {
+            await processHost.dispose();
+        }
     });
 
     it('records per-tool phase averages', () => {
@@ -146,6 +200,10 @@ describe('copilot MCP runtime metrics', () => {
             assert.equal(typeof result.structuredContent['workspaceRoot'], 'string');
             assert.ok(result.structuredContent['operationalSignals']);
             assert.ok(result.structuredContent['operationalSignals'].indexAutoBuild);
+            assert.deepEqual(result.structuredContent['operationalSignals'].runtimeSourceGeneration, {
+                runtimeEpochId: processHost.processConfig.runtime.sourceGeneration.runtimeEpochId,
+                sourceBinding: processHost.processConfig.runtime.sourceGeneration.sourceBinding,
+            });
             assert.equal(typeof result.structuredContent['operationalSignals'].nodeRuntime?.nodeVersion, 'string');
             assert.equal(
                 typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.enabled,
@@ -239,6 +297,10 @@ describe('copilot MCP runtime metrics', () => {
             const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true }, operationContext);
             assert.equal(detailed.isError, undefined);
             assert.equal(detailed.structuredContent?.['detailsAvailable'], undefined);
+            assert.deepEqual(
+                detailed.structuredContent?.['operationalSignals']?.runtimeSourceGeneration,
+                processHost.processConfig.runtime.sourceGeneration,
+            );
             const detailedMetrics = /** @type {Record<string, unknown>} */ (detailed.structuredContent?.['metrics']);
             assert.equal(typeof detailedMetrics['tools'], 'object');
             assert.equal(typeof detailedMetrics['ioCache'], 'object');

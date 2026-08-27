@@ -1,6 +1,7 @@
 // @ts-check
 
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
+import { buildMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import {
     captureRepositorySourceBarrier,
     fingerprintRepositorySourceBarrierEntries,
@@ -194,6 +195,56 @@ describe('repository source barrier', () => {
         assert.equal(result.fingerprint, barrier.fingerprint);
         assert.equal(result.currentFingerprint, barrier.fingerprint);
         assert.equal(result.child.exitCode, 0);
+    });
+
+    it('relays only the exact controlled-promotion binding through the source-barrier child boundary', async () => {
+        const dir = await createTestDir();
+        const file = path.join(dir, 'promotion-child.txt');
+        const manifest = path.join(dir, 'barrier.json');
+        const observedEnvPath = path.join(dir, 'promotion-env.json');
+        await fs.writeFile(file, 'promotion-child\n', 'utf8');
+        const barrier = await captureRepositorySourceBarrier(WORKSPACE, [file]);
+        await fs.writeFile(manifest, `${JSON.stringify(barrier, null, 2)}\n`, 'utf8');
+        const manifestRelative = path.relative(process.cwd(), manifest).split(path.sep).join('/');
+        const promotionEnv = buildMcpRuntimeSourcePromotionEnvironment({
+            requestId: 'mcp-reload-dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            sourceBarrierFingerprint: barrier.fingerprint,
+            sourceBarrierManifestPath: manifestRelative,
+        });
+
+        const child = await execFileAsync(
+            process.execPath,
+            [
+                SOURCE_BARRIER_CLI,
+                'run',
+                '--manifest',
+                manifest,
+                '--expected-fingerprint',
+                barrier.fingerprint,
+                '--',
+                process.execPath,
+                '--input-type=module',
+                '-e',
+                `import fs from 'node:fs'; fs.writeFileSync(process.argv[1], JSON.stringify({ requestId: process.env.COPILOT_MCP_PROMOTION_REQUEST_ID ?? null, fingerprint: process.env.COPILOT_MCP_PROMOTED_SOURCE_FINGERPRINT ?? null, manifestPath: process.env.COPILOT_MCP_PROMOTED_MANIFEST_PATH ?? null, futureSecretPresent: Object.hasOwn(process.env, 'FUTURE_UNKNOWN_SECRET') }));`,
+                observedEnvPath,
+            ],
+            {
+                env: {
+                    ...process.env,
+                    ...promotionEnv,
+                    FUTURE_UNKNOWN_SECRET: 'must-not-cross-source-barrier',
+                },
+            },
+        );
+        const result = JSON.parse(child.stdout.trim());
+        const observed = JSON.parse(await fs.readFile(observedEnvPath, 'utf8'));
+        assert.equal(result.success, true);
+        assert.deepEqual(observed, {
+            requestId: 'mcp-reload-dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            fingerprint: barrier.fingerprint,
+            manifestPath: manifestRelative,
+            futureSecretPresent: false,
+        });
     });
 
     it('source-barrier run detects source mutation performed by the child after the initial verify', async () => {

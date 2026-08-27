@@ -341,6 +341,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/runtime/source-generation",
+      "target": "./src/copilot/mcp/runtime/source-generation/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/runtime/startup-maintenance",
       "target": "./src/copilot/mcp/runtime/startup-maintenance/public/index.js",
       "costTier": "heavy",

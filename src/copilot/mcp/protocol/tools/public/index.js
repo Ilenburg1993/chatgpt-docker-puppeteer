@@ -38,6 +38,7 @@ export {
     requireMcpToolLatencyDashboardConfig,
     requireMcpToolReloadConfig,
     requireMcpToolRepositoryReadCacheConfig,
+    requireMcpToolRuntimeSourceGeneration,
     requireMcpToolRoundTripAnalyticsCapability,
     requireMcpToolSurface,
     requireMcpToolTerminalConfig,

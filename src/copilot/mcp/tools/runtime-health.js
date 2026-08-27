@@ -11,6 +11,7 @@ import {
     requireMcpToolIndexAutoBuildConfig,
     requireMcpToolInfraHealthCapability,
     requireMcpToolRepositoryReadCacheConfig,
+    requireMcpToolRuntimeSourceGeneration,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ export const mcpRuntimeHealthTool = defineMcpRawTool({
                 requireMcpToolRepositoryReadCacheConfig(operationContext),
                 requireMcpToolIndexAutoBuildConfig(operationContext),
                 requireMcpToolGitConfig(operationContext),
+                requireMcpToolRuntimeSourceGeneration(operationContext),
                 requireMcpToolInfraHealthCapability(operationContext),
                 operationContext?.capabilities.httpSessionRuntime,
                 requireMcpToolAiArtifactsCapability(operationContext),
