@@ -20,7 +20,12 @@ import {
     readTerminalSession,
 } from '#copilot/mcp/public/process/terminal';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
-import { okResult, requireMcpToolTerminalConfig, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
+import {
+    okResult,
+    requireMcpToolTerminalConfig,
+    requireMcpToolWorkspace,
+    withResultExecutionHint,
+} from '#copilot/mcp/public/protocol/tools';
 
 const envSchema = z.record(z.string(), z.union([z.string(), z.null()]));
 
@@ -199,8 +204,10 @@ const terminalExecOutputSchema = z.union([
         success: z.boolean(),
         batch: z.literal(true),
         requestCount: z.number().int().min(1),
+        attemptedCount: z.number().int().min(0),
         succeededCount: z.number().int().min(0),
         failedCount: z.number().int().min(0),
+        skippedCount: z.number().int().min(0),
         concurrency: z.number().int().min(1),
         failureMode: z.enum(['best-effort', 'fail-fast']),
         resultBudgetBytes: z.number().int().min(1),
@@ -254,6 +261,7 @@ const terminalSessionReadOutputSchema = z.object({
     events: z.array(terminalEventSchema).optional(),
 });
 
+const MAX_TERMINAL_BATCH_COMMANDS = 32;
 const TERMINAL_EXEC_RESULT_LIMIT_BYTES = 40 * 1024 * 1024;
 const TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES = 12 * 1024 * 1024;
 
@@ -310,7 +318,29 @@ function terminalResult(payload) {
             : {}),
         detail: 'Full bounded terminal data is available in structuredContent.',
     };
-    return okResult(payload, JSON.stringify(compact, null, 2));
+    const result = okResult(payload, JSON.stringify(compact, null, 2));
+    if (payload['batch'] !== true || !Number.isSafeInteger(Number(payload['requestCount']))) return result;
+    const requestCount = Math.max(1, Math.floor(Number(payload['requestCount'])));
+    const rows = Array.isArray(payload['results']) ? payload['results'] : [];
+    const skippedOperations = rows.filter((row) => isRecord(row) && row['skipped'] === true).length;
+    const failedOperations = rows.filter(
+        (row) => isRecord(row) && row['success'] !== true && row['skipped'] !== true,
+    ).length;
+    const truncatedOperations = rows.filter(
+        (row) => isRecord(row) && (row['stdoutTruncated'] === true || row['stderrTruncated'] === true),
+    ).length;
+    return withResultExecutionHint(result, {
+        logicalOperations: requestCount,
+        failedOperations,
+        skippedOperations,
+        mode: `terminal-batch:${String(payload['failureMode'] ?? 'best-effort')}`,
+        batchSize: requestCount,
+        batchCapacity: MAX_TERMINAL_BATCH_COMMANDS,
+        ...(Number.isSafeInteger(Number(payload['resultBudgetBytes']))
+            ? { resultBudgetBytes: Math.max(0, Math.floor(Number(payload['resultBudgetBytes']))) }
+            : {}),
+        truncatedOperations,
+    });
 }
 
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
@@ -334,9 +364,9 @@ export const terminalTools = [
             batch: z
                 .array(commandSpecSchema)
                 .min(1)
-                .max(32)
+                .max(MAX_TERMINAL_BATCH_COMMANDS)
                 .optional()
-                .describe('Execute up to 32 arbitrary commands in one MCP call.'),
+                .describe(`Execute up to ${MAX_TERMINAL_BATCH_COMMANDS} arbitrary commands in one MCP call.`),
             batchConcurrency: z
                 .number()
                 .int()

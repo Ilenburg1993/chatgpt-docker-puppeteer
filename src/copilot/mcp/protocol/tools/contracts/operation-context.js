@@ -10,7 +10,7 @@
  * @module copilot/mcp/protocol/tools/contracts/operation-context
  */
 
-export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
+export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
 
 /**
  * @typedef {'2025' | '2026' | 'unknown'} McpProtocolEra
@@ -31,6 +31,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
  *     version: string;
  *     signal: AbortSignal;
  *     callerSignal: AbortSignal;
+ *     callId?: string;
  *     requestId: string;
  *     method: string;
  *     protocolEra: McpProtocolEra;
@@ -89,6 +90,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.0.0';
  *
  * @typedef {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
+ *     callId?: string;
  *     config?: McpToolConfigProjection;
  *     capabilities?: McpToolCapabilityProjection;
  *     timeoutMs?: number;
@@ -124,6 +126,7 @@ export function createMcpToolOperationContext(serverContext, options) {
         version: MCP_TOOL_OPERATION_CONTEXT_VERSION,
         signal,
         callerSignal,
+        ...(options.callId ? { callId: options.callId } : {}),
         requestId: String(serverContext.mcpReq.id),
         method: serverContext.mcpReq.method,
         protocolEra,

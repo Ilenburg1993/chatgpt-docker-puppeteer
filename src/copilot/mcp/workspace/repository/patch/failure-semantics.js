@@ -64,6 +64,23 @@ export function classifyRepositoryPatchFailure(code, details = {}, failureScope 
     } else if (normalizedCode === 'EEXPECTEDHASH' || normalizedCode === 'ERR_PATH_DENIED') {
         failureClass = 'integrity';
         retryability = normalizedCode === 'EEXPECTEDHASH' ? 'caller-refresh' : 'manual-decision';
+        if (normalizedCode === 'ERR_PATH_DENIED') recoveryRequired = false;
+    } else if (normalizedCode === 'ENOENT') {
+        failureClass = 'target-missing';
+        retryability = 'manual-decision';
+        recoveryRequired = false;
+    } else if (normalizedCode === 'EISDIR' || normalizedCode === 'ENOTDIR') {
+        failureClass = 'target-kind';
+        retryability = 'manual-decision';
+        recoveryRequired = false;
+    } else if (
+        normalizedCode === 'ERR_EMPTY_PATH' ||
+        normalizedCode === 'ERR_NULL_BYTE_PATH' ||
+        normalizedCode === 'ERR_INVALID_PATH'
+    ) {
+        failureClass = 'shape-config';
+        retryability = 'manual-decision';
+        recoveryRequired = false;
     } else if (normalizedCode === 'ERR_PATCH_BATCH_GROUP_ABORTED') {
         failureClass = 'dependency-abort';
         retryability = 'non-retryable';
@@ -114,7 +131,22 @@ export function buildRepositoryPatchNextAction(code, details = {}) {
         return 'The computed patch result is invalid JSON and was not published. Fix new_string or group dependent JSON edits into one atomic same-file batch whose final state parses successfully; no recovery reread is required.';
     }
     if (code === 'ERR_PATH_DENIED') {
-        return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
+        return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason. A reread will not bypass this policy.';
+    }
+    if (code === 'ERR_EMPTY_PATH') {
+        return 'Provide a non-empty workspace-relative target path; no recovery reread is required.';
+    }
+    if (code === 'ERR_NULL_BYTE_PATH') {
+        return 'Remove the null byte from the target path and retry; no recovery reread is required.';
+    }
+    if (code === 'ERR_INVALID_PATH') {
+        return 'Correct the workspace-relative target path according to the returned path-policy reason; no recovery reread is required.';
+    }
+    if (code === 'ENOENT') {
+        return 'The patch target does not exist. Verify the exact path or use the governed create-file workflow when creation is intended; do not retry the unchanged patch.';
+    }
+    if (code === 'EISDIR' || code === 'ENOTDIR') {
+        return 'Patch requires an existing regular-file target. Correct the file/directory path mismatch before retrying; no recovery reread is required.';
     }
     if (code === 'ERR_PATCH_NOT_FOUND') {
         if (

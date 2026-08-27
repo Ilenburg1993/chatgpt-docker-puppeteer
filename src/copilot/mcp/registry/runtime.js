@@ -43,6 +43,7 @@ import { toMcpWorkspaceRelativePath } from '#copilot/mcp/public/workspace';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
+import { buildMcpToolCallAuditCorrelation, scopeMcpToolAuditCapability } from './audit-correlation.js';
 import {
     MCP_TOOL_SURFACE_MODES,
     applyMcpToolSurfacePolicy,
@@ -414,17 +415,32 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
     if (!options.workspace) {
         throw new Error(`MCP tool ${tool.name} cannot execute without a composition-owned workspace capability.`);
     }
+    const callId = randomUUID();
+    const requestMeta =
+        serverContext.mcpReq._meta && typeof serverContext.mcpReq._meta === 'object'
+            ? /** @type {Readonly<Record<string, unknown>>} */ (serverContext.mcpReq._meta)
+            : undefined;
+    const runtimeSourceGeneration = options.toolConfig?.runtimeSourceGeneration;
+    const auditCorrelation = buildMcpToolCallAuditCorrelation({
+        callId,
+        toolName: tool.name,
+        args,
+        ...(requestMeta ? { requestMeta } : {}),
+        ...(runtimeSourceGeneration ? { runtimeSourceGeneration } : {}),
+    });
+    const scopedAudit = scopeMcpToolAuditCapability(options.toolCapabilities?.audit, auditCorrelation);
     const operationContext = createMcpToolOperationContext(serverContext, {
         workspace: options.workspace,
+        callId,
         ...(options.toolConfig ? { config: options.toolConfig } : {}),
         capabilities: {
             ...(options.toolCapabilities ?? {}),
+            ...(scopedAudit ? { audit: scopedAudit } : {}),
             toolSurface: toolSurfaceCapability,
         },
         timeoutMs: registryPolicy.toolTimeoutMs,
     });
     safeRecordMcpToolInteractionStart(tool.name, startedAt);
-    const callId = randomUUID();
     safeRecordMcpHttpToolHandlerStart(tool.name, callId, startedAt);
     const runtimeContext = getMcpToolRuntimeContext(tool);
     const risk = runtimeContext.risk;
@@ -587,6 +603,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
             durationMs,
             isError: result.isError === true,
             risk,
+            ...buildMcpToolResultAuditMetadata(tool.name, result, resultSizeMetric, executionMetric),
         });
         finishPhase('auditCompletion', auditCompletionStartedAt);
         safeRecordMcpToolMetric(tool.name, {
@@ -1562,6 +1579,99 @@ function buildLatencyPulseAuditMetadata(toolName, args) {
  */
 function elapsedMs(startedAt) {
     return Date.now() - startedAt;
+}
+
+/**
+ * Persist only bounded numeric/enum facts about a tool result. This is intentionally not a generic structuredContent
+ * serializer: source text, terminal output and arbitrary nested result fields never enter the audit through this path.
+ *
+ * @param {string} toolName
+ * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
+ * @param {{ strategy?: string; bytes?: number | null; limitBytes?: number } | undefined} resultSizeMetric
+ * @param {ReturnType<typeof getResultExecutionHint> | undefined} executionMetric
+ */
+function buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, executionMetric) {
+    const resultBytes = nonNegativeSafeInteger(resultSizeMetric?.bytes);
+    const textResultBytes = countMcpResultTextBytes(result);
+    const duplicateTextBytes = estimateKnownDuplicateTextBytes(toolName, result, textResultBytes);
+    return {
+        ...(executionMetric
+            ? {
+                  logicalOperations: executionMetric.logicalOperations,
+                  failedOperations: executionMetric.failedOperations ?? 0,
+                  skippedOperations: executionMetric.skippedOperations ?? 0,
+                  ...(executionMetric.mode ? { executionMode: executionMetric.mode } : {}),
+                  ...(executionMetric.batchSize !== undefined ? { batchSize: executionMetric.batchSize } : {}),
+                  ...(executionMetric.batchCapacity !== undefined
+                      ? { batchCapacity: executionMetric.batchCapacity }
+                      : {}),
+                  ...(executionMetric.resultBudgetBytes !== undefined
+                      ? { resultBudgetBytes: executionMetric.resultBudgetBytes }
+                      : {}),
+                  ...(executionMetric.truncatedOperations !== undefined
+                      ? { truncatedOperations: executionMetric.truncatedOperations }
+                      : {}),
+                  ...(executionMetric.continuationRequired === true ? { continuationRequired: true } : {}),
+              }
+            : {}),
+        ...(resultBytes !== null ? { resultBytes } : {}),
+        ...(typeof resultSizeMetric?.strategy === 'string'
+            ? { resultSizeStrategy: resultSizeMetric.strategy.slice(0, 32) }
+            : {}),
+        ...(textResultBytes > 0 ? { textResultBytes } : {}),
+        ...(resultBytes !== null ? { nonTextResultBytes: Math.max(0, resultBytes - textResultBytes) } : {}),
+        ...(duplicateTextBytes > 0 ? { duplicateTextBytes } : {}),
+    };
+}
+
+/**
+ * Testing-only projection of the bounded audit serializer; exported only through #copilot/testing/mcp/registry.
+ * @param {string} toolName
+ * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
+ * @param {{ strategy?: string; bytes?: number | null; limitBytes?: number } | undefined} resultSizeMetric
+ * @param {ReturnType<typeof getResultExecutionHint> | undefined} executionMetric
+ */
+export function buildMcpToolResultAuditMetadataForTests(toolName, result, resultSizeMetric, executionMetric) {
+    return buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, executionMetric);
+}
+
+/** @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result */
+function countMcpResultTextBytes(result) {
+    let bytes = 0;
+    for (const item of Array.isArray(result.content) ? result.content : []) {
+        if (item?.type === 'text' && typeof item.text === 'string') bytes += Buffer.byteLength(item.text, 'utf8');
+    }
+    return bytes;
+}
+
+/**
+ * These equality checks cover the currently proven duplicated single-result forms without serializing arbitrary
+ * structuredContent again. Tree tools use okResult's structured stringify fallback by construction, so their text is
+ * also a duplicate representation of the structured tree.
+ *
+ * @param {string} toolName
+ * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
+ * @param {number} textBytes
+ */
+function estimateKnownDuplicateTextBytes(toolName, result, textBytes) {
+    if (textBytes <= 0) return 0;
+    const text = result.content?.find((item) => item?.type === 'text')?.text;
+    if (typeof text !== 'string') return 0;
+    const structured = result.structuredContent;
+    if (toolName === 'repo_read_file' && typeof structured?.['content'] === 'string') {
+        return structured['content'] === text ? textBytes : 0;
+    }
+    if (toolName === 'repo_search_text' && typeof structured?.['output'] === 'string') {
+        return structured['output'] === text ? textBytes : 0;
+    }
+    if (toolName === 'repo_tree' || toolName === 'repo_root_tree') return textBytes;
+    return 0;
+}
+
+/** @param {unknown} value */
+function nonNegativeSafeInteger(value) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 /**

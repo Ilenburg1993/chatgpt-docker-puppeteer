@@ -97,6 +97,27 @@ function maybeDiffPreview(include, diff) {
 }
 
 /**
+ * Project workspace path-resolution failures through the same stable semantics used by patch-engine failures.
+ *
+ * @param {number} index
+ * @param {unknown} requestedPath
+ * @param {{ reason: string; code: string }} resolved
+ */
+function buildPatchPathResolutionFailure(index, requestedPath, resolved) {
+    const details = { pathResolution: true };
+    return {
+        index,
+        success: false,
+        path: requestedPath ?? null,
+        error: resolved.reason,
+        code: resolved.code,
+        ...classifyRepositoryPatchFailure(resolved.code, details, 'target'),
+        details,
+        nextAction: buildRepositoryPatchNextAction(resolved.code, details),
+    };
+}
+
+/**
  * @param {Record<string, unknown>} operation
  * @param {number} index
  * @returns {Promise<Record<string, unknown>>}
@@ -105,8 +126,7 @@ async function planPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ run
     const resolved = await runtime.workspace.resolveWritePath(String(operation['path'] ?? ''), {
         issueMutableCapability: true,
     });
-    if (!resolved.ok)
-        return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
+    if (!resolved.ok) return buildPatchPathResolutionFailure(index, operation['path'], resolved);
     if (operation['replace_all'] === true && operation['occurrence_index'] !== undefined) {
         return {
             index,
@@ -206,8 +226,7 @@ async function applyPatchBatchOperation(/** @type {RepositoryPatchRuntime} */ ru
     const resolved = await runtime.workspace.resolveWritePath(String(operation['path'] ?? ''), {
         issueMutableCapability: true,
     });
-    if (!resolved.ok)
-        return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
+    if (!resolved.ok) return buildPatchPathResolutionFailure(index, operation['path'], resolved);
     try {
         const patch = await patchResolvedTarget(runtime, resolved, {
             oldString: String(operation['old_string'] ?? ''),
@@ -386,13 +405,7 @@ async function runPatchBatchOperations(/** @type {RepositoryPatchRuntime} */ run
         });
         if (!resolved.ok) {
             for (const entry of group) {
-                results.push({
-                    index: entry.index,
-                    success: false,
-                    path: entry.operation['path'] ?? null,
-                    error: resolved.reason,
-                    code: resolved.code,
-                });
+                results.push(buildPatchPathResolutionFailure(entry.index, entry.operation['path'], resolved));
             }
             if (!dryRun) break;
             continue;

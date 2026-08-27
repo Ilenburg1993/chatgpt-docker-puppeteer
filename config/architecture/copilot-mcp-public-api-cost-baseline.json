@@ -690,6 +690,14 @@
       "externalPackages": []
     },
     {
+      "alias": "#copilot/mcp/public/workflow-policy",
+      "moduleCount": 6,
+      "maxModuleCount": 9,
+      "sourceBytes": 45180,
+      "maxSourceBytes": 67770,
+      "externalPackages": []
+    },
+    {
       "alias": "#copilot/mcp/public/workspace",
       "moduleCount": 3,
       "maxModuleCount": 5,

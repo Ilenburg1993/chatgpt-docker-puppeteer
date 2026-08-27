@@ -237,6 +237,7 @@
     "#copilot/mcp/public/runtime/startup-maintenance": "./src/copilot/mcp/runtime/startup-maintenance/public/index.js",
     "#copilot/mcp/public/server": "./src/copilot/mcp/server/public/index.js",
     "#copilot/mcp/public/tools/catalog": "./src/copilot/mcp/tools/catalog/public/index.js",
+    "#copilot/mcp/public/workflow-policy": "./src/copilot/mcp/workflow-policy/public/index.js",
     "#copilot/mcp/public/transport/http/compat/stateless": "./src/copilot/mcp/transport/http/compat/stateless/public/index.js",
     "#copilot/mcp/public/transport/http/modern": "./src/copilot/mcp/transport/http/modern/public/index.js",
     "#copilot/mcp/public/transport/http/stateful/bootstrap": "./src/copilot/mcp/transport/http/stateful/bootstrap/public/index.js",

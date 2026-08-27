@@ -12,10 +12,11 @@ import {
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
     okResult,
 } from '#copilot/mcp/public/protocol/tools';
+import { MCP_WORKFLOW_POLICY_VERSION, buildMcpWorkflowGuidance } from '#copilot/mcp/public/workflow-policy';
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 62;
+const CAPABILITIES_VERSION = 63;
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
@@ -208,11 +209,11 @@ const IO_GUIDANCE = [
     'Use plan-only tools only when an explicit preview, human inspection or separate approval boundary is useful; governed apply tools revalidate their own preconditions and should not pay an automatic plan round-trip.',
     'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
     `Prefer repo_read_file.batch and repo_search_text.batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxBatchRequests} independent operations, with repo_search_text.contextLines up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxSearchContextLines}. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.`,
-    'Prefer repo_apply_patch_batch directly when exact-string anchors and intent are already known; use repo_patch_batch_plan only when a separate read-only preview or approval boundary adds information.',
+    ...buildMcpWorkflowGuidance(),
     `Use repo_apply_patch_batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchOperations} exact-string patches across up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchTargets} targets and ${Math.floor(MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchInputBytes / (1024 * 1024))} MiB input. Direct apply defaults to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultApplyMode} + ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultFailureMode}: each target is compute-before-write atomic, same-file operations publish together, and independent targets can progress even when another fails. global-preflight is explicit all-target preview gating, not a cross-file transaction. Compact failures report one causal row per failed target plus affected operation indices and bounded recovery evidence.`,
     'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit. Put a sha256 read once on the first same-file operation; it may also be repeated on later operations, and identical supplied hashes are treated as one target-baseline precondition.',
     'Keep repo_apply_patch_batch resultMode=compact by default for low-context success feedback; request detailed only for forensic per-operation hash/line/byte metadata. includeDiffPreview automatically forces detailed output.',
-    'Use repo_apply_file_batch directly for ordered filesystem workflows. Its default is adaptive: create/move-without-overwrite/quarantine sequences use sequential-fast and preserve dependent ordering without a duplicate whole-batch preview; remove_file or overwrite moves default to global-preflight. Explicit applyMode overrides the adaptive choice. Use repo_apply_file_batch_plan only when a separate read-only preview is actually useful.',
+    'repo_apply_file_batch defaults adaptively: create/move-without-overwrite/quarantine sequences use sequential-fast; remove_file or overwrite moves use global-preflight. Explicit applyMode overrides that risk-aware default.',
     'Repository text scripts (.sh/.ps1/.bat/.cmd) are writable source code; editing is not execution. Secret/credential paths, .git/symlink escapes, and opaque native binaries remain blocked by the canonical path policy. Use repo_read_file.sha256 as expectedHash for safe write/patch calls when stale-write detection matters.',
     'Write/create/patch tools accept durability=file-and-directory|file|none. Keep file-and-directory as the default for strongest crash durability; file skips parent-directory fsync; none also skips file flush but still preserves path policy, locks, atomic publish and hash preconditions.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
@@ -225,7 +226,7 @@ const IO_GUIDANCE = [
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use repo_working_set when repeated work is concentrated in a subtree: open defaults to source-first coverage selection, find stays process-local, and refresh defaults to O(delta). Add seedPaths for known causal files or seedSymbols to resolve exact symbols through the local index in the same open call; both stay inside maxFiles. Refresh converges legitimate file removals by shrinking the live set without silent backfill, and contextMode=auto omits empty-delta manifests while keeping changed/removed/failure context inline; use include/omit only when explicitly desired. Use lexical only for explicit historical prefix ordering.',
-    `Use mcp_validation_plan with no suite by default. For one JS/TS gate, use run_copilot_validator validator="unit-focused"; after DevContainer Bash changes use validator="devcontainer-shell", which is fixed to bash -n over the canonical allowlisted scripts and accepts no caller command/path. For several causal gates, use run_copilot_validator.batch so up to ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchRequests} focused/shell/typecheck/lint gates share one MCP round-trip. Validator concurrency is intentionally capped at ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchConcurrency} to protect WSL/runtime headroom. Inline completion means no polling unless a returned wait expires; escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.`,
+    `Validator concurrency remains intentionally capped at ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchConcurrency} to protect WSL/runtime headroom; devcontainer-shell remains fixed to bash -n over canonical allowlisted scripts and accepts no caller command/path.`,
     'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
@@ -246,7 +247,7 @@ const IO_GUIDANCE = [
     'Use mcp_devcontainer_network_posture_audit to distinguish current DNS/control-plane faults from stale DevContainer metadata. The canonical Network Control Plane script is .devcontainer/scripts/network-control-plane-state.sh; lifecycle hooks self-heal an unreadable stale configured path when that canonical script is available. Use mcp_devcontainer_network_control_plane_refresh when only the passive aggregated /tmp state needs regeneration: it accepts no command/path, runs exactly bash <canonical-script> --quiet summary with bounds, performs no external network probes, then returns a fresh posture audit.',
     'Use mcp_post_restart_readiness as a read-only diagnostic fallback when you do not want to refresh connector smoke; it is no longer a mandatory step after a successful smoke refresh.',
     'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; after reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
-    'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep git_stage_plan/git_commit_plan/git_push_plan as granular fallback; governed Git never accepts force, arbitrary remote or arbitrary refspec.',
+    'Governed Git publication never accepts force, arbitrary remote or arbitrary refspec.',
     'Use llmb_live_readiness and llmb_live_runs for read-only Model Gateway live evidence; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
     'LLM-B remains a separate runtime process, but the MCP exposes an allowlisted control/test plane over its canonical live harness.',
@@ -322,6 +323,7 @@ export function buildMcpCapabilitiesSummary(options = {}) {
         capabilitiesVersion: CAPABILITIES_VERSION,
         executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
         executionLimits: MCP_TOOL_EXECUTION_LIMITS,
+        workflowPolicyVersion: MCP_WORKFLOW_POLICY_VERSION,
         advertisedToolCount: advertisedTools.length,
         groupCounts,
         deprecatedCount: DEPRECATED_TOOLS.length,

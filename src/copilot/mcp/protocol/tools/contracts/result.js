@@ -25,6 +25,11 @@
  *     failedOperations?: number;
  *     skippedOperations?: number;
  *     mode?: string;
+ *     batchSize?: number;
+ *     batchCapacity?: number;
+ *     resultBudgetBytes?: number;
+ *     truncatedOperations?: number;
+ *     continuationRequired?: boolean;
  * }} ResultExecutionHint
  */
 
@@ -94,12 +99,28 @@ export function withResultExecutionHint(result, hint) {
         0,
         Math.min(logicalOperations - failedOperations, Math.floor(Number(hint.skippedOperations) || 0)),
     );
+    const batchSize = positiveIntegerOrUndefined(hint.batchSize);
+    const batchCapacityCandidate = positiveIntegerOrUndefined(hint.batchCapacity);
+    const batchCapacity =
+        batchCapacityCandidate !== undefined && (batchSize === undefined || batchCapacityCandidate >= batchSize)
+            ? batchCapacityCandidate
+            : undefined;
+    const truncatedOperations = Math.max(
+        0,
+        Math.min(batchSize ?? logicalOperations, Math.floor(Number(hint.truncatedOperations) || 0)),
+    );
+    const resultBudgetBytes = nonNegativeIntegerOrUndefined(hint.resultBudgetBytes);
     Object.defineProperty(result, RESULT_EXECUTION_HINT_SYMBOL, {
         value: {
             logicalOperations,
             failedOperations,
             skippedOperations,
             mode: typeof hint.mode === 'string' && hint.mode.trim() ? hint.mode.trim().slice(0, 80) : undefined,
+            ...(batchSize !== undefined ? { batchSize } : {}),
+            ...(batchCapacity !== undefined ? { batchCapacity } : {}),
+            ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
+            ...(truncatedOperations > 0 ? { truncatedOperations } : {}),
+            ...(hint.continuationRequired === true ? { continuationRequired: true } : {}),
         },
         enumerable: false,
         configurable: true,
@@ -118,12 +139,37 @@ export function getResultExecutionHint(result) {
     const record = /** @type {Record<string, unknown>} */ (hint);
     const logicalOperations = Number(record['logicalOperations']);
     if (!Number.isFinite(logicalOperations) || logicalOperations < 1) return null;
+    const batchSize = positiveIntegerOrUndefined(record['batchSize']);
+    const batchCapacityCandidate = positiveIntegerOrUndefined(record['batchCapacity']);
+    const batchCapacity =
+        batchCapacityCandidate !== undefined && (batchSize === undefined || batchCapacityCandidate >= batchSize)
+            ? batchCapacityCandidate
+            : undefined;
+    const resultBudgetBytes = nonNegativeIntegerOrUndefined(record['resultBudgetBytes']);
+    const truncatedOperations = nonNegativeIntegerOrUndefined(record['truncatedOperations']);
     return {
         logicalOperations: Math.floor(logicalOperations),
         failedOperations: Math.max(0, Math.floor(Number(record['failedOperations']) || 0)),
         skippedOperations: Math.max(0, Math.floor(Number(record['skippedOperations']) || 0)),
         ...(typeof record['mode'] === 'string' ? { mode: record['mode'] } : {}),
+        ...(batchSize !== undefined ? { batchSize } : {}),
+        ...(batchCapacity !== undefined ? { batchCapacity } : {}),
+        ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
+        ...(truncatedOperations !== undefined ? { truncatedOperations } : {}),
+        ...(record['continuationRequired'] === true ? { continuationRequired: true } : {}),
     };
+}
+
+/** @param {unknown} value */
+function positiveIntegerOrUndefined(value) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : undefined;
+}
+
+/** @param {unknown} value */
+function nonNegativeIntegerOrUndefined(value) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 /**

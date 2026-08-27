@@ -14,7 +14,7 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
     name: 'mcp_round_trip_analytics',
     title: 'MCP round-trip analytics',
     description:
-        'Incrementally sync the append-only MCP audit into a rebuildable SQLite index and return compact round-trip, recovery, preflight and workflow-pressure analytics in the same call.',
+        'Incrementally sync the append-only MCP audit into a rebuildable SQLite index and return completeness-aware temporal pressure, optional lineage-bound transitions/recovery, execution accounting, payload accounting and workflow-pressure analytics in the same call.',
     inputSchema: {
         windowHours: z
             .number()
@@ -67,11 +67,16 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
                 windowMs: report.windowMs,
                 includeSynthetic: report.includeSynthetic,
                 indexedRows: report.indexedRows,
+                completeness: report.completeness,
+                callPairing: report.callPairing,
                 topTransitions: report.topTransitions,
                 sequenceEvidence: report.sequenceEvidence,
                 failures: report.failures,
                 recovery: report.recovery,
                 workflowPressure: report.workflowPressure,
+                executionAccounting: report.executionAccounting,
+                payloadAccounting: report.payloadAccounting,
+                runtimeCohorts: report.runtimeCohorts,
                 optimizationEvidence: report.optimizationEvidence,
                 discontinuities: report.discontinuities,
                 toolStarts: report.toolStarts,

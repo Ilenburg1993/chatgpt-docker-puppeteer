@@ -98,6 +98,16 @@ function compactBatchCallResult(index, result) {
     };
 }
 
+/** @param {Record<string, unknown>[]} results */
+function countRepoBulkContinuationResults(results) {
+    return results.filter(
+        (row) =>
+            row['payloadTruncated'] === true ||
+            row['hasMore'] === true ||
+            (typeof row['nextCursor'] === 'string' && row['nextCursor'].length > 0),
+    ).length;
+}
+
 /** @param {unknown} value */
 function estimateRepoBatchItemBytes(value) {
     try {
@@ -454,6 +464,11 @@ export const repoReadTools = [
                     failedOperations: execution.failedCount,
                     skippedOperations: execution.skippedCount,
                     mode: `read-batch:${execution.failureMode}`,
+                    batchSize: execution.requestCount,
+                    batchCapacity: MAX_REPO_BATCH_REQUESTS,
+                    resultBudgetBytes: bounded.resultBudgetBytes,
+                    truncatedOperations: bounded.payloadTruncatedCount,
+                    continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
                 });
             }
             if (
@@ -621,6 +636,11 @@ export const repoReadTools = [
                 failedOperations: execution.failedCount,
                 skippedOperations: execution.skippedCount,
                 mode: `bulk-inspect:${execution.failureMode}`,
+                batchSize: execution.requestCount,
+                batchCapacity: MAX_REPO_BATCH_REQUESTS,
+                resultBudgetBytes: bounded.resultBudgetBytes,
+                truncatedOperations: bounded.payloadTruncatedCount,
+                continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
             });
         },
     }),
@@ -831,6 +851,11 @@ export const repoReadTools = [
                     failedOperations: execution.failedCount,
                     skippedOperations: execution.skippedCount,
                     mode: `search-batch:${execution.failureMode}`,
+                    batchSize: execution.requestCount,
+                    batchCapacity: MAX_REPO_BATCH_REQUESTS,
+                    resultBudgetBytes: bounded.resultBudgetBytes,
+                    truncatedOperations: bounded.payloadTruncatedCount,
+                    continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
                 });
             }
             if (

@@ -12,6 +12,7 @@ import { buildChatGptConnectorProfile } from '#copilot/mcp/public/connection';
 
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import { okResult } from '#copilot/mcp/public/protocol/tools';
+import { buildMcpSessionWorkflowProjection } from '#copilot/mcp/public/workflow-policy';
 
 /**
  * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
@@ -28,6 +29,7 @@ export const mcpSessionProfileTool = defineMcpRawTool({
 
     handler: async () => {
         const connector = buildChatGptConnectorProfile();
+        const workflows = buildMcpSessionWorkflowProjection();
         return okResult({
             success: true,
             profile: 'chatgpt-max-autonomy-permanent-cloudflare-oauth',
@@ -41,33 +43,13 @@ export const mcpSessionProfileTool = defineMcpRawTool({
             recommendedFirstCalls: ['repo_status'],
             operatingRule:
                 'After repo_status, call the task-specific repo/git tool directly. Run infrastructure diagnostics only when a restart, connector/network change, error, or explicit investigation makes them relevant.',
+            workflowPolicyVersion: workflows.workflowPolicyVersion,
             taskRouting: {
                 navigate: ['repo_search_text', 'repo_read_file', 'repo_file_outline', 'repo_symbol_search'],
                 inspectState: ['repo_status', 'git_diff'],
-                patch: ['repo_apply_patch_batch', 'repo_patch_batch_plan'],
-                fileBatch: ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
-                validate: ['mcp_validation_plan', 'run_copilot_validator', 'job_get_summary'],
+                ...workflows.taskRouting,
             },
-            preferredWriteWorkflows: [
-                {
-                    task: 'patch',
-                    flow: [
-                        'repo_apply_patch_batch dryRun=false confirmBatch=true when anchors/intent are already known; default per-target-fast+best-effort preserves atomicity per target and independent progress',
-                        'use applyMode=global-preflight only when all-target preview gating is deliberately desired; repo_patch_batch_plan only when a separate preview adds information',
-                    ],
-                },
-                {
-                    task: 'file-batch',
-                    flow: [
-                        'repo_apply_file_batch dryRun=false confirmBatch=true (adaptive: safe sequences sequential-fast; delete/overwrite global-preflight)',
-                        'repo_apply_file_batch_plan only when an explicit preview adds information',
-                    ],
-                },
-                {
-                    task: 'validate',
-                    flow: ['mcp_validation_plan', 'run_copilot_validator unit-focused when causal', 'job_get_summary'],
-                },
-            ],
+            preferredWriteWorkflows: workflows.preferredWriteWorkflows,
             diagnosticsOnDemand: {
                 runtime: ['mcp_runtime_health', 'mcp_latency_dashboard'],
                 afterRestart: ['mcp_post_restart_readiness'],

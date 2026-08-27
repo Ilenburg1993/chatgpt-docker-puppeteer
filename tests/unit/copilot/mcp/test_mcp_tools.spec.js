@@ -14,8 +14,13 @@ import { configureApplicationInfraSqliteProvider, getApplicationInfraRuntime } f
 import { ensureIoIndexSchema } from '#copilot/infra/public/testing/indexing/sqlite';
 import { createComposedMcpProcessHost } from '#copilot/mcp/public/composition/process-host';
 import { recordMcpToolMetric } from '#copilot/mcp/public/observability';
-import { createMcpToolOperationContext } from '#copilot/mcp/public/protocol/tools';
+import { createMcpToolOperationContext, getResultExecutionHint } from '#copilot/mcp/public/protocol/tools';
 import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import {
+    MCP_WORKFLOW_POLICY_VERSION,
+    buildMcpWorkflowStatusProjection,
+    readMcpWorkflowPolicy,
+} from '#copilot/mcp/public/workflow-policy';
 import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
 import { resetMcpMetricsForTests } from '#copilot/testing/mcp/observability';
 import {
@@ -132,6 +137,79 @@ describe('copilot MCP tools', () => {
             assert.equal(denied.code, 'ERR_PATH_DENIED');
             assert.equal(typeof denied.hint, 'string');
         }
+    });
+
+    it('canonical workflow guidance surfaces share one direct-first policy', async () => {
+        const policy = readMcpWorkflowPolicy();
+        const expectedStatus = buildMcpWorkflowStatusProjection();
+        const session = await findTool('mcp_session_profile').handler({});
+        const status = await findTool('mcp_tools_status').handler({});
+        const capabilities = await findTool('mcp_capabilities_summary').handler({});
+        const sessionStructured = /** @type {Record<string, any>} */ (session.structuredContent);
+        const statusStructured = /** @type {Record<string, any>} */ (status.structuredContent);
+        const capabilityStructured = /** @type {Record<string, any>} */ (capabilities.structuredContent);
+
+        assert.equal(sessionStructured['workflowPolicyVersion'], MCP_WORKFLOW_POLICY_VERSION);
+        assert.equal(statusStructured['approvalFrictionProfile']['workflowPolicyVersion'], MCP_WORKFLOW_POLICY_VERSION);
+        assert.equal(capabilityStructured['workflowPolicyVersion'], MCP_WORKFLOW_POLICY_VERSION);
+        assert.equal(sessionStructured['taskRouting']['validate'][0], policy.validation.happyPathTool);
+        assert.equal(sessionStructured['taskRouting']['validate'][1], policy.validation.planTool);
+        assert.deepEqual(statusStructured['approvalFrictionProfile']['planFirstWorkflows'], []);
+        assert.deepEqual(
+            statusStructured['approvalFrictionProfile']['escalationOnlyPlans'],
+            expectedStatus.escalationOnlyPlans,
+        );
+        const validationWorkflow = sessionStructured['preferredWriteWorkflows'].find(
+            (workflow) => workflow['task'] === 'validate',
+        );
+        assert.ok(validationWorkflow);
+        assert.match(String(validationWorkflow['flow'][0]), /run_copilot_validator directly/u);
+        assert.match(String(validationWorkflow['flow'][1]), /mcp_validation_plan only/u);
+    });
+
+    it('terminal_exec batch exposes logical-operation accounting including fail-fast skips', async () => {
+        const tool = findTool('terminal_exec');
+        const success = await tool.handler({
+            batch: Array.from({ length: 5 }, (_, index) => ({ command: `printf 'batch-${index}'` })),
+            batchConcurrency: 2,
+            batchFailureMode: 'best-effort',
+        });
+        const successHint = getResultExecutionHint(success);
+        assert.equal(successHint?.logicalOperations, 5);
+        assert.equal(successHint?.failedOperations, 0);
+        assert.equal(successHint?.skippedOperations, 0);
+        assert.equal(successHint?.batchSize, 5);
+        assert.equal(successHint?.batchCapacity, 32);
+        assert.equal(successHint?.mode, 'terminal-batch:best-effort');
+
+        const failFast = await tool.handler({
+            batch: [{ command: 'exit 7' }, { command: "printf 'must-skip-1'" }, { command: "printf 'must-skip-2'" }],
+            batchConcurrency: 1,
+            batchFailureMode: 'fail-fast',
+        });
+        const failFastHint = getResultExecutionHint(failFast);
+        assert.equal(failFastHint?.logicalOperations, 3);
+        assert.equal(failFastHint?.failedOperations, 1);
+        assert.equal(failFastHint?.skippedOperations, 2);
+        assert.equal(failFastHint?.batchSize, 3);
+        assert.equal(failFastHint?.mode, 'terminal-batch:fail-fast');
+    });
+
+    it('repo_apply_patch path denial uses the shared failure taxonomy and no-reread recovery semantics', async () => {
+        const tool = findTool('repo_apply_patch');
+        const result = await tool.handler({
+            path: '../package.json',
+            old_string: 'not-material',
+            new_string: 'not-material-either',
+        });
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(result.isError, true);
+        assert.equal(structured['code'], 'ERR_PATH_DENIED');
+        const details = /** @type {Record<string, unknown>} */ (structured['details']);
+        assert.equal(details['failureClass'], 'integrity');
+        assert.equal(details['retryability'], 'manual-decision');
+        assert.equal(details['recoveryRequired'], false);
+        assert.match(String(details['nextAction'] ?? ''), /reread will not bypass/i);
     });
 
     it('repo_read_file returns structured content and text content', async () => {
@@ -1027,7 +1105,7 @@ describe('copilot MCP tools', () => {
         assert.ok(ioGuidance.length > /** @type {string[]} */ (structured['ioGuidance']).length);
         assert.ok(ioGuidance.some((entry) => entry.includes('up to 64 independent operations')));
         assert.ok(ioGuidance.some((entry) => entry.includes('up to 128 exact-string patches across up to 64 targets')));
-        assert.ok(ioGuidance.some((entry) => entry.includes('concurrency is intentionally capped at 1')));
+        assert.ok(ioGuidance.some((entry) => entry.includes('intentionally capped at 1')));
         assert.equal(
             ioGuidance.some((entry) => entry.includes('use 2 only for genuinely independent gates')),
             false,

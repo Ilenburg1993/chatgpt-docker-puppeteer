@@ -30,6 +30,7 @@ const MAX_SUMMARY_ROWS = 100_000;
  *     chunkBytes?: number;
  *     maxChunks?: number;
  *     retentionMs?: number;
+ *     maxSummaryRows?: number;
  *     now?: () => number;
  * }} options
  */
@@ -48,11 +49,18 @@ export function createMcpRoundTripAnalytics(options) {
         90 * 24 * 60 * 60 * 1000,
     );
     const now = options.now ?? Date.now;
+    const maxSummaryRows = boundedInteger(options.maxSummaryRows, MAX_SUMMARY_ROWS, 1, MAX_SUMMARY_ROWS);
     ensureSchema(db);
 
     const insertEvent = db.prepare(`
         INSERT INTO ${EVENT_TABLE} (
-            source_identity, source_offset, ts_ms, event, tool, duration_ms, is_error, code,
+            source_identity, source_offset, ts_ms, event, tool,
+            call_id, trace_key, trace_context_state, target_precision, target_keys_json,
+            runtime_epoch_id, runtime_source_binding, runtime_source_fingerprint,
+            duration_ms, is_error, code,
+            logical_operations, failed_operations, skipped_operations, execution_mode,
+            batch_size, batch_capacity, result_budget_bytes, truncated_operations, continuation_required,
+            result_bytes, result_size_strategy, text_result_bytes, non_text_result_bytes, duplicate_text_bytes,
             failure_class, retryability, causal_by_code_json, failure_class_counts_json, retryability_counts_json,
             recovery_required, inline_next_action_provided, inline_next_action_target_count,
             inline_recovery_anchor_provided, inline_recovery_anchor_target_count,
@@ -60,7 +68,13 @@ export function createMcpRoundTripAnalytics(options) {
             causal_failure_count, aborted_operation_count, recovery_required_target_count,
             convergence_candidate_count, synthetic
         ) VALUES (
-            @sourceIdentity, @sourceOffset, @tsMs, @event, @tool, @durationMs, @isError, @code,
+            @sourceIdentity, @sourceOffset, @tsMs, @event, @tool,
+            @callId, @traceKey, @traceContextState, @targetPrecision, @targetKeysJson,
+            @runtimeEpochId, @runtimeSourceBinding, @runtimeSourceFingerprint,
+            @durationMs, @isError, @code,
+            @logicalOperations, @failedOperations, @skippedOperations, @executionMode,
+            @batchSize, @batchCapacity, @resultBudgetBytes, @truncatedOperations, @continuationRequired,
+            @resultBytes, @resultSizeStrategy, @textResultBytes, @nonTextResultBytes, @duplicateTextBytes,
             @failureClass, @retryability, @causalByCodeJson, @failureClassCountsJson, @retryabilityCountsJson,
             @recoveryRequired, @inlineNextActionProvided, @inlineNextActionTargetCount,
             @inlineRecoveryAnchorProvided, @inlineRecoveryAnchorTargetCount,
@@ -72,9 +86,31 @@ export function createMcpRoundTripAnalytics(options) {
             ts_ms = excluded.ts_ms,
             event = excluded.event,
             tool = excluded.tool,
+            call_id = excluded.call_id,
+            trace_key = excluded.trace_key,
+            trace_context_state = excluded.trace_context_state,
+            target_precision = excluded.target_precision,
+            target_keys_json = excluded.target_keys_json,
+            runtime_epoch_id = excluded.runtime_epoch_id,
+            runtime_source_binding = excluded.runtime_source_binding,
+            runtime_source_fingerprint = excluded.runtime_source_fingerprint,
             duration_ms = excluded.duration_ms,
             is_error = excluded.is_error,
             code = excluded.code,
+            logical_operations = excluded.logical_operations,
+            failed_operations = excluded.failed_operations,
+            skipped_operations = excluded.skipped_operations,
+            execution_mode = excluded.execution_mode,
+            batch_size = excluded.batch_size,
+            batch_capacity = excluded.batch_capacity,
+            result_budget_bytes = excluded.result_budget_bytes,
+            truncated_operations = excluded.truncated_operations,
+            continuation_required = excluded.continuation_required,
+            result_bytes = excluded.result_bytes,
+            result_size_strategy = excluded.result_size_strategy,
+            text_result_bytes = excluded.text_result_bytes,
+            non_text_result_bytes = excluded.non_text_result_bytes,
+            duplicate_text_bytes = excluded.duplicate_text_bytes,
             failure_class = excluded.failure_class,
             retryability = excluded.retryability,
             causal_by_code_json = excluded.causal_by_code_json,
@@ -217,20 +253,14 @@ export function createMcpRoundTripAnalytics(options) {
         const top = boundedInteger(summaryOptions.top, 20, 1, 100);
         const includeSynthetic = summaryOptions.includeSynthetic === true;
         const cutoff = now() - windowMs;
-        const rows = db
-            .prepare(
-                `SELECT * FROM ${EVENT_TABLE}
-                 WHERE ts_ms >= ? ${includeSynthetic ? '' : 'AND synthetic = 0'}
-                 ORDER BY ts_ms ASC, id ASC
-                 LIMIT ?`,
-            )
-            .all(cutoff, MAX_SUMMARY_ROWS);
+        const window = readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxSummaryRows);
         return {
             ingestion,
-            ...summarizeMcpRoundTripRows(/** @type {Record<string, unknown>[]} */ (rows), {
+            ...summarizeMcpRoundTripRows(window.rows, {
                 windowMs,
                 top,
                 includeSynthetic,
+                completeness: window.completeness,
             }),
         };
     }
@@ -294,6 +324,7 @@ export function createMcpRoundTripAnalyticsCapability(readDatabase, audit) {
  *     windowMs?: number;
  *     top?: number;
  *     includeSynthetic?: boolean;
+ *     maxSummaryRows?: number;
  *     now?: () => number;
  * }} [options]
  */
@@ -302,6 +333,7 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
     const windowMs = boundedInteger(options.windowMs, DEFAULT_WINDOW_MS, 60_000, 14 * 24 * 60 * 60 * 1000);
     const top = boundedInteger(options.top, 20, 1, 100);
     const includeSynthetic = options.includeSynthetic === true;
+    const maxSummaryRows = boundedInteger(options.maxSummaryRows, MAX_SUMMARY_ROWS, 1, MAX_SUMMARY_ROWS);
     if (!db) return buildUnavailableRoundTripSnapshot(windowMs, includeSynthetic, 'database-capability-unavailable');
     const exists = db
         .prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name=? LIMIT 1")
@@ -314,21 +346,65 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
         );
     }
     const cutoff = (options.now ?? Date.now)() - windowMs;
-    const rows = db
-        .prepare(
-            `SELECT * FROM ${EVENT_TABLE}
-             WHERE ts_ms >= ? ${includeSynthetic ? '' : 'AND synthetic = 0'}
-             ORDER BY ts_ms ASC, id ASC
-             LIMIT ?`,
-        )
-        .all(cutoff, MAX_SUMMARY_ROWS);
+    const window = readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxSummaryRows);
     return {
         available: true,
-        ...summarizeMcpRoundTripRows(/** @type {Record<string, unknown>[]} */ (rows), {
+        ...summarizeMcpRoundTripRows(window.rows, {
             windowMs,
             top,
             includeSynthetic,
+            completeness: window.completeness,
         }),
+    };
+}
+
+/**
+ * Read a complete window when it fits the bounded row budget; otherwise keep the newest bounded tail and explicitly
+ * publish incompleteness. Silent prefix truncation is never allowed.
+ *
+ * @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db
+ * @param {number} cutoff
+ * @param {boolean} includeSynthetic
+ * @param {number} maxRows
+ */
+function readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxRows) {
+    const syntheticPredicate = includeSynthetic ? '' : 'AND synthetic = 0';
+    const countRow = /** @type {Record<string, unknown> | undefined} */ (
+        db.prepare(`SELECT COUNT(*) AS count FROM ${EVENT_TABLE} WHERE ts_ms >= ? ${syntheticPredicate}`).get(cutoff)
+    );
+    const rowsEligible = Math.max(0, Number(countRow?.['count'] ?? 0));
+    const truncated = rowsEligible > maxRows;
+    const rows = /** @type {Record<string, unknown>[]} */ (
+        truncated
+            ? db
+                  .prepare(
+                      `SELECT * FROM (
+                           SELECT * FROM ${EVENT_TABLE}
+                           WHERE ts_ms >= ? ${syntheticPredicate}
+                           ORDER BY ts_ms DESC, id DESC
+                           LIMIT ?
+                       ) ORDER BY ts_ms ASC, id ASC`,
+                  )
+                  .all(cutoff, maxRows)
+            : db
+                  .prepare(
+                      `SELECT * FROM ${EVENT_TABLE}
+                       WHERE ts_ms >= ? ${syntheticPredicate}
+                       ORDER BY ts_ms ASC, id ASC`,
+                  )
+                  .all(cutoff)
+    );
+    const rowsAnalyzed = rows.length;
+    return {
+        rows,
+        completeness: {
+            rowsEligible,
+            rowsAnalyzed,
+            maxRows,
+            truncated,
+            selection: truncated ? 'newest-bounded-tail' : 'complete-window',
+            coverageRatio: rowsEligible > 0 ? Number((rowsAnalyzed / rowsEligible).toFixed(6)) : 1,
+        },
     };
 }
 
@@ -349,9 +425,31 @@ function ensureSchema(db) {
             ts_ms INTEGER NOT NULL,
             event TEXT NOT NULL,
             tool TEXT,
+            call_id TEXT,
+            trace_key TEXT,
+            trace_context_state TEXT,
+            target_precision TEXT,
+            target_keys_json TEXT,
+            runtime_epoch_id TEXT,
+            runtime_source_binding TEXT,
+            runtime_source_fingerprint TEXT,
             duration_ms INTEGER,
             is_error INTEGER,
             code TEXT,
+            logical_operations INTEGER,
+            failed_operations INTEGER,
+            skipped_operations INTEGER,
+            execution_mode TEXT,
+            batch_size INTEGER,
+            batch_capacity INTEGER,
+            result_budget_bytes INTEGER,
+            truncated_operations INTEGER,
+            continuation_required INTEGER,
+            result_bytes INTEGER,
+            result_size_strategy TEXT,
+            text_result_bytes INTEGER,
+            non_text_result_bytes INTEGER,
+            duplicate_text_bytes INTEGER,
             failure_class TEXT,
             retryability TEXT,
             causal_by_code_json TEXT,
@@ -380,6 +478,11 @@ function ensureSchema(db) {
         CREATE INDEX IF NOT EXISTS idx_mcp_round_trip_events_event_tool ON ${EVENT_TABLE}(event, tool, ts_ms);
     `);
     ensureRoundTripEventColumns(db);
+    db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_mcp_round_trip_events_call_id ON ${EVENT_TABLE}(call_id, ts_ms);
+        CREATE INDEX IF NOT EXISTS idx_mcp_round_trip_events_trace_key ON ${EVENT_TABLE}(trace_key, ts_ms);
+        CREATE INDEX IF NOT EXISTS idx_mcp_round_trip_events_runtime_epoch ON ${EVENT_TABLE}(runtime_epoch_id, ts_ms);
+    `);
 }
 
 /** @param {import('#copilot/infra/public/database/sqlite').SqliteDatabasePort} db */
@@ -391,6 +494,28 @@ function ensureRoundTripEventColumns(db) {
     );
     /** @type {readonly (readonly [string, string])[]} */
     const additions = [
+        ['call_id', 'TEXT'],
+        ['trace_key', 'TEXT'],
+        ['trace_context_state', 'TEXT'],
+        ['target_precision', 'TEXT'],
+        ['target_keys_json', 'TEXT'],
+        ['runtime_epoch_id', 'TEXT'],
+        ['runtime_source_binding', 'TEXT'],
+        ['runtime_source_fingerprint', 'TEXT'],
+        ['logical_operations', 'INTEGER'],
+        ['failed_operations', 'INTEGER'],
+        ['skipped_operations', 'INTEGER'],
+        ['execution_mode', 'TEXT'],
+        ['batch_size', 'INTEGER'],
+        ['batch_capacity', 'INTEGER'],
+        ['result_budget_bytes', 'INTEGER'],
+        ['truncated_operations', 'INTEGER'],
+        ['continuation_required', 'INTEGER'],
+        ['result_bytes', 'INTEGER'],
+        ['result_size_strategy', 'TEXT'],
+        ['text_result_bytes', 'INTEGER'],
+        ['non_text_result_bytes', 'INTEGER'],
+        ['duplicate_text_bytes', 'INTEGER'],
         ['causal_by_code_json', 'TEXT'],
         ['failure_class_counts_json', 'TEXT'],
         ['retryability_counts_json', 'TEXT'],

@@ -19,6 +19,7 @@ import {
     requireMcpToolPayloadAuditConfig,
     requireMcpToolSurface,
 } from '#copilot/mcp/public/protocol/tools';
+import { buildMcpWorkflowStatusProjection } from '#copilot/mcp/public/workflow-policy';
 
 const NEVER_REMEMBER_APPROVAL_TOOLS = Object.freeze(['job_cancel']);
 
@@ -107,13 +108,7 @@ function buildApprovalFrictionProfile(summaries) {
             ].includes(name),
         ),
         neverRememberApproval: manual,
-        directBatchWorkflows: [
-            ['repo_apply_patch_batch', 'repo_patch_batch_plan'],
-            ['repo_apply_file_batch', 'repo_apply_file_batch_plan'],
-            ['run_copilot_validator', 'mcp_validation_plan'],
-        ],
-        planFirstWorkflows: [],
-        escalationOnlyPlans: ['mcp_validation_plan'],
+        ...buildMcpWorkflowStatusProjection(),
     };
 }
 

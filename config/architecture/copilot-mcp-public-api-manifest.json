@@ -431,6 +431,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/workflow-policy",
+      "target": "./src/copilot/mcp/workflow-policy/public/index.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/workspace",
       "target": "./src/copilot/mcp/workspace/public/index.js",
       "costTier": "micro",

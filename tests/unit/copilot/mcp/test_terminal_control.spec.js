@@ -211,6 +211,28 @@ describe('MCP terminal control plane', () => {
         );
     });
 
+    it('reports fail-fast skipped commands explicitly instead of leaving sparse batch holes', async () => {
+        const result = asRecord(
+            await executeTerminalCommandBatchForTest(
+                [{ command: 'exit 7' }, { command: "printf 'must-skip-1'" }, { command: "printf 'must-skip-2'" }],
+                { concurrency: 1, failureMode: 'fail-fast' },
+            ),
+        );
+        assert.equal(result['success'], false);
+        assert.equal(result['requestCount'], 3);
+        assert.equal(result['attemptedCount'], 1);
+        assert.equal(result['succeededCount'], 0);
+        assert.equal(result['failedCount'], 1);
+        assert.equal(result['skippedCount'], 2);
+        const rows = asArray(result['results']).map(asRecord);
+        assert.equal(rows.length, 3);
+        assert.equal(rows[0]?.['skipped'], undefined);
+        assert.equal(rows[1]?.['skipped'], true);
+        assert.equal(rows[2]?.['skipped'], true);
+        assert.equal(rows[1]?.['reason'], 'fail-fast-aborted');
+        assert.equal(rows[2]?.['reason'], 'fail-fast-aborted');
+    });
+
     it('enforces an aggregate retained-output budget across terminal batches', async () => {
         const result = asRecord(
             await executeTerminalCommandBatchForTest(

@@ -251,16 +251,21 @@ export async function executeTerminalCommandBatch(commands, runtime, options = {
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, commands.length) }, () => worker()));
     const skippedReason = executionRuntime.signal?.aborted === true ? 'request-cancelled' : 'fail-fast-aborted';
-    const finalized = results.map(
-        (result, index) => result ?? { index, success: false, skipped: true, reason: skippedReason },
+    const finalized = Array.from(
+        { length: commands.length },
+        (_, index) => results[index] ?? { index, success: false, skipped: true, reason: skippedReason },
     );
     const succeededCount = finalized.filter((result) => result['success'] === true).length;
+    const skippedCount = finalized.filter((result) => result['skipped'] === true).length;
+    const failedCount = finalized.filter((result) => result['success'] !== true && result['skipped'] !== true).length;
     return {
         success: succeededCount === commands.length,
         batch: true,
         requestCount: commands.length,
+        attemptedCount: commands.length - skippedCount,
         succeededCount,
-        failedCount: commands.length - succeededCount,
+        failedCount,
+        skippedCount,
         concurrency,
         failureMode,
         resultBudgetBytes,

@@ -45,14 +45,14 @@ function compactRoundTripTrend(snapshot) {
         available: snapshot.available,
         windowMs: snapshot.windowMs,
         indexedRows: snapshot.indexedRows,
+        completeness: snapshot.completeness,
         recovery: {
-            traceCount: recovery.traceCount,
-            withInspectionCount: recovery.withInspectionCount,
-            roundTrips: recovery.roundTrips,
-            totalGapMs: recovery.totalGapMs,
+            temporalPressure: recovery.temporalPressure,
+            lineageBound: recovery.lineageBound,
             inlineNextActionCoverage: snapshot.failures.inlineNextActionCoverage,
         },
         recurringTransitionCount: snapshot.sequenceEvidence.recurringTransitionCount,
+        lineageBoundTransitionCount: snapshot.sequenceEvidence.lineageBoundTransitionCount,
         workflowPressure: {
             planThenApplyCount: pressure.planThenApplyCount,
             validatorPollCount: pressure.validatorPollCount,
@@ -76,13 +76,33 @@ function compactRoundTripTrend(snapshot) {
 
 /** @param {ReturnType<typeof readMcpRoundTripAnalyticsSnapshot>} snapshot */
 function compactRoundTripAnalytics(snapshot) {
-    return {
+    const completeness = {
+        rowsEligible: snapshot.completeness.rowsEligible,
+        rowsAnalyzed: snapshot.completeness.rowsAnalyzed,
+        truncated: snapshot.completeness.truncated,
+        coverageRatio: snapshot.completeness.coverageRatio,
+    };
+    const identity = {
         available: snapshot.available,
         schemaVersion: snapshot.schemaVersion,
         normalizerVersion: snapshot.normalizerVersion,
         authority: snapshot.authority,
         windowMs: snapshot.windowMs,
         indexedRows: snapshot.indexedRows,
+        completeness,
+        topTransitions: [],
+        lineageKnownRate: snapshot.sequenceEvidence.lineageKnownRate,
+    };
+    if (!snapshot.available) return identity;
+    return {
+        ...identity,
+        lineageContext: snapshot.lineageContext,
+        callPairing: {
+            pairedCallCount: snapshot.callPairing.pairedCallCount,
+            orphanStartCount: snapshot.callPairing.orphanStartCount,
+            orphanTerminalCount: snapshot.callPairing.orphanTerminalCount,
+            pairingCoverage: snapshot.callPairing.pairingCoverage,
+        },
         topTransitions: snapshot.topTransitions.slice(0, 2).map((row) => ({
             from: row.from,
             to: row.to,
@@ -91,15 +111,46 @@ function compactRoundTripAnalytics(snapshot) {
             p50GapMs: row.p50GapMs,
         })),
         recovery: {
-            traceCount: snapshot.recovery.traceCount,
-            withInspectionCount: snapshot.recovery.withInspectionCount,
-            roundTrips: snapshot.recovery.roundTrips,
-            totalGapMs: snapshot.recovery.totalGapMs,
+            temporalPressure: {
+                traceCount: snapshot.recovery.temporalPressure.traceCount,
+                roundTrips: snapshot.recovery.temporalPressure.roundTrips,
+                totalGapMs: snapshot.recovery.temporalPressure.totalGapMs,
+            },
+            lineageBound: {
+                traceCount: snapshot.recovery.lineageBound.traceCount,
+                roundTrips: snapshot.recovery.lineageBound.roundTrips,
+                totalGapMs: snapshot.recovery.lineageBound.totalGapMs,
+                sameTargetTraceCount: snapshot.recovery.lineageBound.sameTargetTraceCount,
+                pendingCandidateCount: snapshot.recovery.lineageBound.pendingCandidateCount,
+            },
             inlineNextActionCoverage: snapshot.failures.inlineNextActionCoverage,
             inlineRecoveryAnchorCoverage: snapshot.failures.inlineRecoveryAnchorCoverage,
         },
+        executionAccounting: {
+            accountedCalls: snapshot.executionAccounting.accountedCalls,
+            accountingCoverageRate: snapshot.executionAccounting.accountingCoverageRate,
+            logicalOperations: snapshot.executionAccounting.logicalOperations,
+            coalescedLogicalOperations: snapshot.executionAccounting.coalescedLogicalOperations,
+            batchCalls: snapshot.executionAccounting.batchCalls,
+            saturatedBatchCalls: snapshot.executionAccounting.saturatedBatchCalls,
+            truncatedOperations: snapshot.executionAccounting.truncatedOperations,
+            continuationCalls: snapshot.executionAccounting.continuationCalls,
+            repeatAfterBatch: snapshot.executionAccounting.repeatAfterBatch,
+        },
+        payloadAccounting: {
+            heavyResultThresholdBytes: snapshot.payloadAccounting.heavyResultThresholdBytes,
+            heavyResultFollowups: snapshot.payloadAccounting.heavyResultFollowups,
+            byTool: snapshot.payloadAccounting.byTool.slice(0, 3),
+        },
+        runtimeCohorts: {
+            generationMixDetected: snapshot.runtimeCohorts.generationMixDetected,
+            knownCohortCount: snapshot.runtimeCohorts.knownCohortCount,
+            unknownCallCount: snapshot.runtimeCohorts.unknownCallCount,
+        },
         sequenceEvidence: {
             recurringTransitionCount: snapshot.sequenceEvidence.recurringTransitionCount,
+            lineageBoundTransitionCount: snapshot.sequenceEvidence.lineageBoundTransitionCount,
+            lineageKnownRate: snapshot.sequenceEvidence.lineageKnownRate,
             recurringTransitions: snapshot.sequenceEvidence.recurringTransitions.slice(0, 2),
         },
         optimizationEvidence: {
@@ -496,6 +547,7 @@ function buildRoundTripAccounting(tools, maxRows) {
                 calls: metric.calls,
                 batchCalls: batches,
                 logicalOperations: logical,
+                coalescedLogicalOperations: Math.max(0, logical - metric.calls),
                 logicalOperationsPerCall: metric.calls > 0 ? roundRatio(logical / metric.calls) : 0,
                 failedOperations: failed,
                 skippedOperations: skipped,
@@ -517,8 +569,10 @@ function buildRoundTripAccounting(tools, maxRows) {
         failedOperations,
         skippedOperations,
         logicalOperationsPerCall: calls > 0 ? roundRatio(logicalOperations / calls) : 0,
-        compressedRoundTrips: Math.max(0, logicalOperations - calls),
-        topCompressedTools: rows.slice(0, maxRows),
+        coalescedLogicalOperations: Math.max(0, logicalOperations - calls),
+        accountingSemantics:
+            'coalescedLogicalOperations counts additional logical operations executed inside existing calls; it is not measured or counterfactual round-trip savings.',
+        topCoalescingTools: rows.slice(0, maxRows),
     };
 }
 
@@ -753,7 +807,7 @@ export async function buildMcpLatencyDashboard(runtime, input = {}) {
     const phaseTotals = buildPhaseTotals(metrics.tools);
     const byteAccounting = buildByteAccounting(metrics.tools);
     const roundTripAccountingDetailed = buildRoundTripAccounting(metrics.tools, includeTools ? maxRows : 1);
-    const { topCompressedTools, ...roundTripAccounting } = roundTripAccountingDetailed;
+    const { topCoalescingTools, ...roundTripAccounting } = roundTripAccountingDetailed;
     const assessment = assessLatencySnapshot(metrics, phaseTotals, budgets);
     const dashboard = {
         timestamp: new Date().toISOString(),
@@ -838,12 +892,12 @@ export async function buildMcpLatencyDashboard(runtime, input = {}) {
         roundTripAccounting: {
             ...roundTripAccounting,
             silentExternalGapP50Ms: metrics.interaction.originBoundary.silentExternalGaps.p50Ms,
-            estimatedAmortizedSilentMsAtP50:
+            heuristicCoalescingPressureAtSilentGapP50Ms:
                 (metrics.interaction.originBoundary.silentExternalGaps.p50Ms ?? 0) *
-                roundTripAccounting.compressedRoundTrips,
-            estimateCaveat:
-                'Counterfactual estimate only: compressed logical operations are not guaranteed to have required one model→tool round trip each. Use it to rank batching opportunities, not as measured time saved.',
-            ...(includeTools ? { topCompressedTools } : {}),
+                roundTripAccounting.coalescedLogicalOperations,
+            heuristicCaveat:
+                'Ranking heuristic only: coalesced logical operations are not proof that each operation would otherwise have required an extra model→tool call. Never report this value as measured time saved.',
+            ...(includeTools ? { topCoalescingTools } : {}),
         },
         nextActions: buildNextActions(assessment, metrics.totals.calls, budgets),
     };

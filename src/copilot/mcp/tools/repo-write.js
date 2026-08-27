@@ -365,6 +365,8 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.run.execution.skippedCount + workflow.failureSummary.abortedOperationCount,
             mode: 'patch-dry-run:best-effort',
+            batchSize: operations.length,
+            batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
     }
 
@@ -417,6 +419,9 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             causalByCode: workflow.failureSummary.causalByCode,
             failureClassCounts: workflow.failureSummary.failureClassCounts,
             retryabilityCounts: workflow.failureSummary.retryabilityCounts,
+            correlationTargetPaths: compactPreflightFailures
+                .map((failure) => failure['path'])
+                .filter((path) => typeof path === 'string'),
         });
         const text = `Global preflight found ${workflow.failureSummary.causalFailureCount} causal target failure(s) affecting ${workflow.failureSummary.failedOperationCount} operation(s); no files modified.`;
         const result = withResultSizeHint(okResult(structured, text), {
@@ -429,6 +434,8 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.failureSummary.abortedOperationCount,
             mode: 'patch-apply:global-preflight-blocked',
+            batchSize: operations.length,
+            batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
     }
 
@@ -438,6 +445,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         resultMode === 'detailed'
             ? workflow.applied
             : workflow.succeeded.map((operation) => compactPatchBatchSuccessRow(operation));
+    const compactApplyFailures = compactRepositoryPatchFailureRows(workflow.failedApply);
     const targetTransitions = summarizePatchBatchTargets(workflow.succeeded, false)
         .filter(
             (summary) =>
@@ -472,15 +480,14 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         abortedOperationCount: workflow.failureSummary.abortedOperationCount,
         recoveryRequiredTargetCount: workflow.failureSummary.recoveryRequiredTargetCount,
         convergenceCandidateCount: workflow.failureSummary.convergenceCandidateCount,
-        inlineNextActionTargetCount: countPatchFailuresWithInlineNextAction(
-            compactRepositoryPatchFailureRows(workflow.failedApply),
-        ),
-        inlineRecoveryAnchorTargetCount: countPatchFailuresWithRecoveryAnchor(
-            compactRepositoryPatchFailureRows(workflow.failedApply),
-        ),
+        inlineNextActionTargetCount: countPatchFailuresWithInlineNextAction(compactApplyFailures),
+        inlineRecoveryAnchorTargetCount: countPatchFailuresWithRecoveryAnchor(compactApplyFailures),
         causalByCode: workflow.failureSummary.causalByCode,
         failureClassCounts: workflow.failureSummary.failureClassCounts,
         retryabilityCounts: workflow.failureSummary.retryabilityCounts,
+        correlationTargetPaths: compactApplyFailures
+            .map((failure) => failure['path'])
+            .filter((path) => typeof path === 'string'),
     });
     if (workflow.postValidation.requestedCount > 0) {
         await runtime.audit.append({
@@ -567,6 +574,8 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             workflow.failureSummary.abortedOperationCount +
             (workflow.postValidation.skipped ? workflow.postValidation.requestedCount : 0),
         mode: `patch-apply:${workflow.effectiveApplyMode}:${workflow.effectiveFailureMode}${workflow.postValidation.ran ? ':post-validated' : ''}`,
+        batchSize: operations.length,
+        batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
     });
 }
 
@@ -824,6 +833,8 @@ export function createRepoWriteTools(options = {}) {
                     failedOperations: failureSummary.causalFailureCount,
                     skippedOperations: failureSummary.abortedOperationCount,
                     mode: 'patch-plan:best-effort',
+                    batchSize: normalizedOperations.length,
+                    batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
                 });
             },
         }),
@@ -1264,16 +1275,18 @@ export function createRepoWriteTools(options = {}) {
                 });
                 const row = run.operations[0];
                 if (!row || row['success'] !== true) {
-                    const failure = row ?? {
-                        path,
-                        code: 'ERR_PATCH_UNKNOWN',
-                        error: 'Patch execution returned no result row.',
-                        failureClass: 'unknown',
-                        retryability: 'unknown',
-                        mutationState: 'not-applied',
-                        recoveryRequired: false,
-                        convergenceCandidate: false,
-                    };
+                    const failure = /** @type {Record<string, unknown>} */ (
+                        row ?? {
+                            path,
+                            code: 'ERR_PATCH_UNKNOWN',
+                            error: 'Patch execution returned no result row.',
+                            failureClass: 'unknown',
+                            retryability: 'unknown',
+                            mutationState: 'not-applied',
+                            recoveryRequired: false,
+                            convergenceCandidate: false,
+                        }
+                    );
                     await runtime.audit.append({
                         event: 'repo_apply_patch_failed',
                         tool: 'repo_apply_patch',

@@ -1,10 +1,19 @@
 // @ts-check
 /** Sanitized MCP audit-event normalizer for the rebuildable round-trip index. */
 
-export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 3;
+export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 4;
+
+export const MCP_TOOL_CALL_TERMINAL_EVENTS = Object.freeze([
+    'tool_call_completed',
+    'tool_call_failed',
+    'tool_call_rate_limited',
+    'tool_call_auth_denied',
+    'tool_call_result_rejected',
+]);
+
 const INDEXED_EVENTS = Object.freeze([
     'tool_call_started',
-    'tool_call_completed',
+    ...MCP_TOOL_CALL_TERMINAL_EVENTS,
     'repo_apply_patch_failed',
     'repo_apply_patch_batch_preflight_blocked',
     'repo_apply_patch_batch_partial_failure',
@@ -23,9 +32,31 @@ export function normalizeMcpRoundTripAuditEvent(event) {
         tsMs: Math.trunc(tsMs),
         event: eventName,
         tool: stringOrNull(event['tool']),
+        callId: boundedStringOrNull(event['callId'], 128),
+        traceKey: boundedHexOrNull(event['traceKey'], 64),
+        traceContextState: boundedStringOrNull(event['traceContextState'], 40),
+        targetPrecision: boundedStringOrNull(event['targetPrecision'], 32),
+        targetKeysJson: boundedStringArrayJsonOrNull(event['targetKeys'], 64, 96),
+        runtimeEpochId: boundedStringOrNull(event['runtimeEpochId'], 128),
+        runtimeSourceBinding: boundedStringOrNull(event['runtimeSourceBinding'], 64),
+        runtimeSourceFingerprint: boundedHexOrNull(event['runtimeSourceFingerprint'], 128),
         durationMs: integerOrNull(event['durationMs']),
         isError: boolInt(event['isError']),
         code: stringOrNull(event['code']),
+        logicalOperations: positiveIntegerOrNull(event['logicalOperations']),
+        failedOperations: nonNegativeIntegerOrNull(event['failedOperations']),
+        skippedOperations: nonNegativeIntegerOrNull(event['skippedOperations']),
+        executionMode: boundedStringOrNull(event['executionMode'], 96),
+        batchSize: positiveIntegerOrNull(event['batchSize']),
+        batchCapacity: positiveIntegerOrNull(event['batchCapacity']),
+        resultBudgetBytes: nonNegativeIntegerOrNull(event['resultBudgetBytes']),
+        truncatedOperations: nonNegativeIntegerOrNull(event['truncatedOperations']),
+        continuationRequired: boolInt(event['continuationRequired']),
+        resultBytes: nonNegativeIntegerOrNull(event['resultBytes']),
+        resultSizeStrategy: boundedStringOrNull(event['resultSizeStrategy'], 32),
+        textResultBytes: nonNegativeIntegerOrNull(event['textResultBytes']),
+        nonTextResultBytes: nonNegativeIntegerOrNull(event['nonTextResultBytes']),
+        duplicateTextBytes: nonNegativeIntegerOrNull(event['duplicateTextBytes']),
         failureClass: stringOrNull(event['failureClass']),
         retryability: stringOrNull(event['retryability']),
         causalByCodeJson: countMapJsonOrNull(event['causalByCode']),
@@ -56,10 +87,29 @@ function stringOrNull(value) {
     return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+/** @param {unknown} value @param {number} maxLength */
+function boundedStringOrNull(value, maxLength) {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    return text && text.length <= maxLength ? text : null;
+}
+
+/** @param {unknown} value @param {number} maxLength */
+function boundedHexOrNull(value, maxLength) {
+    const text = boundedStringOrNull(value, maxLength);
+    return text && /^[0-9a-f]+$/u.test(text) ? text : null;
+}
+
 /** @param {unknown} value */
 function integerOrNull(value) {
     const parsed = Number(value);
     return Number.isInteger(parsed) ? parsed : null;
+}
+
+/** @param {unknown} value */
+function positiveIntegerOrNull(value) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;
 }
 
 /** @param {unknown} value */
@@ -87,6 +137,20 @@ function countMapJsonOrNull(value) {
     if (entries.length === 0) return null;
     entries.sort(([left], [right]) => left.localeCompare(right));
     return JSON.stringify(Object.fromEntries(entries));
+}
+
+/** @param {unknown} value @param {number} maxItems @param {number} maxItemLength */
+function boundedStringArrayJsonOrNull(value, maxItems, maxItemLength) {
+    if (!Array.isArray(value)) return null;
+    const items = [
+        ...new Set(
+            value
+                .slice(0, maxItems)
+                .map((item) => boundedStringOrNull(item, maxItemLength))
+                .filter((item) => item !== null),
+        ),
+    ].sort();
+    return items.length > 0 ? JSON.stringify(items) : null;
 }
 
 /** @param {unknown} value */
