@@ -4,11 +4,16 @@
 
 > **Status do documento:** CANÔNICO / VIVO / REFERÊNCIA OBRIGATÓRIA.
 >
-> **Revisão documental:** 8.9 — **ROADMAP III-A ENCERRADO / III-B1 RECOVERY RECIPE ENCERRADO LIVE /
-> III-B2 EXACT BOUNDED SELF-REPAIR ENCERRADO LIVE / III-B3 PATCH TARGET GROUPS V3 ENCERRADO
-> CODE+RUNTIME LIVE / III-B4 É A PRÓXIMA FAIXA, AINDA NÃO INICIADA**. Roadmaps I e II permanecem
-> concluídos e publicados e III-A permanece congelado no baseline live da revisão 7.8. III-B1
-> permanece promovido na Source Barrier v2 fingerprint
+> **Revisão documental:** 9.1 — **REAUDITORIA PÓS-III-B3 CONCLUÍDA / ROADMAP III-B REORDENADO POR
+> NOVA EVIDÊNCIA / III-B4-0 DERIVED-INDEX SOURCE-GENERATION INTEGRITY É O PRÓXIMO GATE P0 / NENHUMA
+> NOVA TRANSFORMAÇÃO DE CÓDIGO NESTA REVISÃO**. Roadmaps I e II permanecem concluídos e publicados;
+> III-A permanece encerrado; III-B1 Recovery Recipe, III-B2 Exact Bounded Self-Repair e III-B3 Patch
+> Target Groups V3 estão encerrados code+runtime live. O checkpoint técnico completo foi publicado
+> em `4aec813148b5cc8fd5586733b47cef808fe5245d` com `main == origin/main` e worktree limpa antes
+> desta investigação documental. A nova auditoria encontrou um bug P0 de duplicação cross-identity
+> no derived round-trip index; por isso B4 passa a começar por integridade da authority, não por
+> mudança de wire. III-A permanece congelado no baseline live da revisão 7.8. III-B1 permanece
+> promovido na Source Barrier v2 fingerprint
 > `ecbda618705f443083545ac6cfb36962cc7766a9f1234558d662f6fe6586115f`. III-B2 permanece promovido sob
 > `25170022708eac9c642c23d8ba8d2d288c86c8e1aa0ada679b3b1fe2bca9baa6`. III-B3-A foi validado em
 > `4e90979522010e8853bf86a7b927b1d7521fb35f8b26fb7593a8a6a3d72d6c65` e promovido sob a
@@ -42,10 +47,15 @@
 > **Snapshot quantitativo principal congelado:** `2026-08-27T02:00:00Z`, equivalente a
 > `2026-08-26T23:00:00-03:00` em `America/Sao_Paulo`.
 >
-> **Escopo desta revisão:** investigação profunda seguida de implementação evidence-gated do
-> **Roadmap III-A**, iniciando obrigatoriamente por III-A0. O baseline publicado permanece
-> `HEAD 90191dedb`; as mudanças desta revisão ainda não estão publicadas. Nenhuma faixa III-B pode
-> iniciar antes do Gate III-A→III-B.
+> **Escopo desta revisão 9.1:** fechamento publicado de III-B3 seguido de **releitura integral das
+> 5.404 linhas físicas, investigação profunda, rebaseline raw e replanejamento documental**. Não
+> executar novas transformações de código, testes, config ou runtime nesta fase de reauditoria. O
+> baseline publicado de entrada é `HEAD 4aec813148b5cc8fd5586733b47cef808fe5245d`,
+> `main == origin/main`, worktree limpa antes da investigação. A única mutação autorizada é este MD,
+> que deve ser validado, commitado e publicado ao fim da rodada. A próxima implementação futura
+> somente pode começar depois dessa publicação e deve iniciar em **III-B4-0 — Derived-index logical
+> source-generation / physical-identity correctness**, porque a nova evidência invalida o uso
+> irrestrito do derived index como authority até reparo, rebuild e parity raw↔derived comprovados.
 
 ---
 
@@ -92,7 +102,8 @@
 39. [ROADMAP III-B — expansão bounded de autonomia](#39-roadmap-iii-b--expansão-bounded-de-autonomia)
 40. [Experimentos, métricas e promotion gates do Roadmap III](#40-experimentos-métricas-e-promotion-gates-do-roadmap-iii)
 41. [Definition of Done do Roadmap III](#41-definition-of-done-do-roadmap-iii)
-42. [Conclusão da revisão 7.0](#42-conclusão-da-revisão-70)
+42. [Conclusão histórica da revisão 7.1](#42-conclusão-histórica-da-revisão-71)
+43. [Reauditoria pós-III-B3 e ordem normativa da revisão 9.1](#43-reauditoria-pós-iii-b3-e-ordem-normativa-da-revisão-91)
 
 ---
 
@@ -155,8 +166,9 @@ que:
 - sejam coerentes com a arquitetura do projeto;
 - não relaxem invariants de segurança/correctness;
 - sejam documentados aqui;
-- respeitem os gates sequenciais vigentes; na geração atual, III-B não pode ser antecipado antes do
-  gate III-A→III-B.
+- respeitem os gates sequenciais vigentes. Na revisão 9.1, III-A e III-B1–B3 já estão encerrados;
+  **III-B4-0 é o próximo gate obrigatório** e bloqueia decisões que dependam de analytics de janela
+  longa até que raw↔derived parity e logical-generation/rebind correctness sejam provadas.
 
 ## 1.5 Ordem normativa
 
@@ -165,27 +177,38 @@ AUDITORIA / DOCUMENTO
         ↓
 ROADMAP I — CORREÇÕES DE VERDADE/OBSERVABILIDADE          [CONCLUÍDO]
         ↓
-DoD + GATE I→II                                           [FECHADO HISTORICAMENTE]
-        ↓
 ROADMAP II — UPGRADES EVIDENCE-GATED                      [CONCLUÍDO]
         ↓
-DoD II / PUBLICAÇÃO                                       [CONCLUÍDO]
+ROADMAP III-A — OPTION CORRECTNESS + OBSERVABILIDADE      [CONCLUÍDO LIVE]
         ↓
-REABERTURA / NOVA AUDITORIA DE AUTONOMIA                  [REVISÃO 7.0]
+III-B1 RECOVERY RECIPE                                    [CONCLUÍDO LIVE]
         ↓
-ROADMAP III-A — OPTION CORRECTNESS + OBSERVABILIDADE      [EM EXECUÇÃO — A5 PRÓXIMO]
+III-B2 EXACT BOUNDED SELF-REPAIR                          [CONCLUÍDO LIVE]
         ↓
-DoD + GATE III-A→III-B                                    [FECHADO ATÉ PROMOÇÃO/REBASELINE]
+III-B3 PATCH TARGET GROUPS V3                             [CONCLUÍDO LIVE]
         ↓
-ROADMAP III-B — EXPANSÃO BOUNDED DE AUTONOMIA             [BLOQUEADO]
+III-B4-0 DERIVED-INDEX LOGICAL SOURCE-GENERATION INTEGRITY [PRÓXIMO / P0 / OBRIGATÓRIO]
+        ↓
+III-B4-1 HIGH-COVERAGE STATIC SURFACE / PROGRESSIVE-DISCOVERY READINESS
+        ↓
+III-B4-2 EFFECTIVE EXECUTION-POLICY TELEMETRY
+        ↓
+III-B4-3 SEMANTIC EXECUTION PROFILES — somente se a evidência justificar
+        ↓
+III-B4-4 VALIDATOR SOURCE-STATE BINDING / DUPLICATE-WORK AUTHORITY
+        ↓
+III-B5+ BOUNDED AUTONOMY UPGRADES                         [EVIDENCE-GATED]
         ↓
 DoD III / PUBLICAÇÃO
 ```
 
-A regra continua sendo sequencial, mas agora por **gerações evidence-gated**. Roadmaps I e II são
-histórico concluído e não devem ser reabertos salvo regressão comprovada. A implementação corrente
-só pode começar em III-A; III-B permanece bloqueado até a option semantics/telemetry estar
-confiável.
+A ordem permanece evidence-gated, mas o novo achado P0 tem precedência sobre a ordem antiga.
+Roadmaps I e II, III-A e III-B1–B3 são histórico concluído e não devem ser reabertos sem regressão
+comprovada. A próxima implementação **não** é criar profiles: é restaurar a autoridade do derived
+index separando physical identity de logical source generation. Somente depois B4-1 pode avaliar um
+surface reduzido; B4-2 mede a política efetiva antes de B4-3 decidir se profiles realmente
+simplificam o wire; B4-4 fecha a autoridade de duplicate validator work antes de qualquer claim de
+waste/savings nesse domínio.
 
 ---
 
@@ -257,16 +280,18 @@ Roadmap III é dividido em:
 - `III-B`: recovery recipes, exact bounded self-repair, target-grouped patch, semantic execution
   profiles, batch defaults, Bulk Inspect V2 e outras expansões evidence-gated.
 
-A autoridade completa da geração III está nas seções 29–42.
+A autoridade histórica da geração III está nas seções 29–42; a **seção 43 é o overlay normativo
+corrente** da revisão 9.1 e prevalece quando houver conflito com formulações antigas.
 
 ---
 
 # 3. Síntese executiva
 
-> **Nota de leitura da revisão 7.0:** as seções 3–28 preservam o diagnóstico, as métricas e o
-> registro de decisões que fundamentaram Roadmaps I/II. Quando uma frase histórica usar tempo
-> presente, o **estado corrente e normativo** é o definido nas seções 29–42. Não reinterpretar
-> dívida já fechada de I/II como pendência atual.
+> **Nota de leitura da revisão 9.1:** as seções 3–28 preservam o diagnóstico, as métricas e o
+> registro de decisões que fundamentaram Roadmaps I/II; 29–42 preservam a evolução histórica do
+> Roadmap III. Quando uma frase histórica usar tempo presente, o **estado corrente e normativo** é a
+> seção 43 em conjunto com os checkboxes atualizados da seção 39. Não reinterpretar dívida já
+> fechada de I/II/III-A/III-B1–B3 como pendência atual.
 
 O MCP local já é rápido na maior parte dos handlers de repositório. O custo interativo dominante
 continua sendo o período entre uma resposta de tool e a próxima chamada, mas o sistema atual ainda
@@ -368,9 +393,10 @@ Nesta revisão não são realizados:
 - criação de composites;
 - alteração Cloudflare/OAuth;
 - reload/reconnect;
-- commit/push.
+- qualquer mutation de produção, teste ou configuração.
 
-A única mutação da rodada é este MD.
+A única mutação de conteúdo da rodada é este MD. **Commit/push documental é parte obrigatória do
+fechamento**, para que a revisão normativa não fique separada do checkpoint técnico já publicado.
 
 ## 4.3 Classes de evidência
 
@@ -1237,6 +1263,51 @@ Nenhum desses números, sozinho, autoriza remover calls.
 | RT-UPG-009 | evidence-driven cap/budget tuning                                                  |
 | RT-UPG-010 | novos bounded composites apenas onde compressibilidade for provada                 |
 | RT-UPG-011 | explicit workflow handle experimental apenas se trace propagation for insuficiente |
+
+## 16.4 Novos achados da reauditoria pós-III-B3 — revisões 9.0–9.1
+
+| ID         | Classe             | Severidade | Achado / decisão                                                                                                                                                                  |
+| ---------- | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RT-III-001 | BUG DE AUTHORITY   | P0         | o derived round-trip index mantém rows de uma `source_identity` antiga e reingere o mesmo prefixo após mudança `dev:ino`, duplicando história                                     |
+| RT-III-002 | TEST GAP           | P0         | o teste de rotation exige preservar old-identity history, mas não cobre rebind do mesmo conteúdo/prefixo sob device identity diferente                                            |
+| RT-III-003 | GATE DE EVIDÊNCIA  | P0         | janelas longas e surface coverage não podem ser promotion authority enquanto raw↔derived parity não for revalidada após identity change                                           |
+| RT-III-004 | DOC/GOVERNANCE BUG | P0         | topo normativo ainda dizia III-A em execução/III-B bloqueado apesar de III-B1–B3 já estarem live                                                                                  |
+| RT-III-005 | DESIGN FINDING     | P1         | os três profiles B4 originais não cobrem o espaço semântico atual; o modo dominante observado é `per-target-fast + fail-fast`, não `independent-progress` nem `strict-sequential` |
+| RT-III-006 | OBSERVABILITY GAP  | P1         | `executionMode` persiste apply/failure mode, mas não a classe de effective concurrency necessária para reconstruir a política usada                                               |
+| RT-III-007 | OPPORTUNITY        | P1         | reduced static surface de alta cobertura é viável; snapshot 9.0 usou 76 tools/114009 B, mas a revisão 9.1 mede candidato mais enxuto de 75 tools/111100 B                         |
+| RT-III-008 | PROTOCOL WATCH     | P1         | roadmap MCP oficial de agosto/2026 prioriza progressive discovery; usar como direção, não inventar protocolo dinâmico proprietário antes de standard/SEP suficiente               |
+| RT-III-009 | VALIDATION GAP     | P1         | `duplicateValidationCount` não pode ser autoritativo sem source-state identity/fingerprint nos manifests de jobs                                                                  |
+| RT-III-010 | PRIORITY FINDING   | P2         | Bulk Inspect V2 deve promover operações por demanda; em 24h `tree` teve 24 starts, outline/symbol 4, usages 2 e imports/diff 0                                                    |
+| RT-III-011 | DESIGN BUG         | P0         | `source_identity` funde identity física `dev:ino` com geração lógica; isso explica rebind replay e torna truncation/copytruncate semanticamente perigosa                          |
+| RT-III-012 | SURFACE FINDING    | P1         | candidate 75-tool cobre 98,26% raw/24h e 98,44% raw/7d com ~31,7% menos envelope; frontier deve ser recalculada por workload e não hardcoded eternamente                          |
+| RT-III-013 | GOVERNANCE GAP     | P1         | validator manifests já medem wall time/resource, mas o owner `validation/jobs/runtime.js` não captura source-state identity; duplicate work continua não demonstrável             |
+
+### Evidência causal de RT-III-001
+
+No `data/copilot.sqlite`, a tabela `copilot_mcp_round_trip_events` contém duas identities
+concorrentes:
+
+- `2096:178412`: `22579` rows / `10975` starts, intervalo `2026-08-14 17:16:16Z` →
+  `2026-08-19 01:57:58Z`;
+- `2128:178412`: `56693` rows / `26253` starts no snapshot read-only mais recente;
+- `22578` grupos têm a mesma combinação `source_offset,event,tool,ts_ms` entre identities, isto é,
+  `22578` rows excedentes por replay cross-identity;
+- total derived: `79272` rows / `37228` starts;
+- raw JSONL direto mediu `26256` starts na janela móvel de 14 dias às `2026-08-27T23:10:57Z`,
+  enquanto o derived global permanece materialmente inflado pelo prefixo duplicado;
+- `fileIdentity` é `${dev}:${ino}`. O incidente real preservou `ino=178412` e mudou apenas
+  `dev=2096→2128`, compatível com rebind/mount da mesma fonte;
+- o branch `expectedIdentity !== fileIdentity` zera `offset` e reingere desde o início, mas preserva
+  rows da identity anterior. O teste existente modela rotação lógica com eventos diferentes e exige
+  preservar essa história; falta distinguir **rotação real** de **rebind/replay do mesmo prefixo**;
+- o branch `resetRequired` usa apenas `requestedOffset > fileBytes` e, sob a mesma physical
+  identity, apaga rows dessa `source_identity`. O writer atual não faz copytruncate/rotation, logo
+  isso é risco latente externo, não incidente observado; ainda assim prova que `dev:ino` não pode
+  continuar sendo simultaneamente physical identity e logical history generation.
+
+**Consequência epistemológica:** os baselines 24h e 7d usados na revisão 9.0 permanecem úteis porque
+a identity antiga termina em 19/08 e está fora desses cutoffs atuais. A visão 14d está contaminada e
+é explicitamente inválida para promotion decisions até reparo + rebuild + parity raw↔derived.
 
 ---
 
@@ -2819,6 +2890,59 @@ Esta seção deve crescer ao longo da execução.
   Cada onda deverá usar o menor gate causal capaz de detectar a classe de regressão introduzida;
   suites amplas ficam reservadas a source-barrier/promotion/publication gates.
 
+## 2026-08-27 — Revisão 9.0 — reauditoria pós-III-B3 / reordenação evidence-gated
+
+- III-B3 encerrado, publicado no commit `4aec813148b5cc8fd5586733b47cef808fe5245d` e confirmado com
+  `main == origin/main` / worktree limpa antes da nova investigação;
+- documento relido integralmente (`5316+` linhas) antes da reauditoria;
+- nenhum código/config/teste/runtime transformado nesta revisão documental;
+- descoberto RT-III-001: derived index com replay cross-identity (`2096:178412` e `2128:178412`),
+  `22560` duplicate-offset groups; 14d surface/round-trip coverage deixa de ser authority até
+  rebuild;
+- identificado test gap de rotação versus same-content device rebind;
+- rebaseline íntegro: 24h `1909` starts e 7d `12804` starts no SQLite atual, sem participação da
+  identity antiga;
+- candidato `latency-v2` somente in-memory: 76 tools, `114009 B`, `-48577 B / -29,88%` vs full;
+  coverage atual `1878/1909 = 98,38%` (24h) e `12647/12804 = 98,77%` (7d);
+- official MCP roadmap de 2026-08-22 incorporado: progressive discovery é direção upstream, ainda
+  não contrato final a ser imitado com wire proprietário;
+- profiles B4 originais reclassificados como provisórios: 133/136 patch-batch completions
+  observáveis em 24h eram `patch-apply:per-target-fast:fail-fast`; effective concurrency ainda não é
+  persistida na classe;
+- validation productivity reavaliada: nos 120 jobs recentes, 8 broad suites consumiram ~`1012892 ms`
+  e 68 focused runs ~`372094 ms`; duplicate classification continua corretamente `null` sem
+  source-state binding;
+- B6 reordenado por demanda natural: tree primeiro; outline/symbol/usages depois; imports/diff sem
+  promoção sem nova evidência;
+- próximo gate passa a ser III-B4-0, não semantic-profile mutation.
+
+## 2026-08-27 — Revisão 9.1 — releitura integral final / plano executável pós-B3
+
+- releitura integral repetida sobre a versão física de `5404` linhas antes da atualização final;
+- RT-III-001 reproduzido novamente em SQLite read-only: `79272` rows, `37228` starts e `22578`
+  duplicate-prefix groups/excess rows entre duas physical identities;
+- identificado RT-III-011: physical `dev:ino` e logical audit generation precisam ser conceitos
+  distintos; o mesmo erro de modelagem também deixa truncation/copytruncate semanticamente perigosa,
+  embora o writer atual seja append-only e esse segundo cenário não tenha ocorrido live;
+- B4 reescrito em B4-0→B4-4 com owners, invariants, test matrix e promotion gates;
+- candidate static surface recalculada diretamente do raw JSONL: `75 tools / 111100 B`, cobertura
+  `1865/1898 = 98,26%` em 24h e `12600/12800 = 98,44%` em 7d, mantendo full fallback;
+- análise de frontier mostrou que coverage deve ser tratada como Pareto custo×uso e recalculada por
+  workload; o snapshot 76-tool da revisão 9.0 permanece histórico, não policy hardcoded;
+- B4 profiles continuam condicionais: primeiro persistir effective concurrency/policy class; os
+  `133/136` modes `per-target-fast+fail-fast` permanecem evidência de que a taxonomia antiga era
+  incompleta;
+- B4-4 recebeu owner concreto para source-state binding de validators; até isso existir,
+  `duplicateValidationCount=null` permanece a única resposta epistemicamente correta;
+- B6 reescrito como promotion-per-op, com `tree` primeiro por demanda e zero promoção automática de
+  imports/diff sem evidence;
+- B12 reclassificado como lane transversal de descriptor economics;
+- EXP-III-10→13 e DoD III foram ampliados para source-generation integrity, static-surface A/B,
+  execution-policy census e validator duplicate-work authority;
+- seção 43 materializada como overlay normativo corrente; seção 42 permanece histórica;
+- nenhuma transformação de código/config/teste/runtime foi realizada; a única mutação é este MD, que
+  deve ser publicado em commit documental após docs/diff gates.
+
 ## Template obrigatório para próximas revisões
 
 ```text
@@ -2842,6 +2966,9 @@ DATE / REVISION
 ## 27.1 Fontes oficiais MCP
 
 - MCP Blog — The 2026-07-28 Specification: `https://blog.modelcontextprotocol.io/posts/2026-07-28/`
+- MCP Blog — The New MCP Roadmap (2026-08-22):
+  `https://blog.modelcontextprotocol.io/posts/mcp-roadmap/` — referência upstream para improved
+  primitives/progressive discovery; é roadmap, não spec final.
 - TypeScript SDK — support 2026-07-28 / Multi-Round-Trip Requests:
   `https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md`
 - TypeScript SDK — `input_required` / `requestState`:
@@ -2857,7 +2984,10 @@ DATE / REVISION
 - `src/copilot/mcp/diagnostics/latency/round-trip/summary.js`
 - `src/copilot/mcp/diagnostics/latency/round-trip/analytics.js`
 - `src/copilot/mcp/diagnostics/latency/dashboard/runtime.js`
+- `src/copilot/mcp/observability/audit/service.js`
 - `src/copilot/mcp/registry/runtime.js`
+- `src/copilot/mcp/registry/surface-policy.js`
+- `src/copilot/mcp/diagnostics/tool-payload/runtime.js`
 - `src/copilot/mcp/protocol/tools/contracts/operation-context.js`
 - `src/copilot/mcp/protocol/tools/contracts/result.js`
 - `src/copilot/mcp/tools/terminal.js`
@@ -2870,6 +3000,8 @@ DATE / REVISION
 - `src/copilot/mcp/tools/session-profile.js`
 - `src/copilot/mcp/tools/tools-status.js`
 - `src/copilot/mcp/tools/meta.js`
+- `src/copilot/mcp/validation/jobs/runtime.js`
+- `src/copilot/mcp/validation/jobs/operations.js`
 - `tests/unit/copilot/mcp/test_mcp_round_trip_analytics.spec.js`
 
 ---
@@ -4741,10 +4873,13 @@ Estado final da faixa:
 - [x] path/hash/durability ownership explícito no contrato alvo;
 - [x] operation list relativa ao target no contrato alvo;
 - [x] remover inferência de hash mode por coincidência de valores da execução canônica;
-- [ ] reduzir input bytes no wire promovido;
-- [ ] comparar schema bytes contra flat operations após implementação;
+- [x] reduzir input bytes no wire promovido — V3-only apply descriptor `4636 B`, abaixo do V2
+      pré-migração `4892 B`;
+- [x] comparar schema/payload bytes contra flat operations — ganhos multi-edit de `-42,7%` a
+      `-67,4%` nos casos same-file controlados;
 - [x] definir estratégia de migração **sem shim permanente**;
-- [ ] host refresh gate antes de remoção da forma antiga.
+- [x] host refresh gate observado antes da remoção live; runtime final rejeita V2 e aceita
+      `targets[]`.
 
 ### Investigação e contrato alvo III-B3 — revisão 8.5
 
@@ -4999,9 +5134,229 @@ funcionou live e a forma V2 foi rejeitada. Não reintroduzir compatibilidade V2 
 snapshot administrativo stale; futuras divergências devem ser tratadas via Refresh/review/reconexão
 do host e diagnosticadas separadamente da verdade wire/runtime do origin.
 
-## FAIXA III-B4 — Semantic execution profiles
+## FAIXA III-B4 — Authority integrity, surface discovery e semantic execution policy
 
-Perfis candidatos:
+> **Reordenação normativa da revisão 9.1:** a lista antiga de três profiles era prematura. A nova
+> auditoria descobriu primeiro um bug P0 na authority derivada e, depois, mostrou que a policy de
+> patch realmente usada não cabe nos três nomes propostos. III-B4 passa a ser uma sequência de cinco
+> subfaixas com gates próprios. **B4-0 bloqueia B4-1→B4-4 quando a decisão depender do derived
+> index.** Nenhuma destas mudanças foi implementada nesta revisão documental.
+
+### III-B4-0 — Derived-index logical source-generation integrity — P0 / primeiro alvo
+
+#### Problema provado
+
+`mcp_round_trip_analytics` persiste hoje `source_identity = dev:ino` e também usa esse valor como
+identidade lógica da história ingerida. Quando o mesmo audit append-only é reexposto sob uma nova
+identidade física — incidente observado `2096:178412 → 2128:178412` — o cursor detecta mudança, zera
+`offset` e reingere desde byte zero, **preservando ao mesmo tempo as rows da identity antiga**. O
+prefixo histórico passa a existir duas vezes.
+
+Snapshot read-only reproduzido em 2026-08-27:
+
+```text
+source_identity=2128:178412  rows=56693  starts=26253
+source_identity=2096:178412  rows=22579  starts=10975
+duplicate groups por (source_offset,event,tool,ts_ms)=22578
+excess rows=22578
+total derived rows=79272
+total derived starts=37228
+```
+
+O audit raw atual, lido diretamente, possui aproximadamente `26,2k` starts na janela de 14 dias.
+Logo a inflação global do índice não é interpretação: é replay cross-identity comprovado.
+
+#### Segundo risco arquitetural encontrado
+
+O caminho `resetRequired` é acionado quando `requestedOffset > fileBytes`; para a mesma
+`source_identity`, ele executa `DELETE` das rows dessa identity antes de reingestir. O writer atual
+é append-only e não implementa rotação própria, portanto isso **não é um incidente live observado**.
+Mas uma truncation/copytruncate externa preservando `dev:ino` poderia apagar história derivada
+legítima. A causa comum é a mesma: **identidade física do inode e geração lógica da fonte foram
+fundidas num único conceito**.
+
+#### Estado-alvo
+
+Separar explicitamente:
+
+```text
+physicalFileIdentity = dev:ino                 # diagnóstico de backing file atual
+logicalSourceGeneration = opaque bounded id   # identidade da sequência lógica de audit
+cursor = logical generation + physical identity + byte offset + continuity evidence
+```
+
+Invariantes obrigatórios:
+
+1. mudança de `dev:ino` **não** implica automaticamente nova geração lógica;
+2. rebind da mesma sequência append-only mantém `logicalSourceGeneration` e continua do offset já
+   certificado, sem replay do prefixo;
+3. rotação/replacement realmente novo cria nova `logicalSourceGeneration`, começa em zero e
+   **preserva** a geração anterior dentro da retention;
+4. truncation/rewrite não pode apagar silenciosamente gerações históricas anteriores;
+5. dedupe global por `(ts,event,tool,...)` não é solução primária: eventos legitimamente iguais
+   podem existir; continuity precisa ser provada na boundary da fonte;
+6. continuity evidence deve ser content-free no índice público. Se for necessário fingerprint de
+   checkpoint, usar hash bounded de bytes já lidos/âncora de newline, nunca payload/evento cru;
+7. qualquer estado ambíguo deve falhar visível ou iniciar geração nova conservadora, nunca fundir
+   histories por heurística frouxa;
+8. o raw JSONL permanece source of record; SQLite continua rebuildable.
+
+#### Arquivos/owners a investigar primeiro
+
+- `src/copilot/mcp/observability/audit/service.js` — contrato de `readSlice`, physical identity e
+  continuity evidence;
+- `src/copilot/mcp/diagnostics/latency/round-trip/analytics.js` — cursor, generation ownership,
+  schema/migration/rebuild;
+- `tests/unit/copilot/mcp/test_mcp_round_trip_analytics.spec.js` — rotation/rebind/truncation
+  matrix;
+- tests do audit slice owner quando o contrato de slice mudar.
+
+#### Plano de implementação futuro
+
+- [ ] definir `logicalSourceGeneration` e o menor continuity token suficiente;
+- [ ] não reutilizar `dev:ino` como generation id;
+- [ ] modelar explicitamente `same-log-rebind`, `true-rotation`, `truncate/rewrite` e
+      `normal-append`;
+- [ ] tornar a decisão de transition uma função/testável antes de tocar SQLite;
+- [ ] elevar normalizer/index generation se necessário — candidato natural `v10`, sem reinterpretar
+      rows v9 contaminadas como authority;
+- [ ] criar rebuild explícito a partir do raw source após a correção;
+- [ ] garantir retention por geração sem duplicação de prefixo;
+- [ ] preservar cursor incremental rápido no caso normal;
+- [ ] publicar diagnóstico bounded de `sourceGenerationCount`, rebind/rotation/reset counts e
+      parity, sem path/content;
+- [ ] não usar a correção para mudar semantics de round-trip/recovery no mesmo commit, salvo
+      dependência inevitável e documentada.
+
+#### Test matrix obrigatória
+
+- [ ] append normal, mesma physical identity;
+- [ ] mesma sequência/prefixo sob novo `dev`/mesmo inode-like id — rebind;
+- [ ] mesma sequência sob `dev:ino` totalmente novo — rebind;
+- [ ] true rotation com conteúdo/eventos novos — história antiga preservada;
+- [ ] replacement menor que cursor — nova geração sem apagar a anterior;
+- [ ] copytruncate-like same physical identity — história anterior preservada e generation nova;
+- [ ] restart no meio de chunk/newline;
+- [ ] crash entre event insert e cursor update — transaction invariants;
+- [ ] retention cruzando duas gerações;
+- [ ] idempotent repeated sync após cada cenário.
+
+#### Promotion gate B4-0
+
+- [ ] `duplicatePrefixReplayCount = 0` em fixture de rebind;
+- [ ] true-rotation test preserva ambas as histórias;
+- [ ] truncation test não apaga geração histórica;
+- [ ] raw↔derived start/terminal counts batem para 24h/7d/14d dentro do mesmo cutoff e filters;
+- [ ] query read-only pós-rebuild não encontra duplicate prefix groups atribuíveis a identity
+      rebind;
+- [ ] completeness/pairing/outcome/option/execution aggregates permanecem semanticamente iguais ao
+      raw reconstruído;
+- [ ] performance incremental normal não sofre regressão material;
+- [ ] source/unit/static + live sync gates verdes antes de usar novamente o derived 14d como
+      promotion authority.
+
+**Regra temporária enquanto B4-0 estiver aberto:** para decisões desta frente, usar audit raw direto
+ou recortes derived comprovadamente fora da identity duplicada. A janela derived de 14 dias fica
+**proibida como promotion authority** até rebuild/parity.
+
+### III-B4-1 — High-coverage static surface / progressive-discovery readiness
+
+O MCP upstream colocou **progressive discovery** entre as prioridades de improved primitives em seu
+roadmap de agosto de 2026. Isso é direção arquitetural relevante para um servidor com `131` tools,
+mas ainda não autoriza inventar um protocolo dinâmico proprietário nem assumir comportamento futuro
+do ChatGPT.
+
+A infraestrutura local já oferece surfaces estáticos e reversíveis via `surface-policy.js`. O
+experimento correto é explorar primeiro a fronteira **coverage × descriptor bytes** usando essa
+capacidade existente.
+
+Baseline wire corrente:
+
+```text
+full:    131 tools / 162586 B
+latency:  71 tools / 107458 B   (-33,91%)
+```
+
+Candidato in-memory simples medido nesta revisão:
+
+```text
+latency + {
+  mcp_reload_status,
+  mcp_reload_schedule,
+  mcp_tool_payload_audit,
+  mcp_connection_readiness
+}
+= 75 tools / 111100 B
+≈ -51486 B / -31,7% vs full
+```
+
+Cobertura recalculada **diretamente do raw JSONL**, não do índice contaminado, às
+`2026-08-27T23:10:57Z`:
+
+```text
+24h: 1865 / 1898 = 98,26%
+7d:  12600 / 12800 = 98,44%
+14d: 24959 / 26256 = 95,06%   # workload antigo diferente; não é política eterna
+```
+
+A lista de quatro additions é **snapshot candidato**, não estado-alvo hardcoded. A frontier deve ser
+recalculada por custo/uso: por exemplo, `mcp_smoke_workspace`, `mcp_reload_plan` e
+`repo_patch_batch_plan` também aparecem cedo na fronteira conforme se exige 99%+ de coverage.
+
+Plano:
+
+- [ ] só iniciar após B4-0 restaurar authority ou usar raw-direct tooling explícito durante o
+      experimento;
+- [ ] construir Pareto frontier 98% / 99% / 99,5% sobre 24h e 7d, por cohort/workload;
+- [ ] medir total envelope, input-schema bytes, list serialization e descriptor ranking de cada
+      candidato;
+- [ ] exigir full fallback sempre disponível e trivialmente reversível;
+- [ ] não remover implementação de tool; surface policy só controla advertisement;
+- [ ] testar se misses são operações de exceção/escalation ou parte de workflows normais;
+- [ ] fazer A/B host-side real de tool selection/TTFT/erro antes de qualquer mudança de default;
+- [ ] verificar schema refresh/admin-snapshot behavior separadamente da origem;
+- [ ] acompanhar o standard/SEP de progressive discovery e preferi-lo, quando estável, a protocolo
+      local incompatível.
+
+**Gate:** nenhuma reduced surface vira default só por economizar bytes. Coverage recente ≥99% é um
+pré-requisito preferencial, não suficiente; correctness/selection e fallback precisam passar A/B.
+
+### III-B4-2 — Effective execution-policy telemetry
+
+A telemetria atual já persiste `executionMode`, mas não registra a classe de effective concurrency.
+Isso é insuficiente para decidir profiles semanticamente honestos.
+
+Evidência raw de 24h nesta revisão:
+
+```text
+repo_apply_patch_batch completions com executionMode = 136
+patch-apply:per-target-fast:fail-fast = 133
+patch-dry-run:best-effort = 3
+```
+
+O padrão `per-target-fast + fail-fast` aparece em várias runtime cohorts, inclusive `51/52` calls na
+maior cohort observada. Portanto os três profiles originalmente propostos não descrevem a política
+dominante: best-effort `independent-progress` não é o uso mais comum e `strict-sequential` também
+não, porque fail-fast com concurrency >1 significa **stop-scheduling**, não stop estritamente
+sequencial.
+
+Plano content-free:
+
+- [ ] persistir `effectiveExecutionPolicyClass`, derivada do estado efetivamente usado, não dos args
+      crus;
+- [ ] incluir pelo menos apply/preflight class, failure class e concurrency class
+      (`sequential|parallel-bounded`) ou enum equivalente;
+- [ ] decidir se número exato de concurrency acrescenta informação suficiente para justificar o
+      cardinality; preferir classe pequena;
+- [ ] segmentar por runtime cohort e dry-run/apply;
+- [ ] medir override rate contra defaults;
+- [ ] medir combinações semanticamente distintas realmente usadas;
+- [ ] não persistir targets, paths, patch strings ou argumentos livres;
+- [ ] rebaseline natural antes de desenhar profile tokens.
+
+### III-B4-3 — Semantic execution profiles — condicional, não presumida
+
+Os nomes antigos:
 
 ```text
 independent-progress
@@ -5009,10 +5364,60 @@ preflight-gated
 strict-sequential
 ```
 
-- [ ] runtime deriva applyMode/failureMode/concurrency;
-- [ ] advanced custom mode somente se necessário;
-- [ ] explicit options não podem contradizer profile silenciosamente;
-- [ ] descriptor simplification medida.
+passam a ser **hipóteses históricas**, não contrato alvo. A taxonomia final deve emergir de B4-2 e
+precisa representar honestamente, se material, uma classe semelhante a “direct bounded
+stop-scheduling-on-failure”, hoje dominante.
+
+Somente se B4-2 mostrar concentração suficientemente forte:
+
+- [ ] criar poucos intent profiles estáveis que cubram a maioria do uso sem perda de semantics;
+- [ ] runtime deriva mechanics (`applyMode/failureMode/concurrency`) do profile;
+- [ ] advanced custom policy sobrevive apenas se houver workload real que não caiba nos profiles;
+- [ ] profile + explicit override contraditório deve ser rejeitado, nunca silently overridden;
+- [ ] comparar descriptor/request bytes antes/depois;
+- [ ] provar parity de atomicidade, partial progress, fail-fast e preflight;
+- [ ] evitar schema churn frequente; preferir token semântico estável somente quando ele realmente
+      reduz custo de escolha;
+- [ ] rejeitar B4-3 formalmente se a distribuição real for diversa demais ou se o wire ficar maior.
+
+### III-B4-4 — Validator source-state binding / duplicate-work authority
+
+A faixa transversal III-A-P já mede custo dos validator jobs, mas deixa corretamente
+`duplicateValidationCount=null` porque os manifests não carregam a identidade do source state
+validado.
+
+Baseline recente:
+
+```text
+120 finished jobs
+8 broad-suite runs  ≈ 1012892 ms
+68 focused runs     ≈ 372094 ms
+repeatRunPressure   = 113
+true duplicateValidationCount = unknown
+```
+
+Owner atual: `validation/jobs/runtime.js` cria o manifest com validator, command, timestamps,
+runtime epoch e resource snapshots; `validation/jobs/operations.js` se recusa corretamente a chamar
+duas execuções de “duplicadas” sem source binding.
+
+Plano:
+
+- [ ] definir uma identidade de source state barata, content-free e apropriada ao validator;
+- [ ] evitar capturar uma Source Barrier completa em cada teste focado se o custo for maior que o
+      próprio validator;
+- [ ] incluir pelo menos source-state fingerprint + validator + focused scope/config equivalentes na
+      chave de comparação;
+- [ ] não expor paths/content do worktree no dashboard público por esse mecanismo;
+- [ ] distinguir rerun após mutation de duplicate sobre bytes idênticos;
+- [ ] distinguir rerun necessário após failure de repetition mecânica sem source change;
+- [ ] ligar polling/retry de job à identidade do próprio job antes de chamar poll de redundante;
+- [ ] só então preencher `duplicateValidationCount`, duplicate wall-time e possíveis savings;
+- [ ] usar os dados para ajustar V1/V2/V3 budgets, nunca para pular gate causal obrigatório.
+
+**Resultado esperado de III-B4:** authority derivada confiável, um caminho mensurável para reduzir
+surface/context cost, policy de execução observável antes de ser simplificada e validação com
+contabilidade causal. Só depois faz sentido avançar agressivamente para Batch Defaults/Bulk Inspect
+ou outros autonomy upgrades.
 
 ## FAIXA III-B5 — Batch Defaults
 
@@ -5035,24 +5440,42 @@ strict-sequential
 - [ ] same-result correctness;
 - [ ] descriptor delta aceitável.
 
-## FAIXA III-B6 — Bulk Inspect V2
+## FAIXA III-B6 — Bulk Inspect V2 — promotion por demanda, não por catálogo
 
-Investigar primeiro:
+A reauditoria raw de 24h encontrou, entre os candidatos extras:
 
-- [ ] outline;
-- [ ] tree;
-- [ ] symbol search;
-- [ ] symbol usages;
-- [ ] imports;
-- [ ] diff.
+```text
+repo_tree               24 starts
+repo_file_outline        4
+repo_symbol_search       4
+repo_find_symbol_usages  2
+repo_find_imports        0
+repo_diff_files           0
+```
 
-Promotion por op, não all-or-nothing.
+Enquanto isso, `repo_bulk_inspect=42`, `repo_read_file=333` e `repo_search_text=289`. Logo a ordem
+antiga `outline→tree→symbol...` não possui base empírica. **Tree é o primeiro candidato de demanda;
+os demais ficam bloqueados até sequência causal/controle mostrar ganho.**
+
+Investigar/promover por op:
+
+- [ ] `tree` primeiro, com workload controlado `stat/search/read/tree` quando semanticamente útil;
+- [ ] outline somente se novas sequências mostrarem benefício;
+- [ ] symbol search somente se chamadas separadas forem materiais;
+- [ ] symbol usages somente com demanda suficiente;
+- [ ] imports somente com evidência nova;
+- [ ] diff somente com evidência nova.
+
+Promotion por op, nunca all-or-nothing:
 
 - [ ] mesma redaction/path policy;
-- [ ] budget fairness;
+- [ ] mesma read-only authority;
+- [ ] typed per-op args sem criar union descriptor desproporcional;
+- [ ] budget fairness entre result shapes heterogêneos;
 - [ ] per-item failure isolation;
 - [ ] execution accounting;
-- [ ] A/B com sequências controladas.
+- [ ] A/B de call count, useful bytes e correctness;
+- [ ] rejeitar op cujo descriptor/context cost exceda o ganho de coalescing observado.
 
 ## FAIXA III-B7 — Terminal autonomy V5
 
@@ -5101,13 +5524,22 @@ Promotion por op, não all-or-nothing.
 - [ ] rollback simples: feature off;
 - [ ] não vender MRTR como redução física de round trips.
 
-## FAIXA III-B12 — Descriptor simplification
+## FAIXA III-B12 — Descriptor simplification — lane transversal, não etapa terminal obrigatória
 
-- [ ] medir input-schema bytes após semantic profiles/defaults;
-- [ ] remover knobs tuning sem utilidade comprovada;
-- [ ] não reduzir tool coverage;
-- [ ] full surface continua fallback;
-- [ ] objetivo: mais capacidade por byte de descriptor, não simplesmente menos bytes.
+A reauditoria muda a posição conceitual desta faixa. Descriptor pressure deve ser medido **durante**
+B4-1/B4-3/B5/B6, não apenas depois de todos eles. O maior ganho potencial pode vir de advertisement
+mais seletivo, shared defaults ou remoção de tuning sem utilidade — mecanismos diferentes que devem
+ser comparados no mesmo eixo custo×cobertura.
+
+- [ ] manter baseline `full=131 tools / 162586 B` como referência da revisão 9.1;
+- [ ] medir input-schema/output-schema/meta bytes em cada candidate;
+- [ ] manter Pareto frontier de coverage × envelope bytes;
+- [ ] medir request-input bytes separadamente de descriptor bytes;
+- [ ] remover knobs tuning somente se B4-2/B5 provarem baixa utilidade e nenhuma semantic loss;
+- [ ] não confundir reduzir advertisement com remover implementação/capacidade;
+- [ ] full surface continua fallback obrigatório até standard/host evidence superior;
+- [ ] não usar truncation de descriptions como substituto de simplificação semântica;
+- [ ] objetivo: **mais autonomia útil e coverage por byte**, não simplesmente menos bytes.
 
 ---
 
@@ -5237,31 +5669,142 @@ Medir:
 - requestState expiry/tamper;
 - tool switching evitado.
 
+## 40.10 EXP-III-10 — Audit source rebind / rotation / truncation
+
+Objetivo: provar B4-0 antes de reconstruir o índice real.
+
+Casos controlados mínimos:
+
+```text
+A. append normal, mesma identity física
+B. mesmo log/prefixo sob identity física diferente
+C. true rotation com arquivo/eventos novos
+D. replacement menor que cursor
+E. copytruncate-like mantendo identity física
+F. crash/restart entre insert e cursor commit
+```
+
+Medir:
+
+- logical generation id;
+- start offset efetivo;
+- rows inseridas por sync;
+- prefix replay count;
+- history preserved count;
+- raw↔derived count parity;
+- idempotence em segundo sync;
+- sync duration/catch-up throughput.
+
+Gates absolutos:
+
+- rebind não duplica prefixo;
+- rotação real não apaga história anterior dentro da retention;
+- truncation não reutiliza generation incorreta;
+- repeated sync sem novos bytes insere zero rows;
+- raw source continua a authority de rebuild.
+
+## 40.11 EXP-III-11 — Static surface Pareto frontier
+
+Comparar pelo menos:
+
+```text
+full
+latency atual
+candidate ≥98%
+candidate ≥99%
+candidate ≥99,5% quando alcançável sem custo desproporcional
+```
+
+Usar 24h e 7d por workload/cohort, preferencialmente raw-direct enquanto B4-0 estiver aberto.
+
+Medir:
+
+- tools advertised;
+- envelope/input-schema bytes;
+- list serialization;
+- observed-call coverage;
+- top missing tools e papel no workflow;
+- host TTFT/selection error quando houver A/B real;
+- fallback/recovery para tool não advertised.
+
+Gate: nenhuma candidate vira default sem A/B host-side e full fallback. Um número de coverage
+isolado não é suficiente.
+
+## 40.12 EXP-III-12 — Effective patch execution-policy census
+
+Após instrumentar B4-2:
+
+- coletar distribuição por cohort de apply/preflight/failure/concurrency class;
+- separar defaults de caller overrides;
+- calcular quantas classes cobrem 90/95/99% do uso;
+- reconstruir truth table observada;
+- comparar descriptor/request cost de knobs atuais contra profile candidate.
+
+Gate: profile só existe se comprimir escolha/bytes **sem** eliminar policy material. Se a
+distribuição não for concentrada, B4-3 é rejeitada.
+
+## 40.13 EXP-III-13 — Validator duplicate-work authority
+
+Depois de B4-4:
+
+```text
+same validator + same scope + same source-state fingerprint + equivalent config
+```
+
+é candidato a duplicate; qualquer source/config change quebra equivalência.
+
+Medir:
+
+- duplicate jobs;
+- duplicate wall time;
+- broad vs focused duplication;
+- poll/retry por job id;
+- mutation-between-runs rate;
+- custo de calcular a fingerprint.
+
+Gate: source binding precisa custar pouco frente aos focused validators e não pode expor conteúdo ou
+transformar repetição necessária após mutation em “waste”.
+
 ---
 
 # 41. Definition of Done do Roadmap III
 
 Roadmap III só poderá ser declarado concluído quando:
 
-- [ ] every hot-tool option tiver semântica declarada/derivável;
-- [ ] silent ignored options = 0 nos contratos alvo;
-- [ ] option/result code telemetry estiver historicamente observável;
-- [ ] continuation availability não for confundida com required follow-up;
-- [ ] pairwise + critical option matrix estiver verde;
-- [ ] qualquer self-repair estiver restrita a equivalência determinística provada;
-- [ ] patch exactness/hash/path policy permanecerem intactos;
-- [ ] concurrency semantics forem honestas;
-- [ ] pelo menos um autonomy upgrade demonstrar redução real de calls ou input/context pressure;
+- [x] hot-tool options cobertas por III-A tiverem semântica declarada/derivável no Option Contract;
+- [x] silent ignored options = 0 nos contratos alvo de III-A;
+- [x] option/result code telemetry estiver historicamente observável nas gerações instrumentadas;
+- [x] continuation availability não for confundida com required follow-up;
+- [x] pairwise + critical option matrix de III-A estiver verde;
+- [x] self-repair B2 estiver restrita a equivalência determinística provada;
+- [x] patch exactness/hash/path policy de B1–B3 permanecerem intactos;
+- [ ] **derived-index logical source generation estiver correta sob rebind/rotation/truncation**;
+- [ ] **raw↔derived parity estiver provada após rebuild e duplicate prefix replay = 0**;
+- [ ] nenhuma decisão de janela longa depender de identity-contaminated analytics;
+- [ ] concurrency semantics forem historicamente observáveis em classe suficiente para decidir
+      semantic profiles;
+- [ ] semantic profiles, se implementados, forem derivados da distribuição real — ou formalmente
+      rejeitados se não reduzirem custo sem perda de policy;
+- [ ] qualquer reduced/default surface passar coverage + host-side selection/TTFT A/B e preservar
+      full fallback; acompanhar progressive discovery upstream sem protocolo proprietário prematuro;
+- [ ] validator duplicate-work metrics tiverem source-state binding antes de afirmar desperdício;
+- [ ] pelo menos um novo autonomy/wire upgrade pós-B3 demonstrar redução real de calls, input ou
+      context pressure **ou** ser formalmente rejeitado/depriorizado por evidência;
+- [ ] Bulk Inspect V2 continuar promotion-per-op e não ampliar catálogo sem demanda/experimento;
 - [ ] nenhuma expansão criar generic cross-authority tool-of-tools;
-- [ ] descriptor pressure permanecer abaixo dos budgets com headroom;
+- [ ] descriptor pressure permanecer abaixo dos budgets com headroom e coverage explícita;
 - [ ] resource health permanecer saudável;
-- [ ] ChatGPT refresh/schema behavior estiver documentado e testado quando relevante;
+- [ ] ChatGPT refresh/schema behavior estiver documentado e testado quando relevante, separado da
+      verdade do origin;
 - [ ] documento estiver atualizado na mesma rodada das implementações;
 - [ ] repo final estiver publicado, limpo e `main == origin/main`.
 
+**Estado da revisão 9.1:** DoD III permanece aberto. III-A e III-B1–B3 estão encerrados; o primeiro
+checkbox bloqueante é a integridade de source generation do derived index em III-B4-0.
+
 ---
 
-# 42. Conclusão da revisão 7.1
+# 42. Conclusão histórica da revisão 7.1
 
 A conclusão desta nova auditoria é deliberadamente diferente de “criar mais tools”.
 
@@ -5314,3 +5857,251 @@ do snapshot administrativo do ChatGPT diante de uma **mudança wire futura**; el
 condicionado à primeira alteração real de schema, porque o origin não pode observá-lo nem esta
 revisão deve criar churn apenas para testá-lo. O Gate III-A→III-B está aberto; III-B ainda não foi
 iniciado.
+
+---
+
+# 43. Reauditoria pós-III-B3 e ordem normativa da revisão 9.1
+
+> **Autoridade:** esta seção é o overlay normativo corrente. A seção 42 é preservada como conclusão
+> histórica da revisão 7.1 e não descreve mais o estado atual. Em caso de conflito entre texto
+> histórico e esta seção, prevalece esta seção junto com os checkboxes atualizados da seção 39.
+
+## 43.1 Checkpoint de entrada e escopo efetivamente executado
+
+A investigação começou depois do fechamento técnico completo de III-B3:
+
+```text
+technical checkpoint = 4aec813148b5cc8fd5586733b47cef808fe5245d
+branch = main
+upstream = origin/main
+ahead/behind no checkpoint = 0/0
+worktree = clean antes da reauditoria documental
+```
+
+Depois desse checkpoint:
+
+- o documento foi lido integralmente uma primeira vez e atualizado para a revisão 9.0;
+- a versão física resultante foi **releita integralmente novamente, 5.404/5.404 linhas**, antes
+  desta revisão 9.1;
+- nenhum arquivo de produção, teste ou configuração foi transformado;
+- não houve reload/restart/reconnect;
+- toda nova evidência operacional foi obtida por leitura do raw audit, SQLite read-only, source
+  inspection ou diagnostics read-only/in-memory;
+- a única mutação desta fase é este documento, a ser publicado no fechamento.
+
+## 43.2 Descoberta principal: o próximo problema é authority integrity, não profiles
+
+A prioridade imediatamente posterior a B3 mudou. A razão é RT-III-001/011:
+
+```text
+physical file identity != logical audit source generation
+```
+
+Hoje `dev:ino` é usado nas duas funções. No incidente real, o mesmo prefixo append-only reapareceu
+sob novo `dev` e foi reingestado desde zero, enquanto a história da identity anterior foi mantida. O
+SQLite derivado contém:
+
+```text
+2096:178412  = 22579 rows / 10975 starts
+2128:178412  = 56693 rows / 26253 starts
+excess duplicate-prefix rows = 22578
+total derived = 79272 rows / 37228 starts
+```
+
+O raw JSONL direto continua íntegro como source of record. Consequentemente:
+
+1. não corrigir analytics por dedupe temporal global;
+2. não apagar old identity indiscriminadamente;
+3. introduzir geração lógica explícita e continuity semantics;
+4. reconstruir o índice a partir do raw após o fix;
+5. provar parity antes de voltar a usar 14d como promotion authority.
+
+A janela antiga de identity duplicada termina em 19/08, portanto recortes atuais de 24h/7d podem ser
+usados quando o cutoff é comprovado; ainda assim a política preferida para esta reauditoria foi
+recalcular decisões críticas diretamente do raw.
+
+## 43.3 Rebaseline raw corrente e implicações para tool surface
+
+O surface completo continua saudável e com amplo headroom:
+
+```text
+full = 131 tools / 162586 B
+max envelope budget = 409600 B
+headroom = 247014 B
+```
+
+O `latency` estático atual mede `71 tools / 107458 B`, mas não possui coverage suficiente para virar
+default sem additions. Um candidate simples, construído **somente in-memory**, adiciona:
+
+```text
+mcp_reload_status
+mcp_reload_schedule
+mcp_tool_payload_audit
+mcp_connection_readiness
+```
+
+e resulta em:
+
+```text
+75 tools / 111100 B
+≈ 31,7% menor que full
+```
+
+Coverage raw-direct no snapshot `2026-08-27T23:10:57Z`:
+
+```text
+24h = 1865/1898 = 98,26%
+7d  = 12600/12800 = 98,44%
+14d = 24959/26256 = 95,06%
+```
+
+A queda em 14d mostra por que **surface não pode ser uma lista eterna inferida de um workload
+antigo**. O desenho correto é uma frontier custo×coverage por workload/cohort. A análise marginal
+mostrou que `mcp_smoke_workspace`, `mcp_reload_plan` e `repo_patch_batch_plan` são additions
+naturais conforme o gate sobe de 98% para 99%+, mas o ponto ótimo deve ser decidido por A/B, não
+pelo ranking isolado.
+
+Decisão corrente:
+
+- `full` permanece default;
+- B4-1 investiga static high-coverage surface porque já é reversível e compatível com a arquitetura;
+- nenhuma dynamic/proprietary discovery layer será criada agora;
+- o trabalho upstream de progressive discovery deve ser acompanhado e adotado quando houver
+  standard/SDK/host support suficientemente estável.
+
+## 43.4 Execution policy: a taxonomia antiga foi falsificada pela própria telemetria
+
+O plano antigo sugeria:
+
+```text
+independent-progress
+preflight-gated
+strict-sequential
+```
+
+Mas o raw audit recente mostra:
+
+```text
+136 patch-batch completions observáveis com executionMode
+133 = patch-apply:per-target-fast:fail-fast
+3   = patch-dry-run:best-effort
+```
+
+Esse padrão aparece em múltiplas source/runtime cohorts; na maior, `51/52` completions observáveis
+seguem `per-target-fast + fail-fast`.
+
+Isso importa porque:
+
+- `independent-progress` sugere best-effort e não descreve o uso dominante;
+- `strict-sequential` exige concurrency=1 e também não descreve necessariamente o uso dominante;
+- `fail-fast + concurrency>1` é **stop-scheduling**, não transação ou stop sequencial perfeito;
+- `executionMode` ainda não persiste a classe de concurrency, portanto a policy efetiva não pode ser
+  reconstruída completamente.
+
+Decisão: B4-2 instrumenta a classe efetiva primeiro. B4-3 somente cria profiles se a distribuição
+mostrar compressão real de intent; os três nomes antigos deixam de ser specification target.
+
+## 43.5 Validation productivity: repetir validator ainda não significa duplicação
+
+A última amostra de manifests mostra:
+
+```text
+finished jobs = 120
+broad runs = 8 / ~1012892 ms
+focused runs = 68 / ~372094 ms
+repeatRunPressure = 113
+duplicateValidationCount = null
+```
+
+O `null` é correto. O owner de job não persiste source-state identity; portanto duas execuções do
+mesmo validator podem ter validado bytes diferentes. Chamar isso de duplicate hoje seria o mesmo
+erro epistemológico que chamar temporal adjacency de causalidade.
+
+B4-4 deve anexar uma identidade barata/content-free do source state ao manifest e só então medir
+true duplicate work. A solução não deve usar uma Source Barrier completa por focused test se o
+próprio fingerprint custar mais que a validação curta.
+
+## 43.6 Ordem normativa dos próximos passos
+
+A ordem recomendada a partir desta revisão é:
+
+### 1. III-B4-0 — P0: source-generation integrity
+
+Implementar primeiro e isoladamente. Fechar rebind/rotation/truncation semantics, rebuild v10 ou
+equivalente, raw↔derived parity e performance incremental. **Nenhuma otimização guiada por janela
+longa deve pular esse gate.**
+
+### 2. III-B4-1 — static high-coverage surface / progressive-discovery readiness
+
+Com analytics íntegro — ou raw-direct explicitamente controlado — construir Pareto frontier 98/99/
+99,5%, medir descriptor cost e fazer A/B host-side. `full` continua fallback e default até prova.
+
+### 3. III-B4-2 — effective execution-policy telemetry
+
+Persistir classe efetiva de apply/preflight/failure/concurrency, content-free, e medir distribuição
+natural por cohort.
+
+### 4. III-B4-3 — semantic profiles somente se B4-2 justificar
+
+Não iniciar com enum pronto. Desenhar profiles a partir da distribuição observada, provar parity de
+partial progress/atomicity/fail-fast/preflight e rejeitar a faixa se o ganho líquido não existir.
+
+### 5. III-B4-4 — validator source-state binding
+
+Fechar true duplicate-work authority e refinar V1/V2/V3 validation budgets com dados causais.
+
+### 6. III-B5 — Batch Defaults / wire ergonomics
+
+Investigar shared defaults principalmente onde reduzem request bytes repetidos. Mechanical tuning
+deve tender a runtime-owned; semantic policy só sai do wire quando houver evidência de desuso.
+
+### 7. III-B6 — Bulk Inspect V2 por op
+
+`tree` é o primeiro candidato de demanda. Outline/symbol/usages ficam subordinados a experimento;
+imports/diff não possuem demanda recente que justifique expansão hoje.
+
+### 8. III-B7+ — demais autonomy upgrades
+
+Terminal shared budget, Unified Mutation Batch, safe selectors, Git resume e MRTR permanecem
+candidatos independentes. Cada um exige investigação própria e pode ser rejeitado. B12 descriptor
+economics acompanha transversalmente B4–B7.
+
+## 43.7 O que foi explicitamente rejeitado ou adiado por esta investigação
+
+Não fazer na próxima rodada:
+
+- não corrigir B4-0 com `DELETE old source_identity` em toda mudança de inode/device;
+- não usar global row dedupe como substituto de source-generation semantics;
+- não tratar derived 14d atual como authority;
+- não implementar os três semantic profiles antigos por inércia documental;
+- não tornar o candidate 75-tool default sem host A/B;
+- não inventar progressive discovery proprietário antes do standard;
+- não expandir Bulk Inspect para todas as read-only operations “porque cabem”;
+- não chamar `repeatRunPressure` de duplicate validator work;
+- não elevar caps/budgets — saturation/truncation continuam sem evidência material que justifique;
+- não reintroduzir V2 patch compatibility para acomodar snapshot administrativo ChatGPT stale;
+- não misturar em B4-0 refactors/otimizações independentes que dificultem provar a correção da
+  authority.
+
+## 43.8 Handoff operacional para a próxima rodada
+
+Quem assumir a próxima implementação sem contexto prévio deve começar assim:
+
+1. ler a revisão 9.1, principalmente 16.4, 39/B4-0 e esta seção 43;
+2. confirmar Git clean/synced e reproduzir o P0 em SQLite **read-only** antes de mutar source;
+3. ler integralmente `observability/audit/service.js`, `round-trip/analytics.js` e os testes de
+   rotation/cursor;
+4. desenhar primeiro a state machine `append|rebind|rotation|truncate/rewrite` e seus invariants;
+5. escrever os testes que hoje faltam, inclusive same-content rebind e copytruncate-like;
+6. só então alterar o cursor/schema/ingestion;
+7. manter raw JSONL como authority e preparar rebuild explícito;
+8. validar em gate causal focado, depois static/architecture conforme boundary tocada;
+9. fazer um único broad/promotion gate sobre bytes estáveis quando a candidate estiver pronta;
+10. atualizar este MD **na mesma rodada**, com before/after raw↔derived e decisão sobre B4-1.
+
+O próximo objetivo não é “reduzir mais calls” em abstrato. É restaurar primeiro a propriedade que
+permite saber se qualquer redução posterior é real:
+
+> **uma fonte lógica de audit deve ser ingerida exatamente uma vez, independentemente de como o
+> filesystem a reexpõe fisicamente; uma geração realmente nova deve permanecer distinguível e
+> preservada.**
