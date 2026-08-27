@@ -93,6 +93,16 @@
       "rationale": "OAuth smoke is loaded only for the authenticated connector-smoke branch that requests it."
     },
     {
+      "source": "src/copilot/mcp/diagnostics/oauth-smoke/report.js",
+      "sourceOwnerId": "mcp.diagnostics.oauth-smoke",
+      "specifier": "#copilot/mcp/public/protocol/catalog/descriptor-fingerprint",
+      "targetOwnerId": "mcp.protocol",
+      "audience": "public",
+      "loadPolicy": "operation-lazy",
+      "expectedCount": 1,
+      "rationale": "Descriptor parity is loaded only when the authenticated tools/list summary has local wire fingerprints to compare."
+    },
+    {
       "source": "src/copilot/mcp/cloudflare/posture/mcp-passthrough-plan.js",
       "sourceOwnerId": "mcp.cloudflare.posture",
       "specifier": "cloudflare",

@@ -8,7 +8,7 @@ export {
     runFileBatchPreflight,
 } from '../file-batch/runtime.js';
 export { runRepoWritePatchTargetGroups } from '../patch/runtime.js';
-export { executeRepoPatchBatchWorkflow } from '../patch-batch/workflow.js';
+export { executeRepoPatchBatchWorkflow, resolveRepoPatchPostValidationPolicy } from '../patch-batch/workflow.js';
 export {
     MAX_POST_PATCH_VALIDATORS,
     POST_PATCH_VALIDATOR_NAMES,

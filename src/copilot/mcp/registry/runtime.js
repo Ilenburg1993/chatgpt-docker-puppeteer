@@ -27,7 +27,11 @@ import {
     recordMcpToolMetric,
 } from '#copilot/mcp/public/observability';
 import {
+    MCP_TOOL_DESCRIPTOR_SET_FINGERPRINT_KIND,
+    buildMcpToolDescriptorRevisionToken,
+    buildMcpToolWireFingerprintIndex,
     classifyMcpToolContractRisk,
+    fingerprintMcpToolWireDescriptorSet,
     normalizeMcpToolDefinitions,
     projectMcpToolAnnotations,
     validateMcpToolContractSemantics,
@@ -38,12 +42,13 @@ import {
     getResultExecutionHint,
     getResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
-import { buildMcpWireToolCatalog } from '#copilot/mcp/public/tools/catalog';
+import { buildMcpWireToolCatalog, projectMcpToolOptionPolicy } from '#copilot/mcp/public/tools/catalog';
 import { toMcpWorkspaceRelativePath } from '#copilot/mcp/public/workspace';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
 import { buildMcpToolCallAuditCorrelation, scopeMcpToolAuditCapability } from './audit-correlation.js';
+import { projectMcpToolResultOutcome } from './result-outcome.js';
 import {
     MCP_TOOL_SURFACE_MODES,
     applyMcpToolSurfacePolicy,
@@ -360,9 +365,14 @@ export function registerCanonicalMcpTools(server, options = {}) {
         authConfig,
     });
     const comparisonCapability = createMcpToolSurfaceComparisonCapability(registryPolicy, authConfig);
+    const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
     const toolSurfaceCapability = Object.freeze({
         tools: Object.freeze([...tools]),
         names: Object.freeze(tools.map((tool) => tool.name)),
+        descriptorFingerprint: wireSnapshot.fingerprint,
+        descriptorFingerprintKind: wireSnapshot.fingerprintKind,
+        toolDescriptorFingerprints: wireSnapshot.toolFingerprints,
+        toolDescriptorRevisionTokens: wireSnapshot.toolRevisionTokens,
         resolveCanonicalSurfaces: comparisonCapability.resolveCanonicalSurfaces,
     });
     for (const tool of tools) {
@@ -470,6 +480,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
     };
     const httpTimingMetadata = readMcpHttpToolTimingMetadata();
     const latencyExperimentMetadata = buildLatencyPulseAuditMetadata(tool.name, args);
+    const optionPolicyMetadata = projectMcpToolOptionPolicy(tool.name, args);
     await safeAppendMcpAuditEvent(operationContext.capabilities.audit, {
         event: 'tool_call_started',
         callId,
@@ -479,6 +490,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
             ? { originRequestReceivedAt: new Date(httpTimingMetadata.requestReceivedAt).toISOString() }
             : {}),
         ...latencyExperimentMetadata,
+        ...(optionPolicyMetadata ?? {}),
         readOnly: tool.annotations.readOnlyHint === true,
         destructive: tool.annotations.destructiveHint === true,
         openWorld: tool.annotations.openWorldHint === true,
@@ -1228,15 +1240,32 @@ export function classifyMcpToolRisk(tool) {
  * schema object shape. This is the descriptor-generation authority used by positive MCP cache hints.
  *
  * @param {McpToolDefinition[]} tools
- * @returns {{ schemaVersion: 1; fingerprintKind: 'tools-list-wire-sha256-v1'; fingerprint: string; descriptors: Record<string, unknown>[] }}
+ * @returns {{
+ *   schemaVersion: 2;
+ *   fingerprintKind: typeof MCP_TOOL_DESCRIPTOR_SET_FINGERPRINT_KIND;
+ *   fingerprint: string;
+ *   descriptors: Record<string, unknown>[];
+ *   toolFingerprints: Readonly<Record<string, string>>;
+ *   toolRevisionTokens: Readonly<Record<string, string>>;
+ * }}
  */
 export function buildMcpToolWireDescriptorSnapshot(tools) {
     const descriptors = tools.map((tool) => projectMcpToolWireDescriptor(tool));
+    const toolFingerprints = buildMcpToolWireFingerprintIndex(descriptors);
     return {
-        schemaVersion: 1,
-        fingerprintKind: 'tools-list-wire-sha256-v1',
-        fingerprint: sha256StableJson(descriptors),
+        schemaVersion: 2,
+        fingerprintKind: MCP_TOOL_DESCRIPTOR_SET_FINGERPRINT_KIND,
+        fingerprint: fingerprintMcpToolWireDescriptorSet(descriptors),
         descriptors,
+        toolFingerprints,
+        toolRevisionTokens: Object.freeze(
+            Object.fromEntries(
+                Object.entries(toolFingerprints).map(([name, fingerprint]) => [
+                    name,
+                    buildMcpToolDescriptorRevisionToken(fingerprint),
+                ]),
+            ),
+        ),
     };
 }
 
@@ -1594,7 +1623,9 @@ function buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, exe
     const resultBytes = nonNegativeSafeInteger(resultSizeMetric?.bytes);
     const textResultBytes = countMcpResultTextBytes(result);
     const duplicateTextBytes = estimateKnownDuplicateTextBytes(toolName, result, textResultBytes);
+    const resultOutcome = projectMcpToolResultOutcome(result);
     return {
+        ...resultOutcome,
         ...(executionMetric
             ? {
                   logicalOperations: executionMetric.logicalOperations,
@@ -1611,7 +1642,23 @@ function buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, exe
                   ...(executionMetric.truncatedOperations !== undefined
                       ? { truncatedOperations: executionMetric.truncatedOperations }
                       : {}),
-                  ...(executionMetric.continuationRequired === true ? { continuationRequired: true } : {}),
+                  ...(executionMetric.continuationAvailable === true ? { continuationAvailable: true } : {}),
+                  ...(executionMetric.continuationAvailableOperations !== undefined
+                      ? { continuationAvailableOperations: executionMetric.continuationAvailableOperations }
+                      : {}),
+                  ...(executionMetric.continuationTransportRequired === true
+                      ? { continuationTransportRequired: true }
+                      : {}),
+                  ...(executionMetric.continuationTransportRequiredOperations !== undefined
+                      ? {
+                            continuationTransportRequiredOperations:
+                                executionMetric.continuationTransportRequiredOperations,
+                        }
+                      : {}),
+                  ...(executionMetric.continuationRecommended === true ? { continuationRecommended: true } : {}),
+                  ...(executionMetric.continuationRecommendedOperations !== undefined
+                      ? { continuationRecommendedOperations: executionMetric.continuationRecommendedOperations }
+                      : {}),
               }
             : {}),
         ...(resultBytes !== null ? { resultBytes } : {}),
@@ -1795,14 +1842,6 @@ function stableJsonStringify(value) {
             .join(',')}}`;
     }
     return JSON.stringify(value);
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function sha256StableJson(value) {
-    return sha256String(stableJsonStringify(value));
 }
 
 /**

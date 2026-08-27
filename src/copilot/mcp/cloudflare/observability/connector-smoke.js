@@ -33,6 +33,7 @@ function asRecord(value) {
  *     toolsMatchLocalRegistry: boolean;
  *     missingLocalTools: string[];
  *     unexpectedRemoteTools: string[];
+ *     schemaParity?: Record<string, unknown>;
  * }} AuthenticatedToolsListProjection
  *
  *
@@ -80,6 +81,7 @@ function finiteNumber(value) {
  *     env?: NodeJS.ProcessEnv;
  *     persistState?: boolean;
  *     localToolNames: readonly string[];
+ *     localToolFingerprints?: Readonly<Record<string,string>>;
  *     deps?: {
  *         runUnauthenticatedSmoke?: typeof runCloudflareSmoke;
  *         runOauthSmoke?: (options: CanonicalOAuthSmokeOptions) => Promise<Record<string, unknown>>;
@@ -94,6 +96,7 @@ export async function runCanonicalConnectorSmoke({
     env,
     persistState = true,
     localToolNames,
+    localToolFingerprints = {},
     deps = {},
 }) {
     if (!config) throw new TypeError('Canonical connector smoke requires a Cloudflare tunnel config.');
@@ -120,6 +123,7 @@ export async function runCanonicalConnectorSmoke({
         runPrivateKeyJwt: false,
         runNegativeResourceChecks: false,
         localToolNames,
+        localToolFingerprints,
     };
     const [unauthenticated, oauth] = await Promise.all([
         runUnauthenticatedSmoke({ config, authenticated: false, env: smokeEnv, persistState: false, localToolNames }),
@@ -131,6 +135,7 @@ export async function runCanonicalConnectorSmoke({
     const modernSubscription = asRecord(runtimeFlow['modernSubscription']);
     const legacy2025Compatibility = asRecord(runtimeFlow['legacy2025Compatibility']);
     const runtimeHealth = asRecord(runtimeFlow['runtimeHealth']);
+    const authenticatedSchemaParity = asRecord(authenticatedToolsList['schemaParity']);
     /** @type {AuthenticatedToolsListProjection | null} */
     const authenticatedToolsListProjection =
         Object.keys(authenticatedToolsList).length > 0
@@ -143,6 +148,9 @@ export async function runCanonicalConnectorSmoke({
                   toolsMatchLocalRegistry: authenticatedToolsList['toolsMatchLocalRegistry'] === true,
                   missingLocalTools: stringArray(authenticatedToolsList['missingLocalTools']),
                   unexpectedRemoteTools: stringArray(authenticatedToolsList['unexpectedRemoteTools']),
+                  ...(Object.keys(authenticatedSchemaParity).length > 0
+                      ? { schemaParity: authenticatedSchemaParity }
+                      : {}),
               }
             : null;
     const authenticatedOk = oauthRecord['ok'] === true;
@@ -202,6 +210,9 @@ export async function runCanonicalConnectorSmoke({
                     missingCriticalTools: stringArray(criticalTools['missing']),
                     missingLocalTools: authenticatedToolsListProjection?.missingLocalTools ?? [],
                     unexpectedRemoteTools: authenticatedToolsListProjection?.unexpectedRemoteTools ?? [],
+                    ...(authenticatedToolsListProjection?.schemaParity
+                        ? { schemaParity: authenticatedToolsListProjection.schemaParity }
+                        : {}),
                     authChallenge: authChallenge['ok'] === true,
                 },
                 ok: combinedOk,

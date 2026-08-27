@@ -1,7 +1,7 @@
 // @ts-check
 /** Sanitized MCP audit-event normalizer for the rebuildable round-trip index. */
 
-export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 4;
+export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 7;
 
 export const MCP_TOOL_CALL_TERMINAL_EVENTS = Object.freeze([
     'tool_call_completed',
@@ -43,6 +43,27 @@ export function normalizeMcpRoundTripAuditEvent(event) {
         durationMs: integerOrNull(event['durationMs']),
         isError: boolInt(event['isError']),
         code: stringOrNull(event['code']),
+        resultCode: boundedMachineCodeOrNull(event['resultCode']),
+        resultState: enumOrNull(event['resultState'], ['success', 'tool-error', 'domain-failure']),
+        resultClass: enumOrNull(event['resultClass'], [
+            'success',
+            'option-config',
+            'precondition',
+            'domain-or-unknown',
+            'uncoded-failure',
+        ]),
+        optionContractVersion: boundedStringOrNull(event['optionContractVersion'], 32),
+        optionPolicyCoverage: enumOrNull(event['optionPolicyCoverage'], ['complete']),
+        optionMode: boundedStringOrNull(event['optionMode'], 48),
+        optionDeclaredCount: nonNegativeIntegerOrNull(event['optionDeclaredCount']),
+        optionRequestedCount: nonNegativeIntegerOrNull(event['optionRequestedCount']),
+        optionEffectiveRequestedCount: nonNegativeIntegerOrNull(event['optionEffectiveRequestedCount']),
+        optionDefaultedCount: nonNegativeIntegerOrNull(event['optionDefaultedCount']),
+        optionNormalizedCount: nonNegativeIntegerOrNull(event['optionNormalizedCount']),
+        optionIgnoredCount: nonNegativeIntegerOrNull(event['optionIgnoredCount']),
+        optionCoercedCount: nonNegativeIntegerOrNull(event['optionCoercedCount']),
+        optionRejectedCount: nonNegativeIntegerOrNull(event['optionRejectedCount']),
+        optionConflictCount: nonNegativeIntegerOrNull(event['optionConflictCount']),
         logicalOperations: positiveIntegerOrNull(event['logicalOperations']),
         failedOperations: nonNegativeIntegerOrNull(event['failedOperations']),
         skippedOperations: nonNegativeIntegerOrNull(event['skippedOperations']),
@@ -51,7 +72,15 @@ export function normalizeMcpRoundTripAuditEvent(event) {
         batchCapacity: positiveIntegerOrNull(event['batchCapacity']),
         resultBudgetBytes: nonNegativeIntegerOrNull(event['resultBudgetBytes']),
         truncatedOperations: nonNegativeIntegerOrNull(event['truncatedOperations']),
-        continuationRequired: boolInt(event['continuationRequired']),
+        legacyContinuationRequired: boolInt(event['continuationRequired']),
+        continuationAvailable: boolInt(event['continuationAvailable']),
+        continuationAvailableOperations: nonNegativeIntegerOrNull(event['continuationAvailableOperations']),
+        continuationTransportRequired: boolInt(event['continuationTransportRequired']),
+        continuationTransportRequiredOperations: nonNegativeIntegerOrNull(
+            event['continuationTransportRequiredOperations'],
+        ),
+        continuationRecommended: boolInt(event['continuationRecommended']),
+        continuationRecommendedOperations: nonNegativeIntegerOrNull(event['continuationRecommendedOperations']),
         resultBytes: nonNegativeIntegerOrNull(event['resultBytes']),
         resultSizeStrategy: boundedStringOrNull(event['resultSizeStrategy'], 32),
         textResultBytes: nonNegativeIntegerOrNull(event['textResultBytes']),
@@ -98,6 +127,17 @@ function boundedStringOrNull(value, maxLength) {
 function boundedHexOrNull(value, maxLength) {
     const text = boundedStringOrNull(value, maxLength);
     return text && /^[0-9a-f]+$/u.test(text) ? text : null;
+}
+
+/** @param {unknown} value */
+function boundedMachineCodeOrNull(value) {
+    const text = boundedStringOrNull(value, 96);
+    return text && /^[A-Z][A-Z0-9_]{1,95}$/u.test(text) ? text : null;
+}
+
+/** @template {string} T @param {unknown} value @param {readonly T[]} allowed @returns {T | null} */
+function enumOrNull(value, allowed) {
+    return typeof value === 'string' && allowed.includes(/** @type {T} */ (value)) ? /** @type {T} */ (value) : null;
 }
 
 /** @param {unknown} value */

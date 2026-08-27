@@ -1932,6 +1932,13 @@ export async function runArchitectureContractCheck() {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const report = await runArchitectureContractCheck();
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    const output = report.success
+        ? {
+              success: true,
+              checkCount: report.checks.length,
+              passedCount: report.checks.filter((check) => check.passed).length,
+          }
+        : report;
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
     if (!report.success) process.exitCode = 1;
 }

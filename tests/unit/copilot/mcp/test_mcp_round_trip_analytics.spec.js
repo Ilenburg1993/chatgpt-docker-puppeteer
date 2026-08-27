@@ -71,7 +71,7 @@ function emptySlice(offset = 0, fileIdentity = 'dev:ino-a', fileBytes = offset) 
     };
 }
 
-describe('MCP incremental round-trip analytics v4', () => {
+describe('MCP incremental round-trip analytics v6', () => {
     it('normalizes only bounded correlation/execution metadata and never indexes raw sensitive payload fields', () => {
         const normalized = normalizeMcpRoundTripAuditEvent({
             ts: iso(10_000),
@@ -94,11 +94,32 @@ describe('MCP incremental round-trip analytics v4', () => {
             resultBudgetBytes: 1_000_000,
             truncatedOperations: 2,
             continuationRequired: true,
+            continuationAvailable: true,
+            continuationAvailableOperations: 3,
+            continuationTransportRequired: true,
+            continuationTransportRequiredOperations: 2,
+            continuationRecommended: true,
+            continuationRecommendedOperations: 3,
             resultBytes: 42_000,
             resultSizeStrategy: 'hint',
             textResultBytes: 500,
             nonTextResultBytes: 41_500,
             duplicateTextBytes: 0,
+            resultCode: 'ERR_BATCH_CONFLICTING_MODE',
+            resultState: 'tool-error',
+            resultClass: 'option-config',
+            optionContractVersion: '1.1.0',
+            optionPolicyCoverage: 'complete',
+            optionMode: 'apply',
+            optionDeclaredCount: 11,
+            optionRequestedCount: 4,
+            optionEffectiveRequestedCount: 3,
+            optionDefaultedCount: 4,
+            optionNormalizedCount: 1,
+            optionIgnoredCount: 1,
+            optionCoercedCount: 0,
+            optionRejectedCount: 0,
+            optionConflictCount: 0,
             path: 'src/copilot/secret-not-derived.txt',
             secret: 'must-not-be-indexed',
             old_string: 'must-not-be-indexed',
@@ -112,8 +133,23 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.equal(normalized?.batchSize, 5);
         assert.equal(normalized?.batchCapacity, 128);
         assert.equal(normalized?.truncatedOperations, 2);
-        assert.equal(normalized?.continuationRequired, 1);
+        assert.equal(normalized?.legacyContinuationRequired, 1);
+        assert.equal(normalized?.continuationAvailable, 1);
+        assert.equal(normalized?.continuationAvailableOperations, 3);
+        assert.equal(normalized?.continuationTransportRequired, 1);
+        assert.equal(normalized?.continuationTransportRequiredOperations, 2);
+        assert.equal(normalized?.continuationRecommended, 1);
+        assert.equal(normalized?.continuationRecommendedOperations, 3);
         assert.equal(normalized?.duplicateTextBytes, 0);
+        assert.equal(normalized?.resultCode, 'ERR_BATCH_CONFLICTING_MODE');
+        assert.equal(normalized?.resultState, 'tool-error');
+        assert.equal(normalized?.resultClass, 'option-config');
+        assert.equal(normalized?.optionContractVersion, '1.1.0');
+        assert.equal(normalized?.optionPolicyCoverage, 'complete');
+        assert.equal(normalized?.optionMode, 'apply');
+        assert.equal(normalized?.optionRequestedCount, 4);
+        assert.equal(normalized?.optionEffectiveRequestedCount, 3);
+        assert.equal(normalized?.optionIgnoredCount, 1);
         const serialized = JSON.stringify(normalized);
         for (const forbidden of ['secret-not-derived', 'must-not-be-indexed', 'traceparent', 'baggage', 'old_string']) {
             assert.equal(serialized.includes(forbidden), false, forbidden);
@@ -353,6 +389,111 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.equal(summary.recovery.lineageBound.unknownRecoveryLineageCount, 1);
     });
 
+    it('measures strong retry tax only for same trace, same tool and exact same target', () => {
+        const target = 'a'.repeat(32);
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_started', 'repo_apply_patch', 'fail-a', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                }),
+                row(2, 1_050, 'repo_apply_patch_failed', 'repo_apply_patch', 'fail-a', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                    code: 'ERR_PATCH_NOT_FOUND',
+                    failure_class: 'stale-context',
+                    retryability: 'caller-refresh',
+                }),
+                row(3, 1_100, 'tool_call_completed', 'repo_apply_patch', 'fail-a', {
+                    trace_key: 'trace-a',
+                    result_state: 'tool-error',
+                    result_class: 'domain-or-unknown',
+                }),
+                row(4, 1_200, 'tool_call_started', 'repo_read_file', 'inspect-a', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                }),
+                row(5, 1_250, 'tool_call_completed', 'repo_read_file', 'inspect-a', { trace_key: 'trace-a' }),
+                row(6, 1_400, 'tool_call_started', 'repo_apply_patch', 'retry-a', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.retryTax.retryTaxCalls, 1);
+        assert.equal(summary.retryTax.retryTaxGapMs, 300);
+        assert.equal(summary.retryTax.retryTaxInterveningCalls, 1);
+        assert.deepEqual(summary.retryTax.byTool, { repo_apply_patch: 1 });
+        assert.deepEqual(summary.retryTax.byFailureSignalClass, { 'stale-context': 1 });
+        assert.deepEqual(summary.retryTax.byResultCode, { ERR_PATCH_NOT_FOUND: 1 });
+        assert.equal(summary.retryTax.lineageBound.sameToolRepeatCount, 1);
+        assert.equal(summary.retryTax.lineageBound.targetOverlapRepeatCount, 1);
+        assert.equal(summary.retryTax.lineageBound.pendingCandidateCount, 0);
+    });
+
+    it('keeps same-trace same-tool repeats on a different target outside retry tax', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_started', 'repo_apply_patch', 'fail-a', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson(['a'.repeat(32)]),
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_apply_patch', 'fail-a', {
+                    trace_key: 'trace-a',
+                    result_state: 'tool-error',
+                    result_class: 'option-config',
+                    result_code: 'ERR_PATCH_OPTION_INACTIVE',
+                }),
+                row(3, 1_200, 'tool_call_started', 'repo_apply_patch', 'other-target', {
+                    trace_key: 'trace-a',
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson(['b'.repeat(32)]),
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.retryTax.retryTaxCalls, 0);
+        assert.equal(summary.retryTax.lineageBound.sameToolRepeatCount, 1);
+        assert.equal(summary.retryTax.lineageBound.targetOverlapRepeatCount, 0);
+        assert.deepEqual(summary.retryTax.lineageBound.byFailureSignalClass, { 'shape/config': 1 });
+        assert.equal(summary.retryTax.lineageBound.pendingCandidateCount, 0);
+    });
+
+    it('keeps no-trace same-target repeats as temporal pressure rather than retry tax', () => {
+        const target = 'a'.repeat(32);
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_started', 'repo_apply_patch', 'fail-a', {
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_apply_patch', 'fail-a', {
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                    result_state: 'tool-error',
+                    result_class: 'precondition',
+                    result_code: 'EEXPECTEDHASH',
+                }),
+                row(3, 1_200, 'tool_call_started', 'repo_apply_patch', 'retry-a', {
+                    target_precision: 'exact-single',
+                    target_keys_json: setJson([target]),
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.retryTax.retryTaxCalls, 0);
+        assert.equal(summary.retryTax.lineageBound.candidateWithoutLineageCount, 1);
+        assert.equal(summary.retryTax.temporalPressure.sameToolAdjacentAfterFailureCount, 1);
+        assert.equal(summary.retryTax.temporalPressure.sameExactTargetAdjacentAfterFailureCount, 1);
+        assert.equal(summary.retryTax.temporalPressure.totalGapMs, 100);
+    });
+
     it('measures heavy-result read follow-up pressure without calling it avoidable and proves exact same-target rereads only with lineage', () => {
         const target = 'e'.repeat(32);
         const summary = summarizeMcpRoundTripRows(
@@ -383,7 +524,7 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.match(summary.payloadAccounting.heavyResultFollowups.caveat, /observational pressure/u);
     });
 
-    it('accounts batch size, saturation, continuation and same-trace repeat after a complete unsaturated batch', () => {
+    it('separates optional continuation from transport-required continuation in batch accounting', () => {
         const summary = summarizeMcpRoundTripRows(
             [
                 row(1, 1_000, 'tool_call_started', 'repo_bulk_inspect', 'a', { trace_key: 'trace-a' }),
@@ -395,7 +536,12 @@ describe('MCP incremental round-trip analytics v4', () => {
                     batch_size: 4,
                     batch_capacity: 64,
                     truncated_operations: 0,
-                    continuation_required: 0,
+                    continuation_available: 1,
+                    continuation_available_operations: 1,
+                    continuation_transport_required: 0,
+                    continuation_transport_required_operations: 0,
+                    continuation_recommended: 1,
+                    continuation_recommended_operations: 1,
                     result_bytes: 8_000,
                     text_result_bytes: 100,
                     non_text_result_bytes: 7_900,
@@ -407,7 +553,12 @@ describe('MCP incremental round-trip analytics v4', () => {
                     batch_size: 64,
                     batch_capacity: 64,
                     truncated_operations: 2,
-                    continuation_required: 1,
+                    continuation_available: 1,
+                    continuation_available_operations: 2,
+                    continuation_transport_required: 1,
+                    continuation_transport_required_operations: 2,
+                    continuation_recommended: 1,
+                    continuation_recommended_operations: 2,
                 }),
             ],
             { windowMs: 10_000, top: 20, includeSynthetic: false },
@@ -417,8 +568,15 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.equal(summary.executionAccounting.batchCalls, 2);
         assert.equal(summary.executionAccounting.saturatedBatchCalls, 1);
         assert.equal(summary.executionAccounting.truncatedOperations, 2);
-        assert.equal(summary.executionAccounting.continuationCalls, 1);
+        assert.equal(summary.executionAccounting.continuationAvailableCalls, 2);
+        assert.equal(summary.executionAccounting.continuationAvailableOperations, 3);
+        assert.equal(summary.executionAccounting.continuationTransportRequiredCalls, 1);
+        assert.equal(summary.executionAccounting.continuationTransportRequiredOperations, 2);
+        assert.equal(summary.executionAccounting.continuationRecommendedCalls, 2);
+        assert.equal(summary.executionAccounting.continuationRecommendedOperations, 3);
+        assert.equal(summary.executionAccounting.legacyContinuationRequiredCalls, 0);
         assert.equal(summary.executionAccounting.repeatAfterBatch.unsaturatedComplete, 1);
+        assert.equal(summary.executionAccounting.repeatAfterBatch.transportRequired, 0);
         assert.equal(summary.executionAccounting.byTool[0]?.singleCalls, 0);
         assert.deepEqual(summary.executionAccounting.byTool[0]?.batchSizeHistogram, { 4: 1, 64: 1 });
         assert.equal(summary.executionAccounting.byTool[0]?.batchSizeP50, 4);
@@ -427,8 +585,183 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.equal(summary.executionAccounting.byTool[0]?.logicalOperationsPerCallP95, 64);
         assert.equal(summary.executionAccounting.byTool[0]?.saturationRate, 0.5);
         assert.equal(summary.executionAccounting.byTool[0]?.truncationRate, 0.5);
-        assert.equal(summary.executionAccounting.byTool[0]?.continuationRate, 0.5);
+        assert.equal(summary.executionAccounting.byTool[0]?.continuationAvailableRate, 1);
+        assert.equal(summary.executionAccounting.byTool[0]?.continuationTransportRequiredRate, 0.5);
+        assert.equal(summary.executionAccounting.byTool[0]?.continuationRecommendedRate, 1);
         assert.equal(summary.payloadAccounting.byTool[0]?.resultBytes, 8_000);
+    });
+
+    it('keeps legacy v6 continuation_required out of transport-required metrics', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_completed', 'repo_search_text', 'legacy-a', {
+                    logical_operations: 2,
+                    batch_size: 2,
+                    batch_capacity: 64,
+                    continuation_required: 1,
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.executionAccounting.legacyContinuationRequiredCalls, 1);
+        assert.equal(summary.executionAccounting.continuationAvailableCalls, 0);
+        assert.equal(summary.executionAccounting.continuationTransportRequiredCalls, 0);
+        assert.equal(summary.executionAccounting.continuationRecommendedCalls, 0);
+        assert.match(summary.executionAccounting.caveat, /historical v6 metadata/u);
+    });
+
+    it('aggregates v5 result outcomes by state/class/code/tool/cohort without diluting rates with legacy unobserved completions', () => {
+        const sourceA = '1'.repeat(64);
+        const sourceB = '2'.repeat(64);
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_completed', 'repo_read_file', 'a', {
+                    runtime_source_fingerprint: sourceA,
+                    result_state: 'success',
+                    result_class: 'success',
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_read_file', 'b', {
+                    runtime_source_fingerprint: sourceA,
+                    result_state: 'tool-error',
+                    result_class: 'option-config',
+                    result_code: 'ERR_BATCH_CONFLICTING_MODE',
+                }),
+                row(3, 1_200, 'tool_call_completed', 'repo_read_file', 'legacy', {
+                    runtime_source_fingerprint: sourceA,
+                }),
+                row(4, 1_300, 'tool_call_completed', 'terminal_exec', 'c', {
+                    runtime_source_fingerprint: sourceB,
+                    result_state: 'domain-failure',
+                    result_class: 'option-config',
+                    result_code: 'ERR_TERMINAL_EXEC_SHAPE',
+                }),
+                row(5, 1_400, 'tool_call_completed', 'repo_apply_patch', 'd', {
+                    runtime_source_fingerprint: sourceB,
+                    result_state: 'tool-error',
+                    result_class: 'precondition',
+                    result_code: 'EEXPECTEDHASH',
+                }),
+                row(6, 1_500, 'tool_call_completed', 'repo_apply_patch', 'e', {
+                    runtime_source_fingerprint: sourceB,
+                    result_state: 'tool-error',
+                    result_class: 'domain-or-unknown',
+                    result_code: 'ERR_NEW_UNCLASSIFIED_FAILURE',
+                }),
+                row(7, 1_600, 'tool_call_completed', 'terminal_exec', 'f', {
+                    runtime_source_fingerprint: sourceB,
+                    result_state: 'domain-failure',
+                    result_class: 'uncoded-failure',
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+
+        assert.equal(summary.resultOutcomes.completedCalls, 7);
+        assert.equal(summary.resultOutcomes.observedOutcomeCalls, 6);
+        assert.equal(summary.resultOutcomes.outcomeCoverageRate, 0.8571);
+        assert.equal(summary.resultOutcomes.codedCalls, 4);
+        assert.equal(summary.resultOutcomes.failureCalls, 5);
+        assert.equal(summary.resultOutcomes.optionConfigFailures, 2);
+        assert.equal(summary.resultOutcomes.preconditionFailures, 1);
+        assert.equal(summary.resultOutcomes.domainOrUnknownFailures, 1);
+        assert.equal(summary.resultOutcomes.uncodedFailures, 1);
+        assert.equal(summary.resultOutcomes.optionErrorRate, 0.3333);
+        assert.equal(summary.resultOutcomes.optionErrorShareOfFailures, 0.4);
+        assert.deepEqual(summary.resultOutcomes.byState, {
+            'tool-error': 3,
+            'domain-failure': 2,
+            success: 1,
+            unobserved: 1,
+        });
+        assert.equal(summary.resultOutcomes.byCode['ERR_BATCH_CONFLICTING_MODE'], 1);
+        assert.equal(summary.resultOutcomes.byCode['ERR_TERMINAL_EXEC_SHAPE'], 1);
+        assert.equal(
+            summary.resultOutcomes.byTool.find((item) => item.tool === 'repo_read_file')?.optionErrorRate,
+            0.5,
+        );
+        assert.equal(summary.resultOutcomes.byRuntimeCohort[`source:${sourceA}`].outcomeCoverageRate, 0.6667);
+        assert.equal(summary.resultOutcomes.byRuntimeCohort[`source:${sourceB}`].outcomeCoverageRate, 1);
+        assert.match(summary.resultOutcomes.caveat, /unobserved/u);
+    });
+
+    it('aggregates v6 Option Contract policy telemetry with explicit call and option denominators', () => {
+        const sourceA = 'a'.repeat(64);
+        const sourceB = 'b'.repeat(64);
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_started', 'terminal_exec', 'a', {
+                    runtime_source_fingerprint: sourceA,
+                    option_contract_version: '1.1.0',
+                    option_policy_coverage: 'complete',
+                    option_mode: 'batch',
+                    option_declared_count: 14,
+                    option_requested_count: 2,
+                    option_effective_requested_count: 1,
+                    option_defaulted_count: 3,
+                    option_normalized_count: 0,
+                    option_ignored_count: 1,
+                    option_coerced_count: 0,
+                    option_rejected_count: 0,
+                    option_conflict_count: 0,
+                }),
+                row(2, 1_100, 'tool_call_started', 'terminal_exec', 'b', {
+                    runtime_source_fingerprint: sourceB,
+                    option_contract_version: '1.1.0',
+                    option_policy_coverage: 'complete',
+                    option_mode: 'batch',
+                    option_declared_count: 14,
+                    option_requested_count: 2,
+                    option_effective_requested_count: 1,
+                    option_defaulted_count: 3,
+                    option_normalized_count: 0,
+                    option_ignored_count: 0,
+                    option_coerced_count: 0,
+                    option_rejected_count: 1,
+                    option_conflict_count: 1,
+                }),
+                row(3, 1_200, 'tool_call_started', 'repo_search_text', 'c', {
+                    runtime_source_fingerprint: sourceA,
+                    option_contract_version: '1.1.0',
+                    option_policy_coverage: 'complete',
+                    option_mode: 'single',
+                    option_declared_count: 14,
+                    option_requested_count: 2,
+                    option_effective_requested_count: 1,
+                    option_defaulted_count: 5,
+                    option_normalized_count: 0,
+                    option_ignored_count: 1,
+                    option_coerced_count: 0,
+                    option_rejected_count: 0,
+                    option_conflict_count: 1,
+                }),
+                row(4, 1_300, 'tool_call_started', 'repo_read_file', 'legacy', {
+                    runtime_source_fingerprint: sourceA,
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+
+        assert.equal(summary.optionPolicies.observedCalls, 3);
+        assert.equal(summary.optionPolicies.requestedOptions, 6);
+        assert.equal(summary.optionPolicies.effectiveRequestedOptions, 3);
+        assert.equal(summary.optionPolicies.defaultedOptions, 11);
+        assert.equal(summary.optionPolicies.ignoredOptions, 2);
+        assert.equal(summary.optionPolicies.rejectedOptions, 1);
+        assert.equal(summary.optionPolicies.conflictEvents, 2);
+        assert.equal(summary.optionPolicies.ignoredCallRate, 0.6667);
+        assert.equal(summary.optionPolicies.rejectionCallRate, 0.3333);
+        assert.equal(summary.optionPolicies.conflictCallRate, 0.6667);
+        assert.equal(summary.optionPolicies.ignoredRequestedOptionRate, 0.3333);
+        assert.deepEqual(summary.optionPolicies.byContractVersion, { '1.1.0': 3 });
+        assert.deepEqual(summary.optionPolicies.byMode, { batch: 2, single: 1 });
+        assert.equal(summary.optionPolicies.byTool.find((item) => item.tool === 'terminal_exec')?.ignoredCallRate, 0.5);
+        assert.equal(
+            summary.optionPolicies.byTool.find((item) => item.tool === 'terminal_exec')?.rejectionCallRate,
+            0.5,
+        );
+        assert.equal(summary.optionPolicies.byRuntimeCohort[`source:${sourceA}`].observedCalls, 2);
+        assert.equal(summary.optionPolicies.byRuntimeCohort[`source:${sourceB}`].conflictCallRate, 1);
+        assert.match(summary.optionPolicies.caveat, /pre-v6/u);
     });
 
     it('segments failure quality by runtime source generation instead of mixing rollout cohorts', () => {
@@ -509,7 +842,7 @@ describe('MCP incremental round-trip analytics v4', () => {
         assert.deepEqual(after, before);
     });
 
-    it('migrates a v3-style derived event table with v4 correlation/accounting columns', () => {
+    it('migrates an older derived event table with v5 result-outcome/correlation/accounting columns', () => {
         const db = createDb();
         db.exec(`
             CREATE TABLE copilot_mcp_round_trip_events (
@@ -552,11 +885,32 @@ describe('MCP incremental round-trip analytics v4', () => {
             'trace_key',
             'target_keys_json',
             'runtime_source_fingerprint',
+            'result_code',
+            'result_state',
+            'result_class',
+            'option_contract_version',
+            'option_policy_coverage',
+            'option_mode',
+            'option_declared_count',
+            'option_requested_count',
+            'option_effective_requested_count',
+            'option_defaulted_count',
+            'option_normalized_count',
+            'option_ignored_count',
+            'option_coerced_count',
+            'option_rejected_count',
+            'option_conflict_count',
             'logical_operations',
             'batch_size',
             'batch_capacity',
             'truncated_operations',
             'continuation_required',
+            'continuation_available',
+            'continuation_available_operations',
+            'continuation_transport_required',
+            'continuation_transport_required_operations',
+            'continuation_recommended',
+            'continuation_recommended_operations',
             'result_bytes',
             'duplicate_text_bytes',
             'causal_by_code_json',
@@ -569,7 +923,7 @@ describe('MCP incremental round-trip analytics v4', () => {
         }
     });
 
-    it('replays from zero when only an older normalizer cursor exists and materializes the v4 cursor', async () => {
+    it('replays from zero when only the v6 normalizer cursor exists and materializes the v7 cursor', async () => {
         const db = createDb();
         const nowMs = 100_000;
         const analytics = createMcpRoundTripAnalytics({
@@ -607,14 +961,14 @@ describe('MCP incremental round-trip analytics v4', () => {
         db.prepare(
             `INSERT OR REPLACE INTO copilot_mcp_round_trip_cursor
              (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
-             VALUES ('mcp-audit:v3', 'dev:ino-a', 900, 900, ?)`,
+             VALUES ('mcp-audit:v6', 'dev:ino-a', 900, 900, ?)`,
         ).run(nowMs - 1_000);
         const report = await analytics.summarize({ windowMs: 20_000 });
-        assert.equal(report.schemaVersion, 4);
-        assert.equal(report.normalizerVersion, 4);
+        assert.equal(report.schemaVersion, 7);
+        assert.equal(report.normalizerVersion, 7);
         assert.deepEqual(report.failures.byClass, { 'stale-context': 1 });
         const cursor = db
-            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v4'")
+            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v7'")
             .get();
         assert.ok(cursor && typeof cursor === 'object');
         assert.equal(Number(/** @type {Record<string, unknown>} */ (cursor)['byte_offset']), 100);
@@ -727,6 +1081,54 @@ describe('MCP incremental round-trip analytics v4', () => {
         const includingSynthetic = await analytics.summarize({ windowMs: 20_000, includeSynthetic: true, sync: false });
         assert.equal(includingSynthetic.indexedRows, 3);
         assert.deepEqual(includingSynthetic.failures.byCode, { ERR_PATCH_NOT_FOUND: 1 });
+    });
+
+    it('bounds background-style sync work per call without reducing explicit catch-up capacity', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        /** @type {number[]} */
+        const offsets = [];
+        const readSlice = async ({ offset = 0 } = {}) => {
+            offsets.push(offset);
+            const nextOffset = Math.min(300, offset + 100);
+            return {
+                ok: true,
+                fileIdentity: 'dev:ino-budget',
+                fileBytes: 300,
+                requestedOffset: offset,
+                startOffset: offset,
+                nextOffset,
+                bytesRead: nextOffset - offset,
+                complete: nextOffset >= 300,
+                resetRequired: false,
+                parsedEvents: 0,
+                invalidLines: 0,
+                entries: [],
+                events: [],
+                error: null,
+            };
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            maxChunks: 3,
+        });
+
+        const bounded = await analytics.sync({ maxChunks: 1 });
+        assert.equal(bounded.chunks, 1);
+        assert.equal(bounded.chunkBudget, 1);
+        assert.equal(bounded.complete, false);
+        assert.equal(bounded.lagBytes, 200);
+        assert.equal(bounded.cursor?.byteOffset, 100);
+
+        const catchUp = await analytics.sync();
+        assert.equal(catchUp.chunkBudget, 3);
+        assert.equal(catchUp.chunks, 2);
+        assert.equal(catchUp.complete, true);
+        assert.equal(catchUp.lagBytes, 0);
+        assert.equal(catchUp.cursor?.byteOffset, 300);
+        assert.deepEqual(offsets, [0, 100, 200]);
     });
 
     it('keeps old-identity history while restarting ingestion at zero for a rotated audit file', async () => {

@@ -25,6 +25,7 @@ import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
  *     missingCriticalTools: string[];
  *     missingLocalTools: string[];
  *     unexpectedRemoteTools: string[];
+ *     schemaParity?: Record<string, unknown>;
  *     authChallenge?: boolean;
  * }} toolsList
  */

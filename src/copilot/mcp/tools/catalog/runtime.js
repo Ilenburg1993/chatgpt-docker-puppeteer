@@ -62,6 +62,7 @@ import { terminalTools } from '../terminal.js';
 import { mcpToolPayloadAuditTool } from '../tool-payload-audit.js';
 import { mcpAutonomyPowerScoreTool, mcpToolsStatusTool } from '../tools-status.js';
 import { mcpConnectorSmokeRefreshTool, mcpPostRestartReadinessTool, mcpTunnelStatusTool } from '../tunnel-status.js';
+import { assertMcpToolOptionContractParity } from './option-contracts.js';
 import { attachMcpToolSemanticContracts } from './semantic-contracts.js';
 
 /** @typedef {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} McpRawToolDefinition */
@@ -134,5 +135,6 @@ export function buildMcpWireToolCatalog() {
         ...mcpReloadTools,
         mcpRuntimeHealthTool,
     ];
+    assertMcpToolOptionContractParity(tools);
     return attachMcpToolSemanticContracts(tools);
 }

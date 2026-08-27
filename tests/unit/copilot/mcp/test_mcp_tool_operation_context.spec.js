@@ -52,6 +52,10 @@ describe('MCP tool operation context', () => {
         const toolSurface = Object.freeze({
             tools: Object.freeze([]),
             names: Object.freeze(['repo_status']),
+            descriptorFingerprint: 'descriptor-set-fingerprint',
+            descriptorFingerprintKind: 'tools-list-wire-sha256-v1',
+            toolDescriptorFingerprints: Object.freeze({ repo_status: 'repo-status-fingerprint' }),
+            toolDescriptorRevisionTokens: Object.freeze({ repo_status: 'wire-v1:repo-status' }),
         });
         const context = createMcpToolOperationContext(buildSdkRequestContext(), {
             workspace: TEST_WORKSPACE,
@@ -65,8 +69,18 @@ describe('MCP tool operation context', () => {
             TEST_PROCESS_HOST.processConfig.toolCapabilities.modelGatewayLiveRuns,
         );
         assert.deepEqual(context.capabilities.toolSurface?.names, ['repo_status']);
+        assert.equal(context.capabilities.toolSurface?.descriptorFingerprint, 'descriptor-set-fingerprint');
+        assert.equal(context.capabilities.toolSurface?.descriptorFingerprintKind, 'tools-list-wire-sha256-v1');
+        assert.deepEqual(context.capabilities.toolSurface?.toolDescriptorFingerprints, {
+            repo_status: 'repo-status-fingerprint',
+        });
+        assert.deepEqual(context.capabilities.toolSurface?.toolDescriptorRevisionTokens, {
+            repo_status: 'wire-v1:repo-status',
+        });
         assert.equal(Object.isFrozen(context.capabilities.toolSurface ?? {}), true);
         assert.equal(Object.isFrozen(context.capabilities.toolSurface?.names ?? []), true);
+        assert.equal(Object.isFrozen(context.capabilities.toolSurface?.toolDescriptorFingerprints ?? {}), true);
+        assert.equal(Object.isFrozen(context.capabilities.toolSurface?.toolDescriptorRevisionTokens ?? {}), true);
         assert.equal(context.config.connection, TEST_PROCESS_HOST.processConfig.toolConfig.connection);
         assert.equal(context.config.cloudflare, TEST_PROCESS_HOST.processConfig.toolConfig.cloudflare);
         assert.equal(context.capabilities.cloudflare, TEST_PROCESS_HOST.processConfig.toolCapabilities.cloudflare);

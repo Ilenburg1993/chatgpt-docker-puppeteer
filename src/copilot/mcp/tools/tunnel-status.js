@@ -59,10 +59,14 @@ export const mcpConnectorSmokeRefreshTool = defineMcpRawTool({
             ),
     },
     handler: async (input, operationContext) => {
+        const toolSurface = requireMcpToolSurface(operationContext);
         const outcome = await refreshMcpConnectorSmoke(input, {
             config: requireMcpToolCloudflareConfig(operationContext),
             authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
-            localToolNames: requireMcpToolSurface(operationContext).names,
+            localToolNames: toolSurface.names,
+            ...(toolSurface.toolDescriptorFingerprints
+                ? { localToolFingerprints: toolSurface.toolDescriptorFingerprints }
+                : {}),
             workspace: requireMcpToolWorkspace(operationContext),
             authConfig: requireMcpToolAuthConfig(operationContext),
         });

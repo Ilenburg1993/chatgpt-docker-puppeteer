@@ -10,17 +10,19 @@ import {
     parseRepositorySourceBarrierJson,
     verifyRepositorySourceBarrier,
 } from '#copilot/mcp/public/workspace/repository/integrity';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const FINGERPRINT_RE = /^[a-f0-9]{64}$/u;
 
 function usage() {
     return [
         'Usage:',
-        '  node src/copilot/mcp/scripts/source-barrier.js capture --manifest <file> <source-file>...',
+        '  node src/copilot/mcp/scripts/source-barrier.js capture --manifest <file> <source-path>...',
+        '  node src/copilot/mcp/scripts/source-barrier.js capture-worktree --manifest <file>',
         '  node src/copilot/mcp/scripts/source-barrier.js verify  --manifest <file> --expected-fingerprint <sha256>',
         '  node src/copilot/mcp/scripts/source-barrier.js run     --manifest <file> --expected-fingerprint <sha256> -- <executable> [args...]',
         '',
@@ -32,7 +34,9 @@ function usage() {
 /** @param {string[]} argv */
 function parseArgs(argv) {
     const command = argv[0];
-    if (command !== 'capture' && command !== 'verify' && command !== 'run') throw new Error(usage());
+    if (command !== 'capture' && command !== 'capture-worktree' && command !== 'verify' && command !== 'run') {
+        throw new Error(usage());
+    }
     let manifest = '';
     let expectedFingerprint = '';
     /** @type {string[]} */
@@ -62,10 +66,14 @@ function parseArgs(argv) {
         if (token) files.push(token);
     }
     if (!manifest) throw new Error(`--manifest is required.\n${usage()}`);
-    if (command === 'capture' && files.length < 1) throw new Error(`capture requires source files.\n${usage()}`);
-    if (command !== 'capture' && files.length > 0)
+    if (command === 'capture' && files.length < 1) throw new Error(`capture requires source paths.\n${usage()}`);
+    if (command === 'capture-worktree' && files.length > 0) {
+        throw new Error(`capture-worktree derives paths from Git and does not accept explicit paths.\n${usage()}`);
+    }
+    if (command !== 'capture' && command !== 'capture-worktree' && files.length > 0) {
         throw new Error(`${command} reads source paths from the manifest.\n${usage()}`);
-    if (command !== 'capture' && !FINGERPRINT_RE.test(expectedFingerprint)) {
+    }
+    if (command !== 'capture' && command !== 'capture-worktree' && !FINGERPRINT_RE.test(expectedFingerprint)) {
         throw new Error(`${command} requires --expected-fingerprint <sha256>.\n${usage()}`);
     }
     if (command === 'run' && commandArgs.length < 1)
@@ -77,6 +85,58 @@ function parseArgs(argv) {
         files,
         commandArgs,
     };
+}
+
+/** @param {string} stdout */
+export function parseNulSeparatedGitPaths(stdout) {
+    return stdout
+        .split('\0')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+}
+
+/** @param {...readonly string[]} pathGroups */
+export function mergeSourceBarrierWorktreePaths(...pathGroups) {
+    return [...new Set(pathGroups.flat().map((entry) => entry.replaceAll('\\', '/').replace(/^\.\//u, '')))]
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right));
+}
+
+/** @param {string} workspaceRoot @param {string[]} args */
+function readGitPathQuery(workspaceRoot, args) {
+    const childEnvironment = buildMcpChildEnvironment();
+    const result = spawnSync('git', args, {
+        cwd: workspaceRoot,
+        env: childEnvironment.env,
+        encoding: 'utf8',
+        maxBuffer: 8 * 1024 * 1024,
+        windowsHide: true,
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+        const stderr = String(result.stderr ?? '').trim();
+        throw new Error(
+            `git ${args.join(' ')} failed with exit ${String(result.status)}${stderr ? `: ${stderr}` : ''}`,
+        );
+    }
+    return parseNulSeparatedGitPaths(String(result.stdout ?? ''));
+}
+
+/**
+ * Discover the exact current worktree candidate. `--no-renames` deliberately represents a rename as an old-path
+ * tombstone plus a new-path file so source-barrier v2 certifies both sides of the transition.
+ *
+ * @param {string} workspaceRoot
+ */
+export function collectSourceBarrierWorktreePaths(workspaceRoot) {
+    const diffArgs = ['diff', '--name-only', '-z', '--diff-filter=ACMRD', '--no-renames', '--'];
+    const stagedArgs = ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMRD', '--no-renames', '--'];
+    const untrackedArgs = ['ls-files', '--others', '--exclude-standard', '-z', '--'];
+    return mergeSourceBarrierWorktreePaths(
+        readGitPathQuery(workspaceRoot, diffArgs),
+        readGitPathQuery(workspaceRoot, stagedArgs),
+        readGitPathQuery(workspaceRoot, untrackedArgs),
+    );
 }
 
 /** @param {string} target @param {string} content */
@@ -195,11 +255,33 @@ async function main() {
         hostId: `source-barrier-cli-${process.pid}`,
         backgroundServices: false,
     });
-    if (input.command === 'capture') {
-        const barrier = await captureRepositorySourceBarrier(host.workspace, input.files);
+    if (input.command === 'capture' || input.command === 'capture-worktree') {
+        const sourcePaths =
+            input.command === 'capture-worktree'
+                ? collectSourceBarrierWorktreePaths(host.workspace.workspaceRoot)
+                : input.files;
+        if (sourcePaths.length < 1) {
+            const error = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (
+                new Error('Source-barrier worktree capture found no staged, unstaged or untracked paths.')
+            );
+            error.code = 'ERR_SOURCE_BARRIER_EMPTY_WORKTREE';
+            error.details = { promotionAllowed: false };
+            throw error;
+        }
+        const barrier = await captureRepositorySourceBarrier(host.workspace, sourcePaths);
         await writeAtomicText(input.manifest, `${JSON.stringify(barrier, null, 2)}\n`);
+        const absentEntryCount =
+            barrier.version === 2 ? barrier.entries.filter((entry) => entry.kind === 'absent').length : 0;
         process.stdout.write(
-            `${JSON.stringify({ success: true, command: 'capture', manifest: input.manifest, fingerprint: barrier.fingerprint, entryCount: barrier.entryCount })}\n`,
+            `${JSON.stringify({
+                success: true,
+                command: input.command,
+                source: input.command === 'capture-worktree' ? 'git-worktree' : 'explicit',
+                manifest: input.manifest,
+                fingerprint: barrier.fingerprint,
+                entryCount: barrier.entryCount,
+                absentEntryCount,
+            })}\n`,
         );
         return;
     }
@@ -240,7 +322,9 @@ async function main() {
     if (child.exitCode !== 0) process.exitCode = child.exitCode;
 }
 
-main().catch((error) => {
-    process.stderr.write(`${JSON.stringify(projectError(error))}\n`);
-    process.exitCode = 2;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    main().catch((error) => {
+        process.stderr.write(`${JSON.stringify(projectError(error))}\n`);
+        process.exitCode = 2;
+    });
+}

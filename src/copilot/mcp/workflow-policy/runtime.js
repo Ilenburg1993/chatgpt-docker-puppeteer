@@ -11,7 +11,7 @@
 
 import { MCP_TOOL_EXECUTION_LIMITS } from '#copilot/mcp/public/protocol/tools';
 
-export const MCP_WORKFLOW_POLICY_VERSION = '1.0.0';
+export const MCP_WORKFLOW_POLICY_VERSION = '1.1.0';
 
 const WORKFLOW_POLICY = Object.freeze({
     validation: Object.freeze({
@@ -62,6 +62,14 @@ const WORKFLOW_POLICY = Object.freeze({
         independentKnownCommandsPolicy: 'one-terminal-exec-batch',
         deterministicSequentialPolicy: 'batch-concurrency-1-and-fail-fast',
     }),
+    reload: Object.freeze({
+        planTool: 'mcp_reload_plan',
+        scheduleTool: 'mcp_reload_schedule',
+        statusTool: 'mcp_reload_status',
+        smokeTool: 'mcp_connector_smoke_refresh',
+        statusPolicy: 'only-on-failure-or-uncertain-transition',
+        postRestartPolicy: 'connector-smoke-reconciles-reload-and-readiness',
+    }),
 });
 
 /** Return the immutable canonical workflow policy. */
@@ -97,6 +105,11 @@ export function buildMcpSessionWorkflowProjection() {
                 ...WORKFLOW_POLICY.validation.pollTools,
             ],
             terminal: [WORKFLOW_POLICY.terminal.happyPathTool],
+            reload: [
+                WORKFLOW_POLICY.reload.scheduleTool,
+                WORKFLOW_POLICY.reload.smokeTool,
+                WORKFLOW_POLICY.reload.statusTool,
+            ],
             publish: [WORKFLOW_POLICY.publication.happyPathTool],
         },
         preferredWriteWorkflows: [
@@ -123,6 +136,14 @@ export function buildMcpSessionWorkflowProjection() {
                 ],
             },
             {
+                task: 'reload',
+                flow: [
+                    'mcp_reload_schedule exactly once after source-barrier certification; mcp_reload_plan is only for profile/safety preview when needed',
+                    'after restart/reconnect use mcp_connector_smoke_refresh because it reconciles reload status and post-restart readiness in the same call',
+                    'use mcp_reload_status only when the schedule/restart transition failed or remains uncertain; never poll it mechanically',
+                ],
+            },
+            {
                 task: 'publish',
                 flow: [
                     'git_publish_changes for clean-index publication of explicit paths',
@@ -143,6 +164,7 @@ export function buildMcpWorkflowGuidance() {
         'Use repo_apply_file_batch directly for ordered filesystem workflows; use repo_apply_file_batch_plan only when a separate read-only preview or approval boundary adds information.',
         `Use run_copilot_validator directly for validation. For several already-known causal gates, use run_copilot_validator.batch so up to ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchRequests} focused/shell/typecheck/lint gates share one MCP call. mcp_validation_plan is escalation/preview-only, never a happy-path prerequisite. Inline completion means stop: use job_get_summary/job_get_output only when the validator explicitly returns running after its bounded wait. Escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.`,
         'When several independent terminal commands are already known before execution, send one terminal_exec.batch call. For deterministic sequential execution use batchConcurrency=1 and batchFailureMode=fail-fast instead of multiple terminal_exec calls.',
+        'After a certified mcp_reload_schedule, prefer one mcp_connector_smoke_refresh after restart/reconnect because it reconciles reload and readiness. Use mcp_reload_status only for a failed or uncertain transition; never poll it mechanically.',
         'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep granular Git plan/stage/commit/push tools only for the canonical fallback cases.',
     ];
 }

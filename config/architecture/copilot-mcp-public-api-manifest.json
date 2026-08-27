@@ -47,6 +47,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/auth/config",
+      "target": "./src/copilot/mcp/auth/public/config.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/cloudflare/config",
       "target": "./src/copilot/mcp/cloudflare/public/config.js",
       "costTier": "micro",
@@ -317,6 +323,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/protocol/catalog/descriptor-fingerprint",
+      "target": "./src/copilot/mcp/protocol/catalog/public/descriptor-fingerprint.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/protocol/tools",
       "target": "./src/copilot/mcp/protocol/tools/public/index.js",
       "costTier": "micro",
@@ -363,6 +375,12 @@
       "target": "./src/copilot/mcp/tools/catalog/public/index.js",
       "costTier": "heavy",
       "coldImport": true
+    },
+    {
+      "alias": "#copilot/mcp/public/tools/catalog/option-contracts",
+      "target": "./src/copilot/mcp/tools/catalog/public/option-contracts.js",
+      "costTier": "micro",
+      "coldImport": false
     },
     {
       "alias": "#copilot/mcp/public/transport/http/compat/stateless",

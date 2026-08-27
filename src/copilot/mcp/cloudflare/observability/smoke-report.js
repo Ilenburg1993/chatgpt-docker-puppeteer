@@ -95,6 +95,14 @@ export function summarizeConnectorSmokeReport(value) {
     const unexpectedRemoteTools = Array.isArray(toolsList['unexpectedRemoteTools'])
         ? toolsList['unexpectedRemoteTools']
         : [];
+    const schemaParity = smokeRecord(toolsList['schemaParity']);
+    const schemaMismatches = Array.isArray(schemaParity['mismatchedTools']) ? schemaParity['mismatchedTools'] : [];
+    const schemaMissingRemote = Array.isArray(schemaParity['missingRemoteTools'])
+        ? schemaParity['missingRemoteTools']
+        : [];
+    const schemaUnexpectedRemote = Array.isArray(schemaParity['unexpectedRemoteTools'])
+        ? schemaParity['unexpectedRemoteTools']
+        : [];
     return {
         ok: report['ok'] === true,
         protocolVersion: report['protocolVersion'] ?? null,
@@ -125,6 +133,17 @@ export function summarizeConnectorSmokeReport(value) {
                 toolsMatchLocalRegistry: toolsList['toolsMatchLocalRegistry'] === true,
                 missingCount: missingLocalTools.length,
                 unexpectedCount: unexpectedRemoteTools.length,
+                schemaParity: {
+                    required: schemaParity['required'] === true,
+                    available: schemaParity['available'] === true,
+                    matches: schemaParity['matches'] ?? null,
+                    fingerprintKind: schemaParity['fingerprintKind'] ?? null,
+                    comparedToolCount: schemaParity['comparedToolCount'] ?? 0,
+                    matchingToolCount: schemaParity['matchingToolCount'] ?? 0,
+                    mismatchedCount: schemaMismatches.length,
+                    missingRemoteCount: schemaMissingRemote.length,
+                    unexpectedRemoteCount: schemaUnexpectedRemote.length,
+                },
             },
             modernSubscription: {
                 ok: modernSubscription['ok'] === true,

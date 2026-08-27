@@ -168,8 +168,7 @@ export function createCopilotMcpServer(options = {}) {
         tools,
         validation,
         profile,
-        wireSnapshot.fingerprint,
-        wireSnapshot.fingerprintKind,
+        wireSnapshot,
         descriptorCacheGeneration,
     );
     const server = new McpServer(
@@ -209,14 +208,7 @@ export function buildCopilotMcpServerDescriptorManifest(options = {}) {
     const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
     const descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(baseProfile, wireSnapshot.fingerprint);
     const profile = bindMcpServerProfileToCacheGeneration(baseProfile, descriptorCacheGeneration);
-    return buildMcpToolDescriptorManifest(
-        tools,
-        validation,
-        profile,
-        wireSnapshot.fingerprint,
-        wireSnapshot.fingerprintKind,
-        descriptorCacheGeneration,
-    );
+    return buildMcpToolDescriptorManifest(tools, validation, profile, wireSnapshot, descriptorCacheGeneration);
 }
 
 /**
@@ -548,14 +540,13 @@ function buildMcpToolDescriptorManifest(
     tools,
     validation,
     profile,
-    descriptorFingerprint = buildMcpToolWireDescriptorSnapshot(tools).fingerprint,
-    descriptorFingerprintKind = 'tools-list-wire-sha256-v1',
-    descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(profile, descriptorFingerprint),
+    wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools),
+    descriptorCacheGeneration = buildMcpDescriptorCacheGeneration(profile, wireSnapshot.fingerprint),
 ) {
     const descriptors = tools.map((tool) => canonicalizeToolDescriptorForManifest(tool));
     const surfaceState = getCanonicalMcpToolSurfaceState();
     return {
-        schemaVersion: 2,
+        schemaVersion: 3,
         generatedAt: new Date().toISOString(),
         implementation: {
             name: COPILOT_MCP_SERVER_FACTORY_NAME,
@@ -567,9 +558,11 @@ function buildMcpToolDescriptorManifest(
         cacheHints: profile.sdkOptions['cacheHints'] ?? {},
         instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
         toolCount: tools.length,
-        descriptorFingerprint,
-        descriptorFingerprintKind,
+        descriptorFingerprint: wireSnapshot.fingerprint,
+        descriptorFingerprintKind: wireSnapshot.fingerprintKind,
         descriptorCacheGeneration,
+        toolDescriptorFingerprints: wireSnapshot.toolFingerprints,
+        toolDescriptorRevisionTokens: wireSnapshot.toolRevisionTokens,
         validation: {
             errorCount: validation.errors.length,
             warningCount: validation.warnings.length,

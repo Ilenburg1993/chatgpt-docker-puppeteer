@@ -127,7 +127,7 @@ describe('MCP audit correlation boundary', () => {
         assert.equal('targetKeys' in /** @type {Record<string, unknown>} */ (captured[1]), false);
     });
 
-    it('serializes only bounded numeric execution/payload facts for completion audit metadata', () => {
+    it('serializes only bounded result-outcome/execution/payload facts for completion audit metadata', () => {
         const sensitive = 'source-text-that-must-not-enter-audit';
         const metadata = buildMcpToolResultAuditMetadataForTests(
             'repo_read_file',
@@ -145,9 +145,17 @@ describe('MCP audit correlation boundary', () => {
                 batchCapacity: 64,
                 resultBudgetBytes: 1_000_000,
                 truncatedOperations: 1,
-                continuationRequired: true,
+                continuationAvailable: true,
+                continuationAvailableOperations: 2,
+                continuationTransportRequired: true,
+                continuationTransportRequiredOperations: 1,
+                continuationRecommended: true,
+                continuationRecommendedOperations: 2,
             },
         );
+        assert.equal(metadata['resultState'], 'success');
+        assert.equal(metadata['resultClass'], 'success');
+        assert.equal(metadata['resultCode'], undefined);
         assert.equal(metadata['logicalOperations'], 5);
         assert.equal(metadata['failedOperations'], 1);
         assert.equal(metadata['skippedOperations'], 2);
@@ -155,8 +163,99 @@ describe('MCP audit correlation boundary', () => {
         assert.equal(metadata['batchCapacity'], 64);
         assert.equal(metadata['resultBytes'], 10_000);
         assert.equal(metadata['duplicateTextBytes'], Buffer.byteLength(sensitive, 'utf8'));
-        assert.equal(metadata['continuationRequired'], true);
+        assert.equal(metadata['continuationAvailable'], true);
+        assert.equal(metadata['continuationAvailableOperations'], 2);
+        assert.equal(metadata['continuationTransportRequired'], true);
+        assert.equal(metadata['continuationTransportRequiredOperations'], 1);
+        assert.equal(metadata['continuationRecommended'], true);
+        assert.equal(metadata['continuationRecommendedOperations'], 2);
+        assert.equal(metadata['continuationRequired'], undefined);
         assert.equal(JSON.stringify(metadata).includes(sensitive), false);
+    });
+
+    it('classifies errorResult-style and okResult-style logical failures without serializing failure payloads', () => {
+        const sensitive = 'sensitive failure text /workspace/private/path';
+        const toolError = buildMcpToolResultAuditMetadataForTests(
+            'repo_read_file',
+            {
+                isError: true,
+                content: [{ type: 'text', text: sensitive }],
+                structuredContent: {
+                    success: false,
+                    code: 'ERR_BATCH_CONFLICTING_MODE',
+                    error: sensitive,
+                    details: { path: sensitive },
+                },
+            },
+            { strategy: 'stringify', bytes: 4_000 },
+            undefined,
+        );
+        assert.equal(toolError['resultState'], 'tool-error');
+        assert.equal(toolError['resultClass'], 'option-config');
+        assert.equal(toolError['resultCode'], 'ERR_BATCH_CONFLICTING_MODE');
+
+        const domainFailure = buildMcpToolResultAuditMetadataForTests(
+            'terminal_exec',
+            {
+                content: [{ type: 'text', text: sensitive }],
+                structuredContent: {
+                    success: false,
+                    code: 'ERR_TERMINAL_EXEC_SHAPE',
+                    hint: sensitive,
+                },
+            },
+            { strategy: 'stringify', bytes: 2_000 },
+            undefined,
+        );
+        assert.equal(domainFailure['resultState'], 'domain-failure');
+        assert.equal(domainFailure['resultClass'], 'option-config');
+        assert.equal(domainFailure['resultCode'], 'ERR_TERMINAL_EXEC_SHAPE');
+        assert.equal(JSON.stringify(toolError).includes(sensitive), false);
+        assert.equal(JSON.stringify(domainFailure).includes(sensitive), false);
+    });
+
+    it('classifies only explicitly catalogued result codes and rejects unsafe code labels fail-closed', () => {
+        const precondition = buildMcpToolResultAuditMetadataForTests(
+            'repo_apply_patch',
+            {
+                isError: true,
+                content: [{ type: 'text', text: 'hash mismatch' }],
+                structuredContent: { success: false, code: 'EEXPECTEDHASH', error: 'hash mismatch' },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(precondition['resultState'], 'tool-error');
+        assert.equal(precondition['resultClass'], 'precondition');
+        assert.equal(precondition['resultCode'], 'EEXPECTEDHASH');
+
+        const unknown = buildMcpToolResultAuditMetadataForTests(
+            'repo_apply_patch',
+            {
+                isError: true,
+                content: [{ type: 'text', text: 'new failure' }],
+                structuredContent: { success: false, code: 'ERR_NEW_UNCLASSIFIED_FAILURE', error: 'new failure' },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(unknown['resultClass'], 'domain-or-unknown');
+        assert.equal(unknown['resultCode'], 'ERR_NEW_UNCLASSIFIED_FAILURE');
+
+        const unsafeCode = '../../private/path:do-not-index';
+        const malformed = buildMcpToolResultAuditMetadataForTests(
+            'terminal_exec',
+            {
+                content: [{ type: 'text', text: 'failure' }],
+                structuredContent: { success: false, code: unsafeCode },
+            },
+            undefined,
+            undefined,
+        );
+        assert.equal(malformed['resultState'], 'domain-failure');
+        assert.equal(malformed['resultClass'], 'uncoded-failure');
+        assert.equal(malformed['resultCode'], undefined);
+        assert.equal(JSON.stringify(malformed).includes(unsafeCode), false);
     });
 
     it('does not misclassify compact tree summaries as duplicated structured payload', () => {

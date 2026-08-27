@@ -83,6 +83,14 @@
       "externalPackages": ["jose"]
     },
     {
+      "alias": "#copilot/mcp/public/auth/config",
+      "moduleCount": 10,
+      "maxModuleCount": 15,
+      "sourceBytes": 91783,
+      "maxSourceBytes": 137675,
+      "externalPackages": ["jose"]
+    },
+    {
       "alias": "#copilot/mcp/public/cloudflare/config",
       "moduleCount": 7,
       "maxModuleCount": 11,
@@ -502,6 +510,14 @@
       "externalPackages": ["jose"]
     },
     {
+      "alias": "#copilot/mcp/public/protocol/catalog/descriptor-fingerprint",
+      "moduleCount": 2,
+      "maxModuleCount": 3,
+      "sourceBytes": 9022,
+      "maxSourceBytes": 13533,
+      "externalPackages": []
+    },
+    {
       "alias": "#copilot/mcp/public/protocol/tools",
       "moduleCount": 4,
       "maxModuleCount": 6,
@@ -600,6 +616,14 @@
         "p-limit",
         "zod"
       ]
+    },
+    {
+      "alias": "#copilot/mcp/public/tools/catalog/option-contracts",
+      "moduleCount": 8,
+      "maxModuleCount": 12,
+      "sourceBytes": 75616,
+      "maxSourceBytes": 113424,
+      "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/transport/http/compat/stateless",

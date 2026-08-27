@@ -187,10 +187,12 @@ describe('canonical connector smoke', () => {
         /** @type {NodeJS.ProcessEnv | null} */
         let oauthEnv = null;
 
+        const localToolFingerprints = { repo_status: 'a'.repeat(64) };
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
             env,
             localToolNames: TEST_LOCAL_TOOL_NAMES,
+            localToolFingerprints,
             persistState: false,
             deps: {
                 runUnauthenticatedSmoke: async (input) => {
@@ -203,6 +205,7 @@ describe('canonical connector smoke', () => {
                     assert.equal(options.runLegacyCompatibility, false);
                     assert.equal(options.runPrivateKeyJwt, false);
                     assert.equal(options.runNegativeResourceChecks, false);
+                    assert.deepEqual(options.localToolFingerprints, localToolFingerprints);
                     return healthyOauthSmoke();
                 },
             },

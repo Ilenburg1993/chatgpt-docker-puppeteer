@@ -72,6 +72,21 @@ function resolveBatchDryRun(dryRun, confirmBatch) {
     return confirmBatch !== true;
 }
 
+/**
+ * Copy one top-level patch-batch durability policy into every operation before the domain workflow groups targets.
+ * Keeping this normalization explicit guarantees that same-file groups cannot accidentally derive a different durability
+ * from whichever operation happens to become the first group member.
+ *
+ * @param {Record<string, unknown>[]} operations
+ * @param {'file-and-directory' | 'file' | 'none' | undefined} durability
+ */
+export function normalizePatchBatchOperationsForExecution(operations, durability) {
+    return operations.map((operation) => ({
+        ...operation,
+        ...(durability === undefined ? {} : { durability }),
+    }));
+}
+
 /** @param {Record<string, unknown>[]} failures */
 function countPatchFailuresWithInlineNextAction(failures) {
     return failures.filter((failure) => typeof failure['nextAction'] === 'string' && failure['nextAction'].length > 0)
@@ -922,8 +937,26 @@ export function createRepoWriteTools(options = {}) {
                 },
                 operationContext,
             ) => {
-                const runtime = createRuntime(operationContext);
                 const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
+                const inactiveOptions = [];
+                if (isDryRun) {
+                    if (confirmBatch !== undefined) inactiveOptions.push('confirmBatch');
+                    if (failureMode !== undefined) inactiveOptions.push('failureMode');
+                    if (includePreflightDetails !== undefined) inactiveOptions.push('includePreflightDetails');
+                    if (postValidateOnPartial !== undefined) inactiveOptions.push('postValidateOnPartial');
+                    if (durability !== undefined) inactiveOptions.push('durability');
+                } else if (postValidateOnPartial !== undefined && postValidate === undefined) {
+                    inactiveOptions.push('postValidateOnPartial');
+                }
+                if (inactiveOptions.length > 0) {
+                    return errorResult('Patch-batch options are inactive for the selected mode/configuration.', {
+                        code: 'ERR_PATCH_BATCH_OPTION_INACTIVE',
+                        mode: isDryRun ? 'dry-run' : 'apply',
+                        invalidOptions: inactiveOptions,
+                        hint: 'Remove inactive options or select the apply/postValidate configuration that makes them effective.',
+                    });
+                }
+                const runtime = createRuntime(operationContext);
                 let postValidationRequests;
                 try {
                     postValidationRequests = normalizePostPatchValidationRequests(postValidate ?? []);
@@ -945,11 +978,9 @@ export function createRepoWriteTools(options = {}) {
                         requestedCount: postValidationRequests.length,
                     });
                 }
-                const normalizedOperations = /** @type {Record<string, unknown>[]} */ (
-                    operations.map((/** @type {Record<string, unknown>} */ operation) => ({
-                        ...operation,
-                        ...(durability ? { durability } : {}),
-                    }))
+                const normalizedOperations = normalizePatchBatchOperationsForExecution(
+                    /** @type {Record<string, unknown>[]} */ (operations),
+                    durability,
                 );
                 const resultSurface = resolvePatchBatchResultMode({ resultMode }, normalizedOperations);
                 const envelope = inspectPatchBatchEnvelope(normalizedOperations);
@@ -1084,8 +1115,21 @@ export function createRepoWriteTools(options = {}) {
                 { operations, dryRun, confirmBatch, applyMode, includePreflightDetails },
                 operationContext,
             ) => {
-                const runtime = createRuntime(operationContext);
                 const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
+                const inactiveOptions = [];
+                if (isDryRun) {
+                    if (confirmBatch !== undefined) inactiveOptions.push('confirmBatch');
+                    if (includePreflightDetails !== undefined) inactiveOptions.push('includePreflightDetails');
+                }
+                if (inactiveOptions.length > 0) {
+                    return errorResult('File-batch options are inactive in dry-run mode.', {
+                        code: 'ERR_FILE_BATCH_OPTION_INACTIVE',
+                        mode: 'dry-run',
+                        invalidOptions: inactiveOptions,
+                        hint: 'Remove apply-only options or select apply mode.',
+                    });
+                }
+                const runtime = createRuntime(operationContext);
                 const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
                 const applyModeDecision = resolveFileBatchApplyMode(normalizedOperations, applyMode);
                 if (!isDryRun && confirmBatch !== true) {
@@ -1250,6 +1294,14 @@ export function createRepoWriteTools(options = {}) {
                 if (replace_all === true && occurrence_index !== undefined) {
                     return errorResult('Use replace_all ou occurrence_index, nao ambos na mesma chamada.', {
                         code: 'ERR_PATCH_CONFLICTING_MODE',
+                    });
+                }
+                if (dryRun === true && durability !== undefined) {
+                    return errorResult('durability is inactive in patch dry-run mode.', {
+                        code: 'ERR_PATCH_OPTION_INACTIVE',
+                        mode: 'dry-run',
+                        invalidOptions: ['durability'],
+                        hint: 'Remove durability for dry-run or execute an apply call where durability affects writes.',
                     });
                 }
                 const runtime = createRuntime(operationContext);

@@ -2,7 +2,7 @@
 /** @module copilot/mcp/diagnostics/oauth-smoke/report */
 
 /** @typedef {{ ok:boolean; status?:number; body?:unknown; error?:string; headers?:Record<string,string>; attempts?:number; transient?:boolean; durationMs?:number; responseBytes?:number; eventReceived?:boolean|null; lastEventId?:string; skipped?:boolean }} ProbeResult
- * @typedef {{ verboseTools:boolean; localToolNames:string[] }} OAuthSmokeReportOptions */
+ * @typedef {{ verboseTools:boolean; localToolNames:string[]; localToolFingerprints:Readonly<Record<string,string>> }} OAuthSmokeReportOptions */
 
 /** @param {unknown} value */
 export function asRecord(value) {
@@ -187,14 +187,25 @@ export function summarizeSseProbe(probe) {
 }
 
 /** @param {ProbeResult} probe @param {OAuthSmokeReportOptions} runtime */
-export function summarizeAuthenticatedToolsList(probe, runtime) {
-    const remoteToolNames = extractMcpToolNames(probe.body);
+export async function summarizeAuthenticatedToolsList(probe, runtime) {
+    const { buildMcpToolWireParityProjection, extractMcpToolWireDescriptors, previewMcpToolNames } =
+        await import('#copilot/mcp/public/protocol/catalog/descriptor-fingerprint');
+    const remoteDescriptors = extractMcpToolWireDescriptors(probe.body);
+    const remoteToolNames = remoteDescriptors
+        .map((descriptor) => String(descriptor['name']))
+        .sort((left, right) => left.localeCompare(right));
     const localToolNames = runtime.localToolNames;
     const missingLocalTools = localToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
     const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
     const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
+    const schemaParity = buildMcpToolWireParityProjection(remoteDescriptors, runtime.localToolFingerprints);
     return {
-        ok: Boolean(probe.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry),
+        ok: Boolean(
+            probe.ok &&
+            remoteToolNames.length > 0 &&
+            toolsMatchLocalRegistry &&
+            (schemaParity.required !== true || schemaParity.matches === true),
+        ),
         status: probe.status ?? null,
         attempts: probe.attempts ?? null,
         responseBytes: probe.responseBytes ?? null,
@@ -203,39 +214,13 @@ export function summarizeAuthenticatedToolsList(probe, runtime) {
         toolsMatchLocalRegistry,
         missingLocalTools,
         unexpectedRemoteTools,
-        ...(runtime.verboseTools ? { remoteToolNames } : { remoteToolNamesPreview: previewList(remoteToolNames) }),
+        schemaParity,
+        ...(runtime.verboseTools
+            ? { remoteToolNames }
+            : { remoteToolNamesPreview: previewMcpToolNames(remoteToolNames) }),
         hasJsonRpcError: hasJsonRpcError(probe.body),
         error: probe.error ?? null,
     };
-}
-
-/** @param {string[]} values */
-function previewList(values) {
-    return values.length <= 20
-        ? values
-        : [...values.slice(0, 10), `...${values.length - 20} omitted...`, ...values.slice(-10)];
-}
-
-/** @param {unknown} body */
-function extractMcpToolNames(body) {
-    if (Array.isArray(body)) {
-        const names = new Set();
-        for (const message of body) {
-            for (const name of extractMcpToolNames(message)) names.add(name);
-        }
-        return [...names].sort((left, right) => left.localeCompare(right));
-    }
-    if (!body || typeof body !== 'object') return [];
-    if (!('result' in body) || !body.result || typeof body.result !== 'object') return [];
-    if (!('tools' in body.result) || !Array.isArray(body.result.tools)) return [];
-    return body.result.tools
-        .map((tool) => {
-            if (!tool || typeof tool !== 'object') return undefined;
-            if (!('name' in tool) || typeof tool.name !== 'string') return undefined;
-            return tool.name;
-        })
-        .filter((toolName) => typeof toolName === 'string')
-        .sort((left, right) => left.localeCompare(right));
 }
 
 /** @param {ProbeResult} probe */

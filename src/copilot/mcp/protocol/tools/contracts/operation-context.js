@@ -80,6 +80,10 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
  *     toolSurface?: Readonly<{
  *         tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
  *         names: readonly string[];
+ *         descriptorFingerprint?: string;
+ *         descriptorFingerprintKind?: string;
+ *         toolDescriptorFingerprints?: Readonly<Record<string, string>>;
+ *         toolDescriptorRevisionTokens?: Readonly<Record<string, string>>;
  *         resolveCanonicalSurfaces?: () => readonly Readonly<{
  *             mode: string;
  *             tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
@@ -427,6 +431,26 @@ function freezeToolCapabilities(capabilities) {
                   toolSurface: Object.freeze({
                       tools: Object.freeze([...capabilities.toolSurface.tools]),
                       names: Object.freeze([...capabilities.toolSurface.names]),
+                      ...(capabilities.toolSurface.descriptorFingerprint
+                          ? { descriptorFingerprint: capabilities.toolSurface.descriptorFingerprint }
+                          : {}),
+                      ...(capabilities.toolSurface.descriptorFingerprintKind
+                          ? { descriptorFingerprintKind: capabilities.toolSurface.descriptorFingerprintKind }
+                          : {}),
+                      ...(capabilities.toolSurface.toolDescriptorFingerprints
+                          ? {
+                                toolDescriptorFingerprints: Object.freeze({
+                                    ...capabilities.toolSurface.toolDescriptorFingerprints,
+                                }),
+                            }
+                          : {}),
+                      ...(capabilities.toolSurface.toolDescriptorRevisionTokens
+                          ? {
+                                toolDescriptorRevisionTokens: Object.freeze({
+                                    ...capabilities.toolSurface.toolDescriptorRevisionTokens,
+                                }),
+                            }
+                          : {}),
                       ...(capabilities.toolSurface.resolveCanonicalSurfaces
                           ? { resolveCanonicalSurfaces: capabilities.toolSurface.resolveCanonicalSurfaces }
                           : {}),

@@ -29,7 +29,12 @@
  *     batchCapacity?: number;
  *     resultBudgetBytes?: number;
  *     truncatedOperations?: number;
- *     continuationRequired?: boolean;
+ *     continuationAvailable?: boolean;
+ *     continuationAvailableOperations?: number;
+ *     continuationTransportRequired?: boolean;
+ *     continuationTransportRequiredOperations?: number;
+ *     continuationRecommended?: boolean;
+ *     continuationRecommendedOperations?: number;
  * }} ResultExecutionHint
  */
 
@@ -110,6 +115,24 @@ export function withResultExecutionHint(result, hint) {
         Math.min(batchSize ?? logicalOperations, Math.floor(Number(hint.truncatedOperations) || 0)),
     );
     const resultBudgetBytes = nonNegativeIntegerOrUndefined(hint.resultBudgetBytes);
+    const continuationAvailableOperations = boundedOperationCount(
+        hint.continuationAvailableOperations,
+        logicalOperations,
+    );
+    const continuationTransportRequiredOperations = boundedOperationCount(
+        hint.continuationTransportRequiredOperations,
+        logicalOperations,
+    );
+    const continuationRecommendedOperations = boundedOperationCount(
+        hint.continuationRecommendedOperations,
+        logicalOperations,
+    );
+    const continuationTransportRequired =
+        hint.continuationTransportRequired === true || continuationTransportRequiredOperations > 0;
+    const continuationAvailable =
+        hint.continuationAvailable === true || continuationAvailableOperations > 0 || continuationTransportRequired;
+    const continuationRecommended =
+        hint.continuationRecommended === true || continuationRecommendedOperations > 0 || continuationTransportRequired;
     Object.defineProperty(result, RESULT_EXECUTION_HINT_SYMBOL, {
         value: {
             logicalOperations,
@@ -120,7 +143,12 @@ export function withResultExecutionHint(result, hint) {
             ...(batchCapacity !== undefined ? { batchCapacity } : {}),
             ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
             ...(truncatedOperations > 0 ? { truncatedOperations } : {}),
-            ...(hint.continuationRequired === true ? { continuationRequired: true } : {}),
+            ...(continuationAvailable ? { continuationAvailable: true } : {}),
+            ...(continuationAvailableOperations > 0 ? { continuationAvailableOperations } : {}),
+            ...(continuationTransportRequired ? { continuationTransportRequired: true } : {}),
+            ...(continuationTransportRequiredOperations > 0 ? { continuationTransportRequiredOperations } : {}),
+            ...(continuationRecommended ? { continuationRecommended: true } : {}),
+            ...(continuationRecommendedOperations > 0 ? { continuationRecommendedOperations } : {}),
         },
         enumerable: false,
         configurable: true,
@@ -147,6 +175,18 @@ export function getResultExecutionHint(result) {
             : undefined;
     const resultBudgetBytes = nonNegativeIntegerOrUndefined(record['resultBudgetBytes']);
     const truncatedOperations = nonNegativeIntegerOrUndefined(record['truncatedOperations']);
+    const continuationAvailableOperations = boundedOperationCount(
+        record['continuationAvailableOperations'],
+        logicalOperations,
+    );
+    const continuationTransportRequiredOperations = boundedOperationCount(
+        record['continuationTransportRequiredOperations'],
+        logicalOperations,
+    );
+    const continuationRecommendedOperations = boundedOperationCount(
+        record['continuationRecommendedOperations'],
+        logicalOperations,
+    );
     return {
         logicalOperations: Math.floor(logicalOperations),
         failedOperations: Math.max(0, Math.floor(Number(record['failedOperations']) || 0)),
@@ -156,8 +196,19 @@ export function getResultExecutionHint(result) {
         ...(batchCapacity !== undefined ? { batchCapacity } : {}),
         ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
         ...(truncatedOperations !== undefined ? { truncatedOperations } : {}),
-        ...(record['continuationRequired'] === true ? { continuationRequired: true } : {}),
+        ...(record['continuationAvailable'] === true ? { continuationAvailable: true } : {}),
+        ...(continuationAvailableOperations > 0 ? { continuationAvailableOperations } : {}),
+        ...(record['continuationTransportRequired'] === true ? { continuationTransportRequired: true } : {}),
+        ...(continuationTransportRequiredOperations > 0 ? { continuationTransportRequiredOperations } : {}),
+        ...(record['continuationRecommended'] === true ? { continuationRecommended: true } : {}),
+        ...(continuationRecommendedOperations > 0 ? { continuationRecommendedOperations } : {}),
     };
+}
+
+/** @param {unknown} value @param {number} max */
+function boundedOperationCount(value, max) {
+    const parsed = nonNegativeIntegerOrUndefined(value) ?? 0;
+    return Math.max(0, Math.min(Math.floor(max), parsed));
 }
 
 /** @param {unknown} value */

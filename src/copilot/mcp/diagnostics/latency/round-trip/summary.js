@@ -36,8 +36,17 @@ const PLAN_APPLY_PAIRS = Object.freeze({
  *   batchSize: number | null;
  *   batchCapacity: number | null;
  *   truncatedOperations: number;
- *   continuationRequired: boolean;
+ *   continuationAvailable: boolean;
+ *   continuationTransportRequired: boolean;
+ *   continuationRecommended: boolean;
+ *   legacyContinuationRequired: boolean;
  *   resultBytes: number;
+ *   resultState: string | null;
+ *   resultClass: string | null;
+ *   resultCode: string | null;
+ *   terminalEvent: string | null;
+ *   failureClass: string | null;
+ *   retryability: string | null;
  * }} CallEvidence
  *
  * @typedef {{
@@ -50,6 +59,22 @@ const PLAN_APPLY_PAIRS = Object.freeze({
  *   sameTargetInspected: boolean;
  *   interveningCalls: number;
  * }} RecoveryCandidate
+ *
+ * @typedef {{ failureClass: string | null; retryability: string | null; resultCode: string | null }} FailureSignal
+ * @typedef {{
+ *   callId: string;
+ *   tool: string;
+ *   tsMs: number;
+ *   traceKey: string;
+ *   targetPrecision: string | null;
+ *   targetKeys: Set<string>;
+ *   resultClass: string | null;
+ *   resultCode: string | null;
+ *   terminalEvent: string | null;
+ *   failureClass: string | null;
+ *   retryability: string | null;
+ *   interveningCalls: number;
+ * }} RetryCandidate
  */
 
 /**
@@ -114,6 +139,27 @@ export function summarizeMcpRoundTripRows(rows, options) {
     let sameTargetRecoveryTraceCount = 0;
     let sameTargetRecoveryWithInspectionCount = 0;
 
+    /** Failure→repeat evidence is stricter than generic temporal/recovery pressure. */
+    /** @type {Map<string, FailureSignal>} */
+    const failureSignalsByCallId = new Map();
+    /** @type {RetryCandidate[]} */
+    const retryCandidates = [];
+    let retryCandidateWithLineageCount = 0;
+    let retryCandidateWithoutLineageCount = 0;
+    let temporalFailureSameToolRepeatCount = 0;
+    let temporalFailureSameExactTargetRepeatCount = 0;
+    let temporalFailureRepeatGapMs = 0;
+    let lineageFailureSameToolRepeatCount = 0;
+    let lineageFailureSameToolRepeatGapMs = 0;
+    let lineageFailureTargetOverlapRepeatCount = 0;
+    let retryTaxCalls = 0;
+    let retryTaxGapMs = 0;
+    let retryTaxInterveningCalls = 0;
+    const retryTaxByTool = new Map();
+    const retryTaxByFailureSignalClass = new Map();
+    const retryTaxByResultCode = new Map();
+    const lineageRepeatByFailureSignalClass = new Map();
+
     let planThenApplyCount = 0;
     let lineagePlanThenApplyCount = 0;
     const planThenApplyByPair = new Map();
@@ -130,6 +176,37 @@ export function summarizeMcpRoundTripRows(rows, options) {
 
     const executionByTool = new Map();
     const payloadByTool = new Map();
+    const resultStates = new Map();
+    const resultClasses = new Map();
+    const resultCodes = new Map();
+    const resultOutcomesByTool = new Map();
+    const resultOutcomeCohorts = new Map();
+    const optionPoliciesByTool = new Map();
+    const optionPolicyCohorts = new Map();
+    const optionPolicyVersions = new Map();
+    const optionPolicyModes = new Map();
+    let optionPolicyObservedCalls = 0;
+    let optionPolicyRequestedOptions = 0;
+    let optionPolicyEffectiveRequestedOptions = 0;
+    let optionPolicyDefaultedOptions = 0;
+    let optionPolicyNormalizedEvents = 0;
+    let optionPolicyIgnoredOptions = 0;
+    let optionPolicyCoercedOptions = 0;
+    let optionPolicyRejectedOptions = 0;
+    let optionPolicyConflictEvents = 0;
+    let optionPolicyNormalizedCalls = 0;
+    let optionPolicyIgnoredCalls = 0;
+    let optionPolicyCoercedCalls = 0;
+    let optionPolicyRejectedCalls = 0;
+    let optionPolicyConflictCalls = 0;
+    let resultCompletedCalls = 0;
+    let observedResultOutcomeCalls = 0;
+    let resultCodedCalls = 0;
+    let resultFailureCalls = 0;
+    let optionConfigFailures = 0;
+    let preconditionFailures = 0;
+    let domainOrUnknownFailures = 0;
+    let uncodedFailures = 0;
     let executionCompletedCalls = 0;
     let executionAccountedCalls = 0;
     let totalLogicalOperations = 0;
@@ -137,12 +214,18 @@ export function summarizeMcpRoundTripRows(rows, options) {
     let totalBatchCalls = 0;
     let totalSaturatedBatchCalls = 0;
     let totalTruncatedOperations = 0;
-    let totalContinuationCalls = 0;
+    let totalContinuationAvailableCalls = 0;
+    let totalContinuationAvailableOperations = 0;
+    let totalContinuationTransportRequiredCalls = 0;
+    let totalContinuationTransportRequiredOperations = 0;
+    let totalContinuationRecommendedCalls = 0;
+    let totalContinuationRecommendedOperations = 0;
+    let totalLegacyContinuationRequiredCalls = 0;
     const repeatAfterBatch = {
         unsaturatedComplete: 0,
         saturated: 0,
         truncated: 0,
-        continuation: 0,
+        transportRequired: 0,
     };
     const repeatAfterBatchByTool = new Map();
     const runtimeCohorts = new Map();
@@ -192,6 +275,15 @@ export function summarizeMcpRoundTripRows(rows, options) {
                 inlineNext: inlineNextCount,
                 inlineAnchor: inlineAnchorCount,
             });
+            const failureCallId = stringOrNull(row['call_id'] ?? row['callId']);
+            if (failureCallId) {
+                failureSignalsByCallId.set(failureCallId, {
+                    failureClass:
+                        stringOrNull(row['failure_class'] ?? row['failureClass']) ?? singleCountMapKey(failureClassMap),
+                    retryability: stringOrNull(row['retryability']) ?? singleCountMapKey(retryabilityMap),
+                    resultCode: stringOrNull(row['code']) ?? singleCountMapKey(causalCodeCounts),
+                });
+            }
 
             temporalPendingFailure = { tsMs, inspected: false, interveningCalls: 0 };
             const failureEvidence = readCallEvidence(row, tool ?? 'repo_apply_patch', tsMs);
@@ -221,6 +313,7 @@ export function summarizeMcpRoundTripRows(rows, options) {
 
         if (event === 'tool_call_started' && tool) {
             startedCallCount += 1;
+            recordOptionPolicy(row, tool);
             const traceContextState = stringOrNull(row['trace_context_state'] ?? row['traceContextState']) ?? 'unknown';
             increment(traceContextStates, traceContextState);
             if (traceContextState === 'valid') validTraceStartCount += 1;
@@ -251,13 +344,17 @@ export function summarizeMcpRoundTripRows(rows, options) {
 
             processTemporalRecoveryStart(tool, tsMs);
             processLineageRecoveryStart(start);
+            processRetryCandidateStart(start);
             continue;
         }
 
         if (MCP_TOOL_CALL_TERMINAL_EVENTS.includes(event) && tool) {
             terminalCallCount += 1;
-            const terminal = readCallEvidence(row, tool, tsMs);
-            if (event === 'tool_call_completed') recordExecutionCompletion(row, tool);
+            const terminal = readCallEvidence(row, tool, tsMs, event);
+            if (event === 'tool_call_completed') {
+                recordResultOutcome(row, tool);
+                recordExecutionCompletion(row, tool);
+            }
             if (!terminal.callId) {
                 missingCallIdTerminalCount += 1;
                 continue;
@@ -269,7 +366,10 @@ export function summarizeMcpRoundTripRows(rows, options) {
             }
             pairedCallCount += 1;
             activeCallIds.delete(terminal.callId);
-            const completion = mergeCallEvidence(start, terminal);
+            const failureSignal = failureSignalsByCallId.get(terminal.callId) ?? null;
+            const completion = mergeCallEvidence(start, terminal, failureSignal);
+            failureSignalsByCallId.delete(terminal.callId);
+            if (isFailedCallEvidence(completion)) registerRetryCandidate(completion);
             if (activeCallIds.size === 0) lastQuiescentCompletion = completion;
             continue;
         }
@@ -368,6 +468,88 @@ export function summarizeMcpRoundTripRows(rows, options) {
             ...sameCallActionability,
             byRuntimeCohort: renderFailureCohorts(failureCohorts),
         },
+        resultOutcomes: {
+            authority: 'sanitized-tool-completion-result-metadata-v5',
+            completedCalls: resultCompletedCalls,
+            observedOutcomeCalls: observedResultOutcomeCalls,
+            outcomeCoverageRate:
+                resultCompletedCalls > 0
+                    ? Number((observedResultOutcomeCalls / resultCompletedCalls).toFixed(4))
+                    : null,
+            codedCalls: resultCodedCalls,
+            failureCalls: resultFailureCalls,
+            optionConfigFailures,
+            preconditionFailures,
+            domainOrUnknownFailures,
+            uncodedFailures,
+            optionErrorRate:
+                observedResultOutcomeCalls > 0
+                    ? Number((optionConfigFailures / observedResultOutcomeCalls).toFixed(4))
+                    : null,
+            optionErrorShareOfFailures:
+                resultFailureCalls > 0 ? Number((optionConfigFailures / resultFailureCalls).toFixed(4)) : null,
+            byState: mapToObject(resultStates),
+            byClass: mapToObject(resultClasses),
+            byCode: mapToObject(resultCodes),
+            byTool: renderResultOutcomeByTool(resultOutcomesByTool, options.top),
+            byRuntimeCohort: renderResultOutcomeCohorts(resultOutcomeCohorts),
+            caveat: 'Outcome fields are authoritative only for completions emitted after the v5 registry rollout. Replayed historical completions that never persisted result outcome metadata remain explicitly unobserved and are excluded from optionErrorRate.',
+        },
+        optionPolicies: {
+            authority: 'sanitized-request-option-contract-metadata-v6',
+            observedCalls: optionPolicyObservedCalls,
+            requestedOptions: optionPolicyRequestedOptions,
+            effectiveRequestedOptions: optionPolicyEffectiveRequestedOptions,
+            defaultedOptions: optionPolicyDefaultedOptions,
+            normalizedEvents: optionPolicyNormalizedEvents,
+            ignoredOptions: optionPolicyIgnoredOptions,
+            coercedOptions: optionPolicyCoercedOptions,
+            rejectedOptions: optionPolicyRejectedOptions,
+            conflictEvents: optionPolicyConflictEvents,
+            normalizedCalls: optionPolicyNormalizedCalls,
+            ignoredCalls: optionPolicyIgnoredCalls,
+            coercedCalls: optionPolicyCoercedCalls,
+            rejectedCalls: optionPolicyRejectedCalls,
+            conflictCalls: optionPolicyConflictCalls,
+            normalizedCallRate: ratio(optionPolicyNormalizedCalls, optionPolicyObservedCalls),
+            ignoredCallRate: ratio(optionPolicyIgnoredCalls, optionPolicyObservedCalls),
+            coercionCallRate: ratio(optionPolicyCoercedCalls, optionPolicyObservedCalls),
+            rejectionCallRate: ratio(optionPolicyRejectedCalls, optionPolicyObservedCalls),
+            conflictCallRate: ratio(optionPolicyConflictCalls, optionPolicyObservedCalls),
+            ignoredRequestedOptionRate: ratio(optionPolicyIgnoredOptions, optionPolicyRequestedOptions),
+            byContractVersion: mapToObject(optionPolicyVersions),
+            byMode: mapToObject(optionPolicyModes),
+            byTool: renderOptionPolicyByTool(optionPoliciesByTool, options.top),
+            byRuntimeCohort: renderOptionPolicyCohorts(optionPolicyCohorts),
+            caveat: 'Only v6 tool_call_started rows emitted by tools enrolled in the Option Contract SSOT carry option-policy metadata. Rates use observed policy calls as the call denominator; unenrolled and pre-v6 starts are not treated as implicit zero-error calls.',
+        },
+        retryTax: {
+            authority: 'failure-completion-to-first-same-tool-repeat-with-sanitized-lineage-v6',
+            windowMs: RECOVERY_WINDOW_MS,
+            retryTaxCalls,
+            retryTaxGapMs,
+            retryTaxAverageGapMs: retryTaxCalls > 0 ? Math.round(retryTaxGapMs / retryTaxCalls) : 0,
+            retryTaxInterveningCalls,
+            byTool: mapToObject(retryTaxByTool),
+            byFailureSignalClass: mapToObject(retryTaxByFailureSignalClass),
+            byResultCode: mapToObject(retryTaxByResultCode),
+            temporalPressure: {
+                sameToolAdjacentAfterFailureCount: temporalFailureSameToolRepeatCount,
+                sameExactTargetAdjacentAfterFailureCount: temporalFailureSameExactTargetRepeatCount,
+                totalGapMs: temporalFailureRepeatGapMs,
+                caveat: 'Quiescent temporal adjacency only; without matching lineage it is repeat pressure, not retry tax.',
+            },
+            lineageBound: {
+                candidateWithLineageCount: retryCandidateWithLineageCount,
+                candidateWithoutLineageCount: retryCandidateWithoutLineageCount,
+                sameToolRepeatCount: lineageFailureSameToolRepeatCount,
+                sameToolRepeatGapMs: lineageFailureSameToolRepeatGapMs,
+                targetOverlapRepeatCount: lineageFailureTargetOverlapRepeatCount,
+                byFailureSignalClass: mapToObject(lineageRepeatByFailureSignalClass),
+                pendingCandidateCount: retryCandidates.length,
+            },
+            caveat: 'retryTaxCalls requires same sanitized trace, same tool, exact-single target identity on both calls and target overlap. Same-tool lineage repeats without exact target identity remain pressure only.',
+        },
         recovery: {
             authority: 'temporal-pressure-plus-lineage-bound-v4',
             temporalPressure: {
@@ -422,8 +604,15 @@ export function summarizeMcpRoundTripRows(rows, options) {
             batchCalls: totalBatchCalls,
             saturatedBatchCalls: totalSaturatedBatchCalls,
             truncatedOperations: totalTruncatedOperations,
-            continuationCalls: totalContinuationCalls,
+            continuationAvailableCalls: totalContinuationAvailableCalls,
+            continuationAvailableOperations: totalContinuationAvailableOperations,
+            continuationTransportRequiredCalls: totalContinuationTransportRequiredCalls,
+            continuationTransportRequiredOperations: totalContinuationTransportRequiredOperations,
+            continuationRecommendedCalls: totalContinuationRecommendedCalls,
+            continuationRecommendedOperations: totalContinuationRecommendedOperations,
+            legacyContinuationRequiredCalls: totalLegacyContinuationRequiredCalls,
             repeatAfterBatch,
+            caveat: 'Only continuationTransportRequired represents result data omitted by the batch transport budget. Availability/recommendation do not imply another model→tool round trip is required; legacyContinuationRequired is historical v6 metadata and is excluded from induced-continuation metrics.',
             byTool: renderExecutionByTool(executionByTool, repeatAfterBatchByTool, options.top),
         },
         payloadAccounting: {
@@ -466,6 +655,17 @@ export function summarizeMcpRoundTripRows(rows, options) {
             return;
         }
         recordTransition(temporalTransitions, previous.tool, current.tool, gapMs);
+        if (isFailedCallEvidence(previous) && previous.tool === current.tool) {
+            temporalFailureSameToolRepeatCount += 1;
+            temporalFailureRepeatGapMs += gapMs;
+            if (
+                previous.targetPrecision === 'exact-single' &&
+                current.targetPrecision === 'exact-single' &&
+                hasTargetOverlap(previous.targetKeys, current.targetKeys)
+            ) {
+                temporalFailureSameExactTargetRepeatCount += 1;
+            }
+        }
         const heavyReadFollowup =
             previous.resultBytes >= HEAVY_RESULT_THRESHOLD_BYTES && INSPECTION_TOOLS.includes(current.tool);
         if (heavyReadFollowup) temporalHeavyResultReadFollowupCount += 1;
@@ -508,7 +708,7 @@ export function summarizeMcpRoundTripRows(rows, options) {
                 unsaturatedComplete: 0,
                 saturated: 0,
                 truncated: 0,
-                continuation: 0,
+                transportRequired: 0,
             };
             byTool[category] += 1;
             repeatAfterBatchByTool.set(previous.tool, byTool);
@@ -563,6 +763,195 @@ export function summarizeMcpRoundTripRows(rows, options) {
         }
     }
 
+    /** @param {CallEvidence} completion */
+    function registerRetryCandidate(completion) {
+        if (!completion.callId) return;
+        if (!completion.traceKey) {
+            retryCandidateWithoutLineageCount += 1;
+            return;
+        }
+        retryCandidateWithLineageCount += 1;
+        retryCandidates.push({
+            callId: completion.callId,
+            tool: completion.tool,
+            tsMs: completion.tsMs,
+            traceKey: completion.traceKey,
+            targetPrecision: completion.targetPrecision,
+            targetKeys: completion.targetKeys,
+            resultClass: completion.resultClass,
+            resultCode: completion.resultCode,
+            terminalEvent: completion.terminalEvent,
+            failureClass: completion.failureClass,
+            retryability: completion.retryability,
+            interveningCalls: 0,
+        });
+    }
+
+    /** @param {CallEvidence} start */
+    function processRetryCandidateStart(start) {
+        expireRetryCandidates(retryCandidates, start.tsMs);
+        if (!start.traceKey) return;
+        for (const candidate of retryCandidates) {
+            if (candidate.traceKey !== start.traceKey || start.tsMs <= candidate.tsMs) continue;
+            if (candidate.tool !== start.tool) candidate.interveningCalls += 1;
+        }
+        for (let index = retryCandidates.length - 1; index >= 0; index -= 1) {
+            const candidate = retryCandidates[index];
+            if (
+                !candidate ||
+                candidate.traceKey !== start.traceKey ||
+                candidate.tool !== start.tool ||
+                start.tsMs <= candidate.tsMs
+            ) {
+                continue;
+            }
+            const gapMs = Math.max(0, start.tsMs - candidate.tsMs);
+            lineageFailureSameToolRepeatCount += 1;
+            lineageFailureSameToolRepeatGapMs += gapMs;
+            const signalClass = classifyRetryFailureSignal(candidate);
+            increment(lineageRepeatByFailureSignalClass, signalClass);
+            const targetOverlap = hasTargetOverlap(candidate.targetKeys, start.targetKeys);
+            if (targetOverlap) lineageFailureTargetOverlapRepeatCount += 1;
+            const exactSameTarget =
+                candidate.targetPrecision === 'exact-single' &&
+                start.targetPrecision === 'exact-single' &&
+                targetOverlap;
+            if (exactSameTarget) {
+                retryTaxCalls += 1;
+                retryTaxGapMs += gapMs;
+                retryTaxInterveningCalls += candidate.interveningCalls;
+                increment(retryTaxByTool, candidate.tool);
+                increment(retryTaxByFailureSignalClass, signalClass);
+                if (candidate.resultCode) increment(retryTaxByResultCode, candidate.resultCode);
+            }
+            retryCandidates.splice(index, 1);
+            break;
+        }
+    }
+
+    /** @param {Record<string, unknown>} row @param {string} toolName */
+    function recordOptionPolicy(row, toolName) {
+        const coverage = stringOrNull(row['option_policy_coverage'] ?? row['optionPolicyCoverage']);
+        if (coverage !== 'complete') return;
+        const version = stringOrNull(row['option_contract_version'] ?? row['optionContractVersion']) ?? 'unknown';
+        const mode = stringOrNull(row['option_mode'] ?? row['optionMode']) ?? 'unknown';
+        const requested = nonNegativeIntegerOrNull(row['option_requested_count'] ?? row['optionRequestedCount']) ?? 0;
+        const effectiveRequested =
+            nonNegativeIntegerOrNull(row['option_effective_requested_count'] ?? row['optionEffectiveRequestedCount']) ??
+            0;
+        const defaulted = nonNegativeIntegerOrNull(row['option_defaulted_count'] ?? row['optionDefaultedCount']) ?? 0;
+        const normalized =
+            nonNegativeIntegerOrNull(row['option_normalized_count'] ?? row['optionNormalizedCount']) ?? 0;
+        const ignored = nonNegativeIntegerOrNull(row['option_ignored_count'] ?? row['optionIgnoredCount']) ?? 0;
+        const coerced = nonNegativeIntegerOrNull(row['option_coerced_count'] ?? row['optionCoercedCount']) ?? 0;
+        const rejected = nonNegativeIntegerOrNull(row['option_rejected_count'] ?? row['optionRejectedCount']) ?? 0;
+        const conflicts = nonNegativeIntegerOrNull(row['option_conflict_count'] ?? row['optionConflictCount']) ?? 0;
+        const toolMetric = requireOptionPolicyMetric(optionPoliciesByTool, toolName);
+        const cohortMetric = requireOptionPolicyMetric(optionPolicyCohorts, cohortKey(row));
+        optionPolicyObservedCalls += 1;
+        optionPolicyRequestedOptions += requested;
+        optionPolicyEffectiveRequestedOptions += effectiveRequested;
+        optionPolicyDefaultedOptions += defaulted;
+        optionPolicyNormalizedEvents += normalized;
+        optionPolicyIgnoredOptions += ignored;
+        optionPolicyCoercedOptions += coerced;
+        optionPolicyRejectedOptions += rejected;
+        optionPolicyConflictEvents += conflicts;
+        if (normalized > 0) optionPolicyNormalizedCalls += 1;
+        if (ignored > 0) optionPolicyIgnoredCalls += 1;
+        if (coerced > 0) optionPolicyCoercedCalls += 1;
+        if (rejected > 0) optionPolicyRejectedCalls += 1;
+        if (conflicts > 0) optionPolicyConflictCalls += 1;
+        increment(optionPolicyVersions, version);
+        increment(optionPolicyModes, mode);
+        mergeOptionPolicyMetric(toolMetric, {
+            mode,
+            requested,
+            effectiveRequested,
+            defaulted,
+            normalized,
+            ignored,
+            coerced,
+            rejected,
+            conflicts,
+        });
+        mergeOptionPolicyMetric(cohortMetric, {
+            mode,
+            requested,
+            effectiveRequested,
+            defaulted,
+            normalized,
+            ignored,
+            coerced,
+            rejected,
+            conflicts,
+        });
+    }
+
+    /** @param {Record<string, unknown>} row @param {string} toolName */
+    function recordResultOutcome(row, toolName) {
+        resultCompletedCalls += 1;
+        const state = stringOrNull(row['result_state'] ?? row['resultState']);
+        const resultClassRaw = stringOrNull(row['result_class'] ?? row['resultClass']);
+        const code = stringOrNull(row['result_code'] ?? row['resultCode']);
+        const cohort = cohortKey(row);
+        const toolMetric = requireResultOutcomeMetric(resultOutcomesByTool, toolName);
+        const cohortMetric = requireResultOutcomeMetric(resultOutcomeCohorts, cohort);
+        toolMetric.calls += 1;
+        cohortMetric.calls += 1;
+
+        if (!state) {
+            increment(resultStates, 'unobserved');
+            increment(toolMetric.states, 'unobserved');
+            increment(cohortMetric.states, 'unobserved');
+            toolMetric.unobservedCalls += 1;
+            cohortMetric.unobservedCalls += 1;
+            return;
+        }
+
+        observedResultOutcomeCalls += 1;
+        toolMetric.observedCalls += 1;
+        cohortMetric.observedCalls += 1;
+        increment(resultStates, state);
+        increment(toolMetric.states, state);
+        increment(cohortMetric.states, state);
+        if (code) {
+            resultCodedCalls += 1;
+            toolMetric.codedCalls += 1;
+            cohortMetric.codedCalls += 1;
+            increment(resultCodes, code);
+            increment(toolMetric.codes, code);
+            increment(cohortMetric.codes, code);
+        }
+
+        const resultClass = resultClassRaw ?? (state === 'success' ? 'success' : 'domain-or-unknown');
+        increment(resultClasses, resultClass);
+        increment(toolMetric.classes, resultClass);
+        increment(cohortMetric.classes, resultClass);
+        if (state === 'success') return;
+
+        resultFailureCalls += 1;
+        toolMetric.failureCalls += 1;
+        cohortMetric.failureCalls += 1;
+        if (resultClass === 'option-config') {
+            optionConfigFailures += 1;
+            toolMetric.optionConfigFailures += 1;
+            cohortMetric.optionConfigFailures += 1;
+        } else if (resultClass === 'precondition') {
+            preconditionFailures += 1;
+            toolMetric.preconditionFailures += 1;
+            cohortMetric.preconditionFailures += 1;
+        } else if (resultClass === 'uncoded-failure') {
+            uncodedFailures += 1;
+            toolMetric.uncodedFailures += 1;
+            cohortMetric.uncodedFailures += 1;
+        } else {
+            domainOrUnknownFailures += 1;
+            toolMetric.domainOrUnknownFailures += 1;
+            cohortMetric.domainOrUnknownFailures += 1;
+        }
+    }
+
     /** @param {Record<string, unknown>} row @param {string} toolName */
     function recordExecutionCompletion(row, toolName) {
         executionCompletedCalls += 1;
@@ -573,7 +962,24 @@ export function summarizeMcpRoundTripRows(rows, options) {
         const batchCapacity = positiveIntegerOrNull(row['batch_capacity'] ?? row['batchCapacity']);
         const truncatedOperations =
             nonNegativeIntegerOrNull(row['truncated_operations'] ?? row['truncatedOperations']) ?? 0;
-        const continuationRequired = Number(row['continuation_required'] ?? row['continuationRequired']) === 1;
+        const continuationAvailable = Number(row['continuation_available'] ?? row['continuationAvailable']) === 1;
+        const continuationAvailableOperations =
+            nonNegativeIntegerOrNull(
+                row['continuation_available_operations'] ?? row['continuationAvailableOperations'],
+            ) ?? 0;
+        const continuationTransportRequired =
+            Number(row['continuation_transport_required'] ?? row['continuationTransportRequired']) === 1;
+        const continuationTransportRequiredOperations =
+            nonNegativeIntegerOrNull(
+                row['continuation_transport_required_operations'] ?? row['continuationTransportRequiredOperations'],
+            ) ?? 0;
+        const continuationRecommended = Number(row['continuation_recommended'] ?? row['continuationRecommended']) === 1;
+        const continuationRecommendedOperations =
+            nonNegativeIntegerOrNull(
+                row['continuation_recommended_operations'] ?? row['continuationRecommendedOperations'],
+            ) ?? 0;
+        const legacyContinuationRequired =
+            Number(row['continuation_required'] ?? row['legacyContinuationRequired']) === 1;
         const effectiveLogicalOperations = logicalOperations ?? 1;
         if (logicalOperations !== null) executionAccountedCalls += 1;
         totalLogicalOperations += effectiveLogicalOperations;
@@ -581,7 +987,13 @@ export function summarizeMcpRoundTripRows(rows, options) {
         if ((batchSize ?? 0) > 1) totalBatchCalls += 1;
         if (batchSize !== null && batchCapacity !== null && batchSize >= batchCapacity) totalSaturatedBatchCalls += 1;
         totalTruncatedOperations += truncatedOperations;
-        if (continuationRequired) totalContinuationCalls += 1;
+        if (continuationAvailable) totalContinuationAvailableCalls += 1;
+        totalContinuationAvailableOperations += continuationAvailableOperations;
+        if (continuationTransportRequired) totalContinuationTransportRequiredCalls += 1;
+        totalContinuationTransportRequiredOperations += continuationTransportRequiredOperations;
+        if (continuationRecommended) totalContinuationRecommendedCalls += 1;
+        totalContinuationRecommendedOperations += continuationRecommendedOperations;
+        if (legacyContinuationRequired) totalLegacyContinuationRequiredCalls += 1;
 
         const metric = executionByTool.get(toolName) ?? {
             calls: 0,
@@ -591,7 +1003,13 @@ export function summarizeMcpRoundTripRows(rows, options) {
             batchCalls: 0,
             saturatedBatchCalls: 0,
             truncatedOperations: 0,
-            continuationCalls: 0,
+            continuationAvailableCalls: 0,
+            continuationAvailableOperations: 0,
+            continuationTransportRequiredCalls: 0,
+            continuationTransportRequiredOperations: 0,
+            continuationRecommendedCalls: 0,
+            continuationRecommendedOperations: 0,
+            legacyContinuationRequiredCalls: 0,
             truncatedCalls: 0,
             batchSizes: [],
             logicalOperationSamples: [],
@@ -606,7 +1024,13 @@ export function summarizeMcpRoundTripRows(rows, options) {
         if (batchSize !== null && batchCapacity !== null && batchSize >= batchCapacity) metric.saturatedBatchCalls += 1;
         metric.truncatedOperations += truncatedOperations;
         if (truncatedOperations > 0) metric.truncatedCalls += 1;
-        if (continuationRequired) metric.continuationCalls += 1;
+        if (continuationAvailable) metric.continuationAvailableCalls += 1;
+        metric.continuationAvailableOperations += continuationAvailableOperations;
+        if (continuationTransportRequired) metric.continuationTransportRequiredCalls += 1;
+        metric.continuationTransportRequiredOperations += continuationTransportRequiredOperations;
+        if (continuationRecommended) metric.continuationRecommendedCalls += 1;
+        metric.continuationRecommendedOperations += continuationRecommendedOperations;
+        if (legacyContinuationRequired) metric.legacyContinuationRequiredCalls += 1;
         metric.failedOperations = (metric.failedOperations ?? 0) + failedOperations;
         metric.skippedOperations = (metric.skippedOperations ?? 0) + skippedOperations;
         executionByTool.set(toolName, metric);
@@ -677,7 +1101,9 @@ export function buildUnavailableRoundTripSnapshot(windowMs, includeSynthetic, au
             caveat: 'Only the sanitized trace-context state is retained. Raw traceparent, tracestate and baggage are neither exposed here nor persisted in the derived index.',
         },
         failures: emptyFailureAnalytics(),
+        resultOutcomes: emptyResultOutcomeAnalytics(),
         sequenceEvidence: emptySequenceEvidence(),
+        retryTax: emptyRetryTaxAnalytics(),
         recovery: emptyRecoveryAnalytics(),
         workflowPressure: emptyWorkflowPressure(),
         executionAccounting: emptyExecutionAccounting(),
@@ -724,6 +1150,29 @@ function emptyFailureAnalytics() {
     };
 }
 
+function emptyResultOutcomeAnalytics() {
+    return {
+        authority: 'sanitized-tool-completion-result-metadata-v5',
+        completedCalls: 0,
+        observedOutcomeCalls: 0,
+        outcomeCoverageRate: null,
+        codedCalls: 0,
+        failureCalls: 0,
+        optionConfigFailures: 0,
+        preconditionFailures: 0,
+        domainOrUnknownFailures: 0,
+        uncodedFailures: 0,
+        optionErrorRate: null,
+        optionErrorShareOfFailures: null,
+        byState: {},
+        byClass: {},
+        byCode: {},
+        byTool: [],
+        byRuntimeCohort: {},
+        caveat: 'Outcome fields are authoritative only for completions emitted after the v5 registry rollout. Replayed historical completions that never persisted result outcome metadata remain explicitly unobserved and are excluded from optionErrorRate.',
+    };
+}
+
 function emptySequenceEvidence() {
     return {
         authority: 'quiescent-burst-temporal-adjacency-not-workflow-causality',
@@ -738,6 +1187,36 @@ function emptySequenceEvidence() {
         unknownLineageTransitionCount: 0,
         crossTracePairRejectedCount: 0,
         activeOverlapExcludedCount: 0,
+    };
+}
+
+function emptyRetryTaxAnalytics() {
+    return {
+        authority: 'failure-completion-to-first-same-tool-repeat-with-sanitized-lineage-v6',
+        windowMs: RECOVERY_WINDOW_MS,
+        retryTaxCalls: 0,
+        retryTaxGapMs: 0,
+        retryTaxAverageGapMs: 0,
+        retryTaxInterveningCalls: 0,
+        byTool: {},
+        byFailureSignalClass: {},
+        byResultCode: {},
+        temporalPressure: {
+            sameToolAdjacentAfterFailureCount: 0,
+            sameExactTargetAdjacentAfterFailureCount: 0,
+            totalGapMs: 0,
+            caveat: 'Quiescent temporal adjacency only; without matching lineage it is repeat pressure, not retry tax.',
+        },
+        lineageBound: {
+            candidateWithLineageCount: 0,
+            candidateWithoutLineageCount: 0,
+            sameToolRepeatCount: 0,
+            sameToolRepeatGapMs: 0,
+            targetOverlapRepeatCount: 0,
+            byFailureSignalClass: {},
+            pendingCandidateCount: 0,
+        },
+        caveat: 'retryTaxCalls requires same sanitized trace, same tool, exact-single target identity on both calls and target overlap. Same-tool lineage repeats without exact target identity remain pressure only.',
     };
 }
 
@@ -797,8 +1276,15 @@ function emptyExecutionAccounting() {
         batchCalls: 0,
         saturatedBatchCalls: 0,
         truncatedOperations: 0,
-        continuationCalls: 0,
-        repeatAfterBatch: { unsaturatedComplete: 0, saturated: 0, truncated: 0, continuation: 0 },
+        continuationAvailableCalls: 0,
+        continuationAvailableOperations: 0,
+        continuationTransportRequiredCalls: 0,
+        continuationTransportRequiredOperations: 0,
+        continuationRecommendedCalls: 0,
+        continuationRecommendedOperations: 0,
+        legacyContinuationRequiredCalls: 0,
+        repeatAfterBatch: { unsaturatedComplete: 0, saturated: 0, truncated: 0, transportRequired: 0 },
+        caveat: 'Only continuationTransportRequired represents result data omitted by the batch transport budget. Availability/recommendation do not imply another model→tool round trip is required; legacyContinuationRequired is historical v6 metadata and is excluded from induced-continuation metrics.',
         byTool: [],
     };
 }
@@ -820,8 +1306,14 @@ function isPatchFailureEvent(event) {
     );
 }
 
-/** @param {Record<string, unknown>} row @param {string} tool @param {number} tsMs @returns {CallEvidence} */
-function readCallEvidence(row, tool, tsMs) {
+/**
+ * @param {Record<string, unknown>} row
+ * @param {string} tool
+ * @param {number} tsMs
+ * @param {string | null} [terminalEvent]
+ * @returns {CallEvidence}
+ */
+function readCallEvidence(row, tool, tsMs, terminalEvent = null) {
     return {
         callId: stringOrNull(row['call_id'] ?? row['callId']),
         tool,
@@ -832,13 +1324,28 @@ function readCallEvidence(row, tool, tsMs) {
         batchSize: positiveIntegerOrNull(row['batch_size'] ?? row['batchSize']),
         batchCapacity: positiveIntegerOrNull(row['batch_capacity'] ?? row['batchCapacity']),
         truncatedOperations: nonNegativeIntegerOrNull(row['truncated_operations'] ?? row['truncatedOperations']) ?? 0,
-        continuationRequired: Number(row['continuation_required'] ?? row['continuationRequired']) === 1,
+        continuationAvailable: Number(row['continuation_available'] ?? row['continuationAvailable']) === 1,
+        continuationTransportRequired:
+            Number(row['continuation_transport_required'] ?? row['continuationTransportRequired']) === 1,
+        continuationRecommended: Number(row['continuation_recommended'] ?? row['continuationRecommended']) === 1,
+        legacyContinuationRequired: Number(row['continuation_required'] ?? row['legacyContinuationRequired']) === 1,
         resultBytes: nonNegativeIntegerOrNull(row['result_bytes'] ?? row['resultBytes']) ?? 0,
+        resultState: stringOrNull(row['result_state'] ?? row['resultState']),
+        resultClass: stringOrNull(row['result_class'] ?? row['resultClass']),
+        resultCode: stringOrNull(row['result_code'] ?? row['resultCode']),
+        terminalEvent,
+        failureClass: stringOrNull(row['failure_class'] ?? row['failureClass']),
+        retryability: stringOrNull(row['retryability']),
     };
 }
 
-/** @param {CallEvidence} start @param {CallEvidence} terminal @returns {CallEvidence} */
-function mergeCallEvidence(start, terminal) {
+/**
+ * @param {CallEvidence} start
+ * @param {CallEvidence} terminal
+ * @param {FailureSignal | null} [failureSignal]
+ * @returns {CallEvidence}
+ */
+function mergeCallEvidence(start, terminal, failureSignal = null) {
     return {
         callId: terminal.callId ?? start.callId,
         tool: terminal.tool || start.tool,
@@ -849,14 +1356,48 @@ function mergeCallEvidence(start, terminal) {
         batchSize: terminal.batchSize ?? start.batchSize,
         batchCapacity: terminal.batchCapacity ?? start.batchCapacity,
         truncatedOperations: terminal.truncatedOperations,
-        continuationRequired: terminal.continuationRequired,
+        continuationAvailable: terminal.continuationAvailable || start.continuationAvailable,
+        continuationTransportRequired: terminal.continuationTransportRequired || start.continuationTransportRequired,
+        continuationRecommended: terminal.continuationRecommended || start.continuationRecommended,
+        legacyContinuationRequired: terminal.legacyContinuationRequired || start.legacyContinuationRequired,
         resultBytes: terminal.resultBytes || start.resultBytes,
+        resultState: terminal.resultState ?? start.resultState,
+        resultClass: terminal.resultClass ?? start.resultClass,
+        resultCode: terminal.resultCode ?? failureSignal?.resultCode ?? start.resultCode,
+        terminalEvent: terminal.terminalEvent ?? start.terminalEvent,
+        failureClass: failureSignal?.failureClass ?? terminal.failureClass ?? start.failureClass,
+        retryability: failureSignal?.retryability ?? terminal.retryability ?? start.retryability,
     };
 }
 
 /** @param {CallEvidence} previous */
+/** @param {CallEvidence} call */
+function isFailedCallEvidence(call) {
+    if (call.failureClass || call.retryability) return true;
+    if (call.terminalEvent && call.terminalEvent !== 'tool_call_completed') return true;
+    return call.resultState !== null && call.resultState !== 'success';
+}
+
+/**
+ * @param {{failureClass:string|null;resultClass:string|null;terminalEvent:string|null}} candidate
+ */
+function classifyRetryFailureSignal(candidate) {
+    if (candidate.failureClass && !['unknown', 'unknown-or-legacy'].includes(candidate.failureClass)) {
+        return candidate.failureClass;
+    }
+    if (candidate.resultClass === 'option-config') return 'shape/config';
+    if (candidate.resultClass === 'precondition') return 'precondition';
+    if (candidate.resultClass === 'uncoded-failure') return 'uncoded-failure';
+    if (candidate.terminalEvent === 'tool_call_rate_limited') return 'transient-rate-limit';
+    if (candidate.terminalEvent === 'tool_call_auth_denied') return 'manual-decision-auth';
+    if (candidate.terminalEvent === 'tool_call_result_rejected') return 'result-contract';
+    if (candidate.terminalEvent === 'tool_call_failed') return 'runtime-failure';
+    return candidate.resultClass ?? 'domain-or-unknown';
+}
+
+/** @param {CallEvidence} previous */
 function classifyRepeatAfterBatch(previous) {
-    if (previous.continuationRequired) return /** @type {const} */ ('continuation');
+    if (previous.continuationTransportRequired) return /** @type {const} */ ('transportRequired');
     if (previous.truncatedOperations > 0) return /** @type {const} */ ('truncated');
     if (
         previous.batchSize !== null &&
@@ -870,6 +1411,13 @@ function classifyRepeatAfterBatch(previous) {
 
 /** @param {RecoveryCandidate[]} candidates @param {number} nowMs */
 function expireRecoveryCandidates(candidates, nowMs) {
+    for (let index = candidates.length - 1; index >= 0; index -= 1) {
+        if (nowMs - (candidates[index]?.tsMs ?? nowMs) > RECOVERY_WINDOW_MS) candidates.splice(index, 1);
+    }
+}
+
+/** @param {RetryCandidate[]} candidates @param {number} nowMs */
+function expireRetryCandidates(candidates, nowMs) {
     for (let index = candidates.length - 1; index >= 0; index -= 1) {
         if (nowMs - (candidates[index]?.tsMs ?? nowMs) > RECOVERY_WINDOW_MS) candidates.splice(index, 1);
     }
@@ -916,6 +1464,161 @@ function rankTransitions(transitions) {
         .sort((left, right) => right.totalGapMs - left.totalGapMs);
 }
 
+/** @param {Map<string, any>} metrics @param {string} key */
+function requireOptionPolicyMetric(metrics, key) {
+    const existing = metrics.get(key);
+    if (existing) return existing;
+    const metric = {
+        observedCalls: 0,
+        requestedOptions: 0,
+        effectiveRequestedOptions: 0,
+        defaultedOptions: 0,
+        normalizedEvents: 0,
+        ignoredOptions: 0,
+        coercedOptions: 0,
+        rejectedOptions: 0,
+        conflictEvents: 0,
+        normalizedCalls: 0,
+        ignoredCalls: 0,
+        coercedCalls: 0,
+        rejectedCalls: 0,
+        conflictCalls: 0,
+        modes: new Map(),
+    };
+    metrics.set(key, metric);
+    return metric;
+}
+
+/** @param {any} metric @param {{mode:string;requested:number;effectiveRequested:number;defaulted:number;normalized:number;ignored:number;coerced:number;rejected:number;conflicts:number}} sample */
+function mergeOptionPolicyMetric(metric, sample) {
+    metric.observedCalls += 1;
+    metric.requestedOptions += sample.requested;
+    metric.effectiveRequestedOptions += sample.effectiveRequested;
+    metric.defaultedOptions += sample.defaulted;
+    metric.normalizedEvents += sample.normalized;
+    metric.ignoredOptions += sample.ignored;
+    metric.coercedOptions += sample.coerced;
+    metric.rejectedOptions += sample.rejected;
+    metric.conflictEvents += sample.conflicts;
+    if (sample.normalized > 0) metric.normalizedCalls += 1;
+    if (sample.ignored > 0) metric.ignoredCalls += 1;
+    if (sample.coerced > 0) metric.coercedCalls += 1;
+    if (sample.rejected > 0) metric.rejectedCalls += 1;
+    if (sample.conflicts > 0) metric.conflictCalls += 1;
+    increment(metric.modes, sample.mode);
+}
+
+/** @param {any} metric */
+function projectOptionPolicyMetric(metric) {
+    return {
+        observedCalls: metric.observedCalls,
+        requestedOptions: metric.requestedOptions,
+        effectiveRequestedOptions: metric.effectiveRequestedOptions,
+        defaultedOptions: metric.defaultedOptions,
+        normalizedEvents: metric.normalizedEvents,
+        ignoredOptions: metric.ignoredOptions,
+        coercedOptions: metric.coercedOptions,
+        rejectedOptions: metric.rejectedOptions,
+        conflictEvents: metric.conflictEvents,
+        normalizedCalls: metric.normalizedCalls,
+        ignoredCalls: metric.ignoredCalls,
+        coercedCalls: metric.coercedCalls,
+        rejectedCalls: metric.rejectedCalls,
+        conflictCalls: metric.conflictCalls,
+        normalizedCallRate: ratio(metric.normalizedCalls, metric.observedCalls),
+        ignoredCallRate: ratio(metric.ignoredCalls, metric.observedCalls),
+        coercionCallRate: ratio(metric.coercedCalls, metric.observedCalls),
+        rejectionCallRate: ratio(metric.rejectedCalls, metric.observedCalls),
+        conflictCallRate: ratio(metric.conflictCalls, metric.observedCalls),
+        ignoredRequestedOptionRate: ratio(metric.ignoredOptions, metric.requestedOptions),
+        byMode: mapToObject(metric.modes),
+    };
+}
+
+/** @param {Map<string, any>} byTool @param {number} top */
+function renderOptionPolicyByTool(byTool, top) {
+    return [...byTool.entries()]
+        .map(([tool, metric]) => ({ tool, ...projectOptionPolicyMetric(metric) }))
+        .sort((left, right) => right.observedCalls - left.observedCalls || left.tool.localeCompare(right.tool))
+        .slice(0, top);
+}
+
+/** @param {Map<string, any>} cohorts */
+function renderOptionPolicyCohorts(cohorts) {
+    return Object.fromEntries(
+        [...cohorts.entries()]
+            .sort((left, right) => Number(right[1]?.observedCalls ?? 0) - Number(left[1]?.observedCalls ?? 0))
+            .map(([key, metric]) => [key, projectOptionPolicyMetric(metric)]),
+    );
+}
+
+/** @param {number} numerator @param {number} denominator */
+function ratio(numerator, denominator) {
+    return denominator > 0 ? Number((numerator / denominator).toFixed(4)) : null;
+}
+
+/** @param {Map<string, any>} metrics @param {string} key */
+function requireResultOutcomeMetric(metrics, key) {
+    const existing = metrics.get(key);
+    if (existing) return existing;
+    const metric = {
+        calls: 0,
+        observedCalls: 0,
+        unobservedCalls: 0,
+        codedCalls: 0,
+        failureCalls: 0,
+        optionConfigFailures: 0,
+        preconditionFailures: 0,
+        domainOrUnknownFailures: 0,
+        uncodedFailures: 0,
+        states: new Map(),
+        classes: new Map(),
+        codes: new Map(),
+    };
+    metrics.set(key, metric);
+    return metric;
+}
+
+/** @param {any} metric */
+function projectResultOutcomeMetric(metric) {
+    return {
+        calls: metric.calls,
+        observedCalls: metric.observedCalls,
+        unobservedCalls: metric.unobservedCalls,
+        outcomeCoverageRate: metric.calls > 0 ? Number((metric.observedCalls / metric.calls).toFixed(4)) : null,
+        codedCalls: metric.codedCalls,
+        failureCalls: metric.failureCalls,
+        optionConfigFailures: metric.optionConfigFailures,
+        preconditionFailures: metric.preconditionFailures,
+        domainOrUnknownFailures: metric.domainOrUnknownFailures,
+        uncodedFailures: metric.uncodedFailures,
+        optionErrorRate:
+            metric.observedCalls > 0 ? Number((metric.optionConfigFailures / metric.observedCalls).toFixed(4)) : null,
+        optionErrorShareOfFailures:
+            metric.failureCalls > 0 ? Number((metric.optionConfigFailures / metric.failureCalls).toFixed(4)) : null,
+        byState: mapToObject(metric.states),
+        byClass: mapToObject(metric.classes),
+        byCode: mapToObject(metric.codes),
+    };
+}
+
+/** @param {Map<string, any>} byTool @param {number} top */
+function renderResultOutcomeByTool(byTool, top) {
+    return [...byTool.entries()]
+        .map(([tool, metric]) => ({ tool, ...projectResultOutcomeMetric(metric) }))
+        .sort((left, right) => right.calls - left.calls || left.tool.localeCompare(right.tool))
+        .slice(0, top);
+}
+
+/** @param {Map<string, any>} cohorts */
+function renderResultOutcomeCohorts(cohorts) {
+    return Object.fromEntries(
+        [...cohorts.entries()]
+            .sort((left, right) => Number(right[1]?.calls ?? 0) - Number(left[1]?.calls ?? 0))
+            .map(([key, metric]) => [key, projectResultOutcomeMetric(metric)]),
+    );
+}
+
 /** @param {Map<string, any>} byTool @param {Map<string, any>} repeats @param {number} top */
 function renderExecutionByTool(byTool, repeats, top) {
     return [...byTool.entries()]
@@ -953,9 +1656,25 @@ function renderExecutionByTool(byTool, repeats, top) {
                 truncatedCalls: metric.truncatedCalls ?? 0,
                 truncationRate:
                     metric.batchCalls > 0 ? Number(((metric.truncatedCalls ?? 0) / metric.batchCalls).toFixed(4)) : 0,
-                continuationCalls: metric.continuationCalls,
-                continuationRate:
-                    metric.batchCalls > 0 ? Number((metric.continuationCalls / metric.batchCalls).toFixed(4)) : 0,
+                continuationAvailableCalls: metric.continuationAvailableCalls,
+                continuationAvailableOperations: metric.continuationAvailableOperations,
+                continuationAvailableRate:
+                    metric.batchCalls > 0
+                        ? Number((metric.continuationAvailableCalls / metric.batchCalls).toFixed(4))
+                        : 0,
+                continuationTransportRequiredCalls: metric.continuationTransportRequiredCalls,
+                continuationTransportRequiredOperations: metric.continuationTransportRequiredOperations,
+                continuationTransportRequiredRate:
+                    metric.batchCalls > 0
+                        ? Number((metric.continuationTransportRequiredCalls / metric.batchCalls).toFixed(4))
+                        : 0,
+                continuationRecommendedCalls: metric.continuationRecommendedCalls,
+                continuationRecommendedOperations: metric.continuationRecommendedOperations,
+                continuationRecommendedRate:
+                    metric.batchCalls > 0
+                        ? Number((metric.continuationRecommendedCalls / metric.batchCalls).toFixed(4))
+                        : 0,
+                legacyContinuationRequiredCalls: metric.legacyContinuationRequiredCalls,
                 failedOperations: metric.failedOperations ?? 0,
                 skippedOperations: metric.skippedOperations ?? 0,
                 repeatAfterBatch: repeat,
@@ -1106,6 +1825,12 @@ function parseCountMap(value) {
     } catch {
         return new Map();
     }
+}
+
+/** @param {Map<string, number>} map */
+function singleCountMapKey(map) {
+    if (map.size !== 1) return null;
+    return map.keys().next().value ?? null;
 }
 
 /** @param {Map<string, number>} target @param {Map<string, number>} source */

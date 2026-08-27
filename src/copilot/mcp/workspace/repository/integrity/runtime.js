@@ -12,23 +12,34 @@
 import { createHash } from 'node:crypto';
 
 const SOURCE_BARRIER_SCHEMA = 'copilot.repository-source-barrier';
-const SOURCE_BARRIER_VERSION = 1;
-const SOURCE_BARRIER_DOMAIN = 'copilot.repository-source-barrier.v1';
+const SOURCE_BARRIER_VERSION = 2;
+const SOURCE_BARRIER_LEGACY_DOMAIN = 'copilot.repository-source-barrier.v1';
+const SOURCE_BARRIER_DOMAIN = 'copilot.repository-source-barrier.v2';
 const MAX_SOURCE_BARRIER_FILES = 500;
 const SOURCE_BARRIER_FINGERPRINT_RE = /^[a-f0-9]{64}$/u;
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} SourceBarrierWorkspace */
-/** @typedef {Readonly<{ path: string; sha256: string; bytes: number }>} RepositorySourceBarrierEntry */
-/** @typedef {Readonly<{ schema: typeof SOURCE_BARRIER_SCHEMA; version: typeof SOURCE_BARRIER_VERSION; algorithm: 'sha256'; domain: typeof SOURCE_BARRIER_DOMAIN; capturedAt: string; entryCount: number; fingerprint: string; entries: readonly RepositorySourceBarrierEntry[] }>} RepositorySourceBarrier */
-/** @typedef {Readonly<{ path: string; kind: 'missing-or-unreadable' | 'content-changed'; expectedSha256: string; actualSha256: string | null; expectedBytes: number; actualBytes: number | null; provenance: 'controlled-mcp-transition' | 'unattributed'; traceId: string | null }>} RepositorySourceDrift */
+/** @typedef {Readonly<{ path: string; sha256: string; bytes: number }>} RepositorySourceBarrierLegacyEntry */
+/** @typedef {Readonly<{ kind: 'file'; path: string; sha256: string; bytes: number }>} RepositorySourceBarrierFileEntry */
+/** @typedef {Readonly<{ kind: 'absent'; path: string }>} RepositorySourceBarrierAbsentEntry */
+/** @typedef {RepositorySourceBarrierFileEntry | RepositorySourceBarrierAbsentEntry} RepositorySourceBarrierEntry */
+/** @typedef {Readonly<{ schema: typeof SOURCE_BARRIER_SCHEMA; version: 1; algorithm: 'sha256'; domain: typeof SOURCE_BARRIER_LEGACY_DOMAIN; capturedAt: string; entryCount: number; fingerprint: string; entries: readonly RepositorySourceBarrierLegacyEntry[] }> | Readonly<{ schema: typeof SOURCE_BARRIER_SCHEMA; version: typeof SOURCE_BARRIER_VERSION; algorithm: 'sha256'; domain: typeof SOURCE_BARRIER_DOMAIN; capturedAt: string; entryCount: number; fingerprint: string; entries: readonly RepositorySourceBarrierEntry[] }>} RepositorySourceBarrier */
+/** @typedef {Readonly<{ path: string; kind: 'missing-or-unreadable' | 'content-changed' | 'unexpected-file'; expectedSha256: string | null; actualSha256: string | null; expectedBytes: number | null; actualBytes: number | null; provenance: 'controlled-mcp-transition' | 'unattributed'; traceId: string | null }>} RepositorySourceDrift */
 /** @typedef {Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'readTail'>} SourceBarrierAuditCapability */
 
-/** @param {readonly RepositorySourceBarrierEntry[]} entries */
+/** @param {readonly (RepositorySourceBarrierEntry | RepositorySourceBarrierLegacyEntry)[]} entries */
 export function fingerprintRepositorySourceBarrierEntries(entries) {
+    const legacy = entries.every((entry) => !('kind' in entry));
+    const current = entries.every((entry) => 'kind' in entry);
+    if (!legacy && !current) {
+        throw new TypeError('Repository source barrier fingerprint entries cannot mix v1 and v2 shapes.');
+    }
     const hash = createHash('sha256');
-    hash.update(`${SOURCE_BARRIER_DOMAIN}\0`);
+    hash.update(`${legacy ? SOURCE_BARRIER_LEGACY_DOMAIN : SOURCE_BARRIER_DOMAIN}\0`);
     for (const entry of entries) {
-        hash.update(JSON.stringify([entry.path, entry.sha256, entry.bytes]));
+        if (!('kind' in entry)) hash.update(JSON.stringify([entry.path, entry.sha256, entry.bytes]));
+        else if (entry.kind === 'absent') hash.update(JSON.stringify([entry.kind, entry.path]));
+        else hash.update(JSON.stringify([entry.kind, entry.path, entry.sha256, entry.bytes]));
         hash.update('\n');
     }
     return hash.digest('hex');
@@ -38,10 +49,12 @@ export function fingerprintRepositorySourceBarrierEntries(entries) {
 function assertRepositorySourceBarrier(value) {
     if (!value || typeof value !== 'object') throw new TypeError('Repository source barrier must be an object.');
     const barrier = /** @type {Record<string, unknown>} */ (value);
-    if (barrier['schema'] !== SOURCE_BARRIER_SCHEMA || barrier['version'] !== SOURCE_BARRIER_VERSION) {
+    const version = barrier['version'];
+    if (barrier['schema'] !== SOURCE_BARRIER_SCHEMA || (version !== 1 && version !== SOURCE_BARRIER_VERSION)) {
         throw new TypeError('Unsupported repository source barrier schema/version.');
     }
-    if (barrier['algorithm'] !== 'sha256' || barrier['domain'] !== SOURCE_BARRIER_DOMAIN) {
+    const expectedDomain = version === 1 ? SOURCE_BARRIER_LEGACY_DOMAIN : SOURCE_BARRIER_DOMAIN;
+    if (barrier['algorithm'] !== 'sha256' || barrier['domain'] !== expectedDomain) {
         throw new TypeError('Repository source barrier algorithm/domain is invalid.');
     }
     if (!SOURCE_BARRIER_FINGERPRINT_RE.test(String(barrier['fingerprint'] ?? ''))) {
@@ -53,7 +66,7 @@ function assertRepositorySourceBarrier(value) {
         barrier['entries'].length > MAX_SOURCE_BARRIER_FILES
     ) {
         throw new TypeError(
-            `Repository source barrier entries must be an array with 1..${MAX_SOURCE_BARRIER_FILES} files.`,
+            `Repository source barrier entries must be an array with 1..${MAX_SOURCE_BARRIER_FILES} paths.`,
         );
     }
     if (barrier['entryCount'] !== barrier['entries'].length) {
@@ -64,15 +77,29 @@ function assertRepositorySourceBarrier(value) {
             throw new TypeError('Repository source barrier entries must be objects.');
         }
         const row = /** @type {Record<string, unknown>} */ (entry);
-        if (
-            typeof row['path'] !== 'string' ||
-            !row['path'] ||
-            !SOURCE_BARRIER_FINGERPRINT_RE.test(String(row['sha256'] ?? ''))
-        ) {
-            throw new TypeError('Repository source barrier entry path/hash is invalid.');
+        if (typeof row['path'] !== 'string' || !row['path']) {
+            throw new TypeError('Repository source barrier entry path is invalid.');
+        }
+        if (version === 1) {
+            if (!SOURCE_BARRIER_FINGERPRINT_RE.test(String(row['sha256'] ?? ''))) {
+                throw new TypeError('Repository source barrier v1 entry hash is invalid.');
+            }
+            if (!Number.isSafeInteger(row['bytes']) || Number(row['bytes']) < 0) {
+                throw new TypeError('Repository source barrier v1 entry bytes must be a non-negative safe integer.');
+            }
+            continue;
+        }
+        if (row['kind'] === 'absent') {
+            if (row['sha256'] !== undefined || row['bytes'] !== undefined) {
+                throw new TypeError('Repository source barrier absent entries cannot carry file hash/bytes.');
+            }
+            continue;
+        }
+        if (row['kind'] !== 'file' || !SOURCE_BARRIER_FINGERPRINT_RE.test(String(row['sha256'] ?? ''))) {
+            throw new TypeError('Repository source barrier file entry kind/hash is invalid.');
         }
         if (!Number.isSafeInteger(row['bytes']) || Number(row['bytes']) < 0) {
-            throw new TypeError('Repository source barrier entry bytes must be a non-negative safe integer.');
+            throw new TypeError('Repository source barrier file entry bytes must be a non-negative safe integer.');
         }
     }
     return /** @type {RepositorySourceBarrier} */ (value);
@@ -82,6 +109,11 @@ function assertRepositorySourceBarrier(value) {
 export function parseRepositorySourceBarrierJson(content) {
     const parsed = JSON.parse(content);
     return assertRepositorySourceBarrier(parsed);
+}
+
+/** @param {unknown} error */
+function isMissingPathError(error) {
+    return Boolean(error && typeof error === 'object' && /** @type {{code?:unknown}} */ (error).code === 'ENOENT');
 }
 
 /**
@@ -96,22 +128,31 @@ async function readBarrierEntry(workspace, requestedPath) {
         /** @type {Error & { code?: string }} */ (error).code = resolved.code;
         throw error;
     }
-    const snapshot = await workspace.io.readBytesFresh(resolved.resolved, {
-        includeHash: true,
-        advisoryLimits: { operation: 'repository-source-barrier' },
-    });
-    if (!snapshot.isFile || !snapshot.contentHash) {
-        throw new TypeError(`Repository source barrier requires a regular hashable file: ${resolved.relative}`);
+    const relative = resolved.relative.replaceAll('\\', '/');
+    try {
+        const snapshot = await workspace.io.readBytesFresh(resolved.resolved, {
+            includeHash: true,
+            advisoryLimits: { operation: 'repository-source-barrier' },
+        });
+        if (!snapshot.isFile || !snapshot.contentHash) {
+            throw new TypeError(`Repository source barrier requires a regular file or absent path: ${relative}`);
+        }
+        return Object.freeze({
+            kind: /** @type {const} */ ('file'),
+            path: relative,
+            sha256: snapshot.contentHash,
+            bytes: snapshot.bytesRead,
+        });
+    } catch (error) {
+        if (isMissingPathError(error)) {
+            return Object.freeze({ kind: /** @type {const} */ ('absent'), path: relative });
+        }
+        throw error;
     }
-    return Object.freeze({
-        path: resolved.relative.replaceAll('\\', '/'),
-        sha256: snapshot.contentHash,
-        bytes: snapshot.bytesRead,
-    });
 }
 
 /**
- * Capture a deterministic byte-identity barrier for explicit repository files.
+ * Capture a deterministic state barrier for explicit repository paths, including absent-path tombstones.
  *
  * @param {SourceBarrierWorkspace} workspace
  * @param {readonly string[]} paths
@@ -119,7 +160,7 @@ async function readBarrierEntry(workspace, requestedPath) {
  */
 export async function captureRepositorySourceBarrier(workspace, paths) {
     if (!Array.isArray(paths) || paths.length < 1 || paths.length > MAX_SOURCE_BARRIER_FILES) {
-        throw new TypeError(`Repository source barrier requires 1..${MAX_SOURCE_BARRIER_FILES} explicit files.`);
+        throw new TypeError(`Repository source barrier requires 1..${MAX_SOURCE_BARRIER_FILES} explicit paths.`);
     }
     const requested = [...new Set(paths.map((value) => String(value).trim()).filter(Boolean))];
     if (requested.length < 1)
@@ -253,19 +294,86 @@ export async function verifyRepositorySourceBarrier(workspace, barrierInput, opt
 
     /** @type {RepositorySourceDrift[]} */
     const drift = [];
-    /** @type {RepositorySourceBarrierEntry[]} */
+    /** @type {(RepositorySourceBarrierEntry | RepositorySourceBarrierLegacyEntry)[]} */
     const currentEntries = [];
     for (const expected of barrier.entries) {
+        const legacy = barrier.version === 1;
+        const expectedKind = legacy ? 'file' : /** @type {RepositorySourceBarrierEntry} */ (expected).kind;
+        const expectedSha256 = expectedKind === 'file' ? /** @type {{sha256:string}} */ (expected).sha256 : null;
+        const expectedBytes = expectedKind === 'file' ? /** @type {{bytes:number}} */ (expected).bytes : null;
         try {
             const current = await readBarrierEntry(workspace, expected.path);
+            if (legacy) {
+                if (current.kind === 'absent') {
+                    drift.push({
+                        path: expected.path,
+                        kind: 'missing-or-unreadable',
+                        expectedSha256,
+                        actualSha256: null,
+                        expectedBytes,
+                        actualBytes: null,
+                        provenance: 'unattributed',
+                        traceId: null,
+                    });
+                    continue;
+                }
+                const legacyCurrent = Object.freeze({
+                    path: current.path,
+                    sha256: current.sha256,
+                    bytes: current.bytes,
+                });
+                currentEntries.push(legacyCurrent);
+                if (current.sha256 !== expectedSha256 || current.bytes !== expectedBytes) {
+                    drift.push({
+                        path: expected.path,
+                        kind: 'content-changed',
+                        expectedSha256,
+                        actualSha256: current.sha256,
+                        expectedBytes,
+                        actualBytes: current.bytes,
+                        provenance: 'unattributed',
+                        traceId: null,
+                    });
+                }
+                continue;
+            }
+
             currentEntries.push(current);
-            if (current.sha256 !== expected.sha256 || current.bytes !== expected.bytes) {
+            if (expectedKind === 'absent') {
+                if (current.kind === 'file') {
+                    drift.push({
+                        path: expected.path,
+                        kind: 'unexpected-file',
+                        expectedSha256: null,
+                        actualSha256: current.sha256,
+                        expectedBytes: null,
+                        actualBytes: current.bytes,
+                        provenance: 'unattributed',
+                        traceId: null,
+                    });
+                }
+                continue;
+            }
+            if (current.kind === 'absent') {
+                drift.push({
+                    path: expected.path,
+                    kind: 'missing-or-unreadable',
+                    expectedSha256,
+                    actualSha256: null,
+                    expectedBytes,
+                    actualBytes: null,
+                    provenance: 'unattributed',
+                    traceId: null,
+                });
+                continue;
+            }
+            if (current.sha256 !== expectedSha256 || current.bytes !== expectedBytes) {
                 drift.push({
                     path: expected.path,
                     kind: 'content-changed',
-                    expectedSha256: expected.sha256,
+                    expectedSha256,
                     actualSha256: current.sha256,
-                    expectedBytes: expected.bytes,
+                    expectedBytes,
                     actualBytes: current.bytes,
                     provenance: 'unattributed',
                     traceId: null,
@@ -275,9 +383,9 @@ export async function verifyRepositorySourceBarrier(workspace, barrierInput, opt
             drift.push({
                 path: expected.path,
                 kind: 'missing-or-unreadable',
-                expectedSha256: expected.sha256,
+                expectedSha256,
                 actualSha256: null,
-                expectedBytes: expected.bytes,
+                expectedBytes,
                 actualBytes: null,
                 provenance: 'unattributed',
                 traceId: null,
@@ -401,4 +509,8 @@ export async function verifyRepositorySourceBarrierManifest(workspace, manifestP
     });
 }
 
-export const REPOSITORY_SOURCE_BARRIER_LIMITS = Object.freeze({ maxFiles: MAX_SOURCE_BARRIER_FILES });
+export const REPOSITORY_SOURCE_BARRIER_LIMITS = Object.freeze({
+    version: SOURCE_BARRIER_VERSION,
+    maxFiles: MAX_SOURCE_BARRIER_FILES,
+    absentPathTombstones: true,
+});

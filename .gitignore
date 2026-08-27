@@ -141,7 +141,7 @@ src/copilot/.ai/cloudflare/*
 !src/copilot/.ai/cloudflare/.gitkeep
 src/copilot/.ai/mcp/*
 !src/copilot/.ai/mcp/.gitkeep
-
+src/copilot/.ai/source-barriers/*
 
 # =============================================================================
 # Stray file-descriptor redirect artifacts

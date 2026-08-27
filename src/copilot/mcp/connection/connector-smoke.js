@@ -13,6 +13,7 @@ import { readMcpPostRestartReadiness, summarizeMcpPostRestartReadiness } from '.
  *     config: import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig;
  *     authority: import('#copilot/mcp/public/cloudflare/environment-authority').CloudflareEnvironmentAuthority;
  *     localToolNames: readonly string[];
+ *     localToolFingerprints?: Readonly<Record<string,string>>;
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
  *     authConfig: import('#copilot/mcp/public/auth').McpAuthConfig;
  * }} McpConnectorSmokeRuntime
@@ -47,6 +48,7 @@ export async function refreshMcpConnectorSmoke(input, runtime) {
             authority: runtime.authority,
             persistState: true,
             localToolNames: [...runtime.localToolNames],
+            ...(runtime.localToolFingerprints ? { localToolFingerprints: runtime.localToolFingerprints } : {}),
         });
     } catch (error) {
         return {

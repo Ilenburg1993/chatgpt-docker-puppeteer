@@ -36,6 +36,18 @@ import process from 'node:process';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
+function mcpUnitTestArgs() {
+    return [
+        'vitest',
+        '--config',
+        'vitest.copilot.config.js',
+        'run',
+        '--reporter=dot',
+        '--silent=passed-only',
+        'tests/unit/copilot/mcp',
+    ];
+}
+
 /** @type {Record<SafeValidationSuiteName, SafeValidationStep[]>} */
 const SAFE_VALIDATION_SUITES = {
     'mcp-fast': [
@@ -43,18 +55,19 @@ const SAFE_VALIDATION_SUITES = {
         {
             name: 'unit-mcp',
             command: npxCommand,
-            args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
+            args: mcpUnitTestArgs(),
         },
     ],
     'mcp-full': [
         { name: 'typecheck', command: npmCommand, args: ['run', 'typecheck:strict:src.copilot'] },
-        { name: 'lint', command: npmCommand, args: ['run', 'lint:copilot'] },
+        { name: 'lint-changed', command: npmCommand, args: ['run', 'lint:copilot:changed'] },
         { name: 'docs-contract', command: npmCommand, args: ['run', 'copilot:docs:check'] },
         { name: 'architecture-contract', command: npmCommand, args: ['run', 'copilot:architecture:check'] },
+        { name: 'lint', command: npmCommand, args: ['run', 'lint:copilot'] },
         {
             name: 'unit-mcp',
             command: npxCommand,
-            args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
+            args: mcpUnitTestArgs(),
         },
     ],
     'copilot-fast': [

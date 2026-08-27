@@ -44,7 +44,7 @@ import {
     summarizeQuickTunnelState,
 } from '#copilot/mcp/public/cloudflare/tunnel';
 import { formatChatGptConnectorAuthentication } from '#copilot/mcp/public/connection';
-import { getCanonicalMcpTools } from '#copilot/mcp/public/registry';
+import { buildMcpToolWireDescriptorSnapshot, getCanonicalMcpTools } from '#copilot/mcp/public/registry';
 import process from 'node:process';
 import {
     buildCloudflareLogReport,
@@ -254,12 +254,15 @@ async function runQuick({ env, config }) {
 }
 /** @param {CloudflareCliContext} context */
 async function runSmoke({ config, authority }) {
+    const tools = getCanonicalMcpTools();
+    const wireSnapshot = buildMcpToolWireDescriptorSnapshot(tools);
     await writeJsonAndSetExit(
         await runCanonicalConnectorSmoke({
             config,
             authority,
             persistState: true,
-            localToolNames: canonicalToolNames(),
+            localToolNames: tools.map((tool) => tool.name),
+            localToolFingerprints: wireSnapshot.toolFingerprints,
         }),
     );
 }

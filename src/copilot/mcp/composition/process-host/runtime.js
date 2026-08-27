@@ -209,7 +209,10 @@ export function createComposedMcpProcessHost(options = {}) {
                 () =>
                     scheduleMcpRoundTripAnalyticsMonitor({
                         policy: processConfig.diagnostics.latency.owner.roundTripMonitor,
-                        syncFn: () => roundTripAnalytics.sync(),
+                        // Background refresh is intentionally one chunk per cycle so a new analytics generation cannot
+                        // monopolize the interactive process while replaying historical audit bytes. Explicit analytics
+                        // calls retain the full catch-up budget.
+                        syncFn: () => roundTripAnalytics.sync({ maxChunks: 1 }),
                     }),
                 stopMcpRoundTripAnalyticsMonitor,
             ),

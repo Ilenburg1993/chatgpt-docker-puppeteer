@@ -44,6 +44,33 @@ function emptyPostValidation(requests) {
 }
 
 /**
+ * Resolve whether post-validation adds information after patch execution.
+ * A complete failure has no mutated state to validate and must never start validator work merely because
+ * postValidateOnPartial=true was requested.
+ *
+ * @param {number} requestedCount
+ * @param {number} succeededCount
+ * @param {boolean} patchFullyApplied
+ * @param {boolean | undefined} postValidateOnPartial
+ */
+export function resolveRepoPatchPostValidationPolicy(
+    requestedCount,
+    succeededCount,
+    patchFullyApplied,
+    postValidateOnPartial,
+) {
+    if (requestedCount === 0) return Object.freeze({ action: /** @type {const} */ ('none'), reason: null });
+    if (patchFullyApplied) return Object.freeze({ action: /** @type {const} */ ('run'), reason: null });
+    if (succeededCount === 0) {
+        return Object.freeze({ action: /** @type {const} */ ('skip'), reason: 'patch-not-applied' });
+    }
+    if (postValidateOnPartial === true) {
+        return Object.freeze({ action: /** @type {const} */ ('run'), reason: null });
+    }
+    return Object.freeze({ action: /** @type {const} */ ('skip'), reason: 'partial-patch-apply' });
+}
+
+/**
  * Execute one patch-batch workflow while preserving explicit preflight/apply/post-validation phases.
  * Presentation choices such as compact rows, echoed preflight details and text remain in the wire adapter.
  *
@@ -128,59 +155,59 @@ export async function executeRepoPatchBatchWorkflow(runtime, operations, dryRun,
     const patchFullyApplied = failedApply.length === 0 && skipped.length === 0;
 
     let postValidation = emptyPostValidation(options.postValidationRequests);
-    if (options.postValidationRequests.length > 0) {
-        if (!patchFullyApplied && options.postValidateOnPartial !== true) {
-            postValidation = { ...postValidation, skipped: true, skippedReason: 'partial-patch-apply' };
-        } else {
-            if (!options.validationConfig) {
-                throw new TypeError('Post-validation requires a validation process config projection.');
-            }
-            const barrierPaths = [
-                ...new Set(
-                    succeeded
-                        .map((operation) => operation['path'])
-                        .filter(
-                            /** @returns {value is string} */ (value) => typeof value === 'string' && value.length > 0,
-                        ),
-                ),
-            ];
-            const sourceBarrier =
-                barrierPaths.length > 0 ? await captureRepositorySourceBarrier(runtime.workspace, barrierPaths) : null;
-            postValidation = {
-                ...(await runPostPatchValidations(options.postValidationRequests, runtime, options.validationConfig)),
-                sourceBarrier: null,
-            };
-            if (sourceBarrier) {
-                try {
-                    const verified = await verifyRepositorySourceBarrier(runtime.workspace, sourceBarrier, {
-                        audit: runtime.audit,
-                    });
-                    postValidation = {
-                        ...postValidation,
-                        sourceBarrier: {
-                            capturedFingerprint: sourceBarrier.fingerprint,
-                            verifiedFingerprint: verified.currentFingerprint,
-                            entryCount: sourceBarrier.entryCount,
-                            passed: true,
-                        },
-                    };
-                } catch (error) {
-                    const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (
-                        error
-                    );
-                    postValidation = {
-                        ...postValidation,
-                        allPassed: false,
-                        sourceBarrier: {
-                            capturedFingerprint: sourceBarrier.fingerprint,
-                            entryCount: sourceBarrier.entryCount,
-                            passed: false,
-                            code: candidate.code ?? 'ERR_SOURCE_DRIFT',
-                            error: candidate.message,
-                            details: candidate.details ?? null,
-                        },
-                    };
-                }
+    const postValidationPolicy = resolveRepoPatchPostValidationPolicy(
+        options.postValidationRequests.length,
+        succeeded.length,
+        patchFullyApplied,
+        options.postValidateOnPartial,
+    );
+    if (postValidationPolicy.action === 'skip') {
+        postValidation = { ...postValidation, skipped: true, skippedReason: postValidationPolicy.reason };
+    } else if (postValidationPolicy.action === 'run') {
+        if (!options.validationConfig) {
+            throw new TypeError('Post-validation requires a validation process config projection.');
+        }
+        const barrierPaths = [
+            ...new Set(
+                succeeded
+                    .map((operation) => operation['path'])
+                    .filter(/** @returns {value is string} */ (value) => typeof value === 'string' && value.length > 0),
+            ),
+        ];
+        const sourceBarrier =
+            barrierPaths.length > 0 ? await captureRepositorySourceBarrier(runtime.workspace, barrierPaths) : null;
+        postValidation = {
+            ...(await runPostPatchValidations(options.postValidationRequests, runtime, options.validationConfig)),
+            sourceBarrier: null,
+        };
+        if (sourceBarrier) {
+            try {
+                const verified = await verifyRepositorySourceBarrier(runtime.workspace, sourceBarrier, {
+                    audit: runtime.audit,
+                });
+                postValidation = {
+                    ...postValidation,
+                    sourceBarrier: {
+                        capturedFingerprint: sourceBarrier.fingerprint,
+                        verifiedFingerprint: verified.currentFingerprint,
+                        entryCount: sourceBarrier.entryCount,
+                        passed: true,
+                    },
+                };
+            } catch (error) {
+                const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                postValidation = {
+                    ...postValidation,
+                    allPassed: false,
+                    sourceBarrier: {
+                        capturedFingerprint: sourceBarrier.fingerprint,
+                        entryCount: sourceBarrier.entryCount,
+                        passed: false,
+                        code: candidate.code ?? 'ERR_SOURCE_DRIFT',
+                        error: candidate.message,
+                        details: candidate.details ?? null,
+                    },
+                };
             }
         }
     }

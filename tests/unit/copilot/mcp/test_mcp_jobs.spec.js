@@ -22,11 +22,14 @@ import {
 import { resolveSafeValidationSuite } from '#copilot/mcp/public/validation/suites';
 import { jobTools } from '#copilot/testing/mcp/tools/jobs';
 import {
+    buildEffectiveValidationChecks,
     pruneCompletedJobRecords,
     readMcpValidationProcessConfig,
     readValidatorResourceSnapshot,
+    recommendValidationAction,
     resolveJobTimeoutMs,
     resolveValidatorVitestMaxWorkers,
+    summarizeValidationProductivity,
 } from '#copilot/testing/mcp/validation';
 import {
     runBoundedDevcontainerValidationProcess,
@@ -237,10 +240,14 @@ describe('copilot MCP jobs', () => {
             resolveSafeValidationSuite('mcp-fast').map((step) => step.name),
             ['typecheck', 'unit-mcp'],
         );
+        const mcpFull = resolveSafeValidationSuite('mcp-full');
         assert.deepEqual(
-            resolveSafeValidationSuite('mcp-full').map((step) => step.name),
-            ['typecheck', 'lint', 'docs-contract', 'architecture-contract', 'unit-mcp'],
+            mcpFull.map((step) => step.name),
+            ['typecheck', 'lint-changed', 'docs-contract', 'architecture-contract', 'lint', 'unit-mcp'],
         );
+        const mcpFullUnit = mcpFull.find((step) => step.name === 'unit-mcp');
+        assert.ok(mcpFullUnit?.args.includes('--reporter=dot'));
+        assert.ok(mcpFullUnit?.args.includes('--silent=passed-only'));
         assert.deepEqual(
             resolveSafeValidationSuite('copilot-fast').map((step) => step.name),
             ['typecheck', 'lint', 'docs-contract', 'architecture-contract', 'unit-copilot'],
@@ -293,6 +300,92 @@ describe('copilot MCP jobs', () => {
         assert.equal(resolveJobTimeoutMs(10), 1_000);
         assert.equal(resolveJobTimeoutMs(2_500), 2_500);
         assert.equal(resolveJobTimeoutMs(9_999_999), 3_600_000);
+    });
+
+    it('does not misclassify cancelled validation as a failure requiring log-tail inspection', () => {
+        const cancelled = /** @type {any} */ ({
+            id: randomUUID(),
+            validator: 'unit-copilot',
+            status: 'cancelled',
+            startedAt: 1_000,
+            endedAt: 6_000,
+            exitCode: null,
+            signal: 'SIGTERM',
+            command: 'npm',
+            args: ['run', 'test:copilot:unit'],
+            timeoutMs: 60_000,
+            timedOut: false,
+            terminationRequested: 'cancel',
+            terminationRequestedAt: 5_900,
+            logFile: '/tmp/cancelled.log',
+            manifestFile: '/tmp/cancelled.json',
+            runtimeAttached: null,
+            runtimeSameEpoch: false,
+            process: null,
+            supervisor: null,
+            completion: null,
+        });
+        const effective = buildEffectiveValidationChecks([cancelled]);
+        assert.equal(effective['unit-copilot']?.['effectiveStatus'], 'cancelled');
+        assert.equal(recommendValidationAction(effective), 'none');
+
+        const failed = /** @type {any} */ ({ ...cancelled, id: randomUUID(), validator: 'lint', status: 'failed' });
+        assert.equal(
+            recommendValidationAction(buildEffectiveValidationChecks([failed])),
+            'read-small-tail-for-failing-job',
+        );
+    });
+
+    it('summarizes validation wall-time and repeat pressure without claiming duplicates absent source identity', () => {
+        const base = {
+            exitCode: 0,
+            signal: null,
+            command: 'npm',
+            args: [],
+            timeoutMs: 600_000,
+            timedOut: false,
+            terminationRequested: null,
+            terminationRequestedAt: null,
+            logFile: '/tmp/job.log',
+            manifestFile: '/tmp/job.json',
+            runtimeAttached: null,
+            runtimeSameEpoch: false,
+            process: null,
+            supervisor: null,
+            completion: null,
+        };
+        const jobs = /** @type {any[]} */ ([
+            { ...base, id: randomUUID(), validator: 'lint', status: 'completed', startedAt: 1_000, endedAt: 2_000 },
+            { ...base, id: randomUUID(), validator: 'lint', status: 'completed', startedAt: 3_000, endedAt: 5_000 },
+            {
+                ...base,
+                id: randomUUID(),
+                validator: 'suite-mcp-full',
+                status: 'completed',
+                startedAt: 10_000,
+                endedAt: 20_000,
+            },
+            {
+                ...base,
+                id: randomUUID(),
+                validator: 'unit-focused',
+                status: 'completed',
+                startedAt: 21_000,
+                endedAt: 24_000,
+            },
+        ]);
+        const productivity = summarizeValidationProductivity(jobs);
+        assert.equal(productivity.jobsConsidered, 4);
+        assert.equal(productivity.finishedJobs, 4);
+        assert.equal(productivity.totalFinishedDurationMs, 16_000);
+        assert.equal(productivity.broadSuiteRuns, 1);
+        assert.equal(productivity.broadSuiteDurationMs, 10_000);
+        assert.equal(productivity.focusedRuns, 1);
+        assert.equal(productivity.focusedDurationMs, 3_000);
+        assert.equal(productivity.repeatRunPressure, 1);
+        assert.equal(productivity.duplicateValidationCount, null);
+        assert.equal(productivity.duplicateClassification, 'requires-source-state-binding');
+        assert.equal(productivity.byValidator['lint']?.runs, 2);
     });
 
     it('prunes only the oldest completed in-memory jobs', () => {

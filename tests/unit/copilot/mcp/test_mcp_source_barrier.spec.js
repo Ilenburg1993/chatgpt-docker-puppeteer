@@ -5,6 +5,7 @@ import { buildMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/r
 import {
     captureRepositorySourceBarrier,
     fingerprintRepositorySourceBarrierEntries,
+    parseRepositorySourceBarrierJson,
     verifyRepositorySourceBarrier,
 } from '#copilot/mcp/public/workspace/repository/integrity';
 import { createMcpAuditCapability, readMcpAuditProcessConfig } from '#copilot/testing/mcp/observability';
@@ -15,6 +16,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, it } from 'vitest';
+import {
+    collectSourceBarrierWorktreePaths,
+    mergeSourceBarrierWorktreePaths,
+    parseNulSeparatedGitPaths,
+} from '../../../../src/copilot/mcp/scripts/source-barrier.js';
 
 const PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'mcp-source-barrier-unit-process-host',
@@ -42,6 +48,40 @@ describe('repository source barrier', () => {
         await Promise.all(TEST_DIRS.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
     });
 
+    it('parses and merges NUL-delimited Git path discovery deterministically', () => {
+        assert.deepEqual(parseNulSeparatedGitPaths('b.js\0a.js\0'), ['b.js', 'a.js']);
+        assert.deepEqual(mergeSourceBarrierWorktreePaths(['./b.js', 'a.js'], ['b.js', 'c\\d.js']), [
+            'a.js',
+            'b.js',
+            'c/d.js',
+        ]);
+    });
+
+    it('discovers staged, unstaged, untracked, deleted and both sides of renames for worktree capture', async () => {
+        const dir = await createTestDir();
+        await execFileAsync('git', ['init', '-q'], { cwd: dir });
+        await execFileAsync('git', ['config', 'user.name', 'Source Barrier Test'], { cwd: dir });
+        await execFileAsync('git', ['config', 'user.email', 'source-barrier@example.invalid'], { cwd: dir });
+        await fs.writeFile(path.join(dir, 'keep.js'), 'export const keep = 1;\n', 'utf8');
+        await fs.writeFile(path.join(dir, 'delete.js'), 'export const remove = 1;\n', 'utf8');
+        await fs.writeFile(path.join(dir, 'rename-old.js'), 'export const rename = 1;\n', 'utf8');
+        await execFileAsync('git', ['add', '.'], { cwd: dir });
+        await execFileAsync('git', ['commit', '-qm', 'baseline'], { cwd: dir });
+
+        await fs.writeFile(path.join(dir, 'keep.js'), 'export const keep = 2;\n', 'utf8');
+        await fs.unlink(path.join(dir, 'delete.js'));
+        await execFileAsync('git', ['mv', 'rename-old.js', 'rename-new.js'], { cwd: dir });
+        await fs.writeFile(path.join(dir, 'untracked.js'), 'export const untracked = true;\n', 'utf8');
+
+        assert.deepEqual(collectSourceBarrierWorktreePaths(dir), [
+            'delete.js',
+            'keep.js',
+            'rename-new.js',
+            'rename-old.js',
+            'untracked.js',
+        ]);
+    });
+
     it('produces a deterministic path-sorted fingerprint and verifies unchanged bytes', async () => {
         const dir = await createTestDir();
         const a = path.join(dir, 'a.txt');
@@ -56,11 +96,79 @@ describe('repository source barrier', () => {
             reversed.entries.map((entry) => path.basename(entry.path)),
             ['a.txt', 'b.txt'],
         );
+        assert.equal(reversed.version, 2);
+        assert.equal(reversed.domain, 'copilot.repository-source-barrier.v2');
+        assert.ok(reversed.entries.every((entry) => 'kind' in entry && entry.kind === 'file'));
         assert.equal(reversed.fingerprint, ordered.fingerprint);
         assert.equal(fingerprintRepositorySourceBarrierEntries(reversed.entries), reversed.fingerprint);
         const verified = await verifyRepositorySourceBarrier(WORKSPACE, reversed);
         assert.equal(verified.ok, true);
         assert.equal(verified.currentFingerprint, reversed.fingerprint);
+    });
+
+    it('captures absent-path tombstones and rejects a later unexpected file', async () => {
+        const dir = await createTestDir();
+        const file = path.join(dir, 'absent.txt');
+        const barrier = await captureRepositorySourceBarrier(WORKSPACE, [file]);
+
+        assert.equal(barrier.version, 2);
+        assert.deepEqual(barrier.entries, [
+            {
+                kind: 'absent',
+                path: WORKSPACE.toRelativePath(file).replaceAll('\\', '/'),
+            },
+        ]);
+        const verified = await verifyRepositorySourceBarrier(WORKSPACE, barrier);
+        assert.equal(verified.currentFingerprint, barrier.fingerprint);
+
+        await fs.writeFile(file, '', 'utf8');
+        const presentBarrier = await captureRepositorySourceBarrier(WORKSPACE, [file]);
+        assert.notEqual(presentBarrier.fingerprint, barrier.fingerprint);
+        await assert.rejects(
+            () => verifyRepositorySourceBarrier(WORKSPACE, barrier),
+            /** @param {unknown} error */ (error) => {
+                const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
+                assert.equal(candidate.code, 'ERR_SOURCE_DRIFT');
+                const rows = /** @type {Record<string, unknown>[]} */ (candidate.details?.['drift']);
+                assert.equal(rows[0]?.['kind'], 'unexpected-file');
+                assert.equal(rows[0]?.['expectedSha256'], null);
+                assert.match(String(rows[0]?.['actualSha256']), /^[a-f0-9]{64}$/u);
+                return true;
+            },
+        );
+    });
+
+    it('parses and verifies legacy v1 manifests without changing their fingerprint domain', async () => {
+        const dir = await createTestDir();
+        const file = path.join(dir, 'legacy.txt');
+        const content = 'legacy-source\n';
+        await fs.writeFile(file, content, 'utf8');
+        const current = await captureRepositorySourceBarrier(WORKSPACE, [file]);
+        const currentEntry = current.entries[0];
+        assert.equal(currentEntry?.kind, 'file');
+        if (!currentEntry || currentEntry.kind !== 'file') throw new Error('Expected v2 file entry.');
+        const legacyEntry = Object.freeze({
+            path: currentEntry.path,
+            sha256: currentEntry.sha256,
+            bytes: currentEntry.bytes,
+        });
+        const legacy = {
+            schema: 'copilot.repository-source-barrier',
+            version: 1,
+            algorithm: 'sha256',
+            domain: 'copilot.repository-source-barrier.v1',
+            capturedAt: '2026-08-27T00:00:00.000Z',
+            entryCount: 1,
+            fingerprint: fingerprintRepositorySourceBarrierEntries([legacyEntry]),
+            entries: [legacyEntry],
+        };
+
+        const parsed = parseRepositorySourceBarrierJson(JSON.stringify(legacy));
+        assert.equal(parsed.version, 1);
+        assert.equal(parsed.fingerprint, legacy.fingerprint);
+        const verified = await verifyRepositorySourceBarrier(WORKSPACE, parsed);
+        assert.equal(verified.currentFingerprint, legacy.fingerprint);
+        assert.equal(verified.fingerprint, legacy.fingerprint);
     });
 
     it('fails closed with ERR_SOURCE_DRIFT on a same-length external overwrite', async () => {

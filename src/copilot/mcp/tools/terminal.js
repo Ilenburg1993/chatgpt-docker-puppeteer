@@ -270,6 +270,52 @@ const terminalSessionReadOutputSchema = z.object({
 });
 
 const MAX_TERMINAL_BATCH_COMMANDS = 32;
+const TERMINAL_EXEC_SINGLE_FIELDS = Object.freeze([
+    'command',
+    'args',
+    'shell',
+    'shellPath',
+    'cwd',
+    'env',
+    'inheritEnv',
+    'stdin',
+    'timeoutMs',
+    'maxOutputBytes',
+]);
+const TERMINAL_EXEC_BATCH_ONLY_FIELDS = Object.freeze([
+    'batchConcurrency',
+    'batchFailureMode',
+    'batchResultBudgetBytes',
+]);
+const TERMINAL_SESSION_CONTROL_FIELDS = Object.freeze({
+    open: Object.freeze([
+        'action',
+        'command',
+        'args',
+        'shell',
+        'shellPath',
+        'cwd',
+        'env',
+        'inheritEnv',
+        'backend',
+        'cols',
+        'rows',
+        'bufferBytes',
+        'initialInput',
+    ]),
+    write: Object.freeze(['action', 'sessionId', 'data', 'appendNewline']),
+    eof: Object.freeze(['action', 'sessionId']),
+    resize: Object.freeze(['action', 'sessionId', 'cols', 'rows']),
+    signal: Object.freeze(['action', 'sessionId', 'signal', 'processGroup']),
+    close: Object.freeze(['action', 'sessionId', 'processGroup', 'graceMs']),
+    forget: Object.freeze(['action', 'sessionId']),
+});
+const TERMINAL_SESSION_READ_FIELDS = Object.freeze({
+    read: Object.freeze(['action', 'sessionId', 'afterSeq', 'maxBytes', 'waitFor', 'waitMs']),
+    status: Object.freeze(['action', 'sessionId']),
+    list: Object.freeze(['action', 'limit']),
+    capabilities: Object.freeze(['action']),
+});
 const TERMINAL_EXEC_RESULT_LIMIT_BYTES = 40 * 1024 * 1024;
 const TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES = 12 * 1024 * 1024;
 
@@ -353,15 +399,52 @@ function terminalResult(payload) {
     });
 }
 
+/** @param {Record<string, unknown>} value @param {readonly string[]} fields */
+function presentTerminalFields(value, fields) {
+    return fields.filter((field) => value[field] !== undefined);
+}
+
+/**
+ * @param {Record<string, unknown>} value
+ * @param {Readonly<Record<string, readonly string[]>>} fieldsByMode
+ * @param {string} mode
+ */
+function invalidTerminalFieldsForMode(value, fieldsByMode, mode) {
+    const allowed = fieldsByMode[mode];
+    if (!allowed) return [];
+    const allowedSet = new Set(allowed);
+    return Object.keys(value).filter((field) => value[field] !== undefined && !allowedSet.has(field));
+}
+
+/** @param {Record<string, unknown>} value */
+function invalidTerminalSessionActionFields(value) {
+    return invalidTerminalFieldsForMode(
+        value,
+        /** @type {Readonly<Record<string, readonly string[]>>} */ (TERMINAL_SESSION_CONTROL_FIELDS),
+        String(value['action'] ?? ''),
+    );
+}
+
+/** @param {Record<string, unknown>} value */
+function invalidTerminalSessionReadFields(value) {
+    return invalidTerminalFieldsForMode(
+        value,
+        /** @type {Readonly<Record<string, readonly string[]>>} */ (TERMINAL_SESSION_READ_FIELDS),
+        String(value['action'] ?? 'read'),
+    );
+}
+
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const terminalTools = [
     defineMcpRawTool({
         name: 'terminal_exec',
         title: 'Execute arbitrary terminal commands',
         description:
-            'Execute any shell command or executable permitted by the MCP process OS identity. Supports one-shot or batched execution, arbitrary cwd/explicit env/stdin, optional no-timeout mode, bounded output tails, and process-group termination. Default ambient inheritance is operational-only and excludes parent credentials; no command allowlist is applied.',
+            'Execute any shell command or executable permitted by the MCP process OS identity. Single-command fields and batch are mutually exclusive; batch tuning fields require batch mode. Supports arbitrary cwd/explicit env/stdin, optional no-timeout mode, bounded output tails, and process-group termination. Default ambient inheritance is operational-only and excludes parent credentials; no command allowlist is applied.',
         inputSchema: {
-            command: commandSpecShape.command.optional(),
+            command: commandSpecShape.command
+                .optional()
+                .describe('Single-mode command text or executable; do not combine with batch.'),
             args: commandSpecShape.args,
             shell: commandSpecShape.shell,
             shellPath: commandSpecShape.shellPath,
@@ -400,16 +483,18 @@ export const terminalTools = [
 
         maxResultBytes: TERMINAL_EXEC_RESULT_LIMIT_BYTES,
         handler: async (input = {}, operationContext) => {
-            const runtime = terminalExecutionRuntime(operationContext);
             const value = isRecord(input) ? input : {};
             if (Array.isArray(value['batch'])) {
-                if (value['command'] !== undefined) {
+                const conflictingFields = presentTerminalFields(value, TERMINAL_EXEC_SINGLE_FIELDS);
+                if (conflictingFields.length > 0) {
                     return okResult({
                         success: false,
                         code: 'ERR_TERMINAL_EXEC_SHAPE',
-                        hint: 'Use either single command fields or batch, not both.',
+                        conflictingFields,
+                        hint: 'Batch mode accepts batch plus batchConcurrency/batchFailureMode/batchResultBudgetBytes only.',
                     });
                 }
+                const runtime = terminalExecutionRuntime(operationContext);
                 return terminalResult(
                     await executeTerminalCommandBatch(value['batch'], runtime, {
                         ...(typeof value['batchConcurrency'] === 'number'
@@ -424,6 +509,15 @@ export const terminalTools = [
                     }),
                 );
             }
+            const batchOnlyFields = presentTerminalFields(value, TERMINAL_EXEC_BATCH_ONLY_FIELDS);
+            if (batchOnlyFields.length > 0) {
+                return okResult({
+                    success: false,
+                    code: 'ERR_TERMINAL_EXEC_SHAPE',
+                    conflictingFields: batchOnlyFields,
+                    hint: 'batchConcurrency/batchFailureMode/batchResultBudgetBytes require batch mode.',
+                });
+            }
             if (typeof value['command'] !== 'string' || value['command'].length === 0) {
                 return okResult({
                     success: false,
@@ -431,6 +525,7 @@ export const terminalTools = [
                     hint: 'command is required outside batch mode.',
                 });
             }
+            const runtime = terminalExecutionRuntime(operationContext);
             return terminalResult(
                 await executeTerminalCommand(
                     /** @type {Parameters<typeof executeTerminalCommand>[0]} */ (value),
@@ -445,8 +540,15 @@ export const terminalTools = [
         description:
             'Open and control arbitrary persistent shell/process sessions. Supports backend=auto|pipe|pty, stdin writes, EOF, resize for PTY, signals/process groups, graceful close and forgetting closed sessions. PTY is used automatically when node-pty is installed.',
         inputSchema: {
-            action: z.enum(['open', 'write', 'eof', 'resize', 'signal', 'close', 'forget']),
-            sessionId: z.string().min(1).max(128).optional(),
+            action: z
+                .enum(['open', 'write', 'eof', 'resize', 'signal', 'close', 'forget'])
+                .describe('Session action; each action consumes only its documented action-scoped fields.'),
+            sessionId: z
+                .string()
+                .min(1)
+                .max(128)
+                .optional()
+                .describe('Persistent session id for write/eof/resize/signal/close/forget; omitted for open.'),
             command: z
                 .string()
                 .max(256 * 1024)
@@ -455,14 +557,16 @@ export const terminalTools = [
             args: z
                 .array(z.string().max(64 * 1024))
                 .max(4096)
-                .optional(),
+                .optional()
+                .describe('Executable arguments for action=open when shell=false.'),
             shell: z.boolean().optional().describe('Treat command as shell text. Default: true.'),
-            shellPath: z.string().min(1).max(4096).optional(),
+            shellPath: z.string().min(1).max(4096).optional().describe('Shell executable for action=open.'),
             cwd: z
                 .string()
                 .max(32 * 1024)
-                .optional(),
-            env: envSchema.optional(),
+                .optional()
+                .describe('Working directory for action=open.'),
+            env: envSchema.optional().describe('Environment overrides for action=open; null removes a variable.'),
             inheritEnv: z
                 .boolean()
                 .optional()
@@ -473,23 +577,41 @@ export const terminalTools = [
                 .enum(['auto', 'pipe', 'pty'])
                 .optional()
                 .describe('auto prefers node-pty and falls back to pipes.'),
-            cols: z.number().int().min(1).max(1000).optional(),
-            rows: z.number().int().min(1).max(1000).optional(),
+            cols: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .optional()
+                .describe('PTY column count for action=open or action=resize.'),
+            rows: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .optional()
+                .describe('PTY row count for action=open or action=resize.'),
             bufferBytes: z
                 .number()
                 .int()
                 .min(64 * 1024)
                 .max(64 * 1024 * 1024)
-                .optional(),
+                .optional()
+                .describe('Retained session event-buffer bytes for action=open.'),
             initialInput: z
                 .string()
                 .max(16 * 1024 * 1024)
-                .optional(),
+                .optional()
+                .describe('Initial stdin payload written during action=open.'),
             data: z
                 .string()
                 .max(16 * 1024 * 1024)
-                .optional(),
-            appendNewline: z.boolean().optional(),
+                .optional()
+                .describe('Stdin payload for action=write.'),
+            appendNewline: z
+                .boolean()
+                .optional()
+                .describe('Append a newline after data for action=write. Default: false.'),
             signal: z
                 .string()
                 .min(3)
@@ -509,6 +631,16 @@ export const terminalTools = [
 
         handler: async (input, operationContext) => {
             const value = input;
+            const invalidOptions = invalidTerminalSessionActionFields(/** @type {Record<string, unknown>} */ (value));
+            if (invalidOptions.length > 0) {
+                return okResult({
+                    success: false,
+                    code: 'ERR_TERMINAL_SESSION_ACTION_OPTIONS',
+                    action: value.action,
+                    invalidOptions,
+                    hint: `Remove options that do not apply to action=${value.action}.`,
+                });
+            }
             if (value.action === 'open') {
                 const runtime = terminalExecutionRuntime(operationContext);
                 return terminalResult(
@@ -537,7 +669,12 @@ export const terminalTools = [
             'Read/list/status persistent MCP terminal sessions and inspect terminal capabilities without mutating a process. Reads are cursor-based and bounded; optionally wait event-driven for new output or exit to avoid mechanical polling.',
         inputSchema: {
             action: z.enum(['read', 'status', 'list', 'capabilities']).optional().describe('Default: read.'),
-            sessionId: z.string().min(1).max(128).optional(),
+            sessionId: z
+                .string()
+                .min(1)
+                .max(128)
+                .optional()
+                .describe('Persistent session id for action=read or action=status.'),
             afterSeq: z.number().int().min(0).optional().describe('Return events after this sequence cursor.'),
             maxBytes: z
                 .number()
@@ -572,6 +709,17 @@ export const terminalTools = [
         maxResultBytes: TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES,
         handler: async (input = {}, operationContext) => {
             const value = isRecord(input) ? input : {};
+            const action = String(value['action'] ?? 'read');
+            const invalidOptions = invalidTerminalSessionReadFields(value);
+            if (invalidOptions.length > 0) {
+                return okResult({
+                    success: false,
+                    code: 'ERR_TERMINAL_SESSION_READ_ACTION_OPTIONS',
+                    action,
+                    invalidOptions,
+                    hint: `Remove options that do not apply to action=${action}.`,
+                });
+            }
             if (value['waitMs'] !== undefined && value['waitFor'] !== 'output-or-exit') {
                 return okResult({
                     success: false,

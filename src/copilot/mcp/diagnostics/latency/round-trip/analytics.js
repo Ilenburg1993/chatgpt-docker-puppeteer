@@ -57,9 +57,16 @@ export function createMcpRoundTripAnalytics(options) {
             source_identity, source_offset, ts_ms, event, tool,
             call_id, trace_key, trace_context_state, target_precision, target_keys_json,
             runtime_epoch_id, runtime_source_binding, runtime_source_fingerprint,
-            duration_ms, is_error, code,
+            duration_ms, is_error, code, result_code, result_state, result_class,
+            option_contract_version, option_policy_coverage, option_mode,
+            option_declared_count, option_requested_count, option_effective_requested_count,
+            option_defaulted_count, option_normalized_count, option_ignored_count,
+            option_coerced_count, option_rejected_count, option_conflict_count,
             logical_operations, failed_operations, skipped_operations, execution_mode,
             batch_size, batch_capacity, result_budget_bytes, truncated_operations, continuation_required,
+            continuation_available, continuation_available_operations,
+            continuation_transport_required, continuation_transport_required_operations,
+            continuation_recommended, continuation_recommended_operations,
             result_bytes, result_size_strategy, text_result_bytes, non_text_result_bytes, duplicate_text_bytes,
             failure_class, retryability, causal_by_code_json, failure_class_counts_json, retryability_counts_json,
             recovery_required, inline_next_action_provided, inline_next_action_target_count,
@@ -71,9 +78,16 @@ export function createMcpRoundTripAnalytics(options) {
             @sourceIdentity, @sourceOffset, @tsMs, @event, @tool,
             @callId, @traceKey, @traceContextState, @targetPrecision, @targetKeysJson,
             @runtimeEpochId, @runtimeSourceBinding, @runtimeSourceFingerprint,
-            @durationMs, @isError, @code,
+            @durationMs, @isError, @code, @resultCode, @resultState, @resultClass,
+            @optionContractVersion, @optionPolicyCoverage, @optionMode,
+            @optionDeclaredCount, @optionRequestedCount, @optionEffectiveRequestedCount,
+            @optionDefaultedCount, @optionNormalizedCount, @optionIgnoredCount,
+            @optionCoercedCount, @optionRejectedCount, @optionConflictCount,
             @logicalOperations, @failedOperations, @skippedOperations, @executionMode,
-            @batchSize, @batchCapacity, @resultBudgetBytes, @truncatedOperations, @continuationRequired,
+            @batchSize, @batchCapacity, @resultBudgetBytes, @truncatedOperations, @legacyContinuationRequired,
+            @continuationAvailable, @continuationAvailableOperations,
+            @continuationTransportRequired, @continuationTransportRequiredOperations,
+            @continuationRecommended, @continuationRecommendedOperations,
             @resultBytes, @resultSizeStrategy, @textResultBytes, @nonTextResultBytes, @duplicateTextBytes,
             @failureClass, @retryability, @causalByCodeJson, @failureClassCountsJson, @retryabilityCountsJson,
             @recoveryRequired, @inlineNextActionProvided, @inlineNextActionTargetCount,
@@ -97,6 +111,21 @@ export function createMcpRoundTripAnalytics(options) {
             duration_ms = excluded.duration_ms,
             is_error = excluded.is_error,
             code = excluded.code,
+            result_code = excluded.result_code,
+            result_state = excluded.result_state,
+            result_class = excluded.result_class,
+            option_contract_version = excluded.option_contract_version,
+            option_policy_coverage = excluded.option_policy_coverage,
+            option_mode = excluded.option_mode,
+            option_declared_count = excluded.option_declared_count,
+            option_requested_count = excluded.option_requested_count,
+            option_effective_requested_count = excluded.option_effective_requested_count,
+            option_defaulted_count = excluded.option_defaulted_count,
+            option_normalized_count = excluded.option_normalized_count,
+            option_ignored_count = excluded.option_ignored_count,
+            option_coerced_count = excluded.option_coerced_count,
+            option_rejected_count = excluded.option_rejected_count,
+            option_conflict_count = excluded.option_conflict_count,
             logical_operations = excluded.logical_operations,
             failed_operations = excluded.failed_operations,
             skipped_operations = excluded.skipped_operations,
@@ -106,6 +135,12 @@ export function createMcpRoundTripAnalytics(options) {
             result_budget_bytes = excluded.result_budget_bytes,
             truncated_operations = excluded.truncated_operations,
             continuation_required = excluded.continuation_required,
+            continuation_available = excluded.continuation_available,
+            continuation_available_operations = excluded.continuation_available_operations,
+            continuation_transport_required = excluded.continuation_transport_required,
+            continuation_transport_required_operations = excluded.continuation_transport_required_operations,
+            continuation_recommended = excluded.continuation_recommended,
+            continuation_recommended_operations = excluded.continuation_recommended_operations,
             result_bytes = excluded.result_bytes,
             result_size_strategy = excluded.result_size_strategy,
             text_result_bytes = excluded.text_result_bytes,
@@ -153,7 +188,9 @@ export function createMcpRoundTripAnalytics(options) {
             upsertCursor.run(cursor);
         });
 
-    async function sync() {
+    /** @param {{ maxChunks?: number }} [syncOptions] */
+    async function sync(syncOptions = {}) {
+        const syncMaxChunks = boundedInteger(syncOptions.maxChunks, maxChunks, 1, maxChunks);
         let cursor = readCursor(db);
         let offset = cursor?.byteOffset ?? 0;
         let expectedIdentity = cursor?.fileIdentity ?? null;
@@ -167,7 +204,7 @@ export function createMcpRoundTripAnalytics(options) {
         let fileBytes = cursor?.fileBytes ?? 0;
         let fileIdentity = expectedIdentity;
 
-        while (chunks < maxChunks) {
+        while (chunks < syncMaxChunks) {
             const slice = await readSlice({ offset, maxBytes: chunkBytes, maxEvents: 200_000 });
             chunks += 1;
             if (!slice.ok) {
@@ -180,6 +217,7 @@ export function createMcpRoundTripAnalytics(options) {
                     indexedEvents,
                     invalidLines,
                     complete: false,
+                    chunkBudget: syncMaxChunks,
                 };
             }
             fileBytes = Number(slice.fileBytes ?? 0);
@@ -243,6 +281,7 @@ export function createMcpRoundTripAnalytics(options) {
             fileIdentity,
             fileBytes,
             lagBytes: Math.max(0, fileBytes - (cursor?.byteOffset ?? 0)),
+            chunkBudget: syncMaxChunks,
         };
     }
 
@@ -299,7 +338,7 @@ export function createMcpRoundTripAnalyticsCapability(readDatabase, audit) {
     };
 
     return Object.freeze({
-        sync: () => requireAnalytics().sync(),
+        sync: (/** @type {{ maxChunks?: number }} */ options = {}) => requireAnalytics().sync(options),
         summarize: (
             /** @type {{ windowMs?: number; top?: number; includeSynthetic?: boolean; sync?: boolean }} */ options = {},
         ) => requireAnalytics().summarize(options),
@@ -436,6 +475,21 @@ function ensureSchema(db) {
             duration_ms INTEGER,
             is_error INTEGER,
             code TEXT,
+            result_code TEXT,
+            result_state TEXT,
+            result_class TEXT,
+            option_contract_version TEXT,
+            option_policy_coverage TEXT,
+            option_mode TEXT,
+            option_declared_count INTEGER,
+            option_requested_count INTEGER,
+            option_effective_requested_count INTEGER,
+            option_defaulted_count INTEGER,
+            option_normalized_count INTEGER,
+            option_ignored_count INTEGER,
+            option_coerced_count INTEGER,
+            option_rejected_count INTEGER,
+            option_conflict_count INTEGER,
             logical_operations INTEGER,
             failed_operations INTEGER,
             skipped_operations INTEGER,
@@ -445,6 +499,12 @@ function ensureSchema(db) {
             result_budget_bytes INTEGER,
             truncated_operations INTEGER,
             continuation_required INTEGER,
+            continuation_available INTEGER,
+            continuation_available_operations INTEGER,
+            continuation_transport_required INTEGER,
+            continuation_transport_required_operations INTEGER,
+            continuation_recommended INTEGER,
+            continuation_recommended_operations INTEGER,
             result_bytes INTEGER,
             result_size_strategy TEXT,
             text_result_bytes INTEGER,
@@ -502,6 +562,21 @@ function ensureRoundTripEventColumns(db) {
         ['runtime_epoch_id', 'TEXT'],
         ['runtime_source_binding', 'TEXT'],
         ['runtime_source_fingerprint', 'TEXT'],
+        ['result_code', 'TEXT'],
+        ['result_state', 'TEXT'],
+        ['result_class', 'TEXT'],
+        ['option_contract_version', 'TEXT'],
+        ['option_policy_coverage', 'TEXT'],
+        ['option_mode', 'TEXT'],
+        ['option_declared_count', 'INTEGER'],
+        ['option_requested_count', 'INTEGER'],
+        ['option_effective_requested_count', 'INTEGER'],
+        ['option_defaulted_count', 'INTEGER'],
+        ['option_normalized_count', 'INTEGER'],
+        ['option_ignored_count', 'INTEGER'],
+        ['option_coerced_count', 'INTEGER'],
+        ['option_rejected_count', 'INTEGER'],
+        ['option_conflict_count', 'INTEGER'],
         ['logical_operations', 'INTEGER'],
         ['failed_operations', 'INTEGER'],
         ['skipped_operations', 'INTEGER'],
@@ -511,6 +586,12 @@ function ensureRoundTripEventColumns(db) {
         ['result_budget_bytes', 'INTEGER'],
         ['truncated_operations', 'INTEGER'],
         ['continuation_required', 'INTEGER'],
+        ['continuation_available', 'INTEGER'],
+        ['continuation_available_operations', 'INTEGER'],
+        ['continuation_transport_required', 'INTEGER'],
+        ['continuation_transport_required_operations', 'INTEGER'],
+        ['continuation_recommended', 'INTEGER'],
+        ['continuation_recommended_operations', 'INTEGER'],
         ['result_bytes', 'INTEGER'],
         ['result_size_strategy', 'TEXT'],
         ['text_result_bytes', 'INTEGER'],

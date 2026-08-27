@@ -17,7 +17,7 @@
  */
 
 import { readBoundedResponseText } from '#copilot/infra/public/platform/http-response';
-import { readMcpAuthConfig } from '#copilot/mcp/public/auth';
+import { readMcpAuthConfig } from '#copilot/mcp/public/auth/config';
 import { MCP_PROTOCOL_LEGACY_DEFAULT_VERSION, MCP_PROTOCOL_MODERN_VERSION } from '#copilot/mcp/public/protocol/version';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -86,6 +86,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     runNegativeResourceChecks?: boolean;
  *     verboseTools?: boolean;
  *     localToolNames?: string[];
+ *     localToolFingerprints?: Readonly<Record<string,string>>;
  *     env: NodeJS.ProcessEnv;
  * }} OAuthSmokeOptions
  *
@@ -102,6 +103,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     runNegativeResourceChecks: boolean;
  *     verboseTools: boolean;
  *     localToolNames: string[];
+ *     localToolFingerprints: Readonly<Record<string,string>>;
  *     protocolVersion: typeof MCP_PROTOCOL_MODERN_VERSION;
  *     legacyProtocolVersion: string;
  * }} OAuthSmokeRuntimeOptions
@@ -296,7 +298,7 @@ export async function runMcpOAuthSmoke(options) {
     const modernRuntime = runtimeChecks.modern2026;
     const runtimeHealth = modernRuntime.runtimeHealth;
     const authenticatedToolsList = modernRuntime.authenticatedToolsList;
-    const authenticatedToolsSummary = summarizeAuthenticatedToolsList(authenticatedToolsList, runtime);
+    const authenticatedToolsSummary = await summarizeAuthenticatedToolsList(authenticatedToolsList, runtime);
     const modernSubscription = modernRuntime.subscription;
     const legacyCompatibility = asRecord(runtimeChecks.legacy2025Compatibility) ?? {};
     const legacyRuntimeHealth = asRecord(legacyCompatibility['runtimeHealth']);
@@ -502,9 +504,22 @@ function readSmokeRuntimeOptions(options, env) {
         ),
         verboseTools: readBooleanOption(options.verboseTools, env, 'COPILOT_MCP_OAUTH_SMOKE_VERBOSE_TOOLS', false),
         localToolNames: [...new Set(options.localToolNames ?? [])].sort((left, right) => left.localeCompare(right)),
+        localToolFingerprints: normalizeToolFingerprintIndex(options.localToolFingerprints),
         protocolVersion: MCP_PROTOCOL_MODERN_VERSION,
         legacyProtocolVersion: normalizeLegacyProtocolVersion(env['COPILOT_MCP_PROTOCOL_VERSION']),
     };
+}
+
+/** @param {Readonly<Record<string,string>> | undefined} value */
+function normalizeToolFingerprintIndex(value) {
+    if (!value) return Object.freeze({});
+    return Object.freeze(
+        Object.fromEntries(
+            Object.entries(value)
+                .filter(([name, fingerprint]) => name.length > 0 && /^[0-9a-f]{64}$/u.test(fingerprint))
+                .sort(([left], [right]) => left.localeCompare(right)),
+        ),
+    );
 }
 
 /** @param {unknown} value */

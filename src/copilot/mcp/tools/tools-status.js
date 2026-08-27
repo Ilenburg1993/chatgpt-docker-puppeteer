@@ -19,6 +19,7 @@ import {
     requireMcpToolPayloadAuditConfig,
     requireMcpToolSurface,
 } from '#copilot/mcp/public/protocol/tools';
+import { readMcpToolOptionContractCoverage } from '#copilot/mcp/public/tools/catalog/option-contracts';
 import { buildMcpWorkflowStatusProjection } from '#copilot/mcp/public/workflow-policy';
 
 const NEVER_REMEMBER_APPROVAL_TOOLS = Object.freeze(['job_cancel']);
@@ -158,7 +159,8 @@ export const mcpToolsStatusTool = defineMcpRawTool({
     handler: async (_args, operationContext) => {
         const auth = requireMcpToolAuthConfig(operationContext);
         const toolPayloadConfig = requireMcpToolPayloadAuditConfig(operationContext);
-        const tools = requireMcpToolSurface(operationContext).tools;
+        const toolSurface = requireMcpToolSurface(operationContext);
+        const tools = toolSurface.tools;
         const summaries = tools.map(summarizeTool).sort((left, right) => left.name.localeCompare(right.name));
         const readOnly = summaries.filter((tool) => tool.readOnly);
         const boundedWrite = summaries.filter((tool) => tool.contract.mutation === 'bounded-write');
@@ -181,6 +183,19 @@ export const mcpToolsStatusTool = defineMcpRawTool({
                 detailsTool: 'mcp_tool_payload_audit',
             };
         }
+        const optionContractCoverage = readMcpToolOptionContractCoverage();
+        const descriptorRevisionProfile = {
+            authority: 'registry-tools-list-wire-fingerprint',
+            globalFingerprint: toolSurface.descriptorFingerprint ?? null,
+            fingerprintKind: toolSurface.descriptorFingerprintKind ?? null,
+            semanticProfileToken: `option-contract:${optionContractCoverage.version}`,
+            semanticProfileMeaning:
+                'Policy/normalization generation for enrolled options; it is not an input knob and does not by itself imply tools/list schema churn.',
+            coveredToolRevisions: optionContractCoverage.toolNames.map((name) => ({
+                name,
+                revisionToken: toolSurface.toolDescriptorRevisionTokens?.[name] ?? null,
+            })),
+        };
         return okResult({
             success: true,
             totalTools: summaries.length,
@@ -215,6 +230,7 @@ export const mcpToolsStatusTool = defineMcpRawTool({
             executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
             executionLimits: MCP_TOOL_EXECUTION_LIMITS,
             descriptorObservation: readMcpDescriptorObservationState(),
+            descriptorRevisionProfile,
             publicationWorkflow: {
                 preferred: 'git_publish_changes',
                 happyPath:

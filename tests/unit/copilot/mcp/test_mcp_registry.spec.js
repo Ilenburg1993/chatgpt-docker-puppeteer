@@ -409,7 +409,7 @@ describe('copilot MCP registry', () => {
             openWorld: 10,
             idempotent: 92,
             scopes: { read: 89, write: 20, validate: 9, admin: 13 },
-            cancellation: { cancellable: 30, boundedNonCancellable: 88, notApplicable: 13 },
+            cancellation: { cancellable: 31, boundedNonCancellable: 88, notApplicable: 12 },
             output: { specific: 10, intentionalUntyped: 121 },
         });
         assert.equal(tools.length, coverage.total);
@@ -422,6 +422,15 @@ describe('copilot MCP registry', () => {
                 assert.ok(Number(tool.execution.continuationBoundMs) >= 100, tool.name);
             }
         }
+    });
+
+    it('pins terminal_session_read as cancellable after event-driven long-poll rollout', () => {
+        const tool = getCanonicalMcpTools().find((item) => item.name === 'terminal_session_read');
+        assert.ok(tool?.execution);
+        assert.equal(tool.execution.cancellation, 'cancellable');
+        assert.equal(tool.execution.drainTimeoutMs, 1_000);
+        assert.match(tool.execution.rationale, /event-driven/u);
+        assert.match(tool.execution.rationale, /releases only the read waiter/u);
     });
 
     it('assigns the readiness-specific drain rationale only to llmb_live_readiness', () => {

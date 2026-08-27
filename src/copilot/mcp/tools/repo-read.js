@@ -99,13 +99,25 @@ function compactBatchCallResult(index, result) {
 }
 
 /** @param {Record<string, unknown>[]} results */
-function countRepoBulkContinuationResults(results) {
-    return results.filter(
-        (row) =>
-            row['payloadTruncated'] === true ||
-            row['hasMore'] === true ||
-            (typeof row['nextCursor'] === 'string' && row['nextCursor'].length > 0),
-    ).length;
+function inspectRepoBulkContinuation(results) {
+    let availableOperations = 0;
+    let transportRequiredOperations = 0;
+    let recommendedOperations = 0;
+    for (const row of results) {
+        const nextCursor = typeof row['nextCursor'] === 'string' && row['nextCursor'].length > 0;
+        const hasMore = row['hasMore'] === true;
+        const transportRequired = row['payloadTruncated'] === true;
+        const recommended = transportRequired || hasMore || row['truncated'] === true;
+        const available = transportRequired || hasMore || nextCursor;
+        if (available) availableOperations += 1;
+        if (transportRequired) transportRequiredOperations += 1;
+        if (recommended) recommendedOperations += 1;
+    }
+    return {
+        availableOperations,
+        transportRequiredOperations,
+        recommendedOperations,
+    };
 }
 
 /** @param {unknown} value */
@@ -312,6 +324,11 @@ async function runRepoSearchTextCall(workspace, input) {
     );
 }
 
+/** @param {{pattern?: string | undefined; query?: string | undefined}} input */
+function hasDivergentSearchAliases(input) {
+    return input.pattern !== undefined && input.query !== undefined && input.pattern !== input.query;
+}
+
 /** @param {RepoReadWorkspaceCapability} workspace @param {{ path: string; includeHash?: boolean; maxHashBytes?: number }} input */
 async function runRepoFileStatsCall(workspace, input) {
     return frameRepositoryReadOperation(await readRepositoryFileStats(workspace, input));
@@ -502,6 +519,7 @@ export const repoReadTools = [
                     strategy: 'conservative-estimate',
                     source: 'repo_read_file.batch',
                 });
+                const continuation = inspectRepoBulkContinuation(bounded.results);
                 return withResultExecutionHint(result, {
                     logicalOperations: execution.requestCount,
                     failedOperations: execution.failedCount,
@@ -511,7 +529,12 @@ export const repoReadTools = [
                     batchCapacity: MAX_REPO_BATCH_REQUESTS,
                     resultBudgetBytes: bounded.resultBudgetBytes,
                     truncatedOperations: bounded.payloadTruncatedCount,
-                    continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
+                    continuationAvailable: continuation.availableOperations > 0,
+                    continuationAvailableOperations: continuation.availableOperations,
+                    continuationTransportRequired: continuation.transportRequiredOperations > 0,
+                    continuationTransportRequiredOperations: continuation.transportRequiredOperations,
+                    continuationRecommended: continuation.recommendedOperations > 0,
+                    continuationRecommendedOperations: continuation.recommendedOperations,
                 });
             }
             if (
@@ -674,6 +697,7 @@ export const repoReadTools = [
                 strategy: 'conservative-estimate',
                 source: 'repo_bulk_inspect',
             });
+            const continuation = inspectRepoBulkContinuation(bounded.results);
             return withResultExecutionHint(result, {
                 logicalOperations: execution.requestCount,
                 failedOperations: execution.failedCount,
@@ -683,7 +707,12 @@ export const repoReadTools = [
                 batchCapacity: MAX_REPO_BATCH_REQUESTS,
                 resultBudgetBytes: bounded.resultBudgetBytes,
                 truncatedOperations: bounded.payloadTruncatedCount,
-                continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
+                continuationAvailable: continuation.availableOperations > 0,
+                continuationAvailableOperations: continuation.availableOperations,
+                continuationTransportRequired: continuation.transportRequiredOperations > 0,
+                continuationTransportRequiredOperations: continuation.transportRequiredOperations,
+                continuationRecommended: continuation.recommendedOperations > 0,
+                continuationRecommendedOperations: continuation.recommendedOperations,
             });
         },
     }),
@@ -758,7 +787,7 @@ export const repoReadTools = [
                 .string()
                 .min(1)
                 .optional()
-                ['describe']('Alias for pattern; useful for clients that call search inputs query.'),
+                ['describe']('Alias for pattern; if both pattern and query are supplied they must be identical.'),
             path: z.string().optional()['describe']('Workspace-relative search root. Default: src/copilot.'),
             isRegex: z.boolean().optional()['describe']('Treat pattern as regex. Default: false.'),
             caseSensitive: z.boolean().optional()['describe']('Case-sensitive search. Default: false.'),
@@ -820,7 +849,6 @@ export const repoReadTools = [
             },
             operationContext,
         ) => {
-            const workspace = requireMcpToolWorkspace(operationContext);
             if (batch !== undefined) {
                 if (
                     pattern !== undefined ||
@@ -838,6 +866,7 @@ export const repoReadTools = [
                         code: 'ERR_BATCH_CONFLICTING_MODE',
                     });
                 }
+                const workspace = requireMcpToolWorkspace(operationContext);
                 const execution = await runBoundedOperationBatch(
                     /** @type {Record<string, unknown>[]} */ (batch),
                     async (item, index) => {
@@ -847,6 +876,16 @@ export const repoReadTools = [
                                 code: 'ERR_BATCH_INVALID_ITEM',
                                 index,
                             });
+                        }
+                        if (hasDivergentSearchAliases(parsed.data)) {
+                            return errorResult(
+                                `repo_search_text batch item ${index} has conflicting pattern/query aliases.`,
+                                {
+                                    code: 'ERR_SEARCH_ALIAS_CONFLICT',
+                                    index,
+                                    hint: 'Provide pattern or query, or provide the same value in both aliases.',
+                                },
+                            );
                         }
                         return runRepoSearchTextCall(workspace, parsed.data);
                     },
@@ -889,6 +928,7 @@ export const repoReadTools = [
                     strategy: 'conservative-estimate',
                     source: 'repo_search_text.batch',
                 });
+                const continuation = inspectRepoBulkContinuation(bounded.results);
                 return withResultExecutionHint(result, {
                     logicalOperations: execution.requestCount,
                     failedOperations: execution.failedCount,
@@ -898,7 +938,12 @@ export const repoReadTools = [
                     batchCapacity: MAX_REPO_BATCH_REQUESTS,
                     resultBudgetBytes: bounded.resultBudgetBytes,
                     truncatedOperations: bounded.payloadTruncatedCount,
-                    continuationRequired: countRepoBulkContinuationResults(bounded.results) > 0,
+                    continuationAvailable: continuation.availableOperations > 0,
+                    continuationAvailableOperations: continuation.availableOperations,
+                    continuationTransportRequired: continuation.transportRequiredOperations > 0,
+                    continuationTransportRequiredOperations: continuation.transportRequiredOperations,
+                    continuationRecommended: continuation.recommendedOperations > 0,
+                    continuationRecommendedOperations: continuation.recommendedOperations,
                 });
             }
             if (
@@ -910,6 +955,13 @@ export const repoReadTools = [
                     code: 'ERR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
+            if (hasDivergentSearchAliases({ pattern, query })) {
+                return errorResult('pattern and query aliases conflict.', {
+                    code: 'ERR_SEARCH_ALIAS_CONFLICT',
+                    hint: 'Provide pattern or query, or provide the same value in both aliases.',
+                });
+            }
+            const workspace = requireMcpToolWorkspace(operationContext);
             return runRepoSearchTextCall(workspace, {
                 pattern,
                 query,

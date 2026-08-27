@@ -151,7 +151,7 @@ function latestJobsByValidator(jobs) {
 }
 
 /** @param {import('./runtime.js').PublicJobRecord[]} jobs */
-function buildEffectiveValidationChecks(jobs) {
+export function buildEffectiveValidationChecks(jobs) {
     /** @type {Record<string, Record<string, unknown>>} */
     const effective = {};
     const sorted = [...jobs].sort((left, right) => left.startedAt - right.startedAt);
@@ -182,13 +182,102 @@ function buildEffectiveValidationChecks(jobs) {
 }
 
 /** @param {Record<string, Record<string, unknown>>} effectiveChecks */
-function recommendValidationAction(effectiveChecks) {
+export function recommendValidationAction(effectiveChecks) {
     const entries = Object.values(effectiveChecks);
     if (entries.some((check) => check['effectiveStatus'] === 'orphaned')) return 'inspect-orphaned-validation-job';
     if (entries.some((check) => check['effectiveStatus'] === 'running')) return 'wait-and-refresh-summary';
-    if (entries.some((check) => check['passed'] === false)) return 'read-small-tail-for-failing-job';
+    if (entries.some((check) => check['effectiveStatus'] === 'failed')) return 'read-small-tail-for-failing-job';
     if (entries.length === 0) return 'run-validation-only-when-needed';
     return 'none';
+}
+
+/**
+ * Bounded productivity view over the persisted validator manifests already loaded for a dashboard request. Repeated
+ * validator names are pressure only; they are not called duplicate work until validator jobs carry source-state binding.
+ *
+ * @param {import('./runtime.js').PublicJobRecord[]} jobs
+ */
+export function summarizeValidationProductivity(jobs) {
+    const byValidator = new Map();
+    let totalFinishedDurationMs = 0;
+    let finishedJobs = 0;
+    let passedJobs = 0;
+    let failedJobs = 0;
+    let cancelledJobs = 0;
+    let runningJobs = 0;
+    let orphanedJobs = 0;
+    let broadSuiteRuns = 0;
+    let broadSuiteDurationMs = 0;
+    let focusedRuns = 0;
+    let focusedDurationMs = 0;
+
+    for (const job of jobs) {
+        const summary = summarizeValidationJob(job);
+        const durationMs = Number(summary['durationMs'] ?? 0);
+        const validator = String(summary['validator'] ?? job.validator);
+        const status = String(summary['status'] ?? job.status);
+        const metric = byValidator.get(validator) ?? {
+            runs: 0,
+            passed: 0,
+            failed: 0,
+            cancelled: 0,
+            finishedDurationMs: 0,
+            lastDurationMs: 0,
+        };
+        metric.runs += 1;
+        metric.lastDurationMs = durationMs;
+        if (status === 'running') {
+            runningJobs += 1;
+            if (summary['orphaned'] === true) orphanedJobs += 1;
+        } else {
+            finishedJobs += 1;
+            totalFinishedDurationMs += durationMs;
+            metric.finishedDurationMs += durationMs;
+            if (status === 'completed' && summary['passed'] === true) {
+                passedJobs += 1;
+                metric.passed += 1;
+            } else if (status === 'failed') {
+                failedJobs += 1;
+                metric.failed += 1;
+            } else if (status === 'cancelled') {
+                cancelledJobs += 1;
+                metric.cancelled += 1;
+            }
+        }
+        if (validator.startsWith('suite-')) {
+            broadSuiteRuns += 1;
+            if (status !== 'running') broadSuiteDurationMs += durationMs;
+        }
+        if (validator === 'unit-focused') {
+            focusedRuns += 1;
+            if (status !== 'running') focusedDurationMs += durationMs;
+        }
+        byValidator.set(validator, metric);
+    }
+
+    const repeatRunPressure = [...byValidator.values()].reduce((sum, metric) => sum + Math.max(0, metric.runs - 1), 0);
+    return {
+        authority: 'bounded-persisted-validator-job-manifests',
+        jobsConsidered: jobs.length,
+        finishedJobs,
+        passedJobs,
+        failedJobs,
+        cancelledJobs,
+        runningJobs,
+        orphanedJobs,
+        totalFinishedDurationMs,
+        broadSuiteRuns,
+        broadSuiteDurationMs,
+        focusedRuns,
+        focusedDurationMs,
+        repeatRunPressure,
+        duplicateValidationCount: null,
+        duplicateClassification: 'requires-source-state-binding',
+        byValidator: Object.fromEntries(
+            [...byValidator.entries()].sort((left, right) => left[0].localeCompare(right[0])),
+        ),
+        caveat: 'Repeat-run pressure counts repeated validator names only. It does not claim duplicate work without source-state identity.',
+    };
 }
 
 /**
@@ -418,9 +507,15 @@ export async function readValidationDashboard(input, config) {
         latestCount: latest.length,
         effectiveChecks,
         recommendedNextAction: recommendValidationAction(effectiveChecks),
+        productivity: summarizeValidationProductivity(jobs),
         failingJobIds: latest
             .map(summarizeValidationJob)
-            .filter((job) => job['passed'] === false && job['status'] !== 'running')
+            .filter((job) => job['status'] === 'failed')
+            .map((job) => job['id'])
+            .slice(0, 5),
+        cancelledJobIds: latest
+            .map(summarizeValidationJob)
+            .filter((job) => job['status'] === 'cancelled')
             .map((job) => job['id'])
             .slice(0, 5),
         runningJobIds: running.map((job) => job['id']).slice(0, 5),

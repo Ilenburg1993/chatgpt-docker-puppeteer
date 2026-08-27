@@ -39,6 +39,7 @@ const MAX_ROWS = 12;
 /** @param {ReturnType<typeof readMcpRoundTripAnalyticsSnapshot>} snapshot */
 function compactRoundTripTrend(snapshot) {
     const recovery = snapshot.recovery;
+    const retryTax = snapshot.retryTax;
     const pressure = snapshot.workflowPressure;
     const top = snapshot.topTransitions[0];
     return {
@@ -50,6 +51,13 @@ function compactRoundTripTrend(snapshot) {
             temporalPressure: recovery.temporalPressure,
             lineageBound: recovery.lineageBound,
             inlineNextActionCoverage: snapshot.failures.inlineNextActionCoverage,
+        },
+        retryTax: {
+            retryTaxCalls: retryTax.retryTaxCalls,
+            retryTaxGapMs: retryTax.retryTaxGapMs,
+            retryTaxInterveningCalls: retryTax.retryTaxInterveningCalls,
+            temporalPressure: retryTax.temporalPressure,
+            lineageBound: retryTax.lineageBound,
         },
         recurringTransitionCount: snapshot.sequenceEvidence.recurringTransitionCount,
         lineageBoundTransitionCount: snapshot.sequenceEvidence.lineageBoundTransitionCount,
@@ -134,7 +142,14 @@ function compactRoundTripAnalytics(snapshot) {
             batchCalls: snapshot.executionAccounting.batchCalls,
             saturatedBatchCalls: snapshot.executionAccounting.saturatedBatchCalls,
             truncatedOperations: snapshot.executionAccounting.truncatedOperations,
-            continuationCalls: snapshot.executionAccounting.continuationCalls,
+            continuationAvailableCalls: snapshot.executionAccounting.continuationAvailableCalls,
+            continuationAvailableOperations: snapshot.executionAccounting.continuationAvailableOperations,
+            continuationTransportRequiredCalls: snapshot.executionAccounting.continuationTransportRequiredCalls,
+            continuationTransportRequiredOperations:
+                snapshot.executionAccounting.continuationTransportRequiredOperations,
+            continuationRecommendedCalls: snapshot.executionAccounting.continuationRecommendedCalls,
+            continuationRecommendedOperations: snapshot.executionAccounting.continuationRecommendedOperations,
+            legacyContinuationRequiredCalls: snapshot.executionAccounting.legacyContinuationRequiredCalls,
             repeatAfterBatch: snapshot.executionAccounting.repeatAfterBatch,
         },
         payloadAccounting: {
