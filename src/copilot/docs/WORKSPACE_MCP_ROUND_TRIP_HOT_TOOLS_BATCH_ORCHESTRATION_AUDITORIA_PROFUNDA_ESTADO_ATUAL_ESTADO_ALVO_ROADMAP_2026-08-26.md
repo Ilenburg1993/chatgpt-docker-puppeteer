@@ -4,10 +4,11 @@
 
 > **Status do documento:** CANÔNICO / VIVO / REFERÊNCIA OBRIGATÓRIA.
 >
-> **Revisão documental:** 6.0 — **ROADMAP II TECNICAMENTE CONCLUÍDO / PUBLICAÇÃO FINAL EM GATE**.
-> Roadmap I permanece concluído e publicado; Roadmap II foi rebaselineado sobre cohorts pós-I,
-> II-1/II-2 foram promovidos por evidência controlada e II-3→II-11 receberam disposição formal por
-> evidência. Resta apenas o gate de publicação/limpeza final do repositório.
+> **Revisão documental:** 6.1 — **ROADMAP II CONCLUÍDO E PUBLICADO**. Roadmap I permanece concluído
+> e publicado; Roadmap II foi rebaselineado sobre cohorts pós-I, II-1/II-2 foram promovidos por
+> evidência controlada e II-3→II-11 receberam disposição formal por evidência. A implementação foi
+> publicada em `36006c8e19ee43d417aa6c7f2917062b39e27b0f`; esta revisão 6.1 fecha apenas a
+> sincronização documental pós-publicação.
 >
 > **Workspace:** `/workspaces/chatgpt-docker-puppeteer`.
 >
@@ -2472,12 +2473,15 @@ por evidência**, e:
 - [x] resource health permanecer saudável — connector smoke 131/131, OAuth/subscription/health
       verdes e sem critical runtime findings;
 - [x] docs, tests e runtime estiverem sincronizados — 98/98 testes focados + 19/19 round-trip, TS7
-      strict, lint, docs-contract e architecture-contract verdes; source final segue para último
-      barrier/reload;
-- [ ] repo estiver publicado e limpo no encerramento final da frente.
+      strict, lint, docs-contract e architecture-contract verdes; source final promovida pelo
+      barrier `9f0959731584...`, runtime epoch `e0079c8c-d81b-4ac4-8760-7c39a370e59c`, source drift
+      `false` e smoke 131/131;
+- [x] repo estiver publicado e limpo no encerramento final da frente — implementação publicada em
+      `36006c8e19ee43d417aa6c7f2917062b39e27b0f`, `main == origin/main` e worktree limpa observados
+      antes desta atualização documental de encerramento.
 
-**Único gate restante da revisão 6.0:** publicar o conjunto final, comprovar `main == origin/main` e
-worktree limpa; somente então o último checkbox pode ser fechado.
+**Roadmap II encerrado.** Esta revisão 6.1 é somente a sincronização documental posterior ao
+checkpoint limpo/publicado e deve ser publicada sem reabrir qualquer faixa técnica.
 
 ---
 
@@ -2551,6 +2555,17 @@ Esta seção deve crescer ao longo da execução.
 - architecture-contract repetido integralmente: verde (`owners=70`, mutable state `26/53`, zero
   violações);
 - único gate ainda aberto: publicação final + comprovação de worktree limpa.
+
+## 2026-08-27 — Revisão 6.1 — encerramento publicado do Roadmap II
+
+- source final promovida por barrier `9f0959731584...` no runtime epoch
+  `e0079c8c-d81b-4ac4-8760-7c39a370e59c`, source drift `false`;
+- connector smoke pós-reload: 131/131, OAuth/health/subscription verdes;
+- implementação, testes, governança arquitetural e revisão 6.0 publicados no commit
+  `36006c8e19ee43d417aa6c7f2917062b39e27b0f`;
+- após esse push, `main == origin/main` e worktree limpa foram comprovados;
+- último checkbox do DoD Roadmap II fechado;
+- esta revisão 6.1 é um commit documental de sincronização e não reabre nenhuma faixa técnica.
 
 ## Template obrigatório para próximas revisões
 
