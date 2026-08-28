@@ -197,7 +197,7 @@ async function listWireMcpTools(tools) {
  * Compare multiple explicit tool surfaces through the same SDK wire path used by buildToolPayloadAudit.
  *
  * @param {{
- *   surfaces: { mode:string; tools: import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[] }[];
+ *   surfaces: { mode:string; aliases?:string[]; tools: import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[] }[];
  *   config: import('./config.js').McpToolPayloadAuditConfig;
  *   samples?: number;
  *   usageToolStarts?: { tool:string; count:number }[];
@@ -229,6 +229,7 @@ export async function buildToolSurfacePayloadComparison(options) {
         const timings = audits.map((audit) => /** @type {Record<string, number>} */ (audit['timings']));
         rows.push({
             mode: surface.mode,
+            aliases: Array.isArray(surface.aliases) ? [...surface.aliases] : [],
             toolCount: representative['toolCount'],
             totalEnvelopeBytes: representative['totalEnvelopeBytes'],
             averageToolBytes: representative['averageToolBytes'],

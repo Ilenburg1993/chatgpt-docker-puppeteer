@@ -9,7 +9,7 @@
  * @module copilot/mcp/tools/catalog/semantic-contract-profile
  */
 
-export const MCP_TOOL_CONTRACTS_VERSION = '2.8.0';
+export const MCP_TOOL_CONTRACTS_VERSION = '2.10.0';
 
 /** @typedef {Readonly<{
  * effect: import('#copilot/mcp/public/protocol/catalog').McpToolContract['effects']['mutation'];
@@ -75,22 +75,6 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
             retry: 'safe',
         },
         repo_read_file: {
-            effect: 'none',
-            idempotency: 'idempotent',
-            callerScope: 'read',
-            execution: {
-                cancellation: 'bounded-non-cancellable',
-                continuationBoundMs: 120000,
-                rationale:
-                    'Current implementation is locally/input bounded but does not yet prove end-to-end cooperative cancellation; bounded work may settle after the registry reports cancellation.',
-            },
-            output: 'intentional-untyped',
-            network: 'local',
-            credentials: ['none'],
-            externalSideEffects: 'none',
-            retry: 'safe',
-        },
-        repo_file_stats: {
             effect: 'none',
             idempotency: 'idempotent',
             callerScope: 'read',
@@ -377,22 +361,6 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
             externalSideEffects: 'none',
             retry: 'safe',
         },
-        git_stage_plan: {
-            effect: 'none',
-            idempotency: 'idempotent',
-            callerScope: 'read',
-            execution: {
-                cancellation: 'cancellable',
-                drainTimeoutMs: 15000,
-                rationale:
-                    'OperationContext.signal reaches the owned cancellable/acceptance boundary; after abort the handler must settle only after owned call-scoped work is terminal.',
-            },
-            output: 'intentional-untyped',
-            network: 'local',
-            credentials: ['none'],
-            externalSideEffects: 'none',
-            retry: 'safe',
-        },
         git_stage: {
             effect: 'bounded-write',
             idempotency: 'non-idempotent',
@@ -409,22 +377,6 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
             externalSideEffects: 'none',
             retry: 'manual-only',
         },
-        git_commit_plan: {
-            effect: 'none',
-            idempotency: 'idempotent',
-            callerScope: 'read',
-            execution: {
-                cancellation: 'cancellable',
-                drainTimeoutMs: 15000,
-                rationale:
-                    'OperationContext.signal reaches the owned cancellable/acceptance boundary; after abort the handler must settle only after owned call-scoped work is terminal.',
-            },
-            output: 'intentional-untyped',
-            network: 'local',
-            credentials: ['none'],
-            externalSideEffects: 'none',
-            retry: 'safe',
-        },
         git_commit: {
             effect: 'bounded-write',
             idempotency: 'non-idempotent',
@@ -440,22 +392,6 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
             credentials: ['none'],
             externalSideEffects: 'none',
             retry: 'manual-only',
-        },
-        git_push_plan: {
-            effect: 'none',
-            idempotency: 'idempotent',
-            callerScope: 'read',
-            execution: {
-                cancellation: 'cancellable',
-                drainTimeoutMs: 15000,
-                rationale:
-                    'OperationContext.signal reaches the owned cancellable/acceptance boundary; after abort the handler must settle only after owned call-scoped work is terminal.',
-            },
-            output: 'intentional-untyped',
-            network: 'open-world',
-            credentials: ['git-upstream'],
-            externalSideEffects: 'none',
-            retry: 'safe',
         },
         git_publish_changes: {
             effect: 'destructive',
@@ -1380,21 +1316,6 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
             },
             output: 'intentional-untyped',
             network: 'fixed-external',
-            credentials: ['none'],
-            externalSideEffects: 'none',
-            retry: 'safe',
-        },
-        mcp_reload_plan: {
-            effect: 'none',
-            idempotency: 'idempotent',
-            callerScope: 'read',
-            execution: {
-                cancellation: 'not-applicable',
-                rationale:
-                    'The operation does not claim caller-owned long-running work for which cooperative drain is a meaningful lifecycle promise.',
-            },
-            output: 'intentional-untyped',
-            network: 'local',
             credentials: ['none'],
             externalSideEffects: 'none',
             retry: 'safe',

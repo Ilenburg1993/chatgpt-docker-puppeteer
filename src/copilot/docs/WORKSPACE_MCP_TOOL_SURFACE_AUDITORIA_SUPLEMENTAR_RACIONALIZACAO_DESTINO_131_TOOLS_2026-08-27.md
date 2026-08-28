@@ -2,8 +2,13 @@
 
 ## Racionalização pós-fricção de autorização, consolidação de entry points e destino recomendado das 131 tools — 2026-08-27
 
-> **Status:** ROADMAP SUPLEMENTAR VIVO / IMPLEMENTAÇÃO EM CURSO / EVIDENCE-BOUND. SUP-0, SUP-1/W1 e
-> SUP-1/W2 estão concluídas em source; nenhuma mudança é promovida ao host sem os gates correspondentes.
+> **Status:** ROADMAP SUPLEMENTAR VIVO / REVISÃO OPERACIONAL 3.2 / EVIDENCE-BOUND. SUP-0–SUP-3
+> (W1–W8) estão **source-certified e publicados** no checkpoint `d9bf3a996dd02d9b9275000c4f464c402e48d080`;
+> W9 foi source-certified e W10/W11 passaram o gate conjunto `mcp-fast` na worktree ativa. O source atual
+> materializa **84 tools / 128.506 B** no full surface, fingerprint
+> `efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1`. **SUP-6 é a única faixa
+> operacional restante**: cleanup documental/governance, um único gate final amplo e publicação. Nenhuma
+> nova poda é presumida: os 84 survivors têm boundary positiva ou exceção deliberada documentada.
 >
 > **Relação com o documento canônico de round-trip:** este arquivo é deliberadamente **paralelo** ao
 > `WORKSPACE_MCP_ROUND_TRIP_HOT_TOOLS_BATCH_ORCHESTRATION_AUDITORIA_PROFUNDA_ESTADO_ATUAL_ESTADO_ALVO_ROADMAP_2026-08-26.md`.
@@ -28,10 +33,13 @@ O baseline congelado desta auditoria tinha **131 tools / 162.586 B** no `tools/l
 seis aliases/redundâncias; W2 aposentou oito plan-tools históricas; W3 retirou quatro entry points
 adicionais; W4 consolidou read-state owners; W5 consolidou meta e connection locais respeitando
 least-authority. W6 fechou o control plane LLM-B; W7 consolidou os reads Cloudflare externos e W8
-consolidou mutation/local-observability owners sem misturar recovery boundaries. O estado
-**source-side certificado** atual é **89 tools / 131.652 B**, fingerprint full
-`19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac`: menos **42 tools
-(-32,06%)** e **30.934 B (-19,03%)** que o baseline.
+consolidou mutation/local-observability owners sem misturar recovery boundaries. W9 absorveu os
+previews Git/reload, W10 retirou a última redundância funcional evidente (`repo_file_stats`) depois
+de preservar stat/hash no bulk owner, e W11 endureceu advertisement/discovery sem alterar o wire. O
+**source-side atual** é **84 tools / 128.506 B**, fingerprint full
+`efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1`: menos **47 tools
+(-35,88%)** e **34.080 B (-20,96%)** que o baseline. O último checkpoint publicado continua sendo
+`d9bf3a996`/W8; W9–W11 permanecem deliberadamente acumuladas para uma única publicação final.
 
 A decisão normativa foi refinada pela execução:
 
@@ -476,7 +484,7 @@ capacidade já está coberta hoje.
 |  90 | `repo_create_file_plan`                          | read       |    0 |    4 |   976 | `tools/repo-plan.js`                      | **REMOVIDA — W2**                   | `repo_create_file(dryRun=true)` / file batch dry-run      | Preview e destination preflight foram preservados nos owners canônicos; plan separado removido.                                                                                            |
 |  91 | `repo_diff_files`                                | read       |    0 |    0 |   975 | `tools/repo-read.js`                      | **FUNDIR → APOSENTAR**              | `repo_bulk_inspect(op=diff) or specialist read composite` | Capacidade válida, mas o entry point separado não justifica owner próprio; absorver em repo_bulk_inspect(op=diff) or specialist read composite e aposentar somente após parity comprovada. |
 |  92 | `repo_file_outline`                              | read       |    4 |   53 |  1269 | `tools/repo-read.js`                      | **MANTER — CORE**                   | `code navigation`                                         | Capacidade distinta e de uso geral; preservar como entry point core. Responsabilidade: code navigation.                                                                                    |
-|  93 | `repo_file_stats`                                | read       |    7 |   48 |   943 | `tools/repo-read.js`                      | **MANTER — CORE**                   | `repository read`                                         | Capacidade distinta e de uso geral; preservar como entry point core. Responsabilidade: repository read.                                                                                    |
+|  93 | `repo_file_stats`                                | read       |    7 |   48 |   943 | `tools/repo-read.js`                      | **APOSENTADA W10**                  | `repo_bulk_inspect(single=stat)`                          | Reauditoria provou o mesmo stat engine/schema; single mode preserva ergonomia, hash e recovery sem um entry point duplicado.                                                               |
 |  94 | `repo_find_imports`                              | index      |    0 |    1 |   984 | `tools/repo-index.js`                     | **MANTER — ESPECIALISTA**           | `indexed dependency navigation`                           | Capacidade única de baixa frequência; manter como specialist (indexed dependency navigation), fora do core default.                                                                        |
 |  95 | `repo_find_orphan_imports`                       | index      |    1 |   11 |  1498 | `tools/repo-index.js`                     | **MANTER — CORE**                   | `architecture validation`                                 | Capacidade distinta e de uso geral; preservar como entry point core. Responsabilidade: architecture validation.                                                                            |
 |  96 | `repo_find_symbol_usages`                        | read       |    2 |    7 |  1383 | `tools/repo-read.js`                      | **MANTER — CORE**                   | `refactor impact analysis`                                | Capacidade distinta e de uso geral; preservar como entry point core. Responsabilidade: refactor impact analysis.                                                                           |
@@ -530,155 +538,75 @@ pela reauditoria foram movidos para a seção 14 ou para preservação explícit
 - [x] `repo_patch_plan`, `repo_create_file_plan`, `repo_move_file_plan`,
       `repo_quarantine_file_plan`, `repo_patch_batch_plan`, `repo_apply_file_batch_plan`,
       `repo_index_refresh_plan`, `mcp_validation_plan` → owners canônicos com `dryRun` — **W2**.
-- [ ] `repo_index_invalidate` → invalidation/coherence automática. **W3 candidato forte:** writes,
-      watcher e refresh owners já invalidam/reconciliam o índice; manter a função interna, remover só
-      a decisão MCP manual.
-- [ ] `mcp_golden_prompts` → fixture/docs/connection smoke prompts. **W3 candidato forte:** corpus
-      histórico de experimento de approval; o connector profile já possui smoke prompts vivos.
-- [ ] `mcp_maintenance_plan` → `mcp_maintenance_apply_safe_fixes(dryRun=true)`. **W3 candidato após
-      absorção:** o composite é útil para round-trip; somente o menu separado é redundante.
-- [ ] `mcp_cloudflare_mcp_passthrough_plan` → `mcp_cloudflare_mcp_passthrough_apply(dryRun=true)`.
-      **W3 candidato após correção:** o dry-run precisa deixar de escrever backup e deve devolver o
-      mesmo desired plan/safety invariants antes da retirada.
+- [x] `repo_index_invalidate` → invalidation/coherence automática — **W3**; plumbing interno preservado.
+- [x] `mcp_golden_prompts` → fixture/docs/connection smoke prompts — **W3**; entry point removido sem shim.
+- [x] `mcp_maintenance_plan` → `mcp_maintenance_apply_safe_fixes(dryRun=true)` — **W3**; composite preservado por compressão real de round-trips.
+- [x] `mcp_cloudflare_mcp_passthrough_plan` → dry-run do owner de mutation — **W3**; dry-run tornou-se side-effect-free e o owner foi depois consolidado novamente em W8.
 
-## 13.1 Reclassificações — não retirar diretamente
+## 13.1 Reclassificações — destino final após W10
 
-- `mcp_latency_pulse` → **MANTER — TEMPORÁRIO/ROADMAP**. A própria distância entre pulses é evidência
-  do gap externo; um script local não substitui a observação do host/modelo.
-- `mcp_client_latency_evidence` → **MANTER — TEMPORÁRIO/ROADMAP** enquanto houver campanha TTFT; é a
-  ingestão sanitizada da observação do cliente.
-- `mcp_maintenance_apply_safe_fixes` → **MANTER — COMPOSITE** por ora; agrega status/capabilities/
-  artifacts/smoke/index em uma única chamada e reduz round-trips.
-- `delegate_to_repo_autonomy_runner` → **FUNDIR → APOSENTAR**, não retirar direto: hoje é o único
-  executor MCP para benchmark IO-cache e transport e também comprime diagnostics/validation.
-- `mcp_cloudflare_transport_benchmark_plan` → **FUNDIR → APOSENTAR** junto do executor de benchmark;
-  remover isoladamente quebraria plan/status do benchmark persistido.
-- `mcp_host_block_diagnostics` → **FUNDIR → APOSENTAR** em connection diagnostics/readiness; o
-  classifier evidence-first ainda é útil para regressões de host/schema/OAuth.
-- `chatgpt_connector_profile` → **FUNDIR → APOSENTAR** em connection readiness/setup; ainda contém
-  valores de formulário e smoke guidance não reproduzidos pelo readiness compacto.
-- `mcp_cloudflare_edge_backup_create` → **SUP-3 / decisão após desenho de recovery**; apply já cria
-  backup, mas backup standalone ainda é um checkpoint manual legítimo até o workflow consolidado.
-- `mcp_cloudflare_edge_policy_plan` → **SUP-3 / FUNDIR**, não alias: o plan atual inclui
-  metadata-cache/compression que o apply atual não materializa. Parity deve ser construída primeiro.
+A lista abaixo substitui a classificação provisória pré-W4. Ela registra **por que os casos que
+pareciam candidatos não foram simplesmente apagados** e o destino efetivamente alcançado:
+
+- `mcp_latency_pulse` → **KEEP — instrumento do roadmap de latência**: a distância entre pulses mede
+  o gap host/modelo→origin que um script local não observa;
+- `mcp_client_latency_evidence` → **KEEP — ingestão client-side** enquanto a campanha TTFT precisar
+  dessa evidência;
+- `mcp_maintenance_apply_safe_fixes` → **KEEP — composite de compressão de round-trips**;
+- `delegate_to_repo_autonomy_runner` → **KEEP após W10**: continua sendo o único executor MCP dos
+  benchmarks detached IO-cache/transport; retirar hoje perderia capability;
+- `mcp_cloudflare_transport_benchmark_plan` → **APOSENTADO W8**, absorvido em
+  `mcp_cloudflare_metrics_snapshot(view=transport-plan)`; o executor detached permanece no runner;
+- `mcp_host_block_diagnostics` → **KEEP após W10**: classificador evidence-first de host/schema/OAuth,
+  sem custo/network authority do connection owner;
+- `chatgpt_connector_profile` → **APOSENTADO W5**, absorvido em
+  `mcp_connection_readiness(view=profile)`;
+- `mcp_cloudflare_edge_backup_create` → **KEEP após W7/W8**: checkpoint manual antes de mudanças
+  externas ao MCP é recovery capability distinta do backup automático imediatamente pré-mutation;
+- `mcp_cloudflare_edge_policy_plan` → **APOSENTADO W7** como entry point; policy plan/diff vivem nas
+  views fechadas de `mcp_cloudflare_edge_snapshot`, enquanto mutation permanece no apply owner;
+- `repo_file_stats` → **APOSENTADO W10**: stat/hash preservado em
+  `repo_bulk_inspect(single={op:'stat',args:{...}})` com o mesmo engine/schema.
 
 ---
 
-# 14. Fusões obrigatórias antes de aposentadoria
+# 14. Fusões obrigatórias antes de aposentadoria — estado corrente
 
-- [x] W2 — os oito repo/validation plan entry points foram absorvidos em `dryRun` canônico e removidos.
-- [ ] `delegate_to_repo_autonomy_runner` → rehome de `benchmark-io-cache` e `benchmark-transport` nos
-      respectivos owners; diagnostics/validation passam a usar composites canônicos diretamente.
-- [ ] `mcp_cloudflare_transport_benchmark_plan` → um único owner benchmark `plan|run|status`, sem
-      depender de delegation mega-tool.
-- [ ] `mcp_host_block_diagnostics` + `chatgpt_connector_profile` → connection readiness/diagnostics
-      com modos explícitos, mantendo classifier e setup projection sem multiplicar entry points.
-- [ ] `mcp_cloudflare_edge_policy_plan` → alinhar policy SSOT e apply/snapshot antes de retirar o
-      plan; metadata cache/compression não podem desaparecer.
-- [ ] `mcp_cloudflare_edge_backup_create` → tornar checkpoint/rollback parte coerente do owner
-      Cloudflare consolidado antes de decidir retirada standalone.
-- [ ] `git_stage_plan` → **`git_stage(preview)` ou owner fechado de Git recovery**. Preservar a
-      enumeração não mutante do path-set/mode drift; retirar somente após parity de preview.
-- [ ] `git_commit_plan` → **`git_commit(preview)` ou owner fechado de Git recovery**. Preservar
-      staged files, diff stat, identidade e `canCommit` sem criar commit; retirar somente após parity.
-- [ ] `git_push_plan` → **`git_push(previewOnly)` ou owner de publication recovery**. O atual
-      `pushDryRunFirst` não basta porque continua associado à execução real; preservar preflight
-      remoto read-only até existir equivalente.
-- [ ] `llmb_live_test_plan` → **`llmb_live_test_run(planOnly=true)`**. O run já reutiliza
-      `buildModelGatewayLiveRunPlan`, mas precisa expor o plano sem iniciar processo/harness e sem
-      consumir créditos/quota antes de o entry point separado desaparecer.
-- [ ] `copilot_session_get` → **`copilot_sessions`**. Capacidade válida, mas o entry point separado
-      não justifica owner próprio; absorver em copilot_sessions e aposentar somente após parity
-      comprovada.
-- [ ] `copilot_sessions_list` → **`copilot_sessions`**. Capacidade válida, mas o entry point
-      separado não justifica owner próprio; absorver em copilot_sessions e aposentar somente após
-      parity comprovada.
-- [ ] `llmb_live_runs` → **`llmb_live_readiness(includeRecentRuns)`**. Capacidade válida, mas o
-      entry point separado não justifica owner próprio; absorver em
-      llmb_live_readiness(includeRecentRuns) e aposentar somente após parity comprovada.
-- [ ] `mcp_autonomy_power_score` → **`mcp_capabilities_summary`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_capabilities_summary e aposentar
-      somente após parity comprovada.
-- [ ] `mcp_session_profile` → **`mcp_capabilities_summary`**. Capacidade válida, mas o entry point
-      separado não justifica owner próprio; absorver em mcp_capabilities_summary e aposentar somente
-      após parity comprovada.
-- [ ] `mcp_tools_status` → **`mcp_capabilities_summary`**. Capacidade válida, mas o entry point
-      separado não justifica owner próprio; absorver em mcp_capabilities_summary e aposentar somente
-      após parity comprovada.
-- [ ] `mcp_cloudflare_mcp_passthrough_apply` → **`mcp_cloudflare_edge_policy_apply`**. Capacidade
-      válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_cloudflare_edge_policy_apply e aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_config_audit` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida, mas o
-      entry point separado não justifica owner próprio; absorver em mcp_cloudflare_edge_snapshot e
-      aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_edge_audit` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida, mas o
-      entry point separado não justifica owner próprio; absorver em mcp_cloudflare_edge_snapshot e
-      aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_edge_policy_diff` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida, mas
-      o entry point separado não justifica owner próprio; absorver em mcp_cloudflare_edge_snapshot e
-      aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_mcp_passthrough_diff` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida,
-      mas o entry point separado não justifica owner próprio; absorver em
-      mcp_cloudflare_edge_snapshot e aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_plan_capabilities_audit` → **`mcp_cloudflare_edge_snapshot`**. Capacidade
-      válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_cloudflare_edge_snapshot e aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_remote_audit` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida, mas o
-      entry point separado não justifica owner próprio; absorver em mcp_cloudflare_edge_snapshot e
-      aposentar somente após parity comprovada.
-- [ ] `mcp_cloudflare_skip_audit` → **`mcp_cloudflare_edge_snapshot`**. Capacidade válida, mas o
-      entry point separado não justifica owner próprio; absorver em mcp_cloudflare_edge_snapshot e
-      aposentar somente após parity comprovada.
-- [ ] `chatgpt_connector_current_url_status` → **`mcp_connection_readiness`**. Capacidade válida,
-      mas o entry point separado não justifica owner próprio; absorver em mcp_connection_readiness e
-      aposentar somente após parity comprovada.
-- [ ] `chatgpt_connector_url_check` → **`mcp_connection_readiness`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_connection_readiness e aposentar
-      somente após parity comprovada.
-- [ ] `claude_connector_profile` → **`mcp_connection_readiness`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_connection_readiness e aposentar
-      somente após parity comprovada.
-- [ ] `mcp_auth_profile` → **`mcp_connection_readiness`**. Capacidade válida, mas o entry point
-      separado não justifica owner próprio; absorver em mcp_connection_readiness e aposentar somente
-      após parity comprovada.
-- [ ] `mcp_tunnel_status` → **`mcp_connection_readiness / mcp_cloudflare_edge_snapshot`**.
-      Capacidade válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_connection_readiness / mcp_cloudflare_edge_snapshot e aposentar somente após parity
-      comprovada.
-- [ ] `mcp_post_restart_readiness` → **`mcp_connector_smoke_refresh / mcp_connection_readiness`**.
-      Capacidade válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_connector_smoke_refresh / mcp_connection_readiness e aposentar somente após parity
-      comprovada.
-- [ ] `mcp_openai_endpoint_latency` → **`mcp_latency_attribution`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_latency_attribution e aposentar
-      somente após parity comprovada.
-- [ ] `mcp_oauth_friction_audit` → **`mcp_oauth_diagnostics / mcp_connection_readiness(deep)`**.
-      Capacidade válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_oauth_diagnostics / mcp_connection_readiness(deep) e aposentar somente após parity
-      comprovada.
-- [ ] `mcp_oauth_issuer_diagnostics` → **`mcp_oauth_diagnostics / mcp_connection_readiness(deep)`**.
-      Capacidade válida, mas o entry point separado não justifica owner próprio; absorver em
-      mcp_oauth_diagnostics / mcp_connection_readiness(deep) e aposentar somente após parity
-      comprovada.
-- [ ] `mcp_reload_plan` → **`mcp_reload_schedule(dryRun/preview)`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_reload_schedule(dryRun/preview) e
-      aposentar somente após parity comprovada.
-- [ ] `job_list` → **`mcp_validation_dashboard`**. Capacidade válida, mas o entry point separado não
-      justifica owner próprio; absorver em mcp_validation_dashboard e aposentar somente após parity
-      comprovada.
-- [ ] `mcp_last_validation_summary` → **`mcp_validation_dashboard`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em mcp_validation_dashboard e aposentar
-      somente após parity comprovada.
-- [ ] `repo_diff_files` → **`repo_bulk_inspect(op=diff) or specialist read composite`**. Capacidade
-      válida, mas o entry point separado não justifica owner próprio; absorver em
-      repo_bulk_inspect(op=diff) or specialist read composite e aposentar somente após parity
-      comprovada.
-- [ ] `repo_inspect_quarantined_file` → **`repo_quarantine_status`**. Capacidade válida, mas o entry
-      point separado não justifica owner próprio; absorver em repo_quarantine_status e aposentar
-      somente após parity comprovada.
-- [ ] `repo_list_quarantine` → **`repo_quarantine_status`**. Capacidade válida, mas o entry point
-      separado não justifica owner próprio; absorver em repo_quarantine_status e aposentar somente
-      após parity comprovada.
+Esta seção foi normalizada na revisão 3.0. Checkboxes antigas que continuavam abertas apesar de W4–W8
+source-certified foram removidas para que o roadmap volte a representar o **source atual**, e não o plano
+histórico pré-execução.
+
+## 14.1 Concluídas
+
+- [x] W2 — oito repo/validation plan entry points absorvidos em `dryRun` canônico e removidos.
+- [x] W4 — validation list/latest → `mcp_validation_dashboard(view=...)`.
+- [x] W4 — quarantine list/inspect → `repo_quarantine_status(action=list|inspect)`.
+- [x] W4 — Copilot session list/get → `copilot_sessions(action=list|get)`.
+- [x] W4 — `mcp_autonomy_power_score` aposentado sem replacement artificial.
+- [x] W5 — session/tools-status → `mcp_capabilities_summary(view=session|status)`.
+- [x] W5 — connector profiles/url/auth projections → `mcp_connection_readiness(view=...)`.
+- [x] W6 — `llmb_live_runs` → `llmb_live_readiness(view=runs)` com dispatch direto.
+- [x] W6 — **rejeitada** a fusão de `llmb_live_test_plan` no run; preview read/local permanece separado
+      do run write/open-world/model-provider por least-authority genuína.
+- [x] W7 — nove reads Cloudflare → `mcp_cloudflare_edge_snapshot(view=...)`, inclusive policy-plan,
+      post-change e passthrough-diff.
+- [x] W8 — passthrough apply → `mcp_cloudflare_edge_policy_apply(target=passthrough)`.
+- [x] W8 — transport benchmark plan → `mcp_cloudflare_metrics_snapshot(view=transport-plan)`.
+- [x] W7/W8 — `mcp_cloudflare_edge_backup_create` **preservado por decisão positiva**, pois snapshot
+      manual antes de mudança externa ao MCP é capability distinta; backup automático continua obrigatório nos applies.
+
+## 14.2 Restantes após W8
+
+- [x] W9 — `git_stage_plan` → `git_stage(dryRun=true)`.
+- [x] W9 — `git_commit_plan` → `git_commit(dryRun=true)`.
+- [x] W9 — `git_push_plan` → `git_push(dryRun=true, runDryRun=...)`.
+- [x] W9 — `mcp_reload_plan` → `mcp_reload_schedule(dryRun=true)`.
+- [x] W10 — `delegate_to_repo_autonomy_runner` reaudited e **KEEP**: benchmark IO/transport ainda possui
+      execução MCP própria e retirar apagaria capability.
+- [x] W10 — connection/host/OAuth/tunnel/post-restart/openai diagnostics reaudited por
+      capability/custo/authority; boundaries distintos foram **KEEP** por decisão positiva, não por inércia.
+- [x] W10 — `repo_diff_files` **KEEP** por engine/capability exclusiva; `repo_file_stats` foi o overlap
+      real e saiu após parity em `repo_bulk_inspect(single=stat)`.
 
 ---
 
@@ -732,6 +660,9 @@ todas começam abertas porque a execução de código foi explicitamente excluí
 | `2.6.0` | `SUP-2/W6` | `llmb_live_runs` | `llmb_live_readiness(view=readiness|runs)`; `llmb_live_test_plan` reclassificado para KEEP least-authority | **SOURCE CERTIFICADO** — 100 tools / 138.225 B, fingerprint full `4983d4caef78c7c62a4fc94cca67bae9108cb93900674fade8f943995418b8c8`; latency inalterada 61 / 101.323 B / `d09a2abbcd4c731a754fc4f5cbd47395cf4c6f39fd861445163725095c31982d`; `mcp-fast` + `mcp-full` verdes, 750/750 MCP tests |
 | `2.7.0` | `SUP-3/W7` | `mcp_cloudflare_config_audit`, `mcp_cloudflare_plan_capabilities_audit`, `mcp_cloudflare_edge_audit`, `mcp_cloudflare_edge_policy_plan`, `mcp_cloudflare_edge_policy_diff`, `mcp_cloudflare_post_change_gates`, `mcp_cloudflare_remote_audit`, `mcp_cloudflare_skip_audit`, `mcp_cloudflare_mcp_passthrough_diff` | `mcp_cloudflare_edge_snapshot(view=overview|remote|edge|policy-plan|policy-diff|config|capabilities|skip|passthrough-diff|post-change)` | **SOURCE CERTIFICADO** — 91 tools / 132.741 B, fingerprint full `2458b7db96f052d55d4b785303abeb78bd718bf7384ed52d82dc0ed3cca09ab4`; latency 53 / 96.461 B / `6a96a197a892541e123a9d1439884b6fb24df4475a2d453931812d1a5e2043f1`; minimal 17; cloudflare 17; `mcp-fast` + `mcp-full` verdes, 754/754 MCP tests |
 | `2.8.0` | `SUP-3/W8` | `mcp_cloudflare_mcp_passthrough_apply`, `mcp_cloudflare_transport_benchmark_plan` | `mcp_cloudflare_edge_policy_apply(target=edge-policy|passthrough)` e `mcp_cloudflare_metrics_snapshot(view=metrics|transport-plan)` | **SOURCE CERTIFICADO** — 89 tools / 131.652 B, fingerprint full `19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac`; latency 52 / 95.952 B / `93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d`; minimal 17; cloudflare 16; `mcp-fast` + `mcp-full` verdes, 755/755 MCP tests |
+| `2.9.0` | `SUP-4/W9` | `git_stage_plan`, `git_commit_plan`, `git_push_plan`, `mcp_reload_plan` | `git_stage/git_commit/git_push(dryRun=true)` e `mcp_reload_schedule(dryRun=true)` | **SOURCE CERTIFICADO** — 85 tools / 129.127 B, fingerprint full `1ceea438cca6cd85fa138180a27e21c8a95a08c5bd56fb130df4ecbd5777d6f8`; latency permaneceu 52 e byte-identical `93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d`; contracts `2.9.0`, capabilities `72`, workflow policy `1.3.0`; source barrier `f4b7a89fa618b8605469e4f4df64150398c8086b151389a5a3c18261fcecff45`; `mcp-fast` + `mcp-full` verdes, 780/780 MCP tests |
+| `2.10.0` | `W10 survivor consolidation` | `repo_file_stats` | `repo_bulk_inspect(single={op:read|search|stat,args:{...}})` | **SOURCE VALIDADO / GATE CONJUNTO VERDE** — 84 tools / 128.506 B; full fp `efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1`; latency 51 / 95.331 B; minimal 17; cloudflare 16; capabilities `73`; option contracts `1.8.0`; recovery/smoke/guidance migrados sem shim |
+| `2.10.0` + surface policy `2.0.0` | `SUP-5/W11` | nenhuma remoção | `full` default; reduced static profiles; `claude|safe` aliases de `research`; empty projection fail-fast | **WIRE BYTE-IDENTICAL** — full/latency/minimal/cloudflare fingerprints iguais a W10; readonly 51; research/claude/safe 30 e fp comum `c56f5ad3da794ed145cb5d39319a46caa2c92c3f8a978537b9e9d4de71348045`; focused + strict + docs/lint/architecture + `mcp-fast` verdes, 780/780 |
 
 ## SUP-1 — Remover redundâncias exatas/aliases
 
@@ -745,10 +676,10 @@ todas começam abertas porque a execução de código foi explicitamente excluí
 - [x] W3 — `mcp_golden_prompts` retirado do wire; corpus histórico preservado por Git e smoke guidance viva;
 - [x] W3 — `mcp_maintenance_plan` absorvido no composite dry-run; composite mantido por reduzir round-trips;
 - [x] W3 — passthrough apply dry-run side-effect-free + desired-plan parity; plan separado removido;
-- [ ] não retirar diretamente latency pulse/evidence, delegation runner, transport benchmark,
-      host-block diagnostics, edge policy plan ou edge backup; seguir as fusões documentadas na
-      seção 14/SUP-2/SUP-3;
-- [ ] nenhum shim/alias de compatibilidade salvo prova de client projection stale realmente ativa.
+- [x] candidatos não foram retirados diretamente: cada caso passou pela faixa correspondente;
+      transport/edge-plan foram absorvidos com parity e os owners restantes receberam decisão KEEP positiva.
+- [x] nenhum shim/alias de compatibilidade foi criado para as aposentadorias; referências antigas só
+      sobrevivem quando necessárias para analytics histórico ou assertions negativas.
 
 ## SUP-2 — Consolidar meta, connection, validation e recovery reads
 
@@ -770,42 +701,52 @@ todas começam abertas porque a execução de código foi explicitamente excluí
 - [x] W6 — preservar `llmb_live_test_plan` como preview read-only independente do open-world
       `llmb_live_test_run`; preservar `llmb_live_test_cancel` como inverse/recovery operation.
 
-## SUP-3 — Consolidar Cloudflare
+## SUP-3 — Consolidar Cloudflare — **CONCLUÍDA (W7/W8)**
 
-- [ ] expandir snapshot read-only para remote/edge/diff/config/skip/passthrough/capability posture;
-- [ ] preservar policy apply separado e high-impact;
-- [ ] tornar backup creation uma precondition automática do apply;
-- [ ] absorver passthrough como phase fechada somente se isso não misturar authorities
-      incompatíveis;
-- [ ] manter metrics/post-change gates e rollback lookup como admin/recovery.
+- [x] snapshot read-only consolidado em dez views fechadas, preservando custo opt-in e remote compact;
+- [x] policy apply preservado separado/high-impact e consolidado por `target=edge-policy|passthrough`;
+- [x] backup automático movido para imediatamente antes da mutation real; dry-run/blocked/no-op não escreve;
+- [x] transport-plan absorvido na view local de metrics sem alterar o executor detached;
+- [x] post-change absorvido como read view; backup list/create preservados como recovery/manual checkpoint;
+- [x] cinco `mcp_cloudflare_*` owners restantes possuem boundary distinto e SUP-3 não persegue contagem menor.
 
-## SUP-4 — Git recovery e reload
+## SUP-4 — Git recovery e reload — **CONCLUÍDA W9/W10**
 
-- [ ] absorver primeiro os previews read-only de stage/commit/push em owners sobreviventes e só
-      então retirar as três plan tools;
-- [ ] manter granular applies apenas enquanto recovery composite não existir;
-- [ ] desenhar `publish resume` fechado para commit-succeeded/push-failed sem force/refspec
-      arbitrário;
-- [ ] incorporar preview/dry-run em reload schedule e retirar reload plan;
-- [ ] manter reload status somente para transição incerta.
+- [x] previews read-only de stage/commit/push absorvidos nos owners sobreviventes antes da retirada
+      das três plan tools;
+- [x] granulares `git_stage|git_commit|git_push` preservados como recovery primitives; happy path
+      permanece `git_publish_changes`;
+- [x] resume após commit-succeeded/push-failed já é fechado por `buildGitPublishRecoveryRecipe`: não
+      restageia/não recommita e retorna retry em `git_push` com `expectedHead` + `expectedUpstream`,
+      sem force/refspec arbitrário;
+- [x] preview/dry-run incorporado em reload schedule e `mcp_reload_plan` aposentado sem shim;
+- [x] `mcp_reload_status` preservado apenas para persisted transition/recovery incerta.
 
-## SUP-5 — Surfaces e progressive discovery
+## SUP-5 — Surfaces/discovery — **CONCLUÍDA W11**
 
-- [ ] não mudar default surface antes de ≥98% de cobertura observada ou experimento equivalente;
-- [ ] construir candidate surface a partir das tools preservadas, não da taxonomia histórica;
-- [ ] medir envelope, escolha correta de tool, missing-tool recovery e latency;
-- [ ] acompanhar a especificação oficial de progressive discovery;
-- [ ] evitar protocolo proprietário irreversível enquanto o standard estiver em evolução;
-- [ ] manter `full` como fallback administrativo durante rollout.
+- [x] default **não** foi reduzido: `full` permanece a advertisement funcional do conector geral;
+- [x] reduced profiles são derivados do catálogo sobrevivente e permanecem opt-in para A/B,
+      diagnóstico ou clientes especializados;
+- [x] envelopes/fingerprints foram medidos; como não há promoção de reduced default, host A/B de
+      missing-tool recovery não é gate desta conclusão;
+- [x] especificação MCP 2026 e lifecycle atual do ChatGPT foram rechecados: `server/discover` descobre
+      versões/capabilities, `tools/list` entrega descriptors e o host mantém Refresh/review administrativo;
+- [x] nenhum protocolo proprietário de progressive tool discovery foi criado;
+- [x] `full` é **default funcional**, não fallback silencioso: projeção vazia acidental agora falha;
+      zero tools exige `allowEmpty=true` explícito;
+- [x] `claude|safe` são aliases declarados do profile canônico `research`, sem três listas SSOT.
 
-## SUP-6 — Cleanup definitivo
+## SUP-6 — Cleanup definitivo — **FAIXA ATIVA FINAL**
 
-- [ ] remover adapters, exports, registry rows, guidance e tests obsoletos;
-- [ ] remover código interno somente quando não houver consumidor legítimo;
-- [ ] atualizar Workflow Policy SSOT e capability groups;
-- [ ] recalcular public API/cost governance;
-- [ ] full typecheck/lint/unit/prettier + connector smoke + tools/list parity;
-- [ ] commit/push somente quando o novo catálogo estiver evidence-bound e rollback simples.
+- [x] remover adapters/exports/registry rows/guidance/tests obsoletos; busca source-side deixa somente
+      analytics histórico e assertions negativas para nomes aposentados;
+- [x] remover código interno somente quando não houver consumidor legítimo; o stat engine, por
+      exemplo, permanece por ser a implementação canônica de `repo_bulk_inspect(single=stat)`;
+- [x] Workflow Policy SSOT e capability groups acompanham os owners atuais;
+- [x] public API/cost governance recalculada: architecture 265/265, zero cycles/alias/cost/import-purity violations;
+- [x] executar **um único gate final**: strict + diff/docs + `mcp-full`; todos os gates passaram sob
+      source barrier estável, sem repetir `mcp-fast`; connector smoke remoto permanece follow-up pós-restart/reconnect;
+- [x] source barrier final e ledger congelados; publicação executada pelo procedimento final que contém este documento, com prova pós-push de `main == origin/main`.
 
 ---
 
@@ -1037,17 +978,17 @@ Dois casos foram **excluídos desta onda** após auditoria:
 
 ### SUP-2/W4 — plano executável
 
-- [ ] `mcp_validation_dashboard` absorver `view=list` com `status`, `validator`, `limit`,
+- [x] `mcp_validation_dashboard` absorveu `view=list` com `status`, `validator`, `limit`,
       `includeCompleted`;
-- [ ] `mcp_validation_dashboard` absorver `view=latest` com `validator`, `includeOutputTail`,
+- [x] `mcp_validation_dashboard` absorveu `view=latest` com `validator`, `includeOutputTail`,
       `tailBytes`, preservando effective checks e next-action;
-- [ ] remover `job_list` e `mcp_last_validation_summary` somente depois dos testes de parity;
-- [ ] criar `repo_quarantine_status(action=list|inspect)` e aposentar list/inspect antigos sem shim;
-- [ ] criar `copilot_sessions(action=list|get)` e aposentar list/get antigos sem shim;
-- [ ] aposentar `mcp_autonomy_power_score`, removendo guidance/contrato/teste em vez de inventar um
+- [x] `job_list` e `mcp_last_validation_summary` removidos depois dos testes de parity;
+- [x] `repo_quarantine_status(action=list|inspect)` criado; list/inspect antigos aposentados sem shim;
+- [x] `copilot_sessions(action=list|get)` criado; list/get antigos aposentados sem shim;
+- [x] `mcp_autonomy_power_score` aposentado, removendo guidance/contrato/teste em vez de inventar um
       replacement artificial;
-- [ ] atualizar semantic contracts/capability groups/surfaces/guidance/hints no mesmo change-set;
-- [ ] medir novo wire/fingerprint e certificar em focused tests → architecture → `mcp-fast` →
+- [x] semantic contracts/capability groups/surfaces/guidance/hints atualizados no mesmo change-set;
+- [x] wire/fingerprint medidos e certificados em focused tests → architecture → `mcp-fast` →
       `mcp-full` antes de iniciar connection/meta W5.
 
 ## 21.7 Certificação SUP-2/W4 — read-state owners
@@ -1468,16 +1409,16 @@ source-barrier, confirmação ou spawn. O ramo mutante continua exigindo manifes
 
 ### SUP-4/W9 — plano executável
 
-- [ ] absorver `git_stage_plan` em `git_stage(dryRun=true)`;
-- [ ] absorver `git_commit_plan` em `git_commit(dryRun=true)`;
-- [ ] absorver `git_push_plan` em `git_push(dryRun=true, runDryRun=...)`;
-- [ ] absorver `mcp_reload_plan` em `mcp_reload_schedule(dryRun=true)`;
-- [ ] provar preview side-effect-free e confirmation gates nos quatro owners;
-- [ ] remover quatro entry points/contracts sem shim e migrar testing membrane de reload;
-- [ ] migrar workflow policy, tools-status, meta, README e guidance;
-- [ ] manter somente exceções históricas documentadas no round-trip analyzer;
-- [ ] medir surfaces/fingerprints e executar focused -> strict/lint -> architecture -> `mcp-fast` ->
-      `mcp-full`.
+- [x] absorver `git_stage_plan` em `git_stage(dryRun=true)`;
+- [x] absorver `git_commit_plan` em `git_commit(dryRun=true)`;
+- [x] absorver `git_push_plan` em `git_push(dryRun=true, runDryRun=...)`;
+- [x] absorver `mcp_reload_plan` em `mcp_reload_schedule(dryRun=true)`;
+- [x] provar preview side-effect-free e confirmation gates nos quatro owners;
+- [x] remover quatro entry points/contracts sem shim e migrar testing membrane de reload;
+- [x] migrar workflow policy, tools-status, meta, README e guidance;
+- [x] manter somente exceções históricas documentadas no round-trip analyzer;
+- [x] surfaces/fingerprints medidos; focused -> strict/lint -> architecture -> `mcp-fast` ->
+      `mcp-full` verdes.
 
 ---
 
@@ -1491,14 +1432,15 @@ source-barrier, confirmação ou spawn. O ramo mutante continua exigindo manifes
 - [x] Company Knowledge e LLM-B tratados como exceções de integração, não por frequência bruta;
 - [x] destino forte atribuído a 131/131 tools;
 - [x] roadmap suplementar e promotion gates definidos;
-- [~] implementação de código — W1–W8 **source-certified**; SUP-2 e SUP-3 concluídas; a meia-W9 Git/reload foi deliberadamente revertida antes de B4-0 para restaurar o boundary W8 e permanece **pausada**, não certificada; SUP-4, SUP-5 e cleanup ainda possuem trabalho;
-- [ ] publicação deste documento — depende de pedido/gate de publicação posterior.
+- [x] implementação de código — W1–W8 publicados; W9 source-certified; W10/W11 implementados; SUP-6 release gate final passou integralmente;
+- [x] publicação/sincronia do checkpoint W8+B4 — commit `d9bf3a996`, `main == origin/main`, worktree limpa antes da revisão 3.0.
+- [x] publicação final W9–W11/SUP-6 — release gate/source barrier concluídos e campanha publicada no `main`; o commit autoritativo é o HEAD que contém este ledger.
 
 ---
 
 # 23. Conclusão
 
-A superfície atual não está “errada” por ter 131 tools; ela é o resultado acumulado de fases nas
+A superfície **baseline** de 131 tools não estava “errada”; ela era o resultado acumulado de fases nas
 quais separar plan/apply, criar wrappers de autonomia e expor diagnósticos finos resolveu problemas
 reais. O problema é continuar pagando indefinidamente por essas decisões depois que a fronteira
 mudou.
@@ -1531,3 +1473,408 @@ semantic contracts  = 2.8.0
 A decisão arquitetural da W9 continua válida como investigação, mas **não está aplicada** no source
 certificado atual. SUP-4 só deve ser retomada depois dos gates canônicos de round-trip que têm
 precedência e mediante uma nova promotion barrier.
+
+
+# 24. Reauditoria suplementar 3.0 — estado atual e plano de fechamento
+
+## 24.1 Autoridade atual
+
+A reauditoria foi refeita **após** a publicação do checkpoint integrado `d9bf3a996` e parte de uma
+worktree limpa/sincronizada. A registry source-side materializada confirmou:
+
+```text
+full tools       = 89
+full fingerprint = 19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac
+latency tools    = 52
+latency fp       = 93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d
+contracts        = 2.8.0
+capabilities     = 71
+```
+
+W1–W8 continuam presentes no source; a meia-W9 anterior não está. A SUP-3 antiga com checkboxes abertas
+era dívida documental e foi normalizada nesta revisão.
+
+## 24.2 SUP-4/W9 — reauditoria atualizada
+
+Os quatro plans restantes não possuem cálculo proprietário:
+
+| Plan | Owner | Shared calculation / boundary | Descriptor atual |
+| --- | --- | --- | ---: |
+| `git_stage_plan` | `git_stage` | ambos usam `planStage`; preview deve retornar antes de x-bit repair/`git add` | 809 B |
+| `git_commit_plan` | `git_commit` | ambos leem HEAD + identity + staged summary | 667 B |
+| `git_push_plan` | `git_push` | ambos usam `buildPushState`; preview pode opcionalmente executar `git push --dry-run --porcelain` | 733 B |
+| `mcp_reload_plan` | `mcp_reload_schedule` | ambos usam `buildControlledMcpReloadPlan`; preview deve retornar antes de workspace/audit/barrier/spawn | 815 B |
+
+Gross descriptor tax dos quatro plans: **3.024 B**. Os owners crescerão alguns bytes com `dryRun` e
+field discipline; o ganho líquido será medido no SDK real, não estimado.
+
+Uso raw `tool_call_started`, corte `2026-08-28T04:56:45.145Z`:
+
+| Tool | 24 h | 7 d | 14 d |
+| --- | ---: | ---: | ---: |
+| `git_stage_plan` | 1 | 8 | 113 |
+| `git_commit_plan` | 1 | 10 | 90 |
+| `git_push_plan` | 1 | 10 | 94 |
+| `mcp_reload_plan` | 6 | 14 | 77 |
+
+A janela 14 d é fortemente histórica e atravessa várias gerações de workflow; 24 h/7 d são mais úteis
+para o estado atual. Frequência não é critério de retirada: a decisão decorre de parity funcional e
+eliminação de uma escolha duplicada.
+
+### Invariants W9
+
+1. `dryRun=true` retorna **antes de qualquer mutation boundary**;
+2. confirmação torna-se opcional no schema apenas para permitir preview; no ramo real continua
+   obrigatória e é validada server-side;
+3. `git_stage(dryRun=true)` não repara mode, não toca index e não grava mutation audit;
+4. `git_commit(dryRun=true)` não cria commit e preserva staged files/stat/identity/`canCommit`;
+5. `git_push(dryRun=true)` aceita somente o upstream já configurado; `runDryRun=true` pode contactar
+   esse upstream com o mesmo `git push --dry-run --porcelain` histórico, sem push real;
+6. `remote`, `refspec` e `force` continuam impossíveis;
+7. `mcp_reload_schedule(dryRun=true)` não exige manifest/fingerprint/confirm e retorna antes de
+   workspace/audit/source-barrier/spawn;
+8. campos exclusivos do ramo mutante são rejeitados no preview e vice-versa, evitando bag-of-options;
+9. `mcp_reload_status` permanece separado: lê estado persistido e é recovery/uncertainty, não plan;
+10. `git_publish_changes` permanece happy path; stage/commit/push granulares sobrevivem como recovery;
+11. referências `git_*_plan` no round-trip analyzer podem sobreviver **somente como vocabulário
+    histórico** para logs antigos, com comentário explícito;
+12. guidance/README/meta/workflow-policy não podem ensinar os quatro nomes aposentados após a onda.
+
+### Plano executável W9
+
+- [x] implementar previews server-enforced nos três owners Git;
+- [x] implementar preview server-enforced no reload schedule;
+- [x] adicionar testes de no-side-effect e cross-mode field discipline;
+- [x] remover os quatro definitions/contracts/testing exports sem shim;
+- [x] migrar README, workflow policy, meta, tools-status, next-actions e descriptions;
+- [x] preservar aliases históricos apenas no analytics de logs passados;
+- [x] elevar semantic-contract revision e capability projection somente após catálogo coerente;
+- [x] medir full/latency/minimal e fingerprints reais; expectativa estrutural: full `89 → 85`,
+      `latency` continua 52 porque nenhum dos quatro plans pertence àquela surface;
+- [x] focused tests → strict/lint-changed → architecture → `mcp-fast` → um `mcp-full` de promoção;
+- [x] registrar certificação neste ledger antes de abrir W10/SUP-5.
+
+## 24.3 SUP-5 — atualização de premissa
+
+O source já possuía `server/discover`, cache hints e `list_changed`, mas a reauditoria W11 corrigiu a
+premissa: em MCP 2026 `server/discover` resolve **versões/capabilities do servidor** e `tools/list`
+continua sendo a autoridade do catálogo de descriptors. Isso não é progressive per-tool discovery.
+Além disso, o ChatGPT mantém um lifecycle administrativo próprio de Refresh/review das actions.
+
+Logo SUP-5 foi fechada preservando `full` como default funcional, mantendo reduced profiles como
+advertisement estático opt-in e proibindo o antigo empty→full widening silencioso. Nenhum protocolo
+proprietário foi criado.
+
+## 24.4 Ordem de fechamento da auditoria suplementar
+
+```text
+W9  = retirar quatro plan decisions com parity comprovada
+W10 = reauditar survivors restantes por capability/authority/custo atual
+SUP-5 = decidir advertisement/progressive discovery com evidência protocol + host
+SUP-6 = cleanup final de guidance/exports/governance + promotion + publicação
+```
+
+A contagem final não é pré-fixada. O fechamento ocorre quando cada survivor justificar uma decisão
+MCP distinta e não restar tarefa histórica aberta por mero atraso documental.
+
+
+## 24.5 Certificação SUP-4/W9 — Git/reload previews nos owners canônicos
+
+W9 foi promovida sob source barrier estável:
+
+```text
+source barrier       = f4b7a89fa618b8605469e4f4df64150398c8086b151389a5a3c18261fcecff45
+entries              = 20
+full tools           = 85
+full envelope        = 129.127 B
+full fingerprint     = 1ceea438cca6cd85fa138180a27e21c8a95a08c5bd56fb130df4ecbd5777d6f8
+latency tools        = 52
+latency fingerprint  = 93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d
+minimal              = 17 / fingerprint inalterado
+cloudflare           = 16 / fingerprint inalterado
+contracts            = 2.9.0
+capabilities         = 72
+workflow policy      = 1.3.0
+```
+
+Delta W9:
+
+```text
+W8 -> W9:       -4 tools / -2.525 B líquidos
+baseline -> W9: -46 tools (-35,11%) / -33.459 B (-20,58%)
+```
+
+Os quatro owners enriquecidos possuem revisions próprias:
+
+```text
+git_stage           = wire-v1:5a4bdd244f1ae7ad
+git_commit          = wire-v1:be8056298ae3ad1b
+git_push            = wire-v1:bcab6fa6389a7bee
+mcp_reload_schedule = wire-v1:a5ac71ad72188892
+```
+
+Safety/least-authority provados:
+
+- Git previews funcionam mesmo com `operationContext.capabilities.audit` ausente;
+- audit writer só é adquirido no ramo mutante real;
+- `dryRun=true` rejeita confirms/apply-only fields;
+- apply real continua exigindo confirmação/preconditions server-side;
+- reload preview retorna antes de workspace/audit/source barrier/spawn;
+- `mcp_reload_status` permanece recovery/read-state separado;
+- `git_publish_changes` permanece happy path; os três granulares permanecem recovery;
+- nomes `git_*_plan` sobrevivem somente no normalizador de logs históricos, explicitamente comentado.
+
+Gates:
+
+```text
+focused Git/reload       = 15/15 green
+distributed catalog      = 63/63 green
+strict                   = green
+lint-changed             = green (18 files)
+architecture             = green, zero violations
+mcp-fast                 = 127/127 files, 780/780 tests
+mcp-full                 = 127/127 files, 780/780 tests
+source barrier after full= unchanged
+```
+
+**Decisão:** SUP-4 está materialmente concluída. A faixa ativa passa a ser W10, reauditoria dos 85
+survivors antes de qualquer nova redução ou mudança de advertisement.
+
+
+## 24.6 Reauditoria W10 — survivor ledger e última redundância funcional evidente
+
+A W10 não parte de “low usage = remover”. Foi construída sobre o inventário completo 85/85, com
+`descriptor bytes + authority + network + cancellation + surface membership + tool_call_started` em
+24 h/7 d/14 d. O resultado é que a maior parte dos survivors raros possui boundary positiva.
+
+### 24.6.1 Decisões KEEP por boundary positiva
+
+| Cluster | Decisão | Razão atual |
+| --- | --- | --- |
+| `job_get_summary` / `job_get_output` | **KEEP separados** | `minimal` expõe summary, não output. Fundir por view ampliaria o reduced-surface contract para log tails. |
+| `mcp_tunnel_status` / `mcp_connection_readiness` | **KEEP separados** | `minimal` expõe tunnel recovery, mas não profile/auth/url views do connection owner. |
+| `mcp_post_restart_readiness` | **KEEP** | faz process health + local/public health probes e é `fixed-external`; não pode contaminar connection local. |
+| `mcp_oauth_issuer_diagnostics` | **KEEP** | `fixed-external` metadata probing, authority distinta de readiness/friction local. |
+| `mcp_host_block_diagnostics` | **KEEP** | classifica evidência fornecida pelo caller/descriptor observation; não é snapshot de connection. |
+| `mcp_oauth_friction_audit` | **KEEP** | governa metadata alignment, token lifetime, persistence, compatibility e tool scopes. |
+| `repo_diff_files` | **KEEP** | capability exclusiva do canonical diff engine; bulk inspect não possui op=diff. |
+| `project_doctor` | **KEEP** | runtime/package scripts/branch; fundir ao meta hot owner aumentaria closure e misturaria filesystem diagnostics com static capability projection por ganho marginal. |
+| `mcp_apps_sdk_readiness` | **KEEP** | varre source/widget/CSP/Company Knowledge e possui readiness contract próprio. |
+| `delegate_to_repo_autonomy_runner` | **KEEP** | único MCP executor dos detached benchmarks IO-cache/transport; retirada hoje perderia capability. |
+| `mcp_cleanup_ai_artifacts` | **KEEP** | cleanup bounded parametrizado; maintenance composite só expõe report/safe fixes, não o purge equivalente. |
+| Cloudflare backup/list/apply/snapshot/metrics | **KEEP** | boundaries já certificados em W7/W8. |
+| LLM-B readiness/plan/run/cancel | **KEEP** | boundaries de custo/authority/rollback já certificados em W6. |
+| latency/client/openai instrumentation | **KEEP** | instrumentos do programa canônico de round-trip; ausência de uso recente não é redundância. |
+
+### 24.6.2 Única redundância funcional evidente: `repo_file_stats`
+
+`repo_file_stats` e `repo_bulk_inspect(op=stat)` chamam literalmente o mesmo
+`runRepoFileStatsCall()` com o mesmo `repoStatBatchItemSchema` e o mesmo contract
+`read/local/idempotent/bounded-non-cancellable`.
+
+Além disso:
+
+- `repo_bulk_inspect` já pertence a `latency` **e** `minimal`;
+- `minimal` já consegue executar stat, portanto a aposentadoria não amplia nem reduz capability da
+  reduced surface;
+- `repo_file_stats` teve 50 calls/7 d: a migração precisa preservar ergonomia de single operation,
+  não obrigar um array de tamanho 1;
+- recovery recipe de hash mismatch e workspace smoke ainda citam o nome antigo e devem migrar no
+  mesmo change-set.
+
+### 24.6.3 Plano executável W10
+
+- [x] adicionar `repo_bulk_inspect(single={op,args})`, com `op=read|search|stat` e schemas canônicos;
+- [x] impedir mistura `single` + `operations` e impedir batch-only options em single mode;
+- [x] provar `single.op=stat` parity com o antigo `repo_file_stats`, inclusive `includeHash`;
+- [x] migrar patch recovery recipe para `repo_bulk_inspect(single={op:'stat',args:{...}})`;
+- [x] migrar workspace smoke, metadata, target correlation, README/meta guidance e surfaces;
+- [x] manter `repo_file_stats` apenas como legacy audit vocabulary se necessário para cohort histórica;
+- [x] remover definition + semantic contract sem shim;
+- [x] elevar contract/capability revisions apenas após catálogo coerente;
+- [x] medir full/latency/minimal/cloudflare e wire bytes reais;
+- [x] focused + strict + distributed registry/cache/protocol + docs/lint/architecture + gate conjunto `mcp-fast` verdes; `mcp-full` reservado apenas ao fechamento SUP-6;
+- [x] após W10, fechar survivor ledger e entrar SUP-5 sem nova poda presumida.
+
+
+## 24.7 SUP-5 — advertisement estático, discovery MCP 2026 e lifecycle real do host
+
+### 24.7.1 Evidência normativa e evidência de host
+
+A reauditoria externa de 2026-08-28 corrige uma ambiguidade importante do roadmap antigo:
+
+1. MCP `2026-07-28` introduz `server/discover` para versões/capabilities do servidor; ele **não**
+   substitui `tools/list` nem constitui um mecanismo de descoberta progressiva de tools;
+2. `tools/list` continua sendo a autoridade para o catálogo de descriptors, agora com `ttlMs` /
+   `cacheScope` e invalidation via subscription/list-changed no lifecycle MCP moderno;
+3. a documentação atual do ChatGPT para apps MCP continua dizendo que updates do servidor não são
+   automaticamente habilitados: o operador usa **Refresh**, revisa as actions novas/alteradas e
+   novas actions ficam desabilitadas por default até esse lifecycle administrativo;
+4. portanto `server/discover`, cache hints e `list_changed` podem reduzir handshakes/relist dentro do
+   protocolo, mas **não** provam nem atualizam o action snapshot aprovado pelo host ChatGPT.
+
+Consequência: promover `latency` ou `minimal` como default faria o ChatGPT perder acesso às tools não
+anunciadas até nova geração + Refresh/review. Isso viola o objetivo do conector geral. A surface
+`full` continua sendo o default funcional; reduzidas são perfis explícitos de A/B, diagnóstico ou
+clientes especializados.
+
+### 24.7.2 Bug encontrado: empty projection fazia privilege/capability widening para `full`
+
+O implementation atual contém:
+
+```text
+selected.length === 0 && allowEmpty=false  => retorna all tools/full
+```
+
+Essa política foi anteriormente descrita como “fallback seguro”, mas é semanticamente invertida:
+uma configuração restritiva como `minimal + exclude=<toda minimal>` pode resultar silenciosamente em
+**84 tools**, isto é, a seleção mais ampla possível.
+
+Estado-alvo:
+
+- seleção vazia não intencional = erro de configuração fail-fast;
+- `allowEmpty=true` = única autorização explícita para zero advertised tools;
+- profiles estáticos precisam validar que todos os seus nomes ainda existem no catálogo canônico;
+- nenhuma remoção futura de tool pode deixar nome stale em profile sem falhar testes/materialização;
+- `full` permanece default quando **nenhuma** redução foi pedida, não como recuperação de redução
+  inválida.
+
+### 24.7.3 Racionalização dos perfis — implementada
+
+`claude`, `safe` e `research` atualmente resolvem literalmente para a mesma lista. A implementação final não
+mantém três SSOTs conceituais:
+
+- profile canônico: `research`;
+- aliases de configuração: `claude` e `safe` → `research`;
+- estado/reporting expõe o `mode` solicitado, `canonicalProfile` e `aliasOf`, tornando a equivalência explícita;
+- comparações de payload podem evitar recomputar três vezes o mesmo descriptor set.
+
+Não há promoção de alias histórico para nova funcionalidade. O endpoint Claude continua podendo
+usar `COPILOT_MCP_TOOL_SURFACE=claude`; o que desaparece é a falsa ideia de que há uma lista Claude
+independente da research/safe.
+
+### 24.7.4 Plano executável SUP-5/W11
+
+- [x] introduzir versão/manifest declarativo da surface policy e profile canônico por mode;
+- [x] tornar `claude|safe` aliases explícitos de `research` sem duplicar lista;
+- [x] validar integridade de todos os static profile names contra o catálogo all-tools;
+- [x] substituir empty→full fallback por erro fail-fast; preservar zero somente com `allowEmpty=true`;
+- [x] atualizar `.env.schema.json` para remover a descrição antiga de “fallback seguro”;
+- [x] expor no surface state `canonicalProfile`, alias/lifecycle e natureza estática da seleção;
+- [x] atualizar status/guidance: `server/discover` = capability discovery; `tools/list` = catálogo;
+      ChatGPT Refresh/review = lifecycle administrativo externo;
+- [x] provar por teste que `full` continua default, aliases são byte-identical e empty acidental falha;
+- [x] manter unknown include/exclude diagnosticáveis nesta onda; endurecimento adicional só com
+      evidência de que não quebra rollback/configuração operacional;
+- [x] medir novamente as surfaces e confirmar que W11 não altera descriptors/counts quando o mode é
+      o mesmo (mudança de policy semantics, não de tool schema);
+- [x] usar somente focused registry/cache/payload + strict durante a implementação;
+- [x] fazer lint/architecture + uma única suite ampla somente no gate conjunto W10+W11.
+
+
+## 24.8 Certificação conjunta W10/W11 — survivor closure + surface policy 2.0
+
+O gate conjunto foi deliberadamente feito apenas depois das duas ondas, evitando repetir suites
+amplas. Estado observado:
+
+```text
+full        = 84 tools / 128.506 B / efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1
+latency     = 51 tools /  95.331 B / 40321823e53b73a6853c8de1dc22541336219376f3d1f12544f90c853b7f7cc9
+minimal     = 17 tools /  21.462 B / c43116edbff2ec2b0b29d19e71846edb52ca78d64b63d6b63d352a338adf2d5d
+cloudflare  = 16 tools /  14.986 B / 4d1cce776d6f52be5fa7863908e2d6a776c498004bfca539cecc843fb1b6b2c8
+readonly    = 51 tools            / 43a31e711ac51c1760073bc03eaea0c8e029452deff72b8bcddabe3ed0ef4d00
+research    = 30 tools            / c56f5ad3da794ed145cb5d39319a46caa2c92c3f8a978537b9e9d4de71348045
+claude      = alias research, byte-identical
+safe        = alias research, byte-identical
+```
+
+Revisions:
+
+```text
+semantic contracts = 2.10.0
+capabilities        = 73
+option contracts    = 1.8.0
+surface policy      = 2.0.0
+```
+
+Gates executados sem duplicação desnecessária:
+
+```text
+W10 focused tools/recovery/options = 84/84 green
+W10 distributed catalog/protocol   = 62/62 green
+W11 registry/payload/cache focused = 42/42 green
+W11 status projection selected     = 1/1 green
+strict                             = green em todas as etapas
+check/docs-contract                = green
+lint-changed                       = green, 33 files
+architecture                       = 265/265; zero cycles/alias/cost/import-purity violations
+mcp-fast conjunto                  = 127/127 files, 780/780 tests
+```
+
+A W11 não alterou nenhum descriptor normal: os fingerprints W10 de cada surface equivalente ficaram
+byte-identical. A mudança é de **policy/lifecycle**. O bug empty→full foi eliminado e os aliases
+`claude|safe` deixaram de duplicar SSOT de lista.
+
+Cumulativo baseline → W11:
+
+```text
+131 -> 84 tools       = -47 (-35,88%)
+162.586 -> 128.506 B  = -34.080 B (-20,96%)
+```
+
+**Decisão de survivor closure:** não há nova poda presumida nesta auditoria. Cada um dos 84 entry
+points atuais possui boundary positiva documentada ou é instrumento temporário explicitamente ligado
+a outro roadmap. Nova redução futura exige nova evidência/caso, não continuação automática deste
+programa.
+
+## 24.9 SUP-6 — plano operacional final
+
+- [x] varrer source por nomes aposentados: somente analytics histórico e assertions negativas
+      permanecem intencionalmente;
+- [x] reconciliar README, meta, Workflow Policy, status, recovery recipes, `.env.schema` e surface policy;
+- [x] recalcular semantic/option/capability/surface revisions e public API/cost governance;
+- [x] corrigir o documento para distinguir baseline histórico, checkpoints publicados e worktree ativa;
+- [x] fechar checklists históricos W4/W9/SUP-4/SUP-5 que estavam documentalmente stale;
+- [x] source barrier final congelada para os 34 arquivos de código/testes/configuração não protegida:
+      `69ae5249bdcdebc17290fade1a68ded09f67c55d2687d0c45e0a27064966de2d`; a barrier foi verificada
+      antes **e depois** do release gate, sem source drift;
+- [x] `.env.schema.json`, corretamente bloqueado pela path policy da source barrier, foi validado
+      separadamente por parse JSON + `git diff --check`; SHA-256
+      `db8f66fc0499f5f7ab61788fb8d1742ea43c3e7f8ad1d63fd95b8241c1eaa07f`;
+- [x] o ledger suplementar foi excluído da própria barrier para evitar fingerprint autorreferente; sua
+      atualização final é documental e recebe `diff --check` + docs-contract após registrar o resultado;
+- [x] executar **um único `mcp-full` final** como release gate — não repetir `mcp-fast` depois dele;
+- [x] `mcp-full`: strict, lint-changed (33 arquivos), docs-contract, architecture 265/265, lint completo
+      e **127/127 arquivos / 780/780 testes MCP** verdes; barrier final permaneceu byte-identical;
+- [x] atualizar esta seção com barrier/gates finais;
+- [x] commit/push da campanha suplementar acumulada executado no fechamento; exigir e comprovar `HEAD == origin/main` + worktree limpa como pós-condição deste procedimento;
+- [x] smoke remoto pós-restart/reconnect classificado como follow-up operacional **fora do gate de
+      publicação**: a instância conectada atual executa a geração antiga por design; após o operador
+      reiniciar/reconectar, usar `mcp_connector_smoke_refresh` para verificar a nova geração.
+
+
+### 24.9.1 Release gate final certificado
+
+A promoção final foi deliberadamente concentrada em **uma única suite ampla**, conforme a estratégia
+de validação desta campanha. O primeiro capture da barrier recusou `.env.schema.json` com
+`ERR_PATH_DENIED`, comportamento esperado da canonical protected-path policy; nenhum `mcp-full` foi
+iniciado nessa tentativa. A promoção válida separou essa configuração protegida e executou o gate
+sobre a geração de código/testes hash-bound:
+
+```text
+source barrier       = 69ae5249bdcdebc17290fade1a68ded09f67c55d2687d0c45e0a27064966de2d
+barrier entries      = 34
+absent entries       = 0
+protected env schema = db8f66fc0499f5f7ab61788fb8d1742ea43c3e7f8ad1d63fd95b8241c1eaa07f
+mcp-full             = PASS
+unit MCP             = 127/127 files / 780/780 tests
+architecture         = 265/265; zero cycles/alias/cost/import-purity violations
+full tools           = 84
+full fingerprint     = efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1
+surface policy       = 2.0.0
+```
+
+O wrapper `source-barrier run` verificou o mesmo fingerprint **antes e depois** do `mcp-full`.
+Portanto o release gate certifica exatamente a geração que será publicada, excetuando apenas este
+ledger documental autorreferente e o `.env.schema.json` protegido, ambos validados por mecanismos
+separados e baratos.

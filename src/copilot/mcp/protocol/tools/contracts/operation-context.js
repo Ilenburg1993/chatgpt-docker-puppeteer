@@ -87,6 +87,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
  *         toolDescriptorRevisionTokens?: Readonly<Record<string, string>>;
  *         resolveCanonicalSurfaces?: () => readonly Readonly<{
  *             mode: string;
+ *             aliases?: readonly string[];
  *             tools: readonly import('#copilot/mcp/public/protocol/catalog').McpToolDefinition[];
  *             names: readonly string[];
  *         }>[];

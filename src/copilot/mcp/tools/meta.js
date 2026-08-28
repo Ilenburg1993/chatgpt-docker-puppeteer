@@ -21,7 +21,7 @@ import { buildMcpSessionProfile } from './session-profile.js';
 import { readMcpToolsStatus } from './tools-status.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 71;
+const CAPABILITIES_VERSION = 73;
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
@@ -29,7 +29,6 @@ const READ_TOOLS = [
     'repo_read_file',
     'repo_bulk_inspect',
     'repo_read_file_chunks',
-    'repo_file_stats',
     'repo_diff_files',
     'repo_quarantine_status',
     'repo_search_text',
@@ -67,11 +66,8 @@ const GIT_TOOLS = [
     'git_log',
     'git_branch_info',
     'git_publish_changes',
-    'git_stage_plan',
     'git_stage',
-    'git_commit_plan',
     'git_commit',
-    'git_push_plan',
     'git_push',
 ];
 
@@ -119,7 +115,6 @@ const RUNTIME_TOOLS = [
     'mcp_tunnel_status',
     'mcp_connector_smoke_refresh',
     'mcp_post_restart_readiness',
-    'mcp_reload_plan',
     'mcp_reload_status',
     'mcp_reload_schedule',
     'llmb_live_readiness',
@@ -147,7 +142,7 @@ const ANNOTATION_PROFILE = {
         'readOnlyHint=false, idempotentHint=false, destructiveHint=false, openWorldHint=false by default',
     destructiveTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=true, openWorldHint=false by default',
     openWorldExceptions:
-        'git_push_plan/git_push/git_publish_changes and llmb_live_test_run are explicitly open-world because they can contact configured upstream/provider services; their inputs remain closed/allowlisted.',
+        'git_push/git_publish_changes and llmb_live_test_run are explicitly open-world because they can contact configured upstream/provider services; their inputs remain closed/allowlisted.',
     hostControl:
         'ChatGPT host authorization prompts are controlled by chatgpt.com; this MCP can reduce friction with precise annotations and narrow tools, but cannot disable host safety UI.',
 };
@@ -166,7 +161,7 @@ const IO_GUIDANCE = [
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
     'Use dryRun=true on canonical owners when explicit preview or human inspection is useful; do not pay a separate plan-tool round trip.',
     'Keep includeDiffPreview=false by default for repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
-    `Prefer repo_read_file.batch and repo_search_text.batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxBatchRequests} independent operations, with repo_search_text.contextLines up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxSearchContextLines}. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.`,
+    `Prefer repo_read_file.batch and repo_search_text.batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxBatchRequests} independent operations, with repo_search_text.contextLines up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxSearchContextLines}. Use repo_bulk_inspect single={op,args} for one read/search/stat operation or operations=[...] when mixed/batched inspection reduces round-trips; batch mode preserves per-item failures and bounded output payloads.`,
     ...buildMcpWorkflowGuidance(),
     `Use repo_apply_patch_batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchOperations} exact-string patches across up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchTargets} targets and ${Math.floor(MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchInputBytes / (1024 * 1024))} MiB input. Direct apply defaults to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultApplyMode} + ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultFailureMode}: each target is compute-before-write atomic, same-file operations publish together, and independent targets can progress even when another fails. global-preflight is explicit all-target preview gating, not a cross-file transaction. Compact failures report one causal row per failed target plus affected operation indices and bounded recovery evidence.`,
     'For repo_apply_patch_batch, use canonical targets[]: declare each path once, put the initial sha256 baseline in target.expectedHash, optional durability on that target, and keep only relative edit semantics in target.operations[]. This avoids repeated path/hash payload and makes baseline intent explicit.',
@@ -201,7 +196,7 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_metrics_snapshot (view=metrics by default) for local cloudflared metrics; use view=transport-plan for the controlled transport benchmark design and last persisted comparison. Treat cloudflared_tunnel_request_errors as a process-lifetime origin-proxy signal that is advisory by itself: correlate its window delta with HTTP status-code deltas, fresh connector smoke, origin cancellations/errors and HA connection state before classifying transport health.',
     'Use mcp_devcontainer_network_posture_audit to distinguish current DNS/control-plane faults from stale DevContainer metadata. The canonical Network Control Plane script is .devcontainer/scripts/network-control-plane-state.sh; lifecycle hooks self-heal an unreadable stale configured path when that canonical script is available. Use mcp_devcontainer_network_control_plane_refresh when only the passive aggregated /tmp state needs regeneration: it accepts no command/path, runs exactly bash <canonical-script> --quiet summary with bounds, performs no external network probes, then returns a fresh posture audit.',
     'Use mcp_post_restart_readiness as a read-only diagnostic fallback when you do not want to refresh connector smoke; it is no longer a mandatory step after a successful smoke refresh.',
-    'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; after reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
+    'Use mcp_reload_schedule dryRun=true for an allowlisted reload preview; schedule for real only with the certified source barrier and confirmRestart=true. After reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
     'Governed Git publication never accepts force, arbitrary remote or arbitrary refspec.',
     'Use llmb_live_readiness view=readiness or view=runs for read-only Model Gateway live evidence; keep llmb_live_test_plan as least-authority preview; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
     'Use mcp_connection_readiness view=profile client=claude when adding the same remote MCP server to claude.ai custom connectors.',

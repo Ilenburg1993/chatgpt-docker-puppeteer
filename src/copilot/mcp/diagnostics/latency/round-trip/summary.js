@@ -6,6 +6,8 @@ import { MCP_ROUND_TRIP_NORMALIZER_VERSION, MCP_TOOL_CALL_TERMINAL_EVENTS } from
 const RECOVERY_WINDOW_MS = 5 * 60 * 1000;
 const MAX_INTERACTIVE_TRANSITION_GAP_MS = 5 * 60 * 1000;
 const HEAVY_RESULT_THRESHOLD_BYTES = 64 * 1024;
+// Includes retired repo_file_stats only to interpret historical audit cohorts; current stat inspection is
+// repo_bulk_inspect(single={op:'stat',...}).
 const INSPECTION_TOOLS = Object.freeze([
     'repo_read_file',
     'repo_read_file_chunks',

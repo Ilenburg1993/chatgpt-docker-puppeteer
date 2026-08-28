@@ -14,7 +14,7 @@
 
 import { readMcpWorkflowPolicy } from '#copilot/mcp/public/workflow-policy';
 
-export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.7.0';
+export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.8.0';
 
 const OPTION_CATEGORIES = Object.freeze(['semantic', 'tuning', 'result', 'safety', 'recovery']);
 const INACTIVE_POLICIES = Object.freeze(['reject']);
@@ -223,12 +223,13 @@ const OPTION_CONTRACTS = Object.freeze({
         }),
     }),
     repo_bulk_inspect: Object.freeze({
-        mode: Object.freeze({ kind: 'constant', mode: 'mixed-read' }),
+        mode: Object.freeze({ kind: 'presence', option: 'operations', presentMode: 'batch', absentMode: 'single' }),
         options: Object.freeze({
-            operations: option('semantic'),
-            failureMode: option('semantic', undefined, undefined, 'literal'),
-            concurrency: option('tuning', undefined, undefined, 'literal'),
-            resultBudgetBytes: option('tuning', undefined, undefined, 'literal'),
+            single: option('semantic', ['single'], 'reject'),
+            operations: option('semantic', ['batch'], 'reject'),
+            failureMode: option('semantic', ['batch'], 'reject', 'literal'),
+            concurrency: option('tuning', ['batch'], 'reject', 'literal'),
+            resultBudgetBytes: option('tuning', ['batch'], 'reject', 'literal'),
         }),
     }),
     repo_read_file_chunks: Object.freeze({

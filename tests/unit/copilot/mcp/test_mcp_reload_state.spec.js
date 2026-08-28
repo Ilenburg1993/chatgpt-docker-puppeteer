@@ -11,7 +11,7 @@ import {
     readMcpReloadProcessConfig,
     scheduleControlledMcpReloadWithDependencies,
 } from '#copilot/testing/mcp/runtime/reload';
-import { mcpReloadPlanTool } from '#copilot/testing/mcp/tools/reload';
+import { mcpReloadScheduleTool } from '#copilot/testing/mcp/tools/reload';
 
 const RELOAD_TEST_HOST = createComposedMcpProcessHost({ hostId: 'reload-state-test-host', backgroundServices: false });
 const TEST_SOURCE_BARRIER_MANIFEST = 'src/copilot/.ai/jobs/reload-test-source-barrier.json';
@@ -38,7 +38,10 @@ function reloadOperationContext() {
 
 describe('MCP reload state reconciliation', () => {
     it('reduces the normal post-reload workflow to one connector smoke call', async () => {
-        const result = await mcpReloadPlanTool.handler({ profile: 'current', delayMs: 1200 }, reloadOperationContext());
+        const result = await mcpReloadScheduleTool.handler(
+            { profile: 'current', delayMs: 1200, dryRun: true },
+            reloadOperationContext(),
+        );
         expect(result.isError).toBeUndefined();
         expect(result.structuredContent?.['expectedFollowUp']).toEqual(['mcp_connector_smoke_refresh']);
         expect(result.structuredContent?.['diagnosticFallback']).toEqual([

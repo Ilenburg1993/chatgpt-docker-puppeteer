@@ -8,16 +8,6 @@
  * @module copilot/mcp/tools/git-write
  */
 
-// @ts-check
-/**
- * Governed Git mutation tools for the MCP connector.
- *
- * The surface deliberately does not expose arbitrary Git commands, remotes, refspecs or force flags. Stage operations
- * are path-bounded, commits are HEAD-preconditioned, and pushes use only the already-configured upstream.
- *
- * @module copilot/mcp/tools/git-write
- */
-
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     createMcpRecoveryRecipe,
@@ -41,7 +31,7 @@ const PATHSPEC_MAGIC_RE = /^(?::|[-])|[*?[\]{}!]/u;
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} GitWriteWorkspaceCapability */
 /** @typedef {{ timeoutMs?: number; maxBufferBytes?: number }} GitWriteExecOptions */
 /** @typedef {(args: string[], options?: GitWriteExecOptions) => ReturnType<typeof execGit>} GitWriteExec */
-/** @typedef {Readonly<{ workspace: GitWriteWorkspaceCapability; exec: GitWriteExec; audit: NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['audit']> }>} GitWriteRuntime */
+/** @typedef {Readonly<{ workspace: GitWriteWorkspaceCapability; exec: GitWriteExec }>} GitWriteRuntime */
 
 /**
  * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
@@ -58,7 +48,7 @@ function createGitWriteRuntime(operationContext) {
             config,
             ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
         });
-    return Object.freeze({ workspace, exec, audit: requireMcpToolAuditCapability(operationContext) });
+    return Object.freeze({ workspace, exec });
 }
 
 const explicitPathsSchema = z
@@ -381,50 +371,51 @@ function isFileCoveredBySelectedPaths(file, selected) {
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const gitWriteTools = [
     defineMcpRawTool({
-        name: 'git_stage_plan',
-        title: 'Plan bounded Git stage',
-        description:
-            'Validate explicit workspace paths and enumerate the exact changed files that bounded staging would affect.',
-        inputSchema: { paths: explicitPathsSchema },
-
-        handler: async ({ paths }, operationContext) => {
-            const runtime = createGitWriteRuntime(operationContext);
-            const plan = await planStage(runtime, paths);
-            if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
-            const head = await readHead(runtime);
-            return okResult({ success: true, ...plan, head }, JSON.stringify({ ...plan, head }, null, 2));
-        },
-    }),
-    defineMcpRawTool({
         name: 'git_stage',
         title: 'Stage explicit Git paths',
         description:
             'Stage only the explicitly supplied, policy-validated workspace paths. Never performs git add -A or implicit dot staging.',
         inputSchema: {
             paths: explicitPathsSchema,
-            expectedHead: z
-                .string()
-                .max(64)
-                .optional()
-                ['describe']('Optional HEAD prefix precondition from git_stage_plan.'),
+            expectedHead: z.string().max(64).optional()['describe']('Optional HEAD prefix precondition.'),
+            dryRun: z.boolean().optional()['describe']('Preview exact bounded staging without mutating the index.'),
             confirmStage: z
                 .literal(true)
-                ['describe']('Explicit acknowledgement that the enumerated path set should be staged.'),
+                .optional()
+                ['describe']('Required when dryRun is not true and the enumerated path set should be staged.'),
         },
 
-        handler: async ({ paths, expectedHead }, operationContext) => {
+        handler: async ({ paths, expectedHead, dryRun, confirmStage }, operationContext) => {
             const runtime = createGitWriteRuntime(operationContext);
             const head = await readHead(runtime);
             const headError = validateExpectedHead(expectedHead, head);
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
             const plan = await planStage(runtime, paths);
             if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
+            if (dryRun === true) {
+                if (confirmStage !== undefined) {
+                    return errorResult('confirmStage is apply-only when dryRun=true.', {
+                        code: 'ERR_GIT_STAGE_PREVIEW_FIELDS',
+                    });
+                }
+                const preview = { success: true, preview: true, ...plan, head };
+                return okResult(preview, JSON.stringify(preview, null, 2));
+            }
+            if (confirmStage !== true) {
+                return errorResult('confirmStage must be true when dryRun is not true.', {
+                    code: 'ERR_GIT_STAGE_CONFIRM_REQUIRED',
+                    head,
+                    paths: plan.paths,
+                    affectedCount: plan.affectedCount,
+                });
+            }
             if (plan.affectedCount === 0) {
                 return okResult(
                     { success: true, staged: false, reason: 'no-selected-changes', paths: plan.paths, head },
                     'No selected changes to stage.',
                 );
             }
+            const audit = requireMcpToolAuditCapability(operationContext);
             const repairedExecutableModes = await repairAccidentalExecutableModeDrift(runtime, plan.paths);
             const result = await runtime.exec(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
             if (!result.success)
@@ -433,7 +424,7 @@ export const gitWriteTools = [
                     paths: plan.paths,
                 });
             const staged = await readStagedSummary(runtime);
-            await runtime.audit.append({
+            await audit.append({
                 event: 'git_stage',
                 tool: 'git_stage',
                 head,
@@ -459,16 +450,21 @@ export const gitWriteTools = [
         },
     }),
     defineMcpRawTool({
-        name: 'git_commit_plan',
-        title: 'Plan Git commit',
+        name: 'git_commit',
+        title: 'Create bounded Git commit',
         description:
-            'Return staged files, diff stat, current HEAD and configured Git identity before creating a commit.',
+            'Commit the already-staged Git index without amend, signing overrides, arbitrary flags or additional staging.',
         inputSchema: {
             message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
             expectedHead: z.string().max(64).optional(),
+            dryRun: z
+                .boolean()
+                .optional()
+                ['describe']('Preview the exact staged commit state without creating a commit.'),
+            confirmCommit: z.literal(true).optional()['describe']('Required when dryRun is not true.'),
         },
 
-        handler: async ({ message, expectedHead }, operationContext) => {
+        handler: async ({ message, expectedHead, dryRun, confirmCommit }, operationContext) => {
             const runtime = createGitWriteRuntime(operationContext);
             const [head, identity, staged] = await Promise.all([
                 readHead(runtime),
@@ -479,6 +475,7 @@ export const gitWriteTools = [
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
             const plan = {
                 success: true,
+                preview: true,
                 head,
                 identity,
                 message: message.trim(),
@@ -487,29 +484,21 @@ export const gitWriteTools = [
                 stat: staged.stat,
                 canCommit: staged.names.length > 0 && Boolean(identity.name && identity.email),
             };
-            return okResult(plan, JSON.stringify(plan, null, 2));
-        },
-    }),
-    defineMcpRawTool({
-        name: 'git_commit',
-        title: 'Create bounded Git commit',
-        description:
-            'Commit the already-staged Git index without amend, signing overrides, arbitrary flags or additional staging.',
-        inputSchema: {
-            message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
-            expectedHead: z.string().max(64).optional(),
-            confirmCommit: z.literal(true),
-        },
-
-        handler: async ({ message, expectedHead }, operationContext) => {
-            const runtime = createGitWriteRuntime(operationContext);
-            const [head, identity, staged] = await Promise.all([
-                readHead(runtime),
-                readCommitIdentity(runtime),
-                readStagedSummary(runtime),
-            ]);
-            const headError = validateExpectedHead(expectedHead, head);
-            if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head });
+            if (dryRun === true) {
+                if (confirmCommit !== undefined) {
+                    return errorResult('confirmCommit is apply-only when dryRun=true.', {
+                        code: 'ERR_GIT_COMMIT_PREVIEW_FIELDS',
+                    });
+                }
+                return okResult(plan, JSON.stringify(plan, null, 2));
+            }
+            if (confirmCommit !== true) {
+                return errorResult('confirmCommit must be true when dryRun is not true.', {
+                    code: 'ERR_GIT_COMMIT_CONFIRM_REQUIRED',
+                    head,
+                    stagedFiles: staged.names,
+                });
+            }
             if (staged.names.length === 0)
                 return errorResult('No staged changes are available to commit.', { code: 'ERR_GIT_EMPTY_INDEX' });
             if (!identity.name || !identity.email)
@@ -517,6 +506,7 @@ export const gitWriteTools = [
                     code: 'ERR_GIT_IDENTITY_MISSING',
                     identity,
                 });
+            const audit = requireMcpToolAuditCapability(operationContext);
             const result = await runtime.exec(['commit', '-m', message.trim()], {
                 timeoutMs: 120_000,
                 maxBufferBytes: 4 * 1024 * 1024,
@@ -528,7 +518,7 @@ export const gitWriteTools = [
                     stagedFiles: staged.names,
                 });
             const newHead = await readHead(runtime);
-            await runtime.audit.append({
+            await audit.append({
                 event: 'git_commit',
                 tool: 'git_commit',
                 previousHead: head,
@@ -546,54 +536,6 @@ export const gitWriteTools = [
                     stderr: result.stderr,
                 },
                 result.stdout || String(newHead),
-            );
-        },
-    }),
-    defineMcpRawTool({
-        name: 'git_push_plan',
-        title: 'Check upstream Git push',
-        description:
-            'Resolve only the current branch upstream and perform git push --dry-run without accepting a remote, refspec or force option.',
-        inputSchema: {
-            expectedHead: z.string().max(64).optional(),
-            runDryRun: z
-                .boolean()
-                .optional()
-                ['describe']('Contact the configured upstream with git push --dry-run. Default: true.'),
-        },
-
-        handler: async ({ expectedHead, runDryRun }, operationContext) => {
-            const runtime = createGitWriteRuntime(operationContext);
-            const state = await buildPushState(runtime);
-            const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
-            if (headError)
-                return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head: state['head'] });
-            if (!state['branch'])
-                return errorResult('Detached HEAD cannot be pushed by the governed tool.', {
-                    code: 'ERR_GIT_DETACHED_HEAD',
-                    state,
-                });
-            if (!state['upstream'])
-                return errorResult('Current branch has no configured upstream.', {
-                    code: 'ERR_GIT_UPSTREAM_MISSING',
-                    state,
-                });
-            let dryRun = null;
-            if (runDryRun !== false) {
-                const result = await runtime.exec(['push', '--dry-run', '--porcelain'], {
-                    timeoutMs: 60_000,
-                    maxBufferBytes: 2 * 1024 * 1024,
-                });
-                dryRun = {
-                    success: result.success,
-                    stdout: result.stdout,
-                    stderr: result.stderr,
-                    error: result.error ?? null,
-                };
-            }
-            return okResult(
-                { success: true, ...state, dryRun, canPush: dryRun ? dryRun.success : true },
-                JSON.stringify({ ...state, dryRun }, null, 2),
             );
         },
     }),
@@ -632,12 +574,13 @@ export const gitWriteTools = [
             operationContext,
         ) => {
             const runtime = createGitWriteRuntime(operationContext);
+            const audit = requireMcpToolAuditCapability(operationContext);
             const startedAt = Date.now();
             let sourceBarrier;
             try {
                 sourceBarrier = await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrierManifest, {
                     expectedFingerprint: expectedSourceFingerprint,
-                    audit: runtime.audit,
+                    audit: audit,
                 });
             } catch (error) {
                 const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
@@ -708,7 +651,7 @@ export const gitWriteTools = [
             try {
                 await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrier.manifestPath, {
                     expectedFingerprint: sourceBarrier.fingerprint,
-                    audit: runtime.audit,
+                    audit: audit,
                 });
             } catch (error) {
                 await runtime.exec(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
@@ -736,7 +679,7 @@ export const gitWriteTools = [
             try {
                 await verifyRepositorySourceBarrierManifest(runtime.workspace, sourceBarrier.manifestPath, {
                     expectedFingerprint: sourceBarrier.fingerprint,
-                    audit: runtime.audit,
+                    audit: audit,
                 });
             } catch (error) {
                 const candidate = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (error);
@@ -828,7 +771,7 @@ export const gitWriteTools = [
                 afterPush = await buildPushState(runtime);
             }
 
-            await runtime.audit.append({
+            await audit.append({
                 event: 'git_publish_changes',
                 tool: 'git_publish_changes',
                 previousHead: initialHead,
@@ -864,7 +807,7 @@ export const gitWriteTools = [
                 },
                 nextAction: shouldPush
                     ? 'Publish completed; no separate git_stage/git_commit/git_push calls are required.'
-                    : 'Commit completed locally; use git_push_plan/git_push later if remote publication is desired.',
+                    : 'Commit completed locally; use git_push(dryRun=true) for optional upstream preflight, then git_push with exact HEAD/upstream confirmation when publication is desired.',
             };
             const result = okResult(
                 structured,
@@ -888,22 +831,43 @@ export const gitWriteTools = [
                 .string()
                 .min(7)
                 .max(64)
-                ['describe']('HEAD precondition obtained from git_commit/git_push_plan.'),
+                .optional()
+                ['describe']('Optional in preview; required for real push.'),
             expectedUpstream: z
                 .string()
                 .min(1)
                 .max(256)
-                ['describe']('Expected existing upstream, for example origin/main.'),
+                .optional()
+                ['describe']('Required for real push; preview resolves the configured upstream itself.'),
+            dryRun: z.boolean().optional()['describe']('Preview current upstream state without a real push.'),
+            runDryRun: z
+                .boolean()
+                .optional()
+                ['describe']('Preview-only: contact the configured upstream with git push --dry-run. Default: true.'),
             pushDryRunFirst: z
                 .boolean()
                 .optional()
-                ['describe'](
-                    'Run git push --dry-run before the real push. Default: false; git_push_plan remains available for explicit preflight.',
-                ),
-            confirmPush: z.literal(true),
+                ['describe']('Apply-only: run git push --dry-run before the real push. Default: false.'),
+            confirmPush: z.literal(true).optional()['describe']('Required for a real push.'),
         },
 
-        handler: async ({ expectedHead, expectedUpstream, pushDryRunFirst }, operationContext) => {
+        handler: async (
+            { expectedHead, expectedUpstream, dryRun, runDryRun, pushDryRunFirst, confirmPush },
+            operationContext,
+        ) => {
+            if (
+                dryRun === true &&
+                (expectedUpstream !== undefined || pushDryRunFirst !== undefined || confirmPush !== undefined)
+            ) {
+                return errorResult('expectedUpstream, pushDryRunFirst and confirmPush are apply-only fields.', {
+                    code: 'ERR_GIT_PUSH_PREVIEW_FIELDS',
+                });
+            }
+            if (dryRun !== true && runDryRun !== undefined) {
+                return errorResult('runDryRun is preview-only; use pushDryRunFirst for a real push.', {
+                    code: 'ERR_GIT_PUSH_APPLY_FIELDS',
+                });
+            }
             const runtime = createGitWriteRuntime(operationContext);
             const state = await buildPushState(runtime);
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
@@ -914,12 +878,50 @@ export const gitWriteTools = [
                     code: 'ERR_GIT_DETACHED_HEAD',
                     state,
                 });
-            if (!state['upstream'] || state['upstream'] !== expectedUpstream) {
+            if (!state['upstream'])
+                return errorResult('Current branch has no configured upstream.', {
+                    code: 'ERR_GIT_UPSTREAM_MISSING',
+                    state,
+                });
+            if (dryRun === true) {
+                let upstreamDryRun = null;
+                if (runDryRun !== false) {
+                    const result = await runtime.exec(['push', '--dry-run', '--porcelain'], {
+                        timeoutMs: 60_000,
+                        maxBufferBytes: 2 * 1024 * 1024,
+                    });
+                    upstreamDryRun = {
+                        success: result.success,
+                        stdout: result.stdout,
+                        stderr: result.stderr,
+                        error: result.error ?? null,
+                    };
+                }
+                const preview = {
+                    success: true,
+                    preview: true,
+                    ...state,
+                    dryRun: upstreamDryRun,
+                    canPush: upstreamDryRun ? upstreamDryRun.success : true,
+                };
+                return okResult(preview, JSON.stringify(preview, null, 2));
+            }
+            if (!expectedHead || !expectedUpstream || confirmPush !== true) {
+                return errorResult(
+                    'expectedHead, expectedUpstream and confirmPush=true are required for a real push.',
+                    {
+                        code: 'ERR_GIT_PUSH_CONFIRM_REQUIRED',
+                        state,
+                    },
+                );
+            }
+            if (state['upstream'] !== expectedUpstream) {
                 return errorResult(
                     `Upstream precondition failed: expected ${expectedUpstream}, actual ${String(state['upstream'])}.`,
                     { code: 'ERR_GIT_UPSTREAM_PRECONDITION', state },
                 );
             }
+            const audit = requireMcpToolAuditCapability(operationContext);
             if (pushDryRunFirst === true) {
                 const dryRun = await runtime.exec(['push', '--dry-run', '--porcelain'], {
                     timeoutMs: 60_000,
@@ -944,7 +946,7 @@ export const gitWriteTools = [
                     stderr: result.stderr,
                 });
             const after = await buildPushState(runtime);
-            await runtime.audit.append({
+            await audit.append({
                 event: 'git_push',
                 tool: 'git_push',
                 head: state['head'],

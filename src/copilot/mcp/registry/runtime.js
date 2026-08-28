@@ -55,6 +55,7 @@ import {
     createMcpToolSurfacePolicy,
     describeMcpToolSurfacePolicy,
     readMcpToolSurfacePolicy,
+    resolveMcpToolSurfaceCanonicalProfile,
     toolSurfaceCacheKey,
 } from './surface-policy.js';
 
@@ -236,7 +237,7 @@ function normalizeIntentionalEmptySurfaceValidation(validation, tools, surfacePo
 }
 
 /**
- * Create a bounded, server-generation-owned comparison capability. The all-tool catalog and eight canonical surfaces
+ * Create a bounded, server-generation-owned comparison capability. The all-tool catalog and six canonical profiles
  * are materialized only on the first comparison request, so normal server startup does not pay this diagnostic cost.
  * The closure never mutates the canonical current-surface cache/status.
  *
@@ -244,21 +245,26 @@ function normalizeIntentionalEmptySurfaceValidation(validation, tools, surfacePo
  * @param {import('#copilot/mcp/public/auth').McpAuthConfig} authConfig
  */
 function createMcpToolSurfaceComparisonCapability(registryPolicy, authConfig) {
-    /** @type {readonly Readonly<{ mode:string; tools:readonly McpToolDefinition[]; names:readonly string[] }>[] | null} */
+    /** @type {readonly Readonly<{ mode:string; aliases:readonly string[]; tools:readonly McpToolDefinition[]; names:readonly string[] }>[] | null} */
     let cachedSurfaces = null;
     return Object.freeze({
         resolveCanonicalSurfaces: () => {
             if (cachedSurfaces) return cachedSurfaces;
             const { allTools } = buildCanonicalAllMcpTools(registryPolicy, authConfig);
+            const canonicalProfiles = [...new Set(MCP_TOOL_SURFACE_MODES.map(resolveMcpToolSurfaceCanonicalProfile))];
             cachedSurfaces = Object.freeze(
-                MCP_TOOL_SURFACE_MODES.map((mode) => {
+                canonicalProfiles.map((mode) => {
                     const { tools } = buildCanonicalMcpToolSurface(
                         allTools,
                         createMcpToolSurfacePolicy({ mode }),
                         registryPolicy,
                     );
+                    const aliases = MCP_TOOL_SURFACE_MODES.filter(
+                        (candidate) => candidate !== mode && resolveMcpToolSurfaceCanonicalProfile(candidate) === mode,
+                    );
                     return Object.freeze({
                         mode,
+                        aliases: Object.freeze(aliases),
                         tools: Object.freeze([...tools]),
                         names: Object.freeze(tools.map((tool) => tool.name)),
                     });

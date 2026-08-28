@@ -16,7 +16,7 @@
 
 /**
  * @typedef {'full' | 'latency' | 'minimal' | 'cloudflare' | 'readonly' | 'claude' | 'safe' | 'research'} McpToolSurfaceMode
- *
+ * @typedef {'full' | 'latency' | 'minimal' | 'cloudflare' | 'readonly' | 'research'} McpCanonicalToolSurfaceProfile
  *
  * @typedef {object} McpToolSurfacePolicy
  * @property {McpToolSurfaceMode} mode
@@ -25,6 +25,9 @@
  * @property {boolean} allowEmpty
  */
 
+export const MCP_TOOL_SURFACE_POLICY_VERSION = '2.0.0';
+
+/** @type {readonly McpToolSurfaceMode[]} */
 export const MCP_TOOL_SURFACE_MODES = Object.freeze([
     'full',
     'latency',
@@ -46,7 +49,6 @@ const LATENCY_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_bulk_inspect',
     'repo_read_file_chunks',
     'repo_file_outline',
-    'repo_file_stats',
     'repo_symbol_search',
     'repo_find_orphan_imports',
     'search',
@@ -132,7 +134,7 @@ const CLOUDFLARE_SURFACE_TOOL_NAMES = Object.freeze([
     'git_diff',
 ]);
 
-const SAFE_RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
+const RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_tree',
     'repo_search_text',
@@ -140,7 +142,6 @@ const SAFE_RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_bulk_inspect',
     'repo_read_file_chunks',
     'repo_file_outline',
-    'repo_file_stats',
     'repo_symbol_search',
     'repo_index_status',
     'repo_index_search',
@@ -165,6 +166,37 @@ const SAFE_RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'mcp_tunnel_status',
     'mcp_post_restart_readiness',
 ]);
+
+/** @type {Readonly<Record<'latency'|'minimal'|'cloudflare'|'research', readonly string[]>>} */
+const STATIC_SURFACE_PROFILE_TOOL_NAMES = Object.freeze({
+    latency: LATENCY_SURFACE_TOOL_NAMES,
+    minimal: MINIMAL_SURFACE_TOOL_NAMES,
+    cloudflare: CLOUDFLARE_SURFACE_TOOL_NAMES,
+    research: RESEARCH_SURFACE_TOOL_NAMES,
+});
+
+/** @type {Readonly<Record<McpToolSurfaceMode, McpCanonicalToolSurfaceProfile>>} */
+const SURFACE_MODE_CANONICAL_PROFILE = Object.freeze({
+    full: 'full',
+    latency: 'latency',
+    minimal: 'minimal',
+    cloudflare: 'cloudflare',
+    readonly: 'readonly',
+    claude: 'research',
+    safe: 'research',
+    research: 'research',
+});
+
+/**
+ * Resolve a requested surface mode to the one canonical advertisement profile it represents.
+ * `claude` and `safe` are configuration aliases of `research`, not independent profile SSOTs.
+ *
+ * @param {McpToolSurfaceMode} mode
+ * @returns {McpCanonicalToolSurfaceProfile}
+ */
+export function resolveMcpToolSurfaceCanonicalProfile(mode) {
+    return SURFACE_MODE_CANONICAL_PROFILE[mode];
+}
 
 /**
  * Build one exact immutable surface policy without consulting ambient process state.
@@ -201,6 +233,7 @@ export function readMcpToolSurfacePolicy(env = process.env) {
 export function toolSurfaceCacheKey(policy) {
     return JSON.stringify({
         mode: policy.mode,
+        canonicalProfile: resolveMcpToolSurfaceCanonicalProfile(policy.mode),
         include: Array.from(policy.include).sort(),
         exclude: Array.from(policy.exclude).sort(),
         allowEmpty: policy.allowEmpty,
@@ -214,6 +247,7 @@ export function toolSurfaceCacheKey(policy) {
  * @returns {T[]}
  */
 export function applyMcpToolSurfacePolicy(tools, policy = readMcpToolSurfacePolicy()) {
+    assertStaticSurfaceProfileIntegrity(tools);
     if (policy.mode === 'full' && policy.include.size === 0 && policy.exclude.size === 0) return tools;
     const selected = tools.filter((tool) => {
         const includedByMode = matchesToolSurfaceMode(tool, policy.mode);
@@ -221,7 +255,11 @@ export function applyMcpToolSurfacePolicy(tools, policy = readMcpToolSurfacePoli
         const explicitlyExcluded = policy.exclude.has(tool.name);
         return (includedByMode || explicitlyIncluded) && !explicitlyExcluded;
     });
-    if (selected.length === 0 && !policy.allowEmpty) return tools;
+    if (selected.length === 0 && !policy.allowEmpty) {
+        throw new TypeError(
+            `MCP tool surface ${JSON.stringify(policy.mode)} resolved to zero tools; fix include/exclude/profile configuration or set COPILOT_MCP_TOOL_SURFACE_ALLOW_EMPTY=true explicitly.`,
+        );
+    }
     return selected;
 }
 
@@ -234,8 +272,15 @@ export function applyMcpToolSurfacePolicy(tools, policy = readMcpToolSurfacePoli
  */
 export function describeMcpToolSurfacePolicy(selectedTools, allTools, policy) {
     const allNames = new Set(allTools.map((tool) => tool.name));
+    const canonicalProfile = resolveMcpToolSurfaceCanonicalProfile(policy.mode);
     return {
+        policyVersion: MCP_TOOL_SURFACE_POLICY_VERSION,
         mode: policy.mode,
+        canonicalProfile,
+        aliasOf: canonicalProfile === policy.mode ? null : canonicalProfile,
+        selectionLifecycle: 'process-generation-static',
+        progressiveToolDiscovery: false,
+        defaultMode: DEFAULT_TOOL_SURFACE,
         selectedTools: selectedTools.length,
         totalTools: allTools.length,
         reduced: selectedTools.length < allTools.length,
@@ -258,14 +303,28 @@ export function describeMcpToolSurfacePolicy(selectedTools, allTools, policy) {
  * @returns {boolean}
  */
 function matchesToolSurfaceMode(tool, mode) {
-    if (mode === 'full') return true;
-    if (mode === 'latency') return LATENCY_SURFACE_TOOL_NAMES.includes(tool.name);
-    if (mode === 'minimal') return MINIMAL_SURFACE_TOOL_NAMES.includes(tool.name);
-    if (mode === 'cloudflare') return CLOUDFLARE_SURFACE_TOOL_NAMES.includes(tool.name);
-    if (mode === 'claude' || mode === 'safe' || mode === 'research')
-        return SAFE_RESEARCH_SURFACE_TOOL_NAMES.includes(tool.name);
-    if (mode === 'readonly') return tool.annotations?.readOnlyHint === true;
-    return true;
+    const canonicalProfile = resolveMcpToolSurfaceCanonicalProfile(mode);
+    if (canonicalProfile === 'full') return true;
+    if (canonicalProfile === 'readonly') return tool.annotations?.readOnlyHint === true;
+    return STATIC_SURFACE_PROFILE_TOOL_NAMES[canonicalProfile].includes(tool.name);
+}
+
+/**
+ * Static profiles are source-owned policy. A retired or renamed tool must never remain silently in one profile.
+ * Validate every canonical static profile against each all-tool catalog materialization, even when runtime mode=full.
+ *
+ * @template {{ name: string }} T
+ * @param {T[]} tools
+ */
+function assertStaticSurfaceProfileIntegrity(tools) {
+    const canonicalNames = new Set(tools.map((tool) => tool.name));
+    for (const [profile, names] of Object.entries(STATIC_SURFACE_PROFILE_TOOL_NAMES)) {
+        const missing = names.filter((name) => !canonicalNames.has(name));
+        if (missing.length === 0) continue;
+        throw new TypeError(
+            `MCP static tool surface profile ${JSON.stringify(profile)} references unknown canonical tools: ${missing.join(', ')}.`,
+        );
+    }
 }
 
 /** @param {unknown} value @returns {McpToolSurfaceMode} */

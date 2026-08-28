@@ -78,23 +78,30 @@ describe('MCP governed autonomy mutations', () => {
     });
 
     it('rejects implicit/pathspec Git staging and exposes no arbitrary Git command surface', async () => {
-        const stagePlan = tool(gitWriteTools, 'git_stage_plan');
+        const stagePreview = tool(gitWriteTools, 'git_stage');
         const operationContext = createAutonomyOperationContext();
-        const dot = await stagePlan.handler({ paths: ['.'] }, operationContext);
-        const option = await stagePlan.handler({ paths: ['--all'] }, operationContext);
-        const glob = await stagePlan.handler({ paths: ['src/copilot/**/*.js'] }, operationContext);
+        const dot = await stagePreview.handler({ paths: ['.'], dryRun: true }, operationContext);
+        const option = await stagePreview.handler({ paths: ['--all'], dryRun: true }, operationContext);
+        const glob = await stagePreview.handler({ paths: ['src/copilot/**/*.js'], dryRun: true }, operationContext);
 
         assert.equal(dot.isError, true);
         assert.equal(option.isError, true);
         assert.equal(glob.isError, true);
-        assert.deepEqual(Object.keys(stagePlan.inputSchema).sort(), ['paths']);
+        assert.deepEqual(Object.keys(stagePreview.inputSchema).sort(), [
+            'confirmStage',
+            'dryRun',
+            'expectedHead',
+            'paths',
+        ]);
 
         const push = tool(gitWriteTools, 'git_push');
         assert.deepEqual(Object.keys(push.inputSchema).sort(), [
             'confirmPush',
+            'dryRun',
             'expectedHead',
             'expectedUpstream',
             'pushDryRunFirst',
+            'runDryRun',
         ]);
         assert.equal('remote' in push.inputSchema, false);
         assert.equal('refspec' in push.inputSchema, false);
@@ -107,10 +114,9 @@ describe('MCP governed autonomy mutations', () => {
     });
 
     it('plans reload through a fixed allowlisted runner without arbitrary command/path inputs', async () => {
-        const planTool = tool(mcpReloadTools, 'mcp_reload_plan');
         const scheduleTool = tool(mcpReloadTools, 'mcp_reload_schedule');
-        const result = await planTool.handler(
-            { profile: 'current', delayMs: 2500, reason: 'unit-test' },
+        const result = await scheduleTool.handler(
+            { profile: 'current', delayMs: 2500, reason: 'unit-test', dryRun: true },
             createAutonomyOperationContext(),
         );
         const plan = result.structuredContent;
@@ -128,6 +134,7 @@ describe('MCP governed autonomy mutations', () => {
         assert.deepEqual(Object.keys(scheduleTool.inputSchema).sort(), [
             'confirmRestart',
             'delayMs',
+            'dryRun',
             'expectedSourceFingerprint',
             'profile',
             'reason',
@@ -140,6 +147,93 @@ describe('MCP governed autonomy mutations', () => {
         const publish = tool(gitWriteTools, 'git_publish_changes');
         assert.ok('sourceBarrierManifest' in publish.inputSchema);
         assert.ok('expectedSourceFingerprint' in publish.inputSchema);
+    });
+
+    it('keeps granular Git previews side-effect-free and enforces cross-mode fields', async () => {
+        const operationContext = createAutonomyOperationContext();
+        const noAuditContext = /** @type {typeof operationContext} */ ({
+            ...operationContext,
+            capabilities: { ...operationContext.capabilities, audit: undefined },
+        });
+        const beforeHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8' }).trim();
+        const beforeIndex = execFileSync('git', ['diff', '--cached', '--name-only'], {
+            cwd: process.cwd(),
+            encoding: 'utf8',
+        });
+
+        const stage = tool(gitWriteTools, 'git_stage');
+        const stageResult = await stage.handler(
+            { paths: ['src/copilot/mcp/tools/git-write.js'], dryRun: true },
+            noAuditContext,
+        );
+        assert.equal(stageResult.isError, undefined);
+        assert.equal(stageResult.structuredContent?.['preview'], true);
+        const stageConflict = await stage.handler(
+            { paths: ['src/copilot/mcp/tools/git-write.js'], dryRun: true, confirmStage: true },
+            noAuditContext,
+        );
+        assert.equal(stageConflict.isError, true);
+        assert.equal(stageConflict.structuredContent?.['code'], 'ERR_GIT_STAGE_PREVIEW_FIELDS');
+
+        const commit = tool(gitWriteTools, 'git_commit');
+        const commitResult = await commit.handler({ message: 'preview-only', dryRun: true }, noAuditContext);
+        assert.equal(commitResult.isError, undefined);
+        assert.equal(commitResult.structuredContent?.['preview'], true);
+        const commitConflict = await commit.handler(
+            { message: 'preview-only', dryRun: true, confirmCommit: true },
+            noAuditContext,
+        );
+        assert.equal(commitConflict.isError, true);
+        assert.equal(commitConflict.structuredContent?.['code'], 'ERR_GIT_COMMIT_PREVIEW_FIELDS');
+
+        const push = tool(gitWriteTools, 'git_push');
+        const pushResult = await push.handler({ dryRun: true, runDryRun: false }, noAuditContext);
+        assert.equal(pushResult.isError, undefined);
+        assert.equal(pushResult.structuredContent?.['preview'], true);
+        assert.equal(pushResult.structuredContent?.['dryRun'], null);
+
+        const pushConflict = await push.handler({ dryRun: true, expectedUpstream: 'origin/main' }, operationContext);
+        assert.equal(pushConflict.isError, true);
+        assert.equal(pushConflict.structuredContent?.['code'], 'ERR_GIT_PUSH_PREVIEW_FIELDS');
+
+        const pushMissingConfirm = await push.handler({}, operationContext);
+        assert.equal(pushMissingConfirm.isError, true);
+        assert.equal(pushMissingConfirm.structuredContent?.['code'], 'ERR_GIT_PUSH_CONFIRM_REQUIRED');
+
+        assert.equal(
+            execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8' }).trim(),
+            beforeHead,
+        );
+        assert.equal(
+            execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: process.cwd(), encoding: 'utf8' }),
+            beforeIndex,
+        );
+    });
+
+    it('keeps reload preview before mutation-only fields and scheduling authority', async () => {
+        const schedule = tool(mcpReloadTools, 'mcp_reload_schedule');
+        const preview = await schedule.handler(
+            { profile: 'current', delayMs: 1500, reason: 'preview-test', dryRun: true },
+            createAutonomyOperationContext(),
+        );
+        assert.equal(preview.isError, undefined);
+        assert.equal(preview.structuredContent?.['dryRun'], true);
+        assert.equal(preview.structuredContent?.['scheduled'], false);
+
+        const conflict = await schedule.handler(
+            {
+                profile: 'current',
+                dryRun: true,
+                sourceBarrierManifest: 'src/copilot/.ai/jobs/forbidden-preview.json',
+            },
+            createAutonomyOperationContext(),
+        );
+        assert.equal(conflict.isError, true);
+        assert.equal(conflict.structuredContent?.['code'], 'ERR_MCP_RELOAD_PREVIEW_FIELDS');
+
+        const missingConfirm = await schedule.handler({ profile: 'current' }, createAutonomyOperationContext());
+        assert.equal(missingConfirm.isError, true);
+        assert.equal(missingConfirm.structuredContent?.['code'], 'ERR_MCP_RELOAD_CONFIRM_REQUIRED');
     });
 
     it('blocks git_publish_changes on an invalid source barrier before staging or committing anything', async () => {

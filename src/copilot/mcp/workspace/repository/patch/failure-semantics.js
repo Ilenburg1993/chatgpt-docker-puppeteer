@@ -164,8 +164,8 @@ export function buildRepositoryPatchRecoveryRecipe(code, details, operation, opt
             scope: failureScope,
             reasonCode: 'patch-refresh-target-hash',
             suggestedInvocation: {
-                tool: 'repo_file_stats',
-                args: { path, includeHash: true },
+                tool: 'repo_bulk_inspect',
+                args: { single: { op: 'stat', args: { path, includeHash: true } } },
             },
             preconditions: ['A refreshed hash is diagnostic evidence, not permission to override caller intent.'],
         });

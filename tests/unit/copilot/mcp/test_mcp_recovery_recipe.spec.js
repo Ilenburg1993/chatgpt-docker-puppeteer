@@ -162,7 +162,10 @@ describe('MCP machine-readable recovery recipes', () => {
             { path: 'a.js', old_string: 'x', new_string: 'y', expectedHash: 'a'.repeat(64) },
         );
         assert.equal(hashMismatch?.disposition, 'suggested');
-        assert.equal(hashMismatch?.suggestedInvocation?.tool, 'repo_file_stats');
+        assert.equal(hashMismatch?.suggestedInvocation?.tool, 'repo_bulk_inspect');
+        assert.deepEqual(hashMismatch?.suggestedInvocation?.args, {
+            single: { op: 'stat', args: { path: 'a.js', includeHash: true } },
+        });
         assert.equal(hashMismatch?.retryInvocation, undefined);
 
         const converged = buildRepositoryPatchRecoveryRecipe(

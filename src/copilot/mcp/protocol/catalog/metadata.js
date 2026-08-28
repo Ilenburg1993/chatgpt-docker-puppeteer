@@ -22,7 +22,6 @@ const TOOL_INVOCATION_LABELS = Object.freeze({
     repo_read_file_chunks: 'Lendo arquivo em blocos',
     repo_search_text: 'Buscando texto',
     repo_diff_files: 'Comparando arquivos',
-    repo_file_stats: 'Inspecionando arquivo',
     repo_file_outline: 'Mapeando arquivo',
     repo_symbol_search: 'Buscando simbolo',
     repo_find_symbol_usages: 'Buscando usos',

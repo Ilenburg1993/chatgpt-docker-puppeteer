@@ -8,6 +8,7 @@ import { describe, it } from 'vitest';
 
 import {
     MCP_TOOL_SURFACE_MODES,
+    MCP_TOOL_SURFACE_POLICY_VERSION,
     createMcpToolSurfacePolicy,
     getCanonicalMcpToolSurfaceState,
     getCanonicalMcpTools,
@@ -54,7 +55,7 @@ describe('copilot MCP registry', () => {
         const firstNames = first.map((tool) => tool.name);
         const secondNames = second.map((tool) => tool.name);
 
-        assert.equal(first.length, 89);
+        assert.equal(first.length, 84);
         assert.equal(new Set(firstNames).size, first.length);
         assert.deepEqual(secondNames, firstNames);
         assert.notStrictEqual(second, first);
@@ -81,14 +82,11 @@ describe('copilot MCP registry', () => {
             'fetch',
             'git_branch_info',
             'git_commit',
-            'git_commit_plan',
             'git_diff',
             'git_log',
             'git_publish_changes',
             'git_push',
-            'git_push_plan',
             'git_stage',
-            'git_stage_plan',
             'git_status',
             'job_cancel',
             'job_get_output',
@@ -121,7 +119,6 @@ describe('copilot MCP registry', () => {
             'mcp_oauth_issuer_diagnostics',
             'mcp_openai_endpoint_latency',
             'mcp_post_restart_readiness',
-            'mcp_reload_plan',
             'mcp_reload_schedule',
             'mcp_reload_status',
             'mcp_round_trip_analytics',
@@ -139,7 +136,6 @@ describe('copilot MCP registry', () => {
             'repo_create_file',
             'repo_diff_files',
             'repo_file_outline',
-            'repo_file_stats',
             'repo_find_imports',
             'repo_find_orphan_imports',
             'repo_find_symbol_usages',
@@ -168,12 +164,34 @@ describe('copilot MCP registry', () => {
         ]);
     });
 
-    it('supports a safe Claude/research tool surface without write tools', () => {
-        const tools = getCanonicalMcpTools({
-            toolSurfacePolicy: { mode: 'safe', include: new Set(), exclude: new Set(), allowEmpty: false },
+    it('maps safe/claude aliases to one canonical research surface without write tools', () => {
+        const safe = getCanonicalMcpTools({
+            toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'safe' }),
         });
-        const names = new Set(tools.map((tool) => tool.name));
+        const safeState = getCanonicalMcpToolSurfaceState();
+        const research = getCanonicalMcpTools({
+            toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'research' }),
+        });
+        const claude = getCanonicalMcpTools({
+            toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'claude' }),
+        });
+        const names = new Set(safe.map((tool) => tool.name));
 
+        assert.deepEqual(
+            safe.map((tool) => tool.name),
+            research.map((tool) => tool.name),
+        );
+        assert.deepEqual(
+            claude.map((tool) => tool.name),
+            research.map((tool) => tool.name),
+        );
+        assert.equal(safeState['policyVersion'], MCP_TOOL_SURFACE_POLICY_VERSION);
+        assert.equal(safeState['mode'], 'safe');
+        assert.equal(safeState['canonicalProfile'], 'research');
+        assert.equal(safeState['aliasOf'], 'research');
+        assert.equal(safeState['selectionLifecycle'], 'process-generation-static');
+        assert.equal(safeState['progressiveToolDiscovery'], false);
+        assert.equal(safeState['defaultMode'], 'full');
         assert.equal(names.has('mcp_latency_attribution'), false);
         assert.equal(names.has('mcp_latency_dashboard'), true);
         assert.equal(names.has('mcp_connection_readiness'), true);
@@ -183,7 +201,7 @@ describe('copilot MCP registry', () => {
         assert.equal(names.has('repo_apply_patch'), false);
         assert.equal(names.has('repo_create_file'), false);
         assert.equal(names.has('repo_remove_file'), false);
-        assert.ok(tools.every((tool) => tool.annotations.destructiveHint !== true));
+        assert.ok(safe.every((tool) => tool.annotations.destructiveHint !== true));
     });
 
     it('keeps include/exclude overrides deterministic, diagnosable and safely reversible', () => {
@@ -208,21 +226,15 @@ describe('copilot MCP registry', () => {
         assert.equal(state['allowEmpty'], false);
     });
 
-    it('falls back to the complete surface on an accidental empty projection unless allowEmpty is explicit', () => {
-        const full = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'full' }) });
+    it('fails fast on an accidental empty projection and permits zero tools only by explicit opt-in', () => {
         const minimal = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'minimal' }) });
         const minimalNames = minimal.map((tool) => tool.name);
 
-        const safePolicy = createMcpToolSurfacePolicy({
+        const accidentalEmpty = createMcpToolSurfacePolicy({
             mode: 'minimal',
             exclude: minimalNames,
         });
-        const safeProjection = getCanonicalMcpTools({ toolSurfacePolicy: safePolicy });
-        assert.equal(safeProjection.length, full.length);
-        assert.deepEqual(
-            safeProjection.map((tool) => tool.name),
-            full.map((tool) => tool.name),
-        );
+        assert.throws(() => getCanonicalMcpTools({ toolSurfacePolicy: accidentalEmpty }), /resolved to zero tools/u);
 
         const explicitEmpty = createMcpToolSurfacePolicy({
             mode: 'minimal',
@@ -232,6 +244,7 @@ describe('copilot MCP registry', () => {
         assert.deepEqual(getCanonicalMcpTools({ toolSurfacePolicy: explicitEmpty }), []);
         assert.equal(getCanonicalMcpToolSurfaceState()['selectedTools'], 0);
         assert.equal(getCanonicalMcpToolSurfaceState()['allowEmpty'], true);
+        assert.equal(getCanonicalMcpToolSurfaceState()['canonicalProfile'], 'minimal');
     });
 
     it.each(MCP_TOOL_SURFACE_MODES)(
@@ -273,14 +286,14 @@ describe('copilot MCP registry', () => {
             assert.equal(names.has(name), true, name);
         }
         assert.ok(latency.length < full.length);
-        assert.equal(latency.length, 52);
+        assert.equal(latency.length, 51);
     });
 
     it('warns before the configured tool-count limit is exhausted', () => {
         const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
         const oldPercent = process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
         try {
-            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '110';
+            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '105';
             process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = '80';
             resetCanonicalMcpToolsCacheForTests();
             getCanonicalMcpTools();
@@ -306,7 +319,6 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
 
         const expectedOpenWorld = new Set([
-            'git_push_plan',
             'git_push',
             'git_publish_changes',
             'llmb_live_test_run',
@@ -408,15 +420,15 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
         const coverage = readMcpToolContractCoverage();
         assert.deepEqual(coverage, {
-            total: 89,
-            readOnly: 56,
+            total: 84,
+            readOnly: 51,
             boundedWrite: 25,
             destructive: 8,
-            openWorld: 10,
-            idempotent: 55,
-            scopes: { read: 56, write: 19, validate: 2, admin: 12 },
-            cancellation: { cancellable: 26, boundedNonCancellable: 57, notApplicable: 6 },
-            output: { specific: 10, intentionalUntyped: 79 },
+            openWorld: 9,
+            idempotent: 50,
+            scopes: { read: 51, write: 19, validate: 2, admin: 12 },
+            cancellation: { cancellable: 23, boundedNonCancellable: 56, notApplicable: 5 },
+            output: { specific: 10, intentionalUntyped: 74 },
         });
         assert.equal(tools.length, coverage.total);
         for (const tool of tools) {

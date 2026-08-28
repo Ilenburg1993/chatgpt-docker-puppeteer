@@ -70,12 +70,21 @@ describe('MCP wire descriptor fingerprint authority', () => {
         const snapshot = buildMcpToolWireDescriptorSnapshot(getCanonicalMcpTools());
         assert.equal(snapshot.schemaVersion, 2);
         assert.equal(snapshot.fingerprintKind, 'tools-list-wire-sha256-v1');
-        assert.equal(snapshot.descriptors.length, 89);
-        assert.equal(snapshot.fingerprint, '19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac');
+        assert.equal(snapshot.descriptors.length, 84);
+        assert.equal(snapshot.fingerprint, 'efcae5d0bf58852f180efd1ebb5f456994af64ca6241eebbc93f59db4144d6d1');
         assert.equal(snapshot.toolRevisionTokens['repo_apply_patch_batch'], 'wire-v1:345553b0bc26ad02');
         assert.equal(snapshot.toolRevisionTokens['run_copilot_validator'], 'wire-v1:20ada120b6f14572');
         assert.equal(snapshot.toolRevisionTokens['repo_index_build'], 'wire-v1:adb3e310dcd61693');
-        assert.equal('repo_patch_batch_plan' in snapshot.toolRevisionTokens, false);
+        for (const retired of [
+            'repo_patch_batch_plan',
+            'git_stage_plan',
+            'git_commit_plan',
+            'git_push_plan',
+            'mcp_reload_plan',
+            'repo_file_stats',
+        ]) {
+            assert.equal(retired in snapshot.toolRevisionTokens, false, retired);
+        }
         assert.equal(Object.keys(snapshot.toolFingerprints).length, snapshot.descriptors.length);
         assert.equal(Object.keys(snapshot.toolRevisionTokens).length, snapshot.descriptors.length);
         for (const descriptor of snapshot.descriptors.slice(0, 5)) {

@@ -17,8 +17,10 @@ export {
 } from '../runtime.js';
 export {
     MCP_TOOL_SURFACE_MODES,
+    MCP_TOOL_SURFACE_POLICY_VERSION,
     createMcpToolSurfacePolicy,
     readMcpToolSurfacePolicy,
+    resolveMcpToolSurfaceCanonicalProfile,
 } from '../surface-policy.js';
 /** @typedef {import('../runtime.js').RegisterCanonicalMcpToolsOptions} RegisterCanonicalMcpToolsOptions */
 /** @typedef {import('../runtime.js').McpRegistryPolicy} McpRegistryPolicy */

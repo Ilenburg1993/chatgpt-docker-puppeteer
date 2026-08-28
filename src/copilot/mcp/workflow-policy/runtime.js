@@ -11,7 +11,7 @@
 
 import { MCP_TOOL_EXECUTION_LIMITS } from '#copilot/mcp/public/protocol/tools';
 
-export const MCP_WORKFLOW_POLICY_VERSION = '1.2.0';
+export const MCP_WORKFLOW_POLICY_VERSION = '1.3.0';
 
 const WORKFLOW_POLICY = Object.freeze({
     validation: Object.freeze({
@@ -36,14 +36,7 @@ const WORKFLOW_POLICY = Object.freeze({
     }),
     publication: Object.freeze({
         happyPathTool: 'git_publish_changes',
-        granularFallbackTools: Object.freeze([
-            'git_stage_plan',
-            'git_stage',
-            'git_commit_plan',
-            'git_commit',
-            'git_push_plan',
-            'git_push',
-        ]),
+        granularFallbackTools: Object.freeze(['git_stage', 'git_commit', 'git_push']),
         granularFallbackOnlyFor: Object.freeze([
             'preexisting-staged-index',
             'merge-or-rebase-state',
@@ -60,7 +53,7 @@ const WORKFLOW_POLICY = Object.freeze({
         deterministicSequentialPolicy: 'batch-concurrency-1-and-fail-fast',
     }),
     reload: Object.freeze({
-        planTool: 'mcp_reload_plan',
+        previewMode: 'dryRun=true',
         scheduleTool: 'mcp_reload_schedule',
         statusTool: 'mcp_reload_status',
         smokeTool: 'mcp_connector_smoke_refresh',
@@ -79,9 +72,18 @@ export function buildMcpWorkflowStatusProjection() {
     return {
         workflowPolicyVersion: MCP_WORKFLOW_POLICY_VERSION,
         directBatchWorkflows: [
-            [WORKFLOW_POLICY.patch.happyPathTool, `${WORKFLOW_POLICY.patch.happyPathTool}(${WORKFLOW_POLICY.patch.previewMode})`],
-            [WORKFLOW_POLICY.fileBatch.happyPathTool, `${WORKFLOW_POLICY.fileBatch.happyPathTool}(${WORKFLOW_POLICY.fileBatch.previewMode})`],
-            [WORKFLOW_POLICY.validation.happyPathTool, `${WORKFLOW_POLICY.validation.happyPathTool}(${WORKFLOW_POLICY.validation.previewMode})`],
+            [
+                WORKFLOW_POLICY.patch.happyPathTool,
+                `${WORKFLOW_POLICY.patch.happyPathTool}(${WORKFLOW_POLICY.patch.previewMode})`,
+            ],
+            [
+                WORKFLOW_POLICY.fileBatch.happyPathTool,
+                `${WORKFLOW_POLICY.fileBatch.happyPathTool}(${WORKFLOW_POLICY.fileBatch.previewMode})`,
+            ],
+            [
+                WORKFLOW_POLICY.validation.happyPathTool,
+                `${WORKFLOW_POLICY.validation.happyPathTool}(${WORKFLOW_POLICY.validation.previewMode})`,
+            ],
         ],
         planFirstWorkflows: [],
         escalationOnlyPlans: [],
@@ -131,7 +133,7 @@ export function buildMcpSessionWorkflowProjection() {
             {
                 task: 'reload',
                 flow: [
-                    'mcp_reload_schedule exactly once after source-barrier certification; mcp_reload_plan is only for profile/safety preview when needed',
+                    'use mcp_reload_schedule dryRun=true for profile/safety preview; schedule exactly once with the certified source barrier and confirmRestart=true when the plan is accepted',
                     'after restart/reconnect use mcp_connector_smoke_refresh because it reconciles reload status and post-restart readiness in the same call',
                     'use mcp_reload_status only when the schedule/restart transition failed or remains uncertain; never poll it mechanically',
                 ],
@@ -158,6 +160,6 @@ export function buildMcpWorkflowGuidance() {
         `Use run_copilot_validator directly for validation. For several already-known causal gates, use run_copilot_validator.batch so up to ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchRequests} focused/shell/typecheck/lint gates share one MCP call. Use dryRun=true on the same owner to preview exact commands; dryRun=true without a validator returns inspect-first/no-validator guidance. Inline completion means stop: use job_get_summary/job_get_output only when the validator explicitly returns running after its bounded wait. Escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.`,
         'When several independent terminal commands are already known before execution, send one terminal_exec.batch call. For deterministic sequential execution use batchConcurrency=1 and batchFailureMode=fail-fast instead of multiple terminal_exec calls.',
         'After a certified mcp_reload_schedule, prefer one mcp_connector_smoke_refresh after restart/reconnect because it reconciles reload and readiness. Use mcp_reload_status only for a failed or uncertain transition; never poll it mechanically.',
-        'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep granular Git plan/stage/commit/push tools only for the canonical fallback cases.',
+        'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep granular git_stage/git_commit/git_push only for canonical fallback cases; use dryRun=true on those same owners when preview is needed.',
     ];
 }

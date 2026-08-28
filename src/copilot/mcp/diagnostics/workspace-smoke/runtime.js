@@ -76,7 +76,7 @@ export async function runMcpWorkspaceSmoke(workspace, tunnelConfig, options) {
         const snapshot = await readTextValidated(resolved.validatedReadPath, { startLine: 1, endLine: 8 });
         return { bytes: snapshot.bytesRead, sha256: snapshot.contentHash };
     });
-    await runCheck(checks, 'repo_file_stats', async () => {
+    await runCheck(checks, 'repo_bulk_inspect_stat', async () => {
         const resolved = await workspace.resolveValidatedReadPath('src/copilot/mcp/README.md');
         if (!resolved.ok) throw new Error(resolved.reason);
         const snapshot = await statPathValidated(resolved.validatedReadPath);

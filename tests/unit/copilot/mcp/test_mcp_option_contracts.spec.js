@@ -17,11 +17,11 @@ function policy(tool, args) {
 describe('MCP Option Contract SSOT', () => {
     it('covers the first ten high-friction tools and stays in parity with the canonical wire catalog', () => {
         const coverage = readMcpToolOptionContractCoverage();
-        assert.equal(coverage.version, '1.7.0');
+        assert.equal(coverage.version, '1.8.0');
         assert.equal(coverage.coveredToolCount, 10);
-        assert.equal(coverage.optionCount, 100);
+        assert.equal(coverage.optionCount, 101);
         assert.deepEqual(coverage.categoryCounts, {
-            semantic: 57,
+            semantic: 58,
             tuning: 18,
             result: 10,
             safety: 13,
@@ -39,7 +39,7 @@ describe('MCP Option Contract SSOT', () => {
             'terminal_session_control',
             'terminal_session_read',
         ]);
-        assert.equal(buildMcpWireToolCatalog().length, 89);
+        assert.equal(buildMcpWireToolCatalog().length, 84);
     });
 
     it('projects only bounded aggregate facts and never input values', () => {

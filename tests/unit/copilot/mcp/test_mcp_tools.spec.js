@@ -567,11 +567,10 @@ describe('copilot MCP tools', () => {
         assert.equal(stats.size, 1);
     });
 
-    it('repo_file_stats returns metadata and optional content hash', async () => {
-        const tool = findTool('repo_file_stats');
+    it('repo_bulk_inspect single stat preserves file-stat/hash parity and mode discipline', async () => {
+        const tool = findTool('repo_bulk_inspect');
         const result = await tool.handler({
-            path: 'src/copilot/mcp/README.md',
-            includeHash: true,
+            single: { op: 'stat', args: { path: 'src/copilot/mcp/README.md', includeHash: true } },
         });
 
         assert.equal(result.isError, undefined);
@@ -581,6 +580,24 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['sizeBytes'], 'number');
         assert.equal(typeof result.structuredContent?.['sha256'], 'string');
         assert.equal(result.structuredContent?.['hashComputed'], true);
+
+        const conflicting = await tool.handler({
+            single: { op: 'stat', args: { path: 'src/copilot/mcp/README.md' } },
+            operations: [{ op: 'stat', args: { path: 'src/copilot/mcp/README.md' } }],
+        });
+        assert.equal(conflicting.isError, true);
+        assert.equal(conflicting.structuredContent?.['code'], 'ERR_BULK_INSPECT_CONFLICTING_MODE');
+
+        const batchOption = await tool.handler({
+            single: { op: 'stat', args: { path: 'src/copilot/mcp/README.md' } },
+            failureMode: 'fail-fast',
+        });
+        assert.equal(batchOption.isError, true);
+        assert.equal(batchOption.structuredContent?.['code'], 'ERR_BULK_INSPECT_BATCH_OPTIONS_WITH_SINGLE');
+
+        const missingMode = await tool.handler({});
+        assert.equal(missingMode.isError, true);
+        assert.equal(missingMode.structuredContent?.['code'], 'ERR_BULK_INSPECT_MODE_REQUIRED');
     });
 
     it('read tools return stable error codes for recoverable client errors', async () => {
@@ -1182,6 +1199,13 @@ describe('copilot MCP tools', () => {
         assert.equal(result.isError, undefined);
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         assert.equal(structured['success'], true);
+        const surfaceLifecycle = /** @type {Record<string, unknown>} */ (structured['toolSurfaceLifecycle']);
+        assert.equal(surfaceLifecycle['defaultAdvertisement'], 'full');
+        assert.equal(surfaceLifecycle['selection'], 'process-generation-static');
+        assert.equal(surfaceLifecycle['serverDiscoverRole'], 'server-versions-and-capabilities');
+        assert.equal(surfaceLifecycle['toolsListRole'], 'tool-descriptor-catalog');
+        assert.equal(surfaceLifecycle['progressiveToolDiscovery'], false);
+        assert.equal(surfaceLifecycle['chatgptActionSnapshot'], 'external-refresh-review-lifecycle');
         assert.equal(structured['totalTools'], getCanonicalMcpTools().length);
         assert.ok(Number(structured['readOnlyCount'] ?? 0) > 0);
         assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);

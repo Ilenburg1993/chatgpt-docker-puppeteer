@@ -1,4 +1,4 @@
 // @ts-check
 /** Testing-only membrane for MCP wire module: reload. */
 
-export { mcpReloadPlanTool } from '../restart-control.js';
+export { mcpReloadScheduleTool } from '../restart-control.js';

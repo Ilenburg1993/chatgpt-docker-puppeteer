@@ -114,12 +114,22 @@ No runtime atual, **reconnect** não é um único fenômeno. Diagnóstico e oper
 
 O smoke canônico usa **MCP 2026-07-28 pelo SDK oficial v2** e CIMD. O caminho stateful/SSE 2025 e
 DCR são compatibilidade opt-in e devem ser rotulados como tal. `mcp_runtime_health` e
-`mcp_capabilities_summary view=status` expõe `descriptorObservation`, cujo scope é somente o que esta geração do origin
-observou; `chatgptActionSnapshot.observableFromOrigin=false` é intencional.
+`mcp_capabilities_summary view=status` expõe `descriptorObservation`, cujo scope é somente o que
+esta geração do origin observou; `chatgptActionSnapshot.observableFromOrigin=false` é intencional.
 
 Depois de mudar descriptors/actions, use o fluxo de **Refresh/review do app no ChatGPT** quando o
 host precisar reaprender a surface. Reiniciar ou reconectar o MCP, por si só, não é evidência de
 refresh administrativo.
+
+### Tool surface e discovery
+
+`COPILOT_MCP_TOOL_SURFACE=full` permanece o default do conector geral. As surfaces `latency`,
+`minimal`, `cloudflare`, `readonly` e `research` são advertisement profiles estáticos e opt-in;
+`claude` e `safe` são aliases explícitos do profile canônico `research`. MCP 2026 `server/discover`
+descobre versões/capabilities do servidor, enquanto `tools/list` entrega o catálogo de descriptors;
+nenhum dos dois cria progressive tool discovery no ChatGPT. Uma projeção que resulte acidentalmente
+em zero tools falha na inicialização; zero advertised tools exige
+`COPILOT_MCP_TOOL_SURFACE_ALLOW_EMPTY=true`.
 
 ## Claude
 
@@ -148,7 +158,6 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `repo_tree`
 - `repo_read_file`
 - `repo_read_file_chunks`
-- `repo_file_stats`
 - `repo_diff_files`
 - `repo_search_text`
 - `repo_find_symbol_usages`
@@ -163,10 +172,10 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `git_diff`
 - `git_log`
 - `git_branch_info`
-- `git_stage_plan` / `git_stage`
-- `git_commit_plan` / `git_commit`
-- `git_push_plan` / `git_push`
-- `mcp_reload_plan` / `mcp_reload_status` / `mcp_reload_schedule`
+- `git_stage` (`dryRun=true` for preview)
+- `git_commit` (`dryRun=true` for preview)
+- `git_push` (`dryRun=true` for configured-upstream preflight)
+- `mcp_reload_status` / `mcp_reload_schedule` (`dryRun=true` for reload preview)
 - `llmb_live_readiness` (`readiness|runs`)
 - `llmb_live_test_plan` / `llmb_live_test_run`
 - `project_doctor`
@@ -260,9 +269,9 @@ node src/copilot/mcp/cli/index.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
-offline. `copilot_sessions action=list` continua descrevendo apenas sessões SDK registradas **no processo
-MCP atual**; o terminal externo é outro processo. Para evidência operacional desse runtime separado,
-use o control plane allowlisted:
+offline. `copilot_sessions action=list` continua descrevendo apenas sessões SDK registradas **no
+processo MCP atual**; o terminal externo é outro processo. Para evidência operacional desse runtime
+separado, use o control plane allowlisted:
 
 - `llmb_live_readiness view=readiness`: executa somente o readiness canônico, sem provider/model
   turn. Fresh calls usam subprocesso supervisionado call-scoped; cancellation/timeout encerram o
@@ -325,17 +334,19 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
   `expectedHash`.
 - `repo_read_file_chunks` pagina arquivos grandes por linhas e separa `returnedLineCount`,
   `lastScannedLine`, `fileTotalLines` e `fileTotalLinesKnown`.
-- `repo_file_stats` usa o stat canonico de IO e pode calcular `sha256` sob limite de bytes.
+- `repo_bulk_inspect single={op:"stat",args:{...}}` usa o stat canônico de IO e pode calcular
+  `sha256` sob limite de bytes; `operations=[...]` mantém o modo heterogêneo/batch.
 - `repo_diff_files` usa o diff canonico de IO para comparar dois arquivos do workspace.
 - `repo_find_symbol_usages` espelha `find_symbol_usages` para analise de impacto textual com busca
   whole-word por padrao.
 - `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes, usando o
-  indice simbolico compartilhado como fast path e `rg` como fallback de completude quando necessario.
+  indice simbolico compartilhado como fast path e `rg` como fallback de completude quando
+  necessario.
 - `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor
   runtime da LLM-B.
 - `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_find_imports`,
-  `repo_find_orphan_imports` espelha a família
-  `workspace_index_*`/`workspace_find_imports` usando a mesma engine FTS5/simbolica compartilhada.
+  `repo_find_orphan_imports` espelha a família `workspace_index_*`/`workspace_find_imports` usando a
+  mesma engine FTS5/simbolica compartilhada.
 
 Erros recuperaveis usam contratos estaveis em `structuredContent`:
 

@@ -60,6 +60,7 @@ export const mcpToolPayloadAuditTool = defineMcpRawTool({
         }
         const surfaces = toolSurface.resolveCanonicalSurfaces().map((surface) => ({
             mode: surface.mode,
+            aliases: [...(surface.aliases ?? [])],
             tools: [...surface.tools],
         }));
         const usageWindowMs = (usageWindowHours ?? 24) * 60 * 60 * 1000;

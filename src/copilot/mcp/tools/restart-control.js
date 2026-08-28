@@ -1,25 +1,9 @@
 // @ts-check
-/**
- * Controlled MCP lifecycle planning tool.
- *
- * This tool intentionally starts as plan-first: dryRun is the default and real execution requires a follow-up patchable
- * runner path. It never accepts arbitrary shell or user-provided commands.
- *
- * @module copilot/mcp/tools/restart-control
- */
-
-// @ts-check
-/**
- * Controlled MCP lifecycle planning tool.
- *
- * This tool intentionally starts as plan-first: dryRun is the default and real execution requires a follow-up patchable
- * runner path. It never accepts arbitrary shell or user-provided commands.
- *
- * @module copilot/mcp/tools/restart-control
- */
+/** Controlled MCP lifecycle preview, scheduling and persisted-state tools. @module copilot/mcp/tools/restart-control */
 
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
+    errorResult,
     okResult,
     requireMcpToolAuditCapability,
     requireMcpToolReloadConfig,
@@ -36,32 +20,6 @@ import {
 import { z } from 'zod';
 
 const restartProfileSchema = z.enum(MCP_RELOAD_REQUEST_PROFILES);
-
-/** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
-export const mcpReloadPlanTool = defineMcpRawTool({
-    name: 'mcp_reload_plan',
-    title: 'Plan controlled MCP reload',
-    description:
-        'Plan a detached restart of the managed MCP HTTP origin plus Cloudflare tunnel using only allowlisted transport profiles.',
-    inputSchema: {
-        profile: restartProfileSchema
-            .optional()
-            ['describe']('Default current. quic/h2/auto are the only executable profiles.'),
-        delayMs: z.number().int().min(MCP_RELOAD_MIN_DELAY_MS).max(MCP_RELOAD_MAX_DELAY_MS).optional(),
-        reason: z.string().max(240).optional(),
-    },
-
-    handler: async ({ profile, delayMs, reason }, operationContext) => {
-        const reloadConfig = requireMcpToolReloadConfig(operationContext);
-        const plan = buildControlledMcpReloadPlan({
-            config: reloadConfig,
-            profile: profile ?? 'current',
-            ...(delayMs === undefined ? {} : { delayMs }),
-            reason: reason ?? null,
-        });
-        return okResult(plan, JSON.stringify(plan, null, 2));
-    },
-});
 
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
 export const mcpReloadStatusTool = defineMcpRawTool({
@@ -86,23 +44,31 @@ export const mcpReloadScheduleTool = defineMcpRawTool({
         profile: restartProfileSchema.optional(),
         delayMs: z.number().int().min(MCP_RELOAD_MIN_DELAY_MS).max(MCP_RELOAD_MAX_DELAY_MS).optional(),
         reason: z.string().max(240).optional(),
+        dryRun: z
+            .boolean()
+            .optional()
+            ['describe']('Preview the allowlisted reload plan without barrier verification or spawn.'),
         sourceBarrierManifest: z
             .string()
             .min(1)
             .max(1024)
-            ['describe']('Workspace-relative persisted source-barrier manifest produced by the prior validation gate.'),
+            .optional()
+            ['describe']('Apply-only: workspace-relative persisted source-barrier manifest from the validation gate.'),
         expectedSourceFingerprint: z
             .string()
             .regex(/^[a-f0-9]{64}$/u)
-            ['describe']('Exact SHA-256 source fingerprint returned by the prior validation gate.'),
-        confirmRestart: z.literal(true),
+            .optional()
+            ['describe']('Apply-only: exact SHA-256 source fingerprint returned by the validation gate.'),
+        confirmRestart: z
+            .literal(true)
+            .optional()
+            ['describe']('Apply-only: required to schedule the detached restart.'),
     },
 
     handler: async (
-        { profile, delayMs, reason, sourceBarrierManifest, expectedSourceFingerprint },
+        { profile, delayMs, reason, dryRun, sourceBarrierManifest, expectedSourceFingerprint, confirmRestart },
         operationContext,
     ) => {
-        const workspace = requireMcpToolWorkspace(operationContext);
         const reloadConfig = requireMcpToolReloadConfig(operationContext);
         const plan = buildControlledMcpReloadPlan({
             config: reloadConfig,
@@ -110,6 +76,28 @@ export const mcpReloadScheduleTool = defineMcpRawTool({
             ...(delayMs === undefined ? {} : { delayMs }),
             reason: reason ?? null,
         });
+        if (dryRun === true) {
+            if (
+                sourceBarrierManifest !== undefined ||
+                expectedSourceFingerprint !== undefined ||
+                confirmRestart !== undefined
+            ) {
+                return errorResult(
+                    'sourceBarrierManifest, expectedSourceFingerprint and confirmRestart are apply-only fields.',
+                    {
+                        code: 'ERR_MCP_RELOAD_PREVIEW_FIELDS',
+                    },
+                );
+            }
+            return okResult({ ...plan, dryRun: true, scheduled: false }, JSON.stringify(plan, null, 2));
+        }
+        if (!sourceBarrierManifest || !expectedSourceFingerprint || confirmRestart !== true) {
+            return errorResult(
+                'sourceBarrierManifest, expectedSourceFingerprint and confirmRestart=true are required to schedule reload.',
+                { code: 'ERR_MCP_RELOAD_CONFIRM_REQUIRED' },
+            );
+        }
+        const workspace = requireMcpToolWorkspace(operationContext);
         const resolvedProfile = plan.resolvedProfile;
         const audit = requireMcpToolAuditCapability(operationContext);
         const scheduled = await scheduleControlledMcpReload({
@@ -151,4 +139,4 @@ export const mcpReloadScheduleTool = defineMcpRawTool({
 });
 
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
-export const mcpReloadTools = [mcpReloadPlanTool, mcpReloadStatusTool, mcpReloadScheduleTool];
+export const mcpReloadTools = [mcpReloadStatusTool, mcpReloadScheduleTool];

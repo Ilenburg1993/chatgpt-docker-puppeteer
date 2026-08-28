@@ -335,6 +335,53 @@ async function runRepoFileStatsCall(workspace, input) {
 }
 
 /**
+ * Execute one heterogeneous inspect item through the same canonical schemas used by batch mode.
+ * @param {RepoReadWorkspaceCapability} workspace
+ * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig
+ * @param {unknown} raw
+ * @param {number} index
+ */
+async function runRepoBulkInspectItem(workspace, cacheConfig, raw, index) {
+    const item = repoBulkInspectItemSchema.safeParse(raw);
+    if (!item.success) {
+        return errorResult(`Invalid repo_bulk_inspect item at index ${index}.`, {
+            code: 'ERR_BULK_INSPECT_INVALID_ITEM',
+            index,
+        });
+    }
+    const { op, args } = item.data;
+    if (op === 'read') {
+        const parsed = repoReadBatchItemSchema.safeParse(args);
+        return parsed.success
+            ? runRepoReadFileCall(workspace, cacheConfig, parsed.data)
+            : errorResult(`Invalid read args at repo_bulk_inspect index ${index}.`, {
+                  code: 'ERR_BULK_INSPECT_INVALID_READ',
+                  index,
+              });
+    }
+    if (op === 'search') {
+        const parsed = repoSearchBatchItemSchema.safeParse(args);
+        return parsed.success && (parsed.data.pattern || parsed.data.query)
+            ? runRepoSearchTextCall(workspace, parsed.data)
+            : errorResult(`Invalid search args at repo_bulk_inspect index ${index}.`, {
+                  code: 'ERR_BULK_INSPECT_INVALID_SEARCH',
+                  index,
+              });
+    }
+    const parsed = repoStatBatchItemSchema.safeParse(args);
+    return parsed.success
+        ? runRepoFileStatsCall(workspace, {
+              path: parsed.data.path,
+              ...(parsed.data.includeHash === undefined ? {} : { includeHash: parsed.data.includeHash }),
+              ...(parsed.data.maxHashBytes === undefined ? {} : { maxHashBytes: parsed.data.maxHashBytes }),
+          })
+        : errorResult(`Invalid stat args at repo_bulk_inspect index ${index}.`, {
+              code: 'ERR_BULK_INSPECT_INVALID_STAT',
+              index,
+          });
+}
+
+/**
  * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const repoReadTools = [
@@ -526,108 +573,64 @@ export const repoReadTools = [
         },
     }),
     defineMcpRawTool({
-        name: 'repo_file_stats',
-        title: 'Repository file stats',
-        description:
-            'Return filesystem metadata for a workspace file or directory, with optional SHA-256 for safe follow-up reads/writes.',
-        inputSchema: {
-            path: z.string().min(1)['describe']('Workspace-relative file or directory path.'),
-            includeHash: z
-                .boolean()
-                .optional()
-                ['describe']('If true, compute SHA-256 for files within maxHashBytes. Default: false.'),
-            maxHashBytes: z
-                .number()
-                .int()
-                .min(1)
-                .max(25 * 1024 * 1024)
-                .optional()
-                ['describe']('Maximum file size eligible for hashing. Default: 5 MiB.'),
-        },
-
-        handler: async ({ path, includeHash, maxHashBytes }, operationContext) =>
-            runRepoFileStatsCall(requireMcpToolWorkspace(operationContext), {
-                path,
-                ...(includeHash === undefined ? {} : { includeHash }),
-                ...(maxHashBytes === undefined ? {} : { maxHashBytes }),
-            }),
-    }),
-    defineMcpRawTool({
         name: 'repo_bulk_inspect',
         title: 'Bulk repository inspect',
         description:
             'Mix up to 64 read, search and stat operations in one bounded read-only call with per-item failure isolation.',
         inputSchema: {
+            single: repoBulkInspectItemSchema
+                .optional()
+                ['describe']('One read/search/stat operation using the same canonical item schema as batch mode.'),
             operations: z
                 .array(repoBulkInspectItemSchema)
                 .min(1)
                 .max(MAX_REPO_BATCH_REQUESTS)
-                ['describe']('Ordered heterogeneous operations using {op: read|search|stat, args: {...}}.'),
-            failureMode: z.enum(['best-effort', 'fail-fast']).optional()['describe']('Default: best-effort.'),
+                .optional()
+                ['describe']('Batch of ordered heterogeneous operations using {op: read|search|stat, args: {...}}.'),
+            failureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                ['describe']('Batch-only. Default: best-effort.'),
             concurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_REPO_BATCH_CONCURRENCY)
                 .optional()
-                ['describe']('Maximum independent operations in flight. Default: 6, hard max: 8.'),
+                ['describe']('Batch-only maximum independent operations in flight. Default: 6, hard max: 8.'),
             resultBudgetBytes: z
                 .number()
                 .int()
                 .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .optional()
-                ['describe']('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
+                ['describe']('Batch-only aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
 
-        handler: async ({ operations, failureMode, concurrency, resultBudgetBytes }, operationContext) => {
+        handler: async ({ single, operations, failureMode, concurrency, resultBudgetBytes }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const repositoryReadCacheConfig = requireMcpToolRepositoryReadCacheConfig(operationContext);
+            if (single !== undefined) {
+                if (operations !== undefined) {
+                    return errorResult('Do not mix repo_bulk_inspect single and operations modes.', {
+                        code: 'ERR_BULK_INSPECT_CONFLICTING_MODE',
+                    });
+                }
+                if (failureMode !== undefined || concurrency !== undefined || resultBudgetBytes !== undefined) {
+                    return errorResult('failureMode/concurrency/resultBudgetBytes require operations batch mode.', {
+                        code: 'ERR_BULK_INSPECT_BATCH_OPTIONS_WITH_SINGLE',
+                    });
+                }
+                return runRepoBulkInspectItem(workspace, repositoryReadCacheConfig, single, 0);
+            }
+            if (operations === undefined) {
+                return errorResult('repo_bulk_inspect requires either single or operations.', {
+                    code: 'ERR_BULK_INSPECT_MODE_REQUIRED',
+                });
+            }
             const execution = await runBoundedOperationBatch(
                 /** @type {Record<string, unknown>[]} */ (operations),
-                async (raw, index) => {
-                    const item = repoBulkInspectItemSchema.safeParse(raw);
-                    if (!item.success) {
-                        return errorResult(`Invalid repo_bulk_inspect item at index ${index}.`, {
-                            code: 'ERR_BULK_INSPECT_INVALID_ITEM',
-                            index,
-                        });
-                    }
-                    const { op, args } = item.data;
-                    if (op === 'read') {
-                        const parsed = repoReadBatchItemSchema.safeParse(args);
-                        return parsed.success
-                            ? runRepoReadFileCall(workspace, repositoryReadCacheConfig, parsed.data)
-                            : errorResult(`Invalid read args at repo_bulk_inspect index ${index}.`, {
-                                  code: 'ERR_BULK_INSPECT_INVALID_READ',
-                                  index,
-                              });
-                    }
-                    if (op === 'search') {
-                        const parsed = repoSearchBatchItemSchema.safeParse(args);
-                        return parsed.success && (parsed.data.pattern || parsed.data.query)
-                            ? runRepoSearchTextCall(workspace, parsed.data)
-                            : errorResult(`Invalid search args at repo_bulk_inspect index ${index}.`, {
-                                  code: 'ERR_BULK_INSPECT_INVALID_SEARCH',
-                                  index,
-                              });
-                    }
-                    const parsed = repoStatBatchItemSchema.safeParse(args);
-                    return parsed.success
-                        ? runRepoFileStatsCall(workspace, {
-                              path: parsed.data.path,
-                              ...(parsed.data.includeHash === undefined
-                                  ? {}
-                                  : { includeHash: parsed.data.includeHash }),
-                              ...(parsed.data.maxHashBytes === undefined
-                                  ? {}
-                                  : { maxHashBytes: parsed.data.maxHashBytes }),
-                          })
-                        : errorResult(`Invalid stat args at repo_bulk_inspect index ${index}.`, {
-                              code: 'ERR_BULK_INSPECT_INVALID_STAT',
-                              index,
-                          });
-                },
+                (raw, index) => runRepoBulkInspectItem(workspace, repositoryReadCacheConfig, raw, index),
                 {
                     concurrency: concurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
                     failureMode: failureMode ?? 'best-effort',

@@ -140,21 +140,13 @@ describe('MCP tools/list payload audit', () => {
                         names: Object.freeze(currentTools.map((row) => row.name)),
                         resolveCanonicalSurfaces: () =>
                             Object.freeze(
-                                [
-                                    'full',
-                                    'latency',
-                                    'minimal',
-                                    'cloudflare',
-                                    'readonly',
-                                    'claude',
-                                    'safe',
-                                    'research',
-                                ].map((mode) => {
+                                ['full', 'latency', 'minimal', 'cloudflare', 'readonly', 'research'].map((mode) => {
                                     const tools = getCanonicalMcpTools({
                                         toolSurfacePolicy: createMcpToolSurfacePolicy({ mode }),
                                     });
                                     return Object.freeze({
                                         mode,
+                                        aliases: Object.freeze(mode === 'research' ? ['claude', 'safe'] : []),
                                         tools: Object.freeze([...tools]),
                                         names: Object.freeze(tools.map((row) => row.name)),
                                     });
@@ -195,9 +187,14 @@ describe('MCP tools/list payload audit', () => {
             operationContext,
         );
         const structured = /** @type {Record<string, any>} */ (result.structuredContent);
-        assert.equal(structured['currentSurface']['toolCount'], 89);
+        assert.equal(structured['currentSurface']['toolCount'], 84);
         assert.equal(structured['comparison']['measurement'], 'sdk-in-memory-tools/list-surface-matrix');
         assert.equal(structured['comparison']['usageSample']['totalObservedCalls'], 170);
+        assert.equal(structured['comparison']['surfaces'].length, 6);
+        const research = /** @type {Record<string, any>[]} */ (structured['comparison']['surfaces']).find(
+            (row) => row['mode'] === 'research',
+        );
+        assert.deepEqual(research?.['aliases'], ['claude', 'safe']);
         const latency = /** @type {Record<string, any>[]} */ (structured['comparison']['surfaces']).find(
             (row) => row['mode'] === 'latency',
         );
@@ -219,12 +216,14 @@ describe('MCP tools/list payload audit', () => {
             sync: false,
             runtimeSourceBinding: 'controlled-promotion',
         });
-        assert.equal(currentTools.length, 89);
-        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 89);
+        assert.equal(currentTools.length, 84);
+        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 84);
     });
 
-    it('accepts only canonical surface mode names instead of hidden aliases', () => {
+    it('accepts declared surface aliases and rejects unknown hidden names', () => {
         assert.equal(readMcpToolSurfacePolicy({ COPILOT_MCP_TOOL_SURFACE: 'latency' }).mode, 'latency');
+        assert.equal(readMcpToolSurfacePolicy({ COPILOT_MCP_TOOL_SURFACE: 'safe' }).mode, 'safe');
+        assert.equal(readMcpToolSurfacePolicy({ COPILOT_MCP_TOOL_SURFACE: 'claude' }).mode, 'claude');
         assert.throws(
             () => readMcpToolSurfacePolicy({ COPILOT_MCP_TOOL_SURFACE: 'fast' }),
             /Unsupported MCP tool surface/u,

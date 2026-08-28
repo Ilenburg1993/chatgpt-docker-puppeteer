@@ -147,15 +147,17 @@ export function readMcpToolTargetCorrelation(toolName, args) {
     let candidates = [];
     if (toolName === 'repo_read_file' && Array.isArray(args['batch'])) {
         candidates = args['batch'].map((item) => readObjectField(item, 'path'));
+    } else if (toolName === 'repo_bulk_inspect' && isRecord(args['single'])) {
+        const single = args['single'];
+        if (single['op'] === 'read' || single['op'] === 'stat') {
+            candidates = [readObjectField(single['args'], 'path')];
+        }
     } else if (toolName === 'repo_bulk_inspect' && Array.isArray(args['operations'])) {
         candidates = args['operations'].flatMap((item) => {
             if (!isRecord(item) || (item['op'] !== 'read' && item['op'] !== 'stat')) return [];
             return [readObjectField(item['args'], 'path')];
         });
-    } else if (
-        toolName === 'repo_apply_patch_batch' &&
-        Array.isArray(args['targets'])
-    ) {
+    } else if (toolName === 'repo_apply_patch_batch' && Array.isArray(args['targets'])) {
         candidates = args['targets'].map((item) => readObjectField(item, 'path'));
     } else if (toolName === 'repo_diff_files') {
         candidates = [args['pathA'], args['pathB']];
@@ -165,7 +167,6 @@ export function readMcpToolTargetCorrelation(toolName, args) {
         [
             'repo_read_file',
             'repo_read_file_chunks',
-            'repo_file_stats',
             'repo_apply_patch',
             'repo_write_file',
             'repo_create_file',
