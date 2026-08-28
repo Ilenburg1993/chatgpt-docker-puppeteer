@@ -18,10 +18,7 @@ import {
     withResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
 import { canRunCopilotValidatorInline } from '#copilot/mcp/public/validation';
-import {
-    compactRepositoryPatchFailureRows,
-    summarizeRepositoryPatchFailures,
-} from '#copilot/mcp/public/workspace/repository/patch';
+import { compactRepositoryPatchFailureRows } from '#copilot/mcp/public/workspace/repository/patch';
 
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
@@ -41,7 +38,6 @@ import {
     POST_PATCH_VALIDATOR_NAMES,
     quarantineIdSchema,
     resolveFileBatchApplyMode,
-    runFileBatchPreflight,
     runRepoWritePatchTargetGroups,
     writeQuarantineMetadataDefault,
 } from '#copilot/mcp/public/workspace/repository/write';
@@ -330,6 +326,11 @@ async function projectRepoWriteOutcome(runtime, outcome, includeDiffPreview = fa
     return typeof outcome.text === 'string' ? okResult(structured, outcome.text) : okResult(structured);
 }
 
+/** @param {unknown} concurrency @returns {'sequential' | 'parallel-bounded'} */
+function classifyBoundedConcurrency(concurrency) {
+    return Number(concurrency) > 1 ? 'parallel-bounded' : 'sequential';
+}
+
 /**
  * Project the patch-batch domain state machine into the MCP result/audit surface.
  *
@@ -404,6 +405,9 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.run.execution.skippedCount + workflow.failureSummary.abortedOperationCount,
             mode: 'patch-dry-run:best-effort',
+            executionPolicyClass: 'dry-run',
+            executionFailurePolicyClass: 'best-effort',
+            executionConcurrencyClass: classifyBoundedConcurrency(workflow.run.execution.concurrency),
             batchSize: operationCount,
             batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
@@ -488,6 +492,9 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             failedOperations: workflow.failureSummary.causalFailureCount,
             skippedOperations: workflow.failureSummary.abortedOperationCount,
             mode: 'patch-apply:global-preflight-blocked',
+            executionPolicyClass: 'preflight-blocked',
+            executionFailurePolicyClass: 'best-effort',
+            executionConcurrencyClass: classifyBoundedConcurrency(workflow.preflight.execution.concurrency),
             batchSize: operationCount,
             batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
         });
@@ -642,6 +649,14 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             workflow.failureSummary.abortedOperationCount +
             (workflow.postValidation.skipped ? workflow.postValidation.requestedCount : 0),
         mode: `patch-apply:${workflow.effectiveApplyMode}:${workflow.effectiveFailureMode}${workflow.postValidation.ran ? ':post-validated' : ''}`,
+        executionPolicyClass:
+            workflow.effectiveApplyMode === 'per-target-fast'
+                ? 'direct-apply'
+                : workflow.preflightElided
+                  ? 'atomic-preflight-elided-apply'
+                  : 'preflight-gated-apply',
+        executionFailurePolicyClass: workflow.effectiveFailureMode,
+        executionConcurrencyClass: classifyBoundedConcurrency(workflow.applyRun.execution.concurrency),
         batchSize: operationCount,
         batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
     });
@@ -695,6 +710,8 @@ async function projectRepoFileBatchWorkflow(runtime, workflow, operations, inclu
         return withResultExecutionHint(
             okResult({
                 success: true,
+                plannedTool: 'repo_apply_file_batch',
+                applyRequiresConfirmBatch: true,
                 dryRun: true,
                 applyMode,
                 applyModeReason,
@@ -807,108 +824,6 @@ export function createRepoWriteTools(options = {}) {
         );
 
     return [
-        defineMcpRawTool({
-            name: 'repo_patch_batch_plan',
-            title: 'Plan repository patch batch',
-            description:
-                'Plan a bounded target-grouped batch of exact-string repository patches without modifying files. Each unique target owns path, optional baseline hash/durability and ordered relative operations.',
-            inputSchema: {
-                targets: z
-                    .array(patchBatchTargetSchema)
-                    .min(1)
-                    .max(MAX_PATCH_BATCH_TARGETS)
-                    ['describe'](
-                        'Canonical V3 target groups. Paths are unique; each target owns its baseline hash/durability and ordered relative operations.',
-                    ),
-                targetConcurrency: z
-                    .number()
-                    .int()
-                    .min(1)
-                    .max(MAX_PATCH_TARGET_CONCURRENCY)
-                    .optional()
-                    ['describe']('Parallel target groups during planning. Default: 4.'),
-            },
-
-            handler: async ({ targets, targetConcurrency }, operationContext) => {
-                const normalized = normalizePatchBatchWireInput(
-                    { targets, targetConcurrency },
-                    {
-                        maxOperations: MAX_PATCH_BATCH_OPERATIONS,
-                        maxTargets: MAX_PATCH_BATCH_TARGETS,
-                        maxInputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
-                    },
-                );
-                if (!normalized.ok) {
-                    return errorResult('Patch batch input shape or bounded execution envelope is invalid.', {
-                        code: normalized.code,
-                        operationCount: normalized.operationCount,
-                        targetCount: normalized.targetCount,
-                        inputBytes: normalized.inputBytes,
-                        ...(normalized.duplicatePath ? { duplicatePath: normalized.duplicatePath } : {}),
-                        limits: {
-                            operations: MAX_PATCH_BATCH_OPERATIONS,
-                            targets: MAX_PATCH_BATCH_TARGETS,
-                            inputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
-                        },
-                    });
-                }
-                const runtime = createRuntime(operationContext);
-                const run = await runRepoWritePatchTargetGroups(runtime, normalized.targets, true, {
-                    failureMode: 'best-effort',
-                    concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
-                });
-                const planned = run.operations;
-                const failed = planned.filter((operation) => operation['success'] !== true);
-                const failureSummary = summarizeRepositoryPatchFailures(failed);
-                await runtime.audit.append({
-                    event: 'repo_patch_batch_plan',
-                    tool: 'repo_patch_batch_plan',
-                    operationCount: normalized.operationCount,
-                    targetCount: normalized.targetCount,
-                    failedCount: failed.length,
-                    executionId: run.execution.executionId,
-                });
-                const nextArgs = {
-                    targets,
-                    dryRun: false,
-                    confirmBatch: true,
-                    applyMode: 'per-target-fast',
-                    failureMode: 'best-effort',
-                };
-                const structured = {
-                    success: failed.length === 0,
-                    plannedTool: 'repo_apply_patch_batch',
-                    dryRun: true,
-                    executionId: run.execution.executionId,
-                    operationCount: normalized.operationCount,
-                    targetCount: normalized.targetCount,
-                    inputBytes: normalized.inputBytes,
-                    failedCount: failed.length,
-                    concurrency: run.execution.concurrency,
-                    maxInFlight: run.execution.maxInFlight,
-                    durationMs: run.execution.durationMs,
-                    operations: planned,
-                    nextCall: failed.length === 0 ? { tool: 'repo_apply_patch_batch', args: nextArgs } : null,
-                };
-                const text =
-                    failed.length === 0
-                        ? `Planned ${normalized.operationCount} patch operation(s) across ${normalized.targetCount} target(s); no files modified.`
-                        : `Planned ${normalized.operationCount} patch operation(s) with ${failureSummary.causalFailureCount} causal failure(s); no files modified.`;
-                const result = withResultSizeHint(okResult(structured, text), {
-                    bytes: estimateStructuredTextResultBytes(structured, text),
-                    strategy: 'conservative-estimate',
-                    source: 'repo_patch_batch_plan',
-                });
-                return withResultExecutionHint(result, {
-                    logicalOperations: normalized.operationCount,
-                    failedOperations: failureSummary.causalFailureCount,
-                    skippedOperations: failureSummary.abortedOperationCount,
-                    mode: 'patch-plan:best-effort',
-                    batchSize: normalized.operationCount,
-                    batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
-                });
-            },
-        }),
         defineMcpRawTool({
             name: 'repo_apply_patch_batch',
             title: 'Apply repository patch batch',
@@ -1086,57 +1001,6 @@ export function createRepoWriteTools(options = {}) {
                     resultMode: resultSurface.resultMode,
                     forcedByDiffPreview: resultSurface.forcedByDiffPreview,
                     includePreflightDetails: includePreflightDetails === true,
-                });
-            },
-        }),
-        defineMcpRawTool({
-            name: 'repo_apply_file_batch_plan',
-            title: 'Plan repository file batch',
-            description:
-                'Read-only plan for a bounded batch of workspace file operations. Does not modify files; use before repo_apply_file_batch to reduce high-risk prompts.',
-            inputSchema: {
-                operations: z
-                    .array(batchOperationSchema)
-                    .min(1)
-                    .max(MAX_BATCH_FILE_OPERATIONS)
-                    ['describe']('Ordered file operations to validate and preview.'),
-            },
-
-            handler: async ({ operations }, operationContext) => {
-                const runtime = createRuntime(operationContext);
-                const preflight = await runFileBatchPreflight(runtime, operations);
-                if (!preflight.success) {
-                    return errorResult(preflight.error ?? 'File-batch preflight failed.', {
-                        code: 'ERR_BATCH_FILE_PLAN_FAILED',
-                        operationCount: operations.length,
-                        planned: preflight.previews,
-                        plannedCount: preflight.previews.length,
-                        failureIndex: preflight.failureIndex,
-                        durationMs: preflight.durationMs,
-                    });
-                }
-                const previews = preflight.previews;
-                await runtime.audit.append({
-                    event: 'repo_apply_file_batch_plan',
-                    tool: 'repo_apply_file_batch_plan',
-                    operations: previews.map((preview) => preview['type']),
-                    operationCount: previews.length,
-                });
-                return okResult({
-                    success: true,
-                    plannedTool: 'repo_apply_file_batch',
-                    dryRun: true,
-                    operationCount: previews.length,
-                    durationMs: preflight.durationMs,
-                    operations: previews,
-                    applied: [],
-                    nextCall: {
-                        tool: 'repo_apply_file_batch',
-                        args: {
-                            operations,
-                            confirmBatch: true,
-                        },
-                    },
                 });
             },
         }),
@@ -1464,6 +1328,9 @@ export function createRepoWriteTools(options = {}) {
                 const structured = {
                     success: true,
                     workflowSuccess: true,
+                    ...(row['dryRun'] === true
+                        ? { plannedTool: 'repo_apply_patch', applyPreconditionHash: row['previousHash'] }
+                        : {}),
                     mutationState: row['noop'] === true ? 'already-converged' : 'fully-applied',
                     path: row['path'],
                     dryRun: row['dryRun'] === true,
@@ -1526,7 +1393,7 @@ export function createRepoWriteTools(options = {}) {
             },
 
             handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }, operationContext) => {
-                if (overwrite === true && confirmOverwrite !== true) {
+                if (overwrite === true && dryRun !== true && confirmOverwrite !== true) {
                     return errorResult('confirmOverwrite deve ser true quando overwrite=true.', {
                         code: 'ERR_MOVE_CONFIRM_OVERWRITE_REQUIRED',
                     });
@@ -1542,40 +1409,54 @@ export function createRepoWriteTools(options = {}) {
             },
         }),
         defineMcpRawTool({
-            name: 'repo_list_quarantine',
-            title: 'List quarantined repository files',
+            name: 'repo_quarantine_status',
+            title: 'Repository quarantine status',
             description:
-                'List files currently known to the MCP quarantine area, including restored and restorable items.',
+                'List reversible quarantine records or inspect one quarantine item through the same read-only recovery owner.',
             inputSchema: {
+                action: z.enum(['list', 'inspect'])['describe']('Read projection: list or inspect.'),
                 status: z
                     .enum(['quarantined', 'restored', 'all'])
                     .optional()
-                    ['describe']('Filter by status. Default: all.'),
-                limit: z.number().int().min(1).max(200).optional()['describe']('Maximum items returned. Default: 50.'),
-            },
-
-            handler: async ({ status, limit }, operationContext) => {
-                const runtime = createRuntime(operationContext);
-                const filter = status === 'quarantined' || status === 'restored' ? status : 'all';
-                const max = Math.max(1, Math.min(200, Number(limit ?? 50)));
-                return okResult(await listRepositoryQuarantine(runtime, filter, max));
-            },
-        }),
-        defineMcpRawTool({
-            name: 'repo_inspect_quarantined_file',
-            title: 'Inspect quarantined repository file',
-            description:
-                'Inspect metadata and current stored-object state for one item created by repo_quarantine_file.',
-            inputSchema: {
-                quarantineId: quarantineIdSchema.describe('quarantineId returned by repo_quarantine_file.'),
+                    ['describe']('action=list only: filter by status. Default: all.'),
+                limit: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(200)
+                    .optional()
+                    ['describe']('action=list only: max items. Default: 50.'),
+                quarantineId: quarantineIdSchema.optional().describe('action=inspect only: quarantineId to inspect.'),
                 includeHash: z
                     .boolean()
                     .optional()
-                    ['describe']('Compute SHA-256 for stored data if present. Default: true.'),
+                    ['describe']('action=inspect only: compute SHA-256 for stored data. Default: true.'),
             },
 
-            handler: async ({ quarantineId, includeHash }, operationContext) => {
+            handler: async ({ action, status, limit, quarantineId, includeHash }, operationContext) => {
                 const runtime = createRuntime(operationContext);
+                if (action === 'list') {
+                    if (quarantineId !== undefined || includeHash !== undefined) {
+                        return errorResult('quarantineId/includeHash are valid only with action=inspect.', {
+                            code: 'ERR_QUARANTINE_STATUS_INACTIVE_FIELDS',
+                            action,
+                        });
+                    }
+                    const filter = status === 'quarantined' || status === 'restored' ? status : 'all';
+                    const max = Math.max(1, Math.min(200, Number(limit ?? 50)));
+                    return okResult(await listRepositoryQuarantine(runtime, filter, max));
+                }
+                if (status !== undefined || limit !== undefined) {
+                    return errorResult('status/limit are valid only with action=list.', {
+                        code: 'ERR_QUARANTINE_STATUS_INACTIVE_FIELDS',
+                        action,
+                    });
+                }
+                if (quarantineId === undefined) {
+                    return errorResult('action=inspect requires quarantineId.', {
+                        code: 'ERR_QUARANTINE_STATUS_ID_REQUIRED',
+                    });
+                }
                 const outcome = await inspectRepositoryQuarantinedFile(
                     runtime,
                     String(quarantineId),

@@ -58,6 +58,7 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
             derivedIndex: {
                 authority: 'rebuildable-derived-index-over-append-only-mcp-audit',
                 syncRequested: sync,
+                sourceIntegrity: report.sourceIntegrity,
                 ...(ingestion ? { ingestion } : {}),
             },
             analytics: {
@@ -80,6 +81,7 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
                 recovery: report.recovery,
                 workflowPressure: report.workflowPressure,
                 executionAccounting: report.executionAccounting,
+                executionPolicies: report.executionPolicies,
                 payloadAccounting: report.payloadAccounting,
                 runtimeCohorts: report.runtimeCohorts,
                 optimizationEvidence: report.optimizationEvidence,

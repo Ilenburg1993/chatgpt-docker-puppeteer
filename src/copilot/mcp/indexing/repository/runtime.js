@@ -243,16 +243,3 @@ export function findRepositoryImports(workspace, input) {
         output,
     );
 }
-
-/** @param {RepositoryIndexWorkspace} workspace @param {string} path */
-export async function invalidateRepositoryIndex(workspace, path) {
-    const resolved = await workspace.resolveReadPath(path);
-    if (!resolved.ok) return failure(resolved.reason, resolved);
-    const invalidated = workspace.indexRegistry.invalidatePath(resolved.resolved);
-    return success({
-        success: true,
-        path: resolved.relative,
-        invalidated,
-        stats: workspace.indexRegistry.status(),
-    });
-}

@@ -506,6 +506,27 @@ function summarizeDescriptorObservation(state) {
 
 /** @param {Record<string, unknown>} state */
 function summarizeRoundTripAnalyticsMonitor(state) {
+    const lastRebinds = nonNegativeNumber(state['lastRebindsThisSync']);
+    const lastNewGenerations = nonNegativeNumber(state['lastNewGenerationsThisSync']);
+    const generationSequence = nullableNonNegativeNumber(state['lastGenerationSequence']);
+    const transition = typeof state['lastTransition'] === 'string' ? state['lastTransition'] : null;
+    const reset = state['lastReset'] === true;
+    const rebound = state['lastRebound'] === true;
+    const sourceTransitionObserved =
+        reset ||
+        rebound ||
+        lastRebinds > 0 ||
+        lastNewGenerations > 0 ||
+        generationSequence !== null ||
+        transition !== null;
+
+    const lastPrefixProofs = nonNegativeNumber(state['lastPrefixProofsThisSync']);
+    const lastPrefixProofBytes = nonNegativeNumber(state['lastPrefixProofBytesThisSync']);
+    const totalPrefixProofs = nonNegativeNumber(state['totalPrefixProofs']);
+    const totalPrefixProofBytes = nonNegativeNumber(state['totalPrefixProofBytes']);
+    const prefixProofObserved =
+        lastPrefixProofs > 0 || lastPrefixProofBytes > 0 || totalPrefixProofs > 0 || totalPrefixProofBytes > 0;
+
     return {
         enabled: state['enabled'] === true,
         running: state['running'] === true,
@@ -516,8 +537,43 @@ function summarizeRoundTripAnalyticsMonitor(state) {
         lastDurationMs: state['lastDurationMs'] ?? null,
         lastLagBytes: state['lastLagBytes'] ?? null,
         lastComplete: state['lastComplete'] ?? null,
+        ...(sourceTransitionObserved
+            ? {
+                  sourceTransition: {
+                      reset,
+                      rebound,
+                      rebinds: lastRebinds,
+                      newGenerations: lastNewGenerations,
+                      generationSequence,
+                      transition,
+                  },
+              }
+            : {}),
+        ...(prefixProofObserved
+            ? {
+                  prefixProof: {
+                      lastCount: lastPrefixProofs,
+                      lastBytes: lastPrefixProofBytes,
+                      totalCount: totalPrefixProofs,
+                      totalBytes: totalPrefixProofBytes,
+                  },
+              }
+            : {}),
         lastError: state['lastError'] ?? null,
     };
+}
+
+/** @param {unknown} value */
+function nonNegativeNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+/** @param {unknown} value */
+function nullableNonNegativeNumber(value) {
+    if (value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 /** @param {Record<string, unknown>} durability */

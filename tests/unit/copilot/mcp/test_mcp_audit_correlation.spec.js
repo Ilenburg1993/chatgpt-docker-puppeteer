@@ -156,6 +156,9 @@ describe('MCP audit correlation boundary', () => {
                 failedOperations: 1,
                 skippedOperations: 2,
                 mode: 'read-batch:best-effort',
+                executionPolicyClass: 'direct-apply',
+                executionFailurePolicyClass: 'fail-fast',
+                executionConcurrencyClass: 'parallel-bounded',
                 batchSize: 5,
                 batchCapacity: 64,
                 resultBudgetBytes: 1_000_000,
@@ -174,6 +177,9 @@ describe('MCP audit correlation boundary', () => {
         assert.equal(metadata['logicalOperations'], 5);
         assert.equal(metadata['failedOperations'], 1);
         assert.equal(metadata['skippedOperations'], 2);
+        assert.equal(metadata['executionPolicyClass'], 'direct-apply');
+        assert.equal(metadata['executionFailurePolicyClass'], 'fail-fast');
+        assert.equal(metadata['executionConcurrencyClass'], 'parallel-bounded');
         assert.equal(metadata['batchSize'], 5);
         assert.equal(metadata['batchCapacity'], 64);
         assert.equal(metadata['resultBytes'], 10_000);

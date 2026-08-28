@@ -39,7 +39,7 @@ describe('MCP Option Contract SSOT', () => {
             'terminal_session_control',
             'terminal_session_read',
         ]);
-        assert.equal(buildMcpWireToolCatalog().length, 131);
+        assert.equal(buildMcpWireToolCatalog().length, 89);
     });
 
     it('projects only bounded aggregate facts and never input values', () => {

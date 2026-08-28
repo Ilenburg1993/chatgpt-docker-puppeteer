@@ -201,6 +201,7 @@ async function listWireMcpTools(tools) {
  *   config: import('./config.js').McpToolPayloadAuditConfig;
  *   samples?: number;
  *   usageToolStarts?: { tool:string; count:number }[];
+ *   usageEvidenceComplete?: boolean;
  * }} options
  */
 export async function buildToolSurfacePayloadComparison(options) {
@@ -208,7 +209,15 @@ export async function buildToolSurfacePayloadComparison(options) {
         throw new TypeError('[mcp/tool-payload-audit] surface comparison requires explicit surfaces.');
     }
     const samples = readPositiveInteger(options.samples, 3, 1, 9);
-    const usageToolStarts = normalizeUsageToolStarts(options.usageToolStarts);
+    const usageEvidenceComplete = options.usageEvidenceComplete !== false;
+    const rawUsageToolStarts = normalizeUsageToolStarts(options.usageToolStarts);
+    const fullSurface = options.surfaces.find((surface) => surface.mode === 'full') ?? options.surfaces[0];
+    if (!fullSurface) throw new Error('[mcp/tool-payload-audit] surface comparison requires a full reference surface.');
+    const currentToolNames = new Set(fullSurface.tools.map((tool) => tool.name));
+    const excludedNonCurrentUsage = rawUsageToolStarts
+        .filter((row) => !currentToolNames.has(row.tool))
+        .sort((left, right) => right.count - left.count || left.tool.localeCompare(right.tool));
+    const usageToolStarts = rawUsageToolStarts.filter((row) => currentToolNames.has(row.tool));
     const rows = [];
     for (const surface of options.surfaces) {
         const audits = [];
@@ -262,30 +271,36 @@ export async function buildToolSurfacePayloadComparison(options) {
             },
         };
     });
-    const highCoverage = ranked
-        .filter((row) => Number(row.usage.weightedCoverage ?? 0) >= 0.98 && row.mode !== 'full')
-        .sort(
-            (left, right) =>
-                Number(right.versusFull.envelopeSavingsBytes) - Number(left.versusFull.envelopeSavingsBytes),
-        );
+    const highCoverage = usageEvidenceComplete
+        ? ranked.filter((row) => Number(row.usage.weightedCoverage ?? 0) >= 0.98 && row.mode !== 'full')
+        : [];
+    const rankedHighCoverage = highCoverage.sort(
+        (left, right) => Number(right.versusFull.envelopeSavingsBytes) - Number(left.versusFull.envelopeSavingsBytes),
+    );
     return {
         ok: true,
         measurement: 'sdk-in-memory-tools/list-surface-matrix',
         samplesPerSurface: samples,
         usageSample: {
             available: usageToolStarts.length > 0,
+            complete: usageEvidenceComplete,
+            rawObservedCalls: rawUsageToolStarts.reduce((sum, row) => sum + row.count, 0),
             totalObservedCalls: usageToolStarts.reduce((sum, row) => sum + row.count, 0),
             distinctObservedTools: usageToolStarts.length,
+            excludedNonCurrentCalls: excludedNonCurrentUsage.reduce((sum, row) => sum + row.count, 0),
+            excludedNonCurrentToolCount: excludedNonCurrentUsage.length,
+            excludedNonCurrentTop: excludedNonCurrentUsage.slice(0, 20),
         },
         fullReference: { toolCount: fullTools, totalEnvelopeBytes: fullBytes },
         surfaces: ranked,
         evidence: {
-            highCoverageReducedModes: highCoverage.map((row) => row.mode),
+            highCoverageReducedModes: rankedHighCoverage.map((row) => row.mode),
             defaultChangeRecommended: false,
-            reason:
-                highCoverage.length > 0
-                    ? 'Reduced surfaces show local SDK/payload benefit with observed-usage coverage; a real host A/B is still required before changing the default surface.'
-                    : 'No reduced surface reaches 98% observed-call coverage; keep full until the surface policy is improved and host A/B evidence exists.',
+            reason: !usageEvidenceComplete
+                ? 'Usage evidence is incomplete for the requested window; surface coverage remains diagnostic-only and cannot nominate a reduced mode.'
+                : rankedHighCoverage.length > 0
+                  ? 'Reduced surfaces show local SDK/payload benefit with observed-usage coverage; a real host A/B is still required before changing the default surface.'
+                  : 'No reduced surface reaches 98% observed-call coverage; keep full until the surface policy is improved and host A/B evidence exists.',
         },
     };
 }

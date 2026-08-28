@@ -213,7 +213,7 @@ export function buildChatGptConnectorProfile(options = {}, config = readMcpConne
             `URL do servidor MCP: ${connectorUrl}`,
             `Autenticação: ${authentication}.`,
             'Criar o conector, concluir OAuth quando solicitado e confirmar que a lista de tools aparece.',
-            'Executar mcp_connection_readiness e mcp_auth_profile antes de iniciar operações de escrita.',
+            'Executar mcp_connection_readiness no default e em view=auth-profile antes de iniciar operações de escrita.',
         ],
         smokePrompts: buildChatGptSmokePrompts(),
         requiredLocalChecks: [
@@ -391,9 +391,9 @@ export function buildHttp2PlusProfile(options = {}, config = readMcpConnectionCo
         ],
         readinessChecks: [
             'mcp_connection_readiness retorna ready=true.',
-            'mcp_auth_profile mostra Protected Resource Metadata, issuer, JWKS e audiences configurados.',
+            'mcp_connection_readiness view=auth-profile mostra Protected Resource Metadata, issuer, JWKS e audiences configurados.',
             'mcp_oauth_issuer_diagnostics encontra metadata OAuth com PKCE S256, resource parameter e CIMD/DCR quando aplicável.',
-            'mcp_cloudflare_remote_audit confirma que o serviço remoto corresponde ao esquema do origin local.',
+            'mcp_cloudflare_edge_snapshot view=remote confirma que o serviço remoto corresponde ao esquema do origin local.',
             'mcp_cloudflare_metrics_snapshot não mostra instabilidade no tunnel.',
             'make copilot-mcp-smoke e make copilot-mcp-oauth-smoke passam antes de reconectar o cliente.',
         ],
@@ -545,21 +545,21 @@ function buildChatGptSmokePrompts() {
     return [
         'Use o conector Repo DevContainer MCP e chame repo_status.',
         'Chame mcp_connection_readiness e confirme ready=true ou liste blockers.',
-        'Chame mcp_auth_profile e confirme protectedResourceMetadataUrl, acceptedAudiences e challengePreview.',
+        'Chame mcp_connection_readiness view=auth-profile e confirme protectedResourceMetadataUrl, acceptedAudiences e challengePreview.',
         'Chame mcp_oauth_issuer_diagnostics e confirme PKCE S256, resource parameter, CIMD/DCR e JWKS.',
-        'Chame mcp_session_profile e siga a ordem recommendedFirstCalls.',
+        'Chame mcp_capabilities_summary view=session e siga a ordem recommendedFirstCalls.',
         'Chame mcp_capabilities_summary e resuma as categorias de tools.',
-        'Chame mcp_tools_status e identifique tools read-only, bounded-write e destructive.',
-        'Antes de qualquer escrita, chame repo_patch_plan, repo_create_file_plan, repo_quarantine_file_plan ou repo_move_file_plan.',
-        'Chame chatgpt_connector_current_url_status para recuperar a URL pública atual sem passar URL como argumento.',
+        'Chame mcp_capabilities_summary view=status e identifique tools read-only, bounded-write e destructive.',
+        'Quando precisar de preview antes de escrita, use dryRun=true no próprio owner: repo_apply_patch, repo_create_file, repo_quarantine_file, repo_move_file ou os owners batch.',
+        'Chame mcp_connection_readiness view=current-url para recuperar a URL pública atual sem passar URL como argumento.',
         'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
-        'Chame mcp_cloudflare_remote_audit e confirme que a rota remota está sincronizada com o origin.',
+        'Chame mcp_cloudflare_edge_snapshot view=remote e confirme que a rota remota está sincronizada com o origin.',
         'Chame mcp_cloudflare_metrics_snapshot e procure sinais de instabilidade do tunnel.',
         'Liste a árvore de src/copilot/mcp com repo_tree.',
         'Leia src/copilot/mcp/registry/runtime.js linhas 1 a 120 com repo_read_file e informe o sha256.',
         'Faça repo_symbol_search name=registerCanonicalMcpTools path=src/copilot/mcp.',
         'Chame project_doctor.',
-        'Consulte mcp_validation_plan sem suite: o default deve ser inspect-first/no-validator; forneça testFile explícito somente quando um teste focado agregar evidência.',
+        'Chame run_copilot_validator dryRun=true sem validator: o resultado deve ser inspect-first/no-validator; forneça validator=unit-focused e testFile explícito somente quando um teste focado agregar evidência.',
         'Inicie delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',
         'Chame mcp_runtime_health e mcp_tunnel_status.',
     ];
@@ -571,12 +571,12 @@ function buildChatGptSmokePrompts() {
 function buildClaudeSmokePrompts() {
     return [
         'Use o conector Repo DevContainer MCP e chame repo_status.',
-        'Chame mcp_session_profile e resuma recommendedFirstCalls.',
+        'Chame mcp_capabilities_summary view=session e resuma recommendedFirstCalls.',
         'Chame mcp_connection_readiness e confirme que blockers está vazio.',
-        'Chame mcp_cloudflare_remote_audit e confirme que o origin remoto corresponde ao transport selecionado.',
+        'Chame mcp_cloudflare_edge_snapshot view=remote e confirme que o origin remoto corresponde ao transport selecionado.',
         'Chame mcp_oauth_friction_audit e confirme refresh token persistence.',
         'Chame repo_tree path="src/copilot/mcp" maxDepth=2.',
-        'Chame mcp_validation_plan sem suite antes de validar; prefira um testFile explícito e escale para suite ampla apenas com justificativa transversal.',
+        'Chame run_copilot_validator dryRun=true sem validator antes de validar; prefira validator=unit-focused com testFile explícito e escale para suite ampla apenas com justificativa transversal.',
     ];
 }
 

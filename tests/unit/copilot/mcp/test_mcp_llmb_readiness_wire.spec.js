@@ -54,17 +54,46 @@ async function createFixture() {
         `,
         'utf8',
     );
-    const environmentAuthority = Object.freeze({ readinessEnvironment: () => Object.freeze({}) });
+    const runsScriptPath = join(root, 'scripts/model-gateway/commands/model-gateway-live-runs.mjs');
+    await writeFile(
+        runsScriptPath,
+        `
+            const limitIndex = process.argv.indexOf('--limit');
+            const limit = limitIndex >= 0 ? Number(process.argv[limitIndex + 1]) : 20;
+            process.stdout.write(JSON.stringify({
+                schema: 'model-gateway-live-runs',
+                count: 1,
+                limit,
+                runs: [{ runId: 'fixture-run', status: 'completed' }],
+            }));
+        `,
+        'utf8',
+    );
+    let sqliteFingerprintReads = 0;
+    const environmentAuthority = Object.freeze({
+        readinessEnvironment: () => Object.freeze({}),
+        readOnlyEnvironment: () => Object.freeze({}),
+    });
     return {
+        sqliteFingerprintReads: () => sqliteFingerprintReads,
         operationContext: /** @type {any} */ ({
             workspace: {
                 workspaceRoot: root,
-                io: { statPath: async () => ({ stats: { size: 10, mtimeMs: 20 } }) },
+                io: {
+                    statPath: async () => ({ stats: { size: 10, mtimeMs: 20 } }),
+                    mkdirPathLocked: async () => ({}),
+                    listDirectoryNamesFresh: async () => ({ entries: [] }),
+                },
             },
             config: {},
             capabilities: {
                 modelGatewayLiveRuns: environmentAuthority,
-                modelGatewaySqliteFingerprint: Object.freeze({ read: () => 'wire-sqlite-state' }),
+                modelGatewaySqliteFingerprint: Object.freeze({
+                    read: () => {
+                        sqliteFingerprintReads += 1;
+                        return 'wire-sqlite-state';
+                    },
+                }),
             },
         }),
     };
@@ -103,5 +132,30 @@ describe('LLM-B readiness MCP wire contract', () => {
             String(result.content?.[0]?.text ?? '').length < 512,
             'text remains task-first even for detailed output',
         );
+    });
+
+    it('view=runs dispatches directly to persisted runs without readiness fingerprinting', async () => {
+        const fixture = await createFixture();
+        const result = await readinessTool().handler({ view: 'runs', limit: 7 }, fixture.operationContext);
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['schema'], 'model-gateway-live-runs');
+        assert.equal(result.structuredContent?.['limit'], 7);
+        assert.deepEqual(result.structuredContent?.['runs'], [{ runId: 'fixture-run', status: 'completed' }]);
+        assert.ok(Array.isArray(result.structuredContent?.['detachedRuns']));
+        assert.equal(fixture.sqliteFingerprintReads(), 0, 'runs view must not enter readiness fingerprint/cache path');
+    });
+
+    it('rejects fields belonging to the other LLM-B read projection', async () => {
+        const fixture = await createFixture();
+        const runsConflict = await readinessTool().handler(
+            { view: 'runs', includeDetails: true },
+            fixture.operationContext,
+        );
+        assert.equal(runsConflict.isError, true);
+        assert.equal(runsConflict.structuredContent?.['code'], 'ERR_LLMB_LIVE_READ_VIEW_FIELDS');
+
+        const readinessConflict = await readinessTool().handler({ limit: 3 }, fixture.operationContext);
+        assert.equal(readinessConflict.isError, true);
+        assert.equal(readinessConflict.structuredContent?.['code'], 'ERR_LLMB_LIVE_READ_VIEW_FIELDS');
     });
 });

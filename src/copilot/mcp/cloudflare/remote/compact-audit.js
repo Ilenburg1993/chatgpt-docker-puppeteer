@@ -1,44 +1,10 @@
 // @ts-check
+/** Compact presentation of the rich Cloudflare remote tunnel audit. */
+
 /**
- * Cloudflare remote tunnel audit tools.
+ * Keep routine MCP diagnostics small while the rich remote audit remains available internally to
+ * policy/diff/backup orchestration.
  *
- * The underlying audit remains rich because policy/diff/backup flows consume it internally. The MCP presentation is
- * deliberately compact so a routine read-only diagnostic does not inject tens of KiB of repeated desired-profile data
- * into the caller context.
- *
- * @module copilot/mcp/tools/cloudflare-remote
- */
-
-import { auditCloudflareRemoteTunnel } from '#copilot/mcp/public/cloudflare/remote';
-
-import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
-import { okResult, requireMcpToolCloudflareEnvironmentAuthority } from '#copilot/mcp/public/protocol/tools';
-
-/**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
- */
-
-/**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
- */
-export const mcpCloudflareRemoteAuditTool = defineMcpRawTool({
-    name: 'mcp_cloudflare_remote_audit',
-    title: 'Cloudflare remote tunnel audit',
-    description:
-        'Read the remotely-managed Cloudflare tunnel configuration and return compact sanitized drift/readiness evidence.',
-    inputSchema: {},
-
-    handler: async (_input, operationContext) =>
-        okResult(
-            compactCloudflareRemoteAudit(
-                await auditCloudflareRemoteTunnel({
-                    authority: requireMcpToolCloudflareEnvironmentAuthority(operationContext),
-                }),
-            ),
-        ),
-});
-
-/**
  * @param {Record<string, unknown> & { ok: boolean }} audit
  */
 export function compactCloudflareRemoteAudit(audit) {

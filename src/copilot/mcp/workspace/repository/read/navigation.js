@@ -163,7 +163,7 @@ export async function auditRepositoryRootRedaction(workspace) {
         aggregateTypeCounts: countEntryTypes(aggregateScan.entries),
         totalScannedVisible: visibleScan.scannedEntries,
         totalScannedAggregate: aggregateScan.scannedEntries,
-        hint: 'Use repo_root_tree without showHidden for names. Use this status tool for hidden/protected aggregate auditing.',
+        hint: 'Use repo_tree path="." without showHidden for names. Use this status tool for hidden/protected aggregate auditing.',
     });
 }
 

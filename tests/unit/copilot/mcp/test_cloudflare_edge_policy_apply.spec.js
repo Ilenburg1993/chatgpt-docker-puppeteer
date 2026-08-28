@@ -1,5 +1,6 @@
 import { buildCloudflareEdgeApplyPlan, buildCloudflareEdgeDesiredApiRules } from '#copilot/mcp/public/cloudflare/edge';
 import { describe, expect, it } from 'vitest';
+import { buildCloudflareEdgeApplyDecision } from '../../../../src/copilot/mcp/cloudflare/edge/edge-policy-apply.js';
 
 describe('mcp/cloudflare/edge-policy-apply', () => {
     it('builds idempotent desired API rules for MCP edge policy', () => {
@@ -100,5 +101,110 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
                 }),
             ]),
         );
+    });
+
+    it('keeps preview and unconfirmed paths before the backup boundary', () => {
+        const actual = { ok: true };
+        const diff = { ok: true, mutationReady: true };
+        const plan = { actions: [{ status: 'append-rule' }] };
+
+        expect(
+            buildCloudflareEdgeApplyDecision(actual, diff, plan, {
+                phases: ['http_request_cache_settings'],
+            }),
+        ).toMatchObject({
+            dryRun: true,
+            confirmApply: false,
+            preflightOk: true,
+            mutationNeeded: true,
+            backupRequired: false,
+        });
+        expect(
+            buildCloudflareEdgeApplyDecision(actual, diff, plan, {
+                dryRun: false,
+                confirmApply: false,
+                phases: ['http_request_cache_settings'],
+            }),
+        ).toMatchObject({
+            dryRun: false,
+            confirmApply: false,
+            preflightOk: true,
+            mutationNeeded: true,
+            backupRequired: false,
+        });
+    });
+
+    it('requires backup only for a clean confirmed mutation that still has work', () => {
+        const actual = { ok: true };
+        const diff = { ok: true, mutationReady: true };
+        const mutation = buildCloudflareEdgeApplyDecision(
+            actual,
+            diff,
+            { actions: [{ status: 'append-rule' }] },
+            {
+                dryRun: false,
+                confirmApply: true,
+                phases: ['http_request_cache_settings'],
+            },
+        );
+        expect(mutation).toMatchObject({
+            preflightOk: true,
+            mutationNeeded: true,
+            backupRequired: true,
+        });
+
+        const satisfied = buildCloudflareEdgeApplyDecision(
+            actual,
+            diff,
+            { actions: [{ status: 'present' }] },
+            {
+                dryRun: false,
+                confirmApply: true,
+                phases: ['http_request_cache_settings'],
+            },
+        );
+        expect(satisfied).toMatchObject({
+            preflightOk: true,
+            mutationNeeded: false,
+            backupRequired: false,
+        });
+    });
+
+    it('blocks rate-limit or empty selections before backup', () => {
+        const actual = { ok: true };
+        const diff = { ok: true, mutationReady: true };
+        expect(
+            buildCloudflareEdgeApplyDecision(
+                actual,
+                diff,
+                { actions: [{ status: 'append-rule' }] },
+                {
+                    dryRun: false,
+                    confirmApply: true,
+                    phases: ['http_ratelimit'],
+                },
+            ),
+        ).toMatchObject({
+            preflightOk: false,
+            rateLimitApplyNeedsRefs: true,
+            backupRequired: false,
+        });
+        expect(
+            buildCloudflareEdgeApplyDecision(
+                actual,
+                diff,
+                { actions: [] },
+                {
+                    dryRun: false,
+                    confirmApply: true,
+                    phases: ['http_request_cache_settings'],
+                    ruleRefs: ['missing-ref'],
+                },
+            ),
+        ).toMatchObject({
+            preflightOk: false,
+            selectionEmpty: true,
+            backupRequired: false,
+        });
     });
 });

@@ -15,7 +15,7 @@ describe('MCP workflow productivity policy', () => {
         const session = buildMcpSessionWorkflowProjection();
         const guidance = buildMcpWorkflowGuidance();
 
-        assert.equal(MCP_WORKFLOW_POLICY_VERSION, '1.1.0');
+        assert.equal(MCP_WORKFLOW_POLICY_VERSION, '1.2.0');
         assert.deepEqual(session.taskRouting.reload, [
             policy.reload.scheduleTool,
             policy.reload.smokeTool,

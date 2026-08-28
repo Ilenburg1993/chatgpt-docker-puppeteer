@@ -472,7 +472,7 @@ export async function readLastValidationSummary(input) {
         streamSafety: {
             preferredFlow: [
                 'mcp_validation_dashboard',
-                'mcp_last_validation_summary',
+                'mcp_validation_dashboard view=latest',
                 'job_get_summary',
                 'job_get_output tailBytes<=8000 only when needed',
             ],
@@ -485,8 +485,72 @@ export async function readLastValidationSummary(input) {
     });
 }
 
-/** @param {{ includeRunning?: boolean|undefined; includeLatest?: boolean|undefined; includeDetails?: boolean|undefined; limit?: number|undefined }} input @param {import('../config.js').McpValidationProcessConfig} config */
+/** @param {{
+ * view?: 'dashboard'|'list'|'latest'|undefined;
+ * status?: 'running'|'completed'|'failed'|'cancelled'|undefined;
+ * validator?: string|undefined;
+ * limit?: number|undefined;
+ * includeCompleted?: boolean|undefined;
+ * includeOutputTail?: boolean|undefined;
+ * tailBytes?: number|undefined;
+ * includeRunning?: boolean|undefined;
+ * includeLatest?: boolean|undefined;
+ * includeDetails?: boolean|undefined;
+ * }} input @param {import('../config.js').McpValidationProcessConfig} config */
 export async function readValidationDashboard(input, config) {
+    const view = input.view ?? 'dashboard';
+    if (view === 'list') {
+        if (
+            input.includeOutputTail !== undefined ||
+            input.tailBytes !== undefined ||
+            input.includeRunning !== undefined ||
+            input.includeLatest !== undefined ||
+            input.includeDetails !== undefined
+        ) {
+            return failure('Inactive dashboard/latest fields are not valid with view=list.', {
+                code: 'ERR_VALIDATION_DASHBOARD_VIEW_FIELDS',
+                view,
+            });
+        }
+        return listValidationJobs({
+            status: input.status,
+            validator: input.validator,
+            limit: input.limit,
+            includeCompleted: input.includeCompleted,
+        });
+    }
+    if (view === 'latest') {
+        if (
+            input.status !== undefined ||
+            input.includeCompleted !== undefined ||
+            input.includeRunning !== undefined ||
+            input.includeLatest !== undefined ||
+            input.includeDetails !== undefined ||
+            input.limit !== undefined
+        ) {
+            return failure('Inactive dashboard/list fields are not valid with view=latest.', {
+                code: 'ERR_VALIDATION_DASHBOARD_VIEW_FIELDS',
+                view,
+            });
+        }
+        return readLastValidationSummary({
+            validator: input.validator,
+            includeOutputTail: input.includeOutputTail,
+            tailBytes: input.tailBytes,
+        });
+    }
+    if (
+        input.status !== undefined ||
+        input.validator !== undefined ||
+        input.includeCompleted !== undefined ||
+        input.includeOutputTail !== undefined ||
+        input.tailBytes !== undefined
+    ) {
+        return failure('List/latest-only fields require an explicit mcp_validation_dashboard view.', {
+            code: 'ERR_VALIDATION_DASHBOARD_VIEW_FIELDS',
+            view,
+        });
+    }
     const includeDetails = input.includeDetails === true;
     const jobs = await listJobs({ includeCompleted: true, limit: input.limit ?? 80 });
     const running = jobs
@@ -548,7 +612,7 @@ export async function readValidationJobSummary(jobId) {
     if (!result.job) {
         return failure('Job not found.', {
             code: 'ERR_JOB_NOT_FOUND',
-            hint: 'Use a job id returned by a validator tool, or call mcp_last_validation_summary.',
+            hint: 'Use a job id returned by a validator tool, or call mcp_validation_dashboard view=latest.',
             jobId,
         });
     }

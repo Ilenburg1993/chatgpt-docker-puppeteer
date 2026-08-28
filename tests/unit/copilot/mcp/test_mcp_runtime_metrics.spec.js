@@ -292,6 +292,11 @@ describe('copilot MCP runtime metrics', () => {
             assert.equal(result.structuredContent['metrics']?.['slowestTools'], undefined);
             assert.equal(result.structuredContent['metrics']?.['slowestPhases'], undefined);
             assert.equal(result.structuredContent['metrics']?.['ioCacheBenchmark'], undefined);
+            const roundTripMonitor = /** @type {Record<string, unknown>} */ (
+                result.structuredContent['metrics']?.['roundTripAnalyticsMonitor'] ?? {}
+            );
+            assert.equal(roundTripMonitor['sourceTransition'], undefined);
+            assert.equal(roundTripMonitor['prefixProof'], undefined);
             assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 6 * 1024);
 
             const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true }, operationContext);

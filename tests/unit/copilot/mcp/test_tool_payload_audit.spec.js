@@ -70,6 +70,7 @@ describe('MCP tools/list payload audit', () => {
             { tool: 'repo_apply_patch_batch', count: 20 },
             { tool: 'terminal_session_read', count: 10 },
             { tool: 'repo_working_set', count: 5 },
+            { tool: 'retired_tool_not_in_current_catalog', count: 30 },
         ];
         const comparison = await buildToolSurfacePayloadComparison({
             config: PAYLOAD_CONFIG,
@@ -86,6 +87,13 @@ describe('MCP tools/list payload audit', () => {
         assert.ok(full && latency);
         assert.equal(latency['usage']['weightedCoverage'], 1);
         assert.equal(latency['usage']['missingObservedToolCount'], 0);
+        assert.equal(comparison['usageSample']['rawObservedCalls'], 215);
+        assert.equal(comparison['usageSample']['totalObservedCalls'], 185);
+        assert.equal(comparison['usageSample']['excludedNonCurrentCalls'], 30);
+        assert.equal(comparison['usageSample']['excludedNonCurrentToolCount'], 1);
+        assert.deepEqual(comparison['usageSample']['excludedNonCurrentTop'], [
+            { tool: 'retired_tool_not_in_current_catalog', count: 30 },
+        ]);
         assert.ok(Number(latency['toolCount']) < Number(full['toolCount']));
         assert.ok(Number(latency['totalEnvelopeBytes']) < Number(full['totalEnvelopeBytes']));
         assert.ok(Number(latency['versusFull']['envelopeSavingsPercent']) > 20);
@@ -94,10 +102,32 @@ describe('MCP tools/list payload audit', () => {
         assert.ok(/** @type {string[]} */ (comparison['evidence']['highCoverageReducedModes']).includes('latency'));
     });
 
+    it('fails closed on reduced-mode evidence when the usage window is incomplete', async () => {
+        const comparison = await buildToolSurfacePayloadComparison({
+            config: PAYLOAD_CONFIG,
+            samples: 1,
+            usageEvidenceComplete: false,
+            usageToolStarts: [
+                { tool: 'terminal_exec', count: 100 },
+                { tool: 'repo_bulk_inspect', count: 50 },
+            ],
+            surfaces: ['full', 'latency'].map((mode) => ({
+                mode,
+                tools: getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode }) }),
+            })),
+        });
+        assert.equal(comparison['usageSample']['complete'], false);
+        assert.deepEqual(comparison['evidence']['highCoverageReducedModes'], []);
+        assert.match(String(comparison['evidence']['reason']), /Usage evidence is incomplete/u);
+        assert.equal(comparison['evidence']['defaultChangeRecommended'], false);
+    });
+
     it('orchestrates the surface matrix through the real tool handler with round-trip usage evidence', async () => {
         const currentTools = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'full' }) });
         const tool = currentTools.find((row) => row.name === 'mcp_tool_payload_audit');
         assert.ok(tool);
+        /** @type {Record<string, unknown> | null} */
+        let requestedUsageSummaryOptions = null;
         const operationContext = /** @type {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} */ (
             /** @type {unknown} */ ({
                 signal: new AbortController().signal,
@@ -132,14 +162,30 @@ describe('MCP tools/list payload audit', () => {
                             ),
                     }),
                     roundTripAnalytics: Object.freeze({
-                        summarize: async () => ({
-                            indexedRows: 5,
-                            toolStarts: [
-                                { tool: 'terminal_exec', count: 100 },
-                                { tool: 'repo_bulk_inspect', count: 50 },
-                                { tool: 'repo_apply_patch_batch', count: 20 },
-                            ],
-                        }),
+                        summarize: async (options) => {
+                            requestedUsageSummaryOptions = options;
+                            return {
+                                indexedRows: 5,
+                                sourceIntegrity: { status: 'materialized' },
+                                completeness: {
+                                    rowsEligible: 5,
+                                    rowsAnalyzed: 5,
+                                    maxRows: 100_000,
+                                    truncated: false,
+                                    selection: 'complete-window',
+                                    coverageRatio: 1,
+                                },
+                                queryScope: {
+                                    includeSynthetic: false,
+                                    runtimeSourceBinding: 'controlled-promotion',
+                                },
+                                toolStarts: [
+                                    { tool: 'terminal_exec', count: 100 },
+                                    { tool: 'repo_bulk_inspect', count: 50 },
+                                    { tool: 'repo_apply_patch_batch', count: 20 },
+                                ],
+                            };
+                        },
                     }),
                 },
             })
@@ -149,7 +195,7 @@ describe('MCP tools/list payload audit', () => {
             operationContext,
         );
         const structured = /** @type {Record<string, any>} */ (result.structuredContent);
-        assert.equal(structured['currentSurface']['toolCount'], 131);
+        assert.equal(structured['currentSurface']['toolCount'], 89);
         assert.equal(structured['comparison']['measurement'], 'sdk-in-memory-tools/list-surface-matrix');
         assert.equal(structured['comparison']['usageSample']['totalObservedCalls'], 170);
         const latency = /** @type {Record<string, any>[]} */ (structured['comparison']['surfaces']).find(
@@ -158,9 +204,23 @@ describe('MCP tools/list payload audit', () => {
         assert.ok(latency);
         assert.equal(latency['usage']['weightedCoverage'], 1);
         assert.equal(structured['usageAuthority']['source'], 'round-trip-derived-index');
+        assert.equal(structured['usageAuthority']['population'], 'promoted-runtime-tool-starts-in-current-catalog');
+        assert.equal(structured['usageAuthority']['runtimeSourceBinding'], 'controlled-promotion');
+        assert.equal(structured['usageAuthority']['excludeSynthetic'], true);
+        assert.equal(structured['usageAuthority']['excludeNonCurrentTools'], true);
+        assert.equal(structured['usageAuthority']['coverageUsable'], true);
+        assert.equal(structured['usageAuthority']['sourceIntegrityStatus'], 'materialized');
+        assert.equal(structured['usageAuthority']['completeness']['coverageRatio'], 1);
         assert.equal(structured['usageAuthority']['sync'], false);
-        assert.equal(currentTools.length, 131);
-        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 131);
+        assert.deepEqual(requestedUsageSummaryOptions, {
+            windowMs: 24 * 60 * 60 * 1000,
+            top: 500,
+            includeSynthetic: false,
+            sync: false,
+            runtimeSourceBinding: 'controlled-promotion',
+        });
+        assert.equal(currentTools.length, 89);
+        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 89);
     });
 
     it('accepts only canonical surface mode names instead of hidden aliases', () => {

@@ -203,27 +203,6 @@ export const maintenanceTools = [
             ),
     }),
     defineMcpRawTool({
-        name: 'mcp_maintenance_plan',
-        title: 'MCP maintenance plan',
-        description:
-            'Return the safe batched maintenance actions available for this MCP server, with risk and default behavior.',
-        inputSchema: {},
-
-        handler: async (_args, operationContext) => {
-            const workspace = requireMcpToolWorkspace(operationContext);
-            return okResult({
-                success: true,
-                defaultDryRun: true,
-                defaultFixes: [...DEFAULT_FIXES],
-                items: await buildMaintenancePlanItems(
-                    workspace.indexRegistry,
-                    requireMcpToolAiArtifactsCapability(operationContext),
-                ),
-                note: 'Use mcp_maintenance_apply_safe_fixes with dryRun=true first. No arbitrary shell or arbitrary paths are accepted.',
-            });
-        },
-    }),
-    defineMcpRawTool({
         name: 'mcp_maintenance_apply_safe_fixes',
         title: 'Apply safe MCP maintenance fixes',
         description:
@@ -242,6 +221,12 @@ export const maintenanceTools = [
             const buildIoIndexForDirectory = workspace.indexRegistry.buildDirectory;
             const selectedFixes = normalizeFixes(fixes);
             const isDryRun = dryRun !== false;
+            const planItems = isDryRun
+                ? await buildMaintenancePlanItems(
+                      workspace.indexRegistry,
+                      requireMcpToolAiArtifactsCapability(operationContext),
+                  )
+                : null;
             /** @type {Record<string, unknown>[]} */
             const results = [];
 
@@ -277,7 +262,9 @@ export const maintenanceTools = [
                         fix,
                         dryRun: isDryRun,
                         success: true,
-                        report: await requireMcpToolAiArtifactsCapability(operationContext).buildReport(),
+                        report:
+                            planItems?.find((item) => item['fix'] === 'ai-artifacts-report')?.['currentReport'] ??
+                            (await requireMcpToolAiArtifactsCapability(operationContext).buildReport()),
                     });
                     continue;
                 }
@@ -351,6 +338,14 @@ export const maintenanceTools = [
                 success: results.every((result) => result['success'] === true),
                 dryRun: isDryRun,
                 fixes: selectedFixes,
+                ...(isDryRun
+                    ? {
+                          defaultDryRun: true,
+                          defaultFixes: [...DEFAULT_FIXES],
+                          items: planItems ?? [],
+                          note: 'This dry-run is the canonical maintenance preview; no separate maintenance plan tool is required.',
+                      }
+                    : {}),
                 results,
                 metrics: readMcpMetricsSnapshot().totals,
             });

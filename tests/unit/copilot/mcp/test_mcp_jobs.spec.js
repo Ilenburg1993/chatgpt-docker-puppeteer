@@ -519,14 +519,17 @@ describe('copilot MCP jobs', () => {
         }
     });
 
-    it('exposes canonical validator alias tools', () => {
+    it('exposes canonical validator owners without legacy aliases', () => {
         const names = jobTools.map((tool) => tool.name);
-        assert.ok(names.includes('run_typecheck_copilot'));
-        assert.ok(names.includes('run_lint_copilot'));
-        assert.ok(names.includes('run_unit_copilot'));
-        assert.ok(names.includes('run_project_doctor'));
+        assert.equal(names.includes('run_typecheck_copilot'), false);
+        assert.equal(names.includes('run_lint_copilot'), false);
+        assert.equal(names.includes('run_unit_copilot'), false);
+        assert.equal(names.includes('run_project_doctor'), false);
+        assert.ok(names.includes('run_copilot_validator'));
         assert.ok(names.includes('mcp_run_safe_validation_suite'));
-        assert.ok(names.includes('job_list'));
+        assert.ok(names.includes('mcp_validation_dashboard'));
+        assert.equal(names.includes('job_list'), false);
+        assert.equal(names.includes('mcp_last_validation_summary'), false);
     });
 
     it('keeps the exposed validator schema future-proof while enforcing the runtime allowlist server-side', async () => {
@@ -611,11 +614,24 @@ describe('copilot MCP jobs', () => {
         assert.equal(rows[1]?.['code'], 'ERR_VALIDATOR_NESTED_RUNNER_BLOCKED');
     });
 
-    it('job_list returns a structured job array', async () => {
-        const tool = findJobTool('job_list');
-        const result = await tool.handler({ limit: 5 });
-        assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent?.['success'], true);
-        assert.ok(Array.isArray(result.structuredContent?.['jobs']));
+    it('mcp_validation_dashboard preserves filtered list and latest-summary projections', async () => {
+        const tool = findJobTool('mcp_validation_dashboard');
+        const listed = await tool.handler({ view: 'list', limit: 5 });
+        assert.equal(listed.isError, undefined);
+        assert.equal(listed.structuredContent?.['success'], true);
+        assert.ok(Array.isArray(listed.structuredContent?.['jobs']));
+
+        const latest = await tool.handler({ view: 'latest' });
+        assert.equal(latest.isError, undefined);
+        assert.equal(latest.structuredContent?.['success'], true);
+        assert.ok(Array.isArray(latest.structuredContent?.['summaries']));
+        assert.equal(typeof latest.structuredContent?.['effectiveChecks'], 'object');
+    });
+
+    it('mcp_validation_dashboard rejects fields from inactive projections', async () => {
+        const tool = findJobTool('mcp_validation_dashboard');
+        const conflict = await tool.handler({ view: 'list', includeOutputTail: true });
+        assert.equal(conflict.isError, true);
+        assert.equal(conflict.structuredContent?.['code'], 'ERR_VALIDATION_DASHBOARD_VIEW_FIELDS');
     });
 });

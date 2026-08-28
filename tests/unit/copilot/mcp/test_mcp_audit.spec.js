@@ -4,7 +4,7 @@
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { createMcpAuditCapability, readMcpAuditProcessConfig } from '#copilot/testing/mcp/observability';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { appendFile, copyFile, mkdtemp, readFile, rename, rm, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
@@ -39,6 +39,228 @@ describe('copilot MCP audit capability', () => {
             assert.equal(tail.ok, true);
             assert.equal(tail.parsedEvents, 1);
             assert.equal(tail.events[0]?.['event'], 'test_event');
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('binds audit slices to content-free continuity anchors across append, physical rebind and truncation', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-continuity-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const replacement = path.join(dir, 'replacement.jsonl');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            await audit.append({ event: 'first', tool: 'repo_status' });
+            const first = await audit.readSlice({ offset: 0, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(first.ok, true);
+            assert.equal(first.sourcePresent, true);
+            assert.equal(first.offsetPastEnd, false);
+            assert.equal(typeof first.physicalFileIdentity, 'string');
+            assert.equal(first.continuityAtStart?.version, 1);
+            assert.equal(first.continuityAtStart?.offset, 0);
+            assert.equal(first.continuityAtStart?.windowBytes, 0);
+            assert.match(String(first.continuityAtStart?.token), /^[a-f0-9]{64}$/u);
+            assert.equal(first.continuityAtNext?.offset, first.nextOffset);
+            assert.ok(Number(first.continuityAtNext?.windowBytes) > 0);
+            assert.equal(first.sequenceAtStart?.version, 1);
+            assert.equal(first.sequenceAtStart?.algorithm, 'sha256-chain');
+            assert.match(String(first.sequenceAtStart?.token), /^[a-f0-9]{64}$/u);
+            assert.match(String(first.sequenceAtNext?.token), /^[a-f0-9]{64}$/u);
+            assert.notEqual(first.sequenceAtNext?.token, first.sequenceAtStart?.token);
+            const firstIdentity = first.physicalFileIdentity;
+            const firstCheckpoint = first.nextOffset;
+            const firstToken = first.continuityAtNext?.token;
+            const firstSequenceToken = first.sequenceAtNext?.token;
+
+            await audit.append({ event: 'second', tool: 'repo_status' });
+            const appended = await audit.readSlice({
+                offset: firstCheckpoint,
+                maxBytes: 64 * 1024,
+                maxEvents: 100,
+                sequenceToken: firstSequenceToken,
+            });
+            assert.equal(appended.physicalFileIdentity, firstIdentity);
+            assert.equal(appended.continuityAtStart?.token, firstToken);
+            assert.equal(appended.sequenceAtStart?.token, firstSequenceToken);
+            assert.notEqual(appended.sequenceAtNext?.token, firstSequenceToken);
+            assert.equal(appended.entries.length, 1);
+            assert.equal(appended.entries[0]?.event?.['event'], 'second');
+            const prefixProof = await audit.readPrefixProof({ offset: appended.nextOffset });
+            assert.equal(prefixProof.ok, true);
+            assert.equal(prefixProof.prefixAvailable, true);
+            assert.equal(prefixProof.physicalFileIdentity, appended.physicalFileIdentity);
+            assert.equal(prefixProof.bytesRead, appended.nextOffset);
+            assert.equal(prefixProof.continuityAtOffset?.token, appended.continuityAtNext?.token);
+            assert.equal(prefixProof.sequenceAtOffset?.token, appended.sequenceAtNext?.token);
+
+            // Replace the path with a byte-identical copy. dev:ino changes, but the exact checkpoint prefix is the same.
+            await copyFile(auditFile, replacement);
+            await rename(replacement, auditFile);
+            const rebound = await audit.readSlice({
+                offset: appended.nextOffset,
+                maxBytes: 64 * 1024,
+                maxEvents: 100,
+                sequenceToken: appended.sequenceAtNext?.token,
+            });
+            assert.notEqual(rebound.physicalFileIdentity, appended.physicalFileIdentity);
+            assert.equal(rebound.continuityAtStart?.token, appended.continuityAtNext?.token);
+            assert.equal(rebound.sequenceAtStart?.token, appended.sequenceAtNext?.token);
+            assert.equal(rebound.bytesRead, 0);
+            assert.equal(rebound.offsetPastEnd, false);
+            const reboundProof = await audit.readPrefixProof({ offset: rebound.nextOffset });
+            assert.equal(reboundProof.physicalFileIdentity, rebound.physicalFileIdentity);
+            assert.equal(reboundProof.continuityAtOffset?.token, appended.continuityAtNext?.token);
+            assert.equal(reboundProof.sequenceAtOffset?.token, appended.sequenceAtNext?.token);
+
+            const reboundIdentity = rebound.physicalFileIdentity;
+            await truncate(auditFile, 0);
+            const truncated = await audit.readSlice({
+                offset: rebound.nextOffset,
+                maxBytes: 64 * 1024,
+                maxEvents: 100,
+            });
+            assert.equal(truncated.physicalFileIdentity, reboundIdentity);
+            assert.equal(truncated.offsetPastEnd, true);
+            assert.equal(truncated.bytesRead, 0);
+            assert.equal(truncated.entries.length, 0);
+            assert.equal(truncated.continuityAtStart, null);
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('distinguishes whole-prefix replacement even when the 4 KiB boundary anchor is unchanged', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-prefix-proof-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const replacement = path.join(dir, 'replacement.jsonl');
+        const makeLine = (/** @type {string} */ markerValue, /** @type {number} */ index) =>
+            `${JSON.stringify({ event: 'fixture', tool: 'repo_status', marker: markerValue, index, padding: 'x'.repeat(180) })}\n`;
+        const originalLines = Array.from({ length: 40 }, (_, index) => makeLine(index === 0 ? 'AAAA' : 'same', index));
+        const replacementLines = [...originalLines];
+        replacementLines[0] = makeLine('BBBB', 0);
+        assert.equal(Buffer.byteLength(replacementLines[0] ?? ''), Buffer.byteLength(originalLines[0] ?? ''));
+        await writeFile(auditFile, originalLines.join(''), 'utf8');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            const original = await audit.readSlice({ offset: 0, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(original.ok, true);
+            assert.equal(original.complete, true);
+            assert.ok(original.nextOffset > 4096);
+            const originalProof = await audit.readPrefixProof({ offset: original.nextOffset });
+            assert.equal(originalProof.sequenceAtOffset?.token, original.sequenceAtNext?.token);
+
+            await writeFile(replacement, replacementLines.join(''), 'utf8');
+            await rename(replacement, auditFile);
+            const replacementSlice = await audit.readSlice({
+                offset: original.nextOffset,
+                maxBytes: 64 * 1024,
+                maxEvents: 100,
+                sequenceToken: original.sequenceAtNext?.token,
+            });
+            assert.equal(replacementSlice.ok, true);
+            assert.notEqual(replacementSlice.physicalFileIdentity, original.physicalFileIdentity);
+            // The mutation is before the last 4 KiB, therefore a boundary-only proof cannot distinguish the files.
+            assert.equal(replacementSlice.continuityAtStart?.token, original.continuityAtNext?.token);
+            assert.equal(replacementSlice.sequenceAtStart?.token, original.sequenceAtNext?.token);
+
+            const replacementProof = await audit.readPrefixProof({ offset: original.nextOffset });
+            assert.equal(replacementProof.ok, true);
+            assert.equal(replacementProof.prefixAvailable, true);
+            assert.equal(replacementProof.continuityAtOffset?.token, original.continuityAtNext?.token);
+            assert.notEqual(replacementProof.sequenceAtOffset?.token, original.sequenceAtNext?.token);
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('stops exactly at maxEvents without skipping later JSONL records', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-max-events-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            for (let index = 0; index < 105; index += 1) {
+                await audit.append({ event: `event-${String(index)}`, tool: 'repo_status', index });
+            }
+            const first = await audit.readSlice({ offset: 0, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(first.ok, true);
+            assert.equal(first.entries.length, 100);
+            assert.equal(first.eventLimitReached, true);
+            assert.equal(first.complete, false);
+            assert.ok(first.nextOffset < first.fileBytes);
+            assert.equal(first.entries[99]?.event?.['index'], 99);
+
+            const second = await audit.readSlice({ offset: first.nextOffset, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(second.ok, true);
+            assert.equal(second.entries.length, 5);
+            assert.equal(second.entries[0]?.event?.['index'], 100);
+            assert.equal(second.entries[4]?.event?.['index'], 104);
+            assert.equal(second.eventLimitReached, false);
+            assert.equal(second.complete, true);
+            assert.equal(second.nextOffset, second.fileBytes);
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('keeps a trailing non-newline JSON fragment pending until the record is committed', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-partial-line-'));
+        const auditFile = path.join(dir, 'audit.jsonl');
+        const firstLine = `${JSON.stringify({ event: 'first', tool: 'repo_status' })}\n`;
+        const partial = '{"event":"second"';
+        await writeFile(auditFile, firstLine + partial, 'utf8');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            const first = await audit.readSlice({ offset: 0, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(first.ok, true);
+            assert.equal(first.entries.length, 1);
+            assert.equal(first.entries[0]?.event?.['event'], 'first');
+            assert.equal(first.nextOffset, Buffer.byteLength(firstLine));
+            assert.equal(first.pendingPartialLineBytes, Buffer.byteLength(partial));
+            assert.equal(first.complete, false);
+            assert.equal(first.invalidLines, 0);
+
+            await appendFile(auditFile, ',"tool":"repo_status"}\n', 'utf8');
+            const second = await audit.readSlice({ offset: first.nextOffset, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(second.ok, true);
+            assert.equal(second.entries.length, 1);
+            assert.equal(second.entries[0]?.event?.['event'], 'second');
+            assert.equal(second.pendingPartialLineBytes, 0);
+            assert.equal(second.complete, true);
+            assert.equal(second.invalidLines, 0);
+        } finally {
+            await audit.flush();
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('reports an absent audit source without inventing a cursor reset or logical generation', async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-absent-'));
+        const auditFile = path.join(dir, 'missing.jsonl');
+        const audit = createMcpAuditCapability(
+            readMcpAuditProcessConfig({ COPILOT_MCP_AUDIT_FILE: auditFile, COPILOT_MCP_AUDIT_SYNC: 'true' }),
+        );
+        try {
+            const slice = await audit.readSlice({ offset: 123, maxBytes: 64 * 1024, maxEvents: 100 });
+            assert.equal(slice.ok, true);
+            assert.equal(slice.sourcePresent, false);
+            assert.equal(slice.physicalFileIdentity, null);
+            assert.equal(slice.requestedOffset, 123);
+            assert.equal(slice.nextOffset, 123);
+            assert.equal(slice.offsetPastEnd, true);
+            assert.equal(slice.continuityAtStart, null);
+            assert.equal(slice.continuityAtNext, null);
         } finally {
             await audit.flush();
             await rm(dir, { recursive: true, force: true });

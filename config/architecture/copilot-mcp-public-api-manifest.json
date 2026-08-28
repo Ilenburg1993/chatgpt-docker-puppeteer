@@ -389,6 +389,12 @@
       "coldImport": false
     },
     {
+      "alias": "#copilot/mcp/public/tools/catalog/semantic-contracts",
+      "target": "./src/copilot/mcp/tools/catalog/public/semantic-contracts.js",
+      "costTier": "micro",
+      "coldImport": false
+    },
+    {
       "alias": "#copilot/mcp/public/transport/http/compat/stateless",
       "target": "./src/copilot/mcp/transport/http/compat/stateless/public/index.js",
       "costTier": "micro",
@@ -421,7 +427,7 @@
     {
       "alias": "#copilot/mcp/public/transport/http/stateful/router",
       "target": "./src/copilot/mcp/transport/http/stateful/public/router.js",
-      "costTier": "standard",
+      "costTier": "heavy",
       "coldImport": false
     },
     {

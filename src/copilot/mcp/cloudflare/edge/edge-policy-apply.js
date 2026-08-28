@@ -28,31 +28,34 @@ const RATE_LIMIT_PHASE = 'http_ratelimit';
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function applyCloudflareEdgePolicy(options = {}) {
-    const dryRun = options.dryRun !== false;
-    const confirmApply = options.confirmApply === true;
     const phases = normalizePhases(options.phases);
     const ruleRefs = normalizeRefs(options.ruleRefs);
-    const backup = await createCloudflareEdgeBackup({
-        ...(options.authority ? { authority: options.authority } : {}),
-        ...(options.env ? { env: options.env } : {}),
-        ...(options.now ? { now: options.now } : {}),
-        label: dryRun ? 'preflight' : 'pre-apply',
-    });
     const actual = await auditCloudflareEdgeRulesets(options);
     const diff = await diffCloudflareEdgePolicy(options);
     const desiredRules = buildCloudflareEdgeDesiredApiRules(asString(asRecord(diff['endpoint'])['publicHostname']));
     const planOptions = /** @type {any} */ ({ phases, ruleRefs });
     const plan = buildCloudflareEdgeApplyPlan(asRulesets(actual['rulesets']), desiredRules, planOptions);
-    const rateLimitApplyNeedsRefs = phases.includes(RATE_LIMIT_PHASE) && ruleRefs.length === 0;
-    const preflightOk =
-        backup.ok === true &&
-        actual.ok === true &&
-        diff.ok === true &&
-        diff['mutationReady'] === true &&
-        !rateLimitApplyNeedsRefs;
-    const canApply = preflightOk && confirmApply && !dryRun;
+    const decision = buildCloudflareEdgeApplyDecision(actual, diff, plan, {
+        ...options,
+        phases,
+        ruleRefs,
+    });
+    const {
+        dryRun,
+        confirmApply,
+        preflightOk,
+        mutationNeeded,
+        backupRequired,
+        rateLimitApplyNeedsRefs,
+        selectionEmpty,
+    } = decision;
+    const backupPreview = {
+        requiredBeforeMutation: true,
+        created: false,
+        reason: 'Dry-run, unconfirmed, already-satisfied and blocked preflight paths are side-effect-free; backup is created only immediately before a real mutation.',
+    };
 
-    if (dryRun || !confirmApply) {
+    if (dryRun || !confirmApply || !mutationNeeded) {
         return {
             ok: preflightOk,
             success: true,
@@ -60,18 +63,22 @@ export async function applyCloudflareEdgePolicy(options = {}) {
             appliesChanges: false,
             dryRun: true,
             confirmApply,
-            backup,
+            backup: backupPreview,
             preflight: summarizePreflight(actual, diff),
             plan,
             blockedReason: rateLimitApplyNeedsRefs
                 ? 'Rate-limit apply requires selecting one or more explicit ruleRefs.'
-                : preflightOk
-                  ? 'Set dryRun=false and confirmApply=true to apply this exact plan.'
-                  : 'Preflight is not clean; do not apply Cloudflare edge policy.',
+                : selectionEmpty
+                  ? 'The requested ruleRefs/phases selected no desired Cloudflare edge actions.'
+                  : !preflightOk
+                    ? 'Preflight is not clean; do not apply Cloudflare edge policy.'
+                    : !mutationNeeded
+                      ? 'Cloudflare edge policy is already satisfied for the selected phases/ruleRefs.'
+                      : 'Set dryRun=false and confirmApply=true to create a backup and apply this exact plan.',
         };
     }
 
-    if (!canApply) {
+    if (!backupRequired) {
         return {
             ok: false,
             success: true,
@@ -79,10 +86,31 @@ export async function applyCloudflareEdgePolicy(options = {}) {
             appliesChanges: false,
             dryRun,
             confirmApply,
+            backup: backupPreview,
+            preflight: summarizePreflight(actual, diff),
+            plan,
+            blockedReason: 'Cloudflare edge policy apply requires clean preflight before backup or mutation.',
+        };
+    }
+
+    const backup = await createCloudflareEdgeBackup({
+        ...(options.authority ? { authority: options.authority } : {}),
+        ...(options.env ? { env: options.env } : {}),
+        ...(options.now ? { now: options.now } : {}),
+        label: 'pre-apply',
+    });
+    if (backup.ok !== true) {
+        return {
+            ok: false,
+            success: true,
+            mode: 'guarded-edge-policy-apply',
+            appliesChanges: false,
+            dryRun: false,
+            confirmApply,
             backup,
             preflight: summarizePreflight(actual, diff),
             plan,
-            blockedReason: 'Cloudflare edge policy apply requires clean preflight, dryRun=false and confirmApply=true.',
+            blockedReason: 'Cloudflare edge policy mutation aborted because the mandatory backup did not complete.',
         };
     }
 
@@ -120,10 +148,43 @@ export async function applyCloudflareEdgePolicy(options = {}) {
         plan,
         applied,
         nextActions: [
-            'Run make copilot-mcp-edge-audit.',
-            'Run make copilot-mcp-edge-policy-diff.',
-            'Run make copilot-mcp-smoke-refresh.',
+            'Run mcp_cloudflare_edge_snapshot view=edge.',
+            'Run mcp_cloudflare_edge_snapshot view=policy-diff.',
+            'Run mcp_connector_smoke_refresh.',
         ],
+    };
+}
+
+/**
+ * Pure mutation-boundary decision shared by the edge apply implementation and focused tests.
+ *
+ * @param {Record<string, unknown> & { ok?: boolean }} actual
+ * @param {Record<string, unknown> & { ok?: boolean }} diff
+ * @param {{ actions: Record<string, unknown>[] }} plan
+ * @param {{ dryRun?: boolean; confirmApply?: boolean; phases?: string[]; ruleRefs?: string[] }} [options]
+ */
+export function buildCloudflareEdgeApplyDecision(actual, diff, plan, options = {}) {
+    const dryRun = options.dryRun !== false;
+    const confirmApply = options.confirmApply === true;
+    const phases = normalizePhases(options.phases);
+    const ruleRefs = normalizeRefs(options.ruleRefs);
+    const rateLimitApplyNeedsRefs = phases.includes(RATE_LIMIT_PHASE) && ruleRefs.length === 0;
+    const selectionEmpty = ruleRefs.length > 0 && plan.actions.length === 0;
+    const mutationNeeded = plan.actions.some((action) => action['status'] !== 'present');
+    const preflightOk =
+        actual.ok === true &&
+        diff.ok === true &&
+        diff['mutationReady'] === true &&
+        !rateLimitApplyNeedsRefs &&
+        !selectionEmpty;
+    return {
+        dryRun,
+        confirmApply,
+        preflightOk,
+        mutationNeeded,
+        rateLimitApplyNeedsRefs,
+        selectionEmpty,
+        backupRequired: preflightOk && !dryRun && confirmApply && mutationNeeded,
     };
 }
 

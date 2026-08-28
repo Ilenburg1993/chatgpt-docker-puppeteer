@@ -210,9 +210,29 @@ function buildCanonicalAllMcpTools(registryPolicy, authConfig) {
 function buildCanonicalMcpToolSurface(allTools, surfacePolicy, registryPolicy) {
     const surfacedTools = applyMcpToolSurfacePolicy(allTools, surfacePolicy);
     const tools = surfacedTools.map((tool) => enrichMcpToolDescriptor(tool, registryPolicy));
-    const surfacedValidation = validateMcpToolDefinitions(tools, registryPolicy, 'surfaced-tools');
+    const observedValidation = validateMcpToolDefinitions(tools, registryPolicy, 'surfaced-tools');
+    const surfacedValidation = normalizeIntentionalEmptySurfaceValidation(observedValidation, tools, surfacePolicy);
     enforceRegistryValidation('canonical surfaced-tool registry', surfacedValidation, registryPolicy);
     return { tools, surfacedValidation };
+}
+
+/**
+ * Preserve the global invariant that the canonical all-tool registry is non-empty while allowing an explicitly empty
+ * advertisement projection. `allowEmpty` is a surface-policy escape hatch, not a descriptor-validation bypass: only
+ * the one error caused solely by selecting zero surfaced tools is suppressed; every other error/warning remains.
+ *
+ * @param {McpRegistryValidation} validation
+ * @param {McpToolDefinition[]} tools
+ * @param {import('./surface-policy.js').McpToolSurfacePolicy} surfacePolicy
+ * @returns {McpRegistryValidation}
+ */
+function normalizeIntentionalEmptySurfaceValidation(validation, tools, surfacePolicy) {
+    if (!surfacePolicy.allowEmpty || tools.length !== 0) return validation;
+    const emptySurfaceError = 'surfaced-tools: no tools are registered.';
+    return {
+        ...validation,
+        errors: validation.errors.filter((error) => error !== emptySurfaceError),
+    };
 }
 
 /**
@@ -1724,6 +1744,15 @@ function buildMcpToolResultAuditMetadata(toolName, result, resultSizeMetric, exe
                   failedOperations: executionMetric.failedOperations ?? 0,
                   skippedOperations: executionMetric.skippedOperations ?? 0,
                   ...(executionMetric.mode ? { executionMode: executionMetric.mode } : {}),
+                  ...(executionMetric.executionPolicyClass
+                      ? { executionPolicyClass: executionMetric.executionPolicyClass }
+                      : {}),
+                  ...(executionMetric.executionFailurePolicyClass
+                      ? { executionFailurePolicyClass: executionMetric.executionFailurePolicyClass }
+                      : {}),
+                  ...(executionMetric.executionConcurrencyClass
+                      ? { executionConcurrencyClass: executionMetric.executionConcurrencyClass }
+                      : {}),
                   ...(executionMetric.batchSize !== undefined ? { batchSize: executionMetric.batchSize } : {}),
                   ...(executionMetric.batchCapacity !== undefined
                       ? { batchCapacity: executionMetric.batchCapacity }
@@ -1803,7 +1832,7 @@ function estimateKnownDuplicateTextBytes(toolName, result, textBytes) {
     if (toolName === 'repo_search_text' && typeof structured?.['output'] === 'string') {
         return structured['output'] === text ? textBytes : 0;
     }
-    if (toolName === 'repo_tree' || toolName === 'repo_root_tree') {
+    if (toolName === 'repo_tree') {
         const trimmed = text.trimStart();
         return trimmed.startsWith('{') && trimmed.includes('"entries"') ? textBytes : 0;
     }

@@ -35,37 +35,44 @@ function publicSessionSummary(entry) {
  */
 export const copilotSessionTools = [
     defineMcpRawTool({
-        name: 'copilot_sessions_list',
-        title: 'List Copilot sessions',
-        description: 'List active Copilot SDK/LLM-B sessions known in this process without starting a new session.',
+        name: 'copilot_sessions',
+        title: 'Copilot sessions',
+        description: 'List active Copilot SDK/LLM-B sessions or return read-only metadata for one active session.',
         inputSchema: {
-            limit: z.number().int().min(1).max(100).optional()['describe']('Maximum sessions to return. Default: 50.'),
+            action: z.enum(['list', 'get'])['describe']('Read projection: list or get.'),
+            limit: z.number().int().min(1).max(100).optional()['describe']('action=list only: maximum sessions. Default: 50.'),
+            sessionId: z.string().min(1).optional()['describe']('action=get only: active Copilot SDK session id.'),
         },
 
-        handler: async ({ limit }) => {
-            const max = typeof limit === 'number' ? limit : 50;
-            const sessions = listActiveSdkSessions().slice(0, max).map(publicSessionSummary);
-            return okResult({
-                success: true,
-                count: sessions.length,
-                sessions,
-            });
-        },
-    }),
-    defineMcpRawTool({
-        name: 'copilot_session_get',
-        title: 'Get Copilot session',
-        description: 'Return read-only metadata for one active Copilot SDK/LLM-B session by id.',
-        inputSchema: {
-            sessionId: z.string().min(1)['describe']('Copilot SDK session id.'),
-        },
-
-        handler: async ({ sessionId }) => {
+        handler: async ({ action, limit, sessionId }) => {
+            if (action === 'list') {
+                if (sessionId !== undefined) {
+                    return errorResult('sessionId is valid only with action=get.', {
+                        code: 'ERR_COPILOT_SESSIONS_INACTIVE_FIELDS',
+                        action,
+                    });
+                }
+                const max = typeof limit === 'number' ? limit : 50;
+                const sessions = listActiveSdkSessions().slice(0, max).map(publicSessionSummary);
+                return okResult({ success: true, count: sessions.length, sessions });
+            }
+            if (limit !== undefined) {
+                return errorResult('limit is valid only with action=list.', {
+                    code: 'ERR_COPILOT_SESSIONS_INACTIVE_FIELDS',
+                    action,
+                });
+            }
+            if (sessionId === undefined) {
+                return errorResult('action=get requires sessionId.', {
+                    code: 'ERR_COPILOT_SESSION_ID_REQUIRED',
+                    hint: 'Call copilot_sessions action=list first to discover active ids.',
+                });
+            }
             const entry = getActiveSdkSession(sessionId);
             if (!entry) {
                 return errorResult('Copilot session not found.', {
                     code: 'ERR_COPILOT_SESSION_NOT_FOUND',
-                    hint: 'Call copilot_sessions_list first and pass an active sessionId.',
+                    hint: 'Call copilot_sessions action=list first and pass an active sessionId.',
                     sessionId,
                 });
             }

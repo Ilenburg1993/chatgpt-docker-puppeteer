@@ -10,33 +10,28 @@ import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
+    errorResult,
     okResult,
 } from '#copilot/mcp/public/protocol/tools';
+import { MCP_TOOL_CONTRACTS_VERSION } from '#copilot/mcp/public/tools/catalog/semantic-contracts';
 import { MCP_WORKFLOW_POLICY_VERSION, buildMcpWorkflowGuidance } from '#copilot/mcp/public/workflow-policy';
 import { z } from 'zod';
 
+import { buildMcpSessionProfile } from './session-profile.js';
+import { readMcpToolsStatus } from './tools-status.js';
+
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 63;
+const CAPABILITIES_VERSION = 71;
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
-    'repo_root_tree',
     'repo_root_redaction_status',
     'repo_read_file',
     'repo_bulk_inspect',
     'repo_read_file_chunks',
     'repo_file_stats',
     'repo_diff_files',
-    'repo_list_quarantine',
-    'repo_inspect_quarantined_file',
-    'repo_patch_batch_plan',
-    'repo_patch_plan',
-    'repo_create_file_plan',
-    'repo_quarantine_file_plan',
-    'repo_move_file_plan',
-    'repo_apply_file_batch_plan',
-    'repo_index_refresh_plan',
-    'mcp_validation_plan',
+    'repo_quarantine_status',
     'repo_search_text',
     'repo_find_symbol_usages',
     'repo_symbol_search',
@@ -50,10 +45,8 @@ const INDEX_TOOLS = [
     'repo_index_status',
     'repo_index_build',
     'repo_index_search',
-    'repo_index_find_symbol',
     'repo_find_imports',
     'repo_find_orphan_imports',
-    'repo_index_invalidate',
 ];
 
 const WRITE_TOOLS = [
@@ -90,13 +83,7 @@ const DEV_TOOLS = [
 const VALIDATION_TOOLS = [
     'mcp_run_safe_validation_suite',
     'run_copilot_validator',
-    'run_typecheck_copilot',
-    'run_lint_copilot',
-    'run_unit_copilot',
-    'run_project_doctor',
     'mcp_validation_dashboard',
-    'mcp_last_validation_summary',
-    'job_list',
     'job_get_summary',
     'job_get_output',
     'job_cancel',
@@ -105,25 +92,16 @@ const VALIDATION_TOOLS = [
 const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
     ...DEV_TOOLS,
-    'mcp_golden_prompts',
     'mcp_apps_sdk_readiness',
-    'mcp_cloudflare_config_audit',
-    'mcp_cloudflare_' + 'plan_capabilities_audit',
     'mcp_cloudflare_edge_backup_create',
     'mcp_cloudflare_edge_backups_list',
-    'mcp_cloudflare_edge_audit',
     'mcp_cloudflare_edge_policy_apply',
-    'mcp_cloudflare_edge_policy_diff',
-    'mcp_cloudflare_edge_policy_plan',
     'mcp_cloudflare_edge_snapshot',
     'mcp_cloudflare_metrics_snapshot',
-    'mcp_cloudflare_post_change_gates',
-    'mcp_cloudflare_transport_benchmark_plan',
     'mcp_host_block_diagnostics',
     'mcp_cleanup_ai_artifacts',
     'mcp_dependency_outdated',
     'mcp_dependency_upgrade',
-    'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'terminal_exec',
     'terminal_session_control',
@@ -136,44 +114,26 @@ const RUNTIME_TOOLS = [
     'mcp_openai_endpoint_latency',
     'mcp_round_trip_analytics',
     'mcp_runtime_health',
-    'mcp_session_profile',
     'mcp_smoke_workspace',
     'mcp_tool_payload_audit',
-    'mcp_autonomy_power_score',
-    'mcp_tools_status',
     'mcp_tunnel_status',
-    'mcp_cloudflare_remote_audit',
-    'mcp_cloudflare_skip_audit',
-    'mcp_cloudflare_mcp_passthrough_plan',
-    'mcp_cloudflare_mcp_passthrough_diff',
-    'mcp_cloudflare_mcp_passthrough_apply',
     'mcp_connector_smoke_refresh',
     'mcp_post_restart_readiness',
     'mcp_reload_plan',
     'mcp_reload_status',
     'mcp_reload_schedule',
     'llmb_live_readiness',
-    'llmb_live_runs',
     'llmb_live_test_cancel',
     'llmb_live_test_plan',
     'llmb_live_test_run',
     'mcp_capabilities_summary',
 ];
 
-const CONNECTION_TOOLS = [
-    'chatgpt_connector_profile',
-    'chatgpt_connector_url_check',
-    'chatgpt_connector_current_url_status',
-    'mcp_auth_profile',
-    'mcp_connection_readiness',
-    'mcp_oauth_issuer_diagnostics',
-    'mcp_oauth_friction_audit',
-    'claude_connector_profile',
-];
-const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
+const CONNECTION_TOOLS = ['mcp_connection_readiness', 'mcp_oauth_issuer_diagnostics', 'mcp_oauth_friction_audit'];
+const COPILOT_SDK_TOOLS = ['copilot_sessions'];
 /** @type {string[]} */
 const DEPRECATED_TOOLS = [];
-const EXPERIMENTAL_TOOLS = ['repo_symbol_search', 'repo_file_outline', 'repo_index_search', 'repo_index_find_symbol'];
+const EXPERIMENTAL_TOOLS = ['repo_symbol_search', 'repo_file_outline', 'repo_index_search'];
 
 const SECURITY_POLICY = {
     readProtectedPaths: 'blocked',
@@ -199,15 +159,13 @@ const METADATA_PROFILE = {
 };
 
 const IO_GUIDANCE = [
-    'Use mcp_tools_status before planning broad work to inspect read-only, bounded-write, destructive and approval-friendly tools.',
-    'Use mcp_autonomy_power_score after broad changes to measure connector autonomy posture.',
-    'Use mcp_session_profile at the start of a new ChatGPT conversation to load the recommended autonomy profile.',
-    'Use mcp_maintenance_plan then mcp_maintenance_apply_safe_fixes dryRun=true for batched low-risk maintenance.',
+    'Use mcp_capabilities_summary view=status before planning broad work when contract/risk/descriptor detail is needed.',
+    'Use mcp_capabilities_summary view=session when a compact task-first operating profile is useful.',
+    'Use mcp_maintenance_apply_safe_fixes dryRun=true as the canonical batched maintenance preview; execute selected safe fixes only when they add evidence.',
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
-    'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
-    'Use plan-only tools only when an explicit preview, human inspection or separate approval boundary is useful; governed apply tools revalidate their own preconditions and should not pay an automatic plan round-trip.',
-    'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
+    'Use dryRun=true on canonical owners when explicit preview or human inspection is useful; do not pay a separate plan-tool round trip.',
+    'Keep includeDiffPreview=false by default for repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
     `Prefer repo_read_file.batch and repo_search_text.batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxBatchRequests} independent operations, with repo_search_text.contextLines up to ${MCP_TOOL_EXECUTION_LIMITS.repoRead.maxSearchContextLines}. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.`,
     ...buildMcpWorkflowGuidance(),
     `Use repo_apply_patch_batch for up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchOperations} exact-string patches across up to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchTargets} targets and ${Math.floor(MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchInputBytes / (1024 * 1024))} MiB input. Direct apply defaults to ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultApplyMode} + ${MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultFailureMode}: each target is compute-before-write atomic, same-file operations publish together, and independent targets can progress even when another fails. global-preflight is explicit all-target preview gating, not a cross-file transaction. Compact failures report one causal row per failed target plus affected operation indices and bounded recovery evidence.`,
@@ -221,40 +179,37 @@ const IO_GUIDANCE = [
     'Use repo_search_text as the completeness-oriented filesystem search; it prefers rg when available and avoids treating temporarily partial derived-index hits as complete. Use repo_index_search explicitly for FTS/discovery over the convergent SQLite index.',
     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
     'Use repo_find_symbol_usages for impact analysis before refactors.',
-    'Use repo_index_build then repo_index_search/repo_index_find_symbol/repo_find_imports for indexed navigation.',
+    'Use repo_index_search/repo_find_imports for explicit indexed navigation; repo_symbol_search already uses the shared symbol index as its fast path and falls back to filesystem search when needed.',
     'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use repo_working_set when repeated work is concentrated in a subtree: open defaults to source-first coverage selection, find stays process-local, and refresh defaults to O(delta). Add seedPaths for known causal files or seedSymbols to resolve exact symbols through the local index in the same open call; both stay inside maxFiles. Refresh converges legitimate file removals by shrinking the live set without silent backfill, and contextMode=auto omits empty-delta manifests while keeping changed/removed/failure context inline; use include/omit only when explicitly desired. Use lexical only for explicit historical prefix ordering.',
     `Validator concurrency remains intentionally capped at ${MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchConcurrency} to protect WSL/runtime headroom; devcontainer-shell remains fixed to bash -n over canonical allowlisted scripts and accepts no caller command/path.`,
-    'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
-    'Use repo_root_tree or repo_tree path="." for the real workspace root.',
+    'Use mcp_validation_dashboard for dashboard/list/latest validator-state views, then job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
+    'Use repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
-    'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
-    'Use mcp_auth_profile to confirm OAuth max-power scopes and WWW-Authenticate challenge metadata.',
+    'Use mcp_connection_readiness view=current-url to recover the configured/current connector URL without passing it as input.',
+    'Use mcp_connection_readiness view=auth-profile to confirm OAuth scopes, Protected Resource Metadata and WWW-Authenticate challenge metadata.',
     'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
     'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
     'After an MCP/Cloudflare reload, use mcp_connector_smoke_refresh as the single normal post-restart gate: it refreshes OAuth/tools/SSE smoke and returns reconciled post-restart readiness in the same response. Keep includeDetails=false unless deep smoke diagnostics are needed.',
-    'Use mcp_cloudflare_remote_audit to compare the Cloudflare-hosted tunnel config, DNS CNAME and expected local origin without exposing API tokens.',
-    'Use mcp_cloudflare_edge_audit to inspect Cloudflare zone rulesets for cache, WAF, rate-limit and transform interference with MCP/OAuth.',
-    'Use mcp_cloudflare_edge_policy_plan before proposing Cloudflare edge changes; it is plan-only and does not mutate rulesets.',
-    'Use mcp_cloudflare_edge_policy_diff to compare actual Cloudflare rulesets with the desired MCP edge policy before any dashboard/API change.',
-    'Use mcp_cloudflare_edge_snapshot to capture tunnel, DNS, edge rulesets and desired-policy diff before any Cloudflare mutation.',
-    'Use mcp_cloudflare_edge_backup_create to persist that snapshot locally before changing Cloudflare cache, WAF or rate-limit policy.',
+    'Use mcp_cloudflare_edge_snapshot with no view (overview) for the consolidated tunnel/DNS/edge/policy-diff rollback snapshot; use explicit view=remote|edge|policy-plan|policy-diff|config|capabilities|skip|passthrough-diff|post-change when only one external Cloudflare projection is needed.',
+    'Cloudflare read views are fixed-external and dispatch directly; view=remote remains compact, cache controls belong only to view=edge|config, and includeDetails belongs only to view=post-change.',
+    'Use mcp_cloudflare_edge_backup_create for an explicit rollback snapshot before manual dashboard/API changes; canonical apply tools create their own mandatory backup immediately before real mutation.',
     'Use mcp_cloudflare_edge_backups_list to find the latest rollback reference before and after Cloudflare policy changes.',
-    'Use mcp_cloudflare_edge_policy_apply dryRun=true first; real Cloudflare mutation requires dryRun=false and confirmApply=true.',
-    'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version, registration counters and response-code counters. Treat cloudflared_tunnel_request_errors as a process-lifetime origin-proxy signal that is advisory by itself: correlate its window delta with HTTP status-code deltas, fresh connector smoke, origin cancellations/errors and HA connection state before classifying transport health.',
+    'Use mcp_cloudflare_edge_policy_apply target=edge-policy|passthrough with dryRun=true first; real Cloudflare mutation requires dryRun=false and confirmApply=true, and creates a mandatory backup immediately before mutation.',
+    'Use mcp_cloudflare_metrics_snapshot (view=metrics by default) for local cloudflared metrics; use view=transport-plan for the controlled transport benchmark design and last persisted comparison. Treat cloudflared_tunnel_request_errors as a process-lifetime origin-proxy signal that is advisory by itself: correlate its window delta with HTTP status-code deltas, fresh connector smoke, origin cancellations/errors and HA connection state before classifying transport health.',
     'Use mcp_devcontainer_network_posture_audit to distinguish current DNS/control-plane faults from stale DevContainer metadata. The canonical Network Control Plane script is .devcontainer/scripts/network-control-plane-state.sh; lifecycle hooks self-heal an unreadable stale configured path when that canonical script is available. Use mcp_devcontainer_network_control_plane_refresh when only the passive aggregated /tmp state needs regeneration: it accepts no command/path, runs exactly bash <canonical-script> --quiet summary with bounds, performs no external network probes, then returns a fresh posture audit.',
     'Use mcp_post_restart_readiness as a read-only diagnostic fallback when you do not want to refresh connector smoke; it is no longer a mandatory step after a successful smoke refresh.',
     'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; after reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
     'Governed Git publication never accepts force, arbitrary remote or arbitrary refspec.',
-    'Use llmb_live_readiness and llmb_live_runs for read-only Model Gateway live evidence; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
-    'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
+    'Use llmb_live_readiness view=readiness or view=runs for read-only Model Gateway live evidence; keep llmb_live_test_plan as least-authority preview; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
+    'Use mcp_connection_readiness view=profile client=claude when adding the same remote MCP server to claude.ai custom connectors.',
     'LLM-B remains a separate runtime process, but the MCP exposes an allowlisted control/test plane over its canonical live harness.',
 ];
 
 const DEFAULT_IO_GUIDANCE = Object.freeze([
-    'Start broad work with mcp_session_profile and mcp_tools_status; request the full capabilities manifest only when needed.',
+    'Start broad work with repo_status; use mcp_capabilities_summary view=session or view=status only when operating-profile or contract detail is needed.',
     'Batch independent reads/searches with repo_read_file.batch, repo_search_text.batch or repo_bulk_inspect to reduce round-trips.',
     'Use repo_working_set when repeated context/symbol work benefits from one bounded prewarmed manifest and O(delta) refresh; broad opens use source-first coverage, known files/symbols can be pinned inside the same cap, and empty refreshes omit duplicate context by default.',
     'Use repo_apply_patch_batch targets[] for several exact edits; operations within each target remain sequential and atomic for that file.',
@@ -324,6 +279,12 @@ export function buildMcpCapabilitiesSummary(options = {}) {
         executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
         executionLimits: MCP_TOOL_EXECUTION_LIMITS,
         workflowPolicyVersion: MCP_WORKFLOW_POLICY_VERSION,
+        toolSurfaceRevision: {
+            semanticContractVersion: MCP_TOOL_CONTRACTS_VERSION,
+            wireRevisionAuthority: 'mcp_capabilities_summary(view=status).descriptorRevisionProfile.globalFingerprint',
+            migrationLedgerAuthority:
+                'src/copilot/docs/WORKSPACE_MCP_TOOL_SURFACE_AUDITORIA_SUPLEMENTAR_RACIONALIZACAO_DESTINO_131_TOOLS_2026-08-27.md',
+        },
         advertisedToolCount: advertisedTools.length,
         groupCounts,
         deprecatedCount: DEPRECATED_TOOLS.length,
@@ -359,15 +320,39 @@ export const metaTools = [
         name: 'mcp_capabilities_summary',
         title: 'MCP capabilities summary',
         description:
-            'Return a compact capability decision surface; request details only for the full tool manifest and guidance.',
+            'Read one local capability projection: compact/full summary, task-first session profile, or contract/risk/wire status.',
         inputSchema: {
+            view: z
+                .enum(['summary', 'session', 'status'])
+                .optional()
+                ['describe']('Projection to read. Default: summary.'),
             includeDetails: z
                 .boolean()
                 .optional()
-                ['describe']('Include full grouped tool names and complete IO guidance. Default: false.'),
+                ['describe']('view=summary only: include grouped tool names and complete IO guidance.'),
         },
 
-        handler: async ({ includeDetails }) =>
-            okResult(buildMcpCapabilitiesSummary({ includeDetails: includeDetails === true })),
+        handler: async ({ view, includeDetails }, operationContext) => {
+            const projection = view ?? 'summary';
+            if (projection === 'session') {
+                if (includeDetails !== undefined) {
+                    return errorResult('includeDetails is valid only with view=summary.', {
+                        code: 'ERR_CAPABILITIES_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                return okResult(buildMcpSessionProfile());
+            }
+            if (projection === 'status') {
+                if (includeDetails !== undefined) {
+                    return errorResult('includeDetails is valid only with view=summary.', {
+                        code: 'ERR_CAPABILITIES_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                return okResult(await readMcpToolsStatus(operationContext));
+            }
+            return okResult(buildMcpCapabilitiesSummary({ includeDetails: includeDetails === true }));
+        },
     }),
 ];

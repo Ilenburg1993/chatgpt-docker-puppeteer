@@ -121,7 +121,7 @@ describe('Patch Target Groups V3 wire', () => {
         assert.equal(await readFile(second.absolutePath, 'utf8'), 'beta');
     });
 
-    it('keeps plan nextCall target-native and does not flatten the V3 request', async () => {
+    it('keeps dry-run preview target-native on the canonical V3 owner', async () => {
         const { repoPath } = await createRepoFile('plan.txt', 'alpha beta');
         const targets = [
             {
@@ -132,13 +132,14 @@ describe('Patch Target Groups V3 wire', () => {
                 ],
             },
         ];
-        const result = await findTool('repo_patch_batch_plan').handler({ targets });
+        const result = await findTool('repo_apply_patch_batch').handler({ targets, dryRun: true });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
-        const nextCall = /** @type {Record<string, unknown>} */ (result.structuredContent?.['nextCall']);
-        const args = /** @type {Record<string, unknown>} */ (nextCall['args']);
-        assert.deepEqual(args['targets'], targets);
-        assert.equal('operations' in args, false);
+        assert.equal(result.structuredContent?.['dryRun'], true);
+        assert.equal(result.structuredContent?.['targetCount'], 1);
+        assert.equal(result.structuredContent?.['operationCount'], 2);
+        const targetSummaries = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['targetSummaries']);
+        assert.equal(targetSummaries[0]?.['path'], repoPath);
     });
 
     it('forces detailed result mode from nested V3 includeDiffPreview', async () => {
@@ -159,16 +160,15 @@ describe('Patch Target Groups V3 wire', () => {
 
     it('publishes a V3-only descriptor and rejects duplicate target identities', async () => {
         const snapshot = buildMcpToolWireDescriptorSnapshot(getCanonicalMcpTools());
-        for (const name of ['repo_apply_patch_batch', 'repo_patch_batch_plan']) {
-            const descriptor = snapshot.descriptors.find((candidate) => candidate.name === name);
-            assert.ok(descriptor, `missing descriptor ${name}`);
-            const schema = /** @type {Record<string, unknown>} */ (descriptor.inputSchema);
-            const properties = /** @type {Record<string, unknown>} */ (schema['properties']);
-            assert.ok('targets' in properties);
-            assert.equal('operations' in properties, false);
-            assert.equal('durability' in properties, false);
-            assert.deepEqual(schema['required'], ['targets']);
-        }
+        const descriptor = snapshot.descriptors.find((candidate) => candidate.name === 'repo_apply_patch_batch');
+        assert.ok(descriptor, 'missing descriptor repo_apply_patch_batch');
+        const schema = /** @type {Record<string, unknown>} */ (descriptor.inputSchema);
+        const properties = /** @type {Record<string, unknown>} */ (schema['properties']);
+        assert.ok('targets' in properties);
+        assert.equal('operations' in properties, false);
+        assert.equal('durability' in properties, false);
+        assert.deepEqual(schema['required'], ['targets']);
+        assert.equal(snapshot.descriptors.some((candidate) => candidate.name === 'repo_patch_batch_plan'), false);
 
         const { repoPath } = await createRepoFile('invalid.txt', 'alpha');
         const tool = findTool('repo_apply_patch_batch');

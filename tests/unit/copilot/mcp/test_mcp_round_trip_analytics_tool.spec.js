@@ -58,6 +58,18 @@ describe('MCP round-trip analytics wire projection', () => {
             byTool: [],
             byRuntimeCohort: {},
         };
+        const executionPolicies = {
+            authority: 'sanitized-effective-execution-policy-metadata-v11',
+            eligibleCalls: 3,
+            observedCalls: 2,
+            coverageRate: 0.6667,
+            byPolicyClass: { 'direct-apply': 1, 'dry-run': 1 },
+            byFailurePolicyClass: { 'fail-fast': 1, 'best-effort': 1 },
+            byConcurrencyClass: { 'parallel-bounded': 1, sequential: 1 },
+            byTool: [],
+            byRuntimeCohort: {},
+            caveat: 'test',
+        };
         const recoveryRecipes = {
             authority: 'bounded-recovery-recipe-disposition-counts-from-tool-completion-metadata-v8',
             callsWithRecipe: 1,
@@ -79,8 +91,8 @@ describe('MCP round-trip analytics wire projection', () => {
             byTool: [],
         };
         const report = {
-            schemaVersion: 9,
-            normalizerVersion: 9,
+            schemaVersion: 11,
+            normalizerVersion: 11,
             authority: 'test-authority',
             windowMs: 3_600_000,
             includeSynthetic: false,
@@ -98,11 +110,18 @@ describe('MCP round-trip analytics wire projection', () => {
             recovery: {},
             workflowPressure: {},
             executionAccounting: {},
+            executionPolicies,
             payloadAccounting: {},
             runtimeCohorts: {},
             optimizationEvidence: {},
             discontinuities: {},
             toolStarts: [],
+            sourceIntegrity: {
+                indexSchemaVersion: 11,
+                normalizerVersion: 11,
+                status: 'materialized',
+                cursor: { generationSequence: 1, lastTransition: 'append' },
+            },
             ingestion: { ok: true },
         };
         const operationContext = /** @type {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} */ (
@@ -119,10 +138,12 @@ describe('MCP round-trip analytics wire projection', () => {
 
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
+        assert.deepEqual(result.structuredContent?.['derivedIndex']?.sourceIntegrity, report.sourceIntegrity);
         assert.deepEqual(result.structuredContent?.['analytics']?.resultOutcomes, resultOutcomes);
         assert.deepEqual(result.structuredContent?.['analytics']?.recoveryRecipes, recoveryRecipes);
         assert.deepEqual(result.structuredContent?.['analytics']?.exactSelfRepair, exactSelfRepair);
         assert.deepEqual(result.structuredContent?.['analytics']?.optionPolicies, optionPolicies);
+        assert.deepEqual(result.structuredContent?.['analytics']?.executionPolicies, executionPolicies);
         assert.deepEqual(result.structuredContent?.['analytics']?.retryTax, {});
     });
 });

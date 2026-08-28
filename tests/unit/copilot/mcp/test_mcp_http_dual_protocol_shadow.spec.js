@@ -86,8 +86,8 @@ describe('MCP HTTP dual protocol shadow', () => {
             assert.equal(modern.protocolVersion, MCP_PROTOCOL_MODERN_VERSION);
             assert.equal(legacy.era, 'legacy');
             assert.equal(legacy.protocolVersion, '2025-11-25');
-            assert.equal(modern.toolNames.length, 131);
-            assert.equal(legacy.toolNames.length, 131);
+            assert.equal(modern.toolNames.length, 89);
+            assert.equal(legacy.toolNames.length, 89);
             assert.deepEqual(new Set(modern.toolNames), new Set(legacy.toolNames));
 
             const summary = await audit.readCompatibilitySummary({ tailBytes: 256 * 1024, maxEvents: 1000 });

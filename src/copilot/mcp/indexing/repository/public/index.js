@@ -6,7 +6,6 @@ export {
     buildRepositoryIndex,
     findRepositoryImports,
     findRepositoryIndexSymbol,
-    invalidateRepositoryIndex,
     readRepositoryIndexStatus,
     searchRepositoryIndex,
 } from '../runtime.js';

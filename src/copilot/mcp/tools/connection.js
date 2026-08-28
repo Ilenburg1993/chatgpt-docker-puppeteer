@@ -2,8 +2,8 @@
 /**
  * ChatGPT / Claude connection MCP wire tools.
  *
- * Connector/OAuth/readiness authority belongs to the connection owner. This module owns wire schemas, annotations and
- * MCP result framing only.
+ * Local connector/readiness projections share one least-authority owner. OAuth issuer probing remains a separate
+ * fixed-external tool so local readiness never inherits network authority.
  *
  * @module copilot/mcp/tools/connection
  */
@@ -20,7 +20,7 @@ import {
     requireMcpToolConnectionConfig,
 } from '#copilot/mcp/public/connection';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
-import { okResult } from '#copilot/mcp/public/protocol/tools';
+import { errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 const {
@@ -32,82 +32,91 @@ const {
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]} */
 export const connectionTools = [
     defineMcpRawTool({
-        name: 'chatgpt_connector_profile',
-        title: 'ChatGPT connector profile',
+        name: 'mcp_connection_readiness',
+        title: 'MCP connection readiness',
         description:
-            'Return the canonical ChatGPT connector form values, tunnel checklist, OAuth posture, HTTP/2+ posture, and smoke prompts for this repo MCP server.',
+            'Read one local connector projection: readiness, ChatGPT/Claude profile, URL validation, current URL state, or OAuth auth profile. Does not perform external probes.',
         inputSchema: {
+            view: z
+                .enum(['readiness', 'profile', 'url-check', 'current-url', 'auth-profile'])
+                .optional()
+                ['describe']('Local connection projection. Default: readiness.'),
+            client: z.enum(['chatgpt', 'claude']).optional()['describe']('view=profile only. Default: chatgpt.'),
             publicMcpUrl: z
                 .string()
+                .max(MAX_URL_LENGTH)
                 .optional()
-                ['describe']('Optional public HTTPS /mcp URL from Cloudflare Tunnel or Secure MCP Tunnel.'),
-        },
-
-        handler: async ({ publicMcpUrl }, operationContext) =>
-            okResult(
-                readChatGptConnectorProfileReport({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
-            ),
-    }),
-    defineMcpRawTool({
-        name: 'claude_connector_profile',
-        title: 'Claude connector profile',
-        description:
-            'Return the canonical Claude custom connector form values, OAuth notes, Cloudflare HTTP/2+ checks and smoke prompts for this repo MCP server.',
-        inputSchema: {
-            publicMcpUrl: z
-                .string()
-                .optional()
-                ['describe']('Optional public HTTPS /mcp URL. Defaults to the permanent Cloudflare hostname.'),
-        },
-
-        handler: async ({ publicMcpUrl }, operationContext) =>
-            okResult(
-                readClaudeConnectorProfileReport({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
-            ),
-    }),
-    defineMcpRawTool({
-        name: 'chatgpt_connector_url_check',
-        title: 'Check ChatGPT connector URL',
-        description: 'Validate that a candidate ChatGPT connector URL is HTTPS, canonical and ends with /mcp.',
-        inputSchema: {
-            publicMcpUrl: z.string().min(1).max(MAX_URL_LENGTH)['describe']('Candidate public connector URL.'),
-        },
-
-        handler: async ({ publicMcpUrl }) => okResult(checkChatGptConnectorUrl(publicMcpUrl)),
-    }),
-    defineMcpRawTool({
-        name: 'chatgpt_connector_current_url_status',
-        title: 'Current ChatGPT connector URL status',
-        description:
-            'Return the currently saved ChatGPT connector URL, validation, tunnel age, OAuth readiness and HTTP/2+ posture without requiring the client to pass a public URL.',
-        inputSchema: {},
-
-        handler: async (_args, operationContext) =>
-            okResult(await readChatGptConnectorCurrentUrlStatus(requireMcpToolConnectionConfig(operationContext))),
-    }),
-    defineMcpRawTool({
-        name: 'mcp_auth_profile',
-        title: 'MCP auth profile',
-        description:
-            'Return the current MCP auth mode, protected resource metadata, scopes, WWW-Authenticate challenge preview, environment templates and rollout gates.',
-        inputSchema: {
+                ['describe']('view=readiness|profile|url-check: optional/candidate public HTTPS /mcp URL.'),
             scopes: z
                 .array(z.string().min(1).max(128))
                 .max(16)
                 .optional()
-                ['describe']('Optional scopes to include in the challenge preview.'),
+                ['describe']('view=auth-profile only: scopes for the challenge preview.'),
         },
 
-        handler: async ({ scopes }, operationContext) => {
+        handler: async ({ view, client, publicMcpUrl, scopes }, operationContext) => {
+            const projection = view ?? 'readiness';
             const config = requireMcpToolConnectionConfig(operationContext);
-            return okResult(readMcpConnectionAuthProfile({ scopes }, config.owner));
+            if (projection === 'profile') {
+                if (scopes !== undefined) {
+                    return errorResult('scopes is valid only with view=auth-profile.', {
+                        code: 'ERR_CONNECTION_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                const input = publicMcpUrl === undefined ? {} : { publicMcpUrl };
+                return okResult(
+                    (client ?? 'chatgpt') === 'claude'
+                        ? readClaudeConnectorProfileReport(input, config)
+                        : readChatGptConnectorProfileReport(input, config),
+                );
+            }
+            if (projection === 'url-check') {
+                if (client !== undefined || scopes !== undefined) {
+                    return errorResult('client/scopes are not valid with view=url-check.', {
+                        code: 'ERR_CONNECTION_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                if (typeof publicMcpUrl !== 'string' || publicMcpUrl.trim().length === 0) {
+                    return errorResult('view=url-check requires publicMcpUrl.', {
+                        code: 'ERR_CONNECTION_URL_REQUIRED',
+                    });
+                }
+                return okResult(checkChatGptConnectorUrl(publicMcpUrl));
+            }
+            if (projection === 'current-url') {
+                if (client !== undefined || publicMcpUrl !== undefined || scopes !== undefined) {
+                    return errorResult('client/publicMcpUrl/scopes are not valid with view=current-url.', {
+                        code: 'ERR_CONNECTION_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                return okResult(await readChatGptConnectorCurrentUrlStatus(config));
+            }
+            if (projection === 'auth-profile') {
+                if (client !== undefined || publicMcpUrl !== undefined) {
+                    return errorResult('client/publicMcpUrl are not valid with view=auth-profile.', {
+                        code: 'ERR_CONNECTION_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                return okResult(readMcpConnectionAuthProfile({ scopes }, config.owner));
+            }
+            if (client !== undefined || scopes !== undefined) {
+                return errorResult('client/scopes require view=profile or view=auth-profile.', {
+                    code: 'ERR_CONNECTION_VIEW_FIELDS',
+                    view: projection,
+                });
+            }
+            return okResult(await readMcpConnectionReadiness({ publicMcpUrl }, config));
         },
     }),
     defineMcpRawTool({
         name: 'mcp_oauth_issuer_diagnostics',
         title: 'MCP OAuth issuer diagnostics',
         description:
-            'Check OAuth authorization server well-known metadata readiness for ChatGPT/MCP without exposing secrets or fetching local/private hosts by default.',
+            'Probe OAuth authorization-server well-known metadata readiness without exposing secrets or fetching local/private hosts by default.',
         inputSchema: {
             issuer: z
                 .string()
@@ -129,23 +138,5 @@ export const connectionTools = [
             const config = requireMcpToolConnectionConfig(operationContext);
             return okResult(await diagnoseMcpOAuthIssuer({ issuer, timeoutMs }, config.owner));
         },
-    }),
-    defineMcpRawTool({
-        name: 'mcp_connection_readiness',
-        title: 'MCP connection readiness',
-        description:
-            'Return one consolidated read-only readiness report for ChatGPT/Claude connector setup, OAuth metadata, Cloudflare tunnel state, HTTP/2+ posture and smoke gates.',
-        inputSchema: {
-            publicMcpUrl: z
-                .string()
-                .max(MAX_URL_LENGTH)
-                .optional()
-                ['describe']('Optional public HTTPS /mcp URL to validate instead of the configured/current URL.'),
-        },
-
-        handler: async ({ publicMcpUrl }, operationContext) =>
-            okResult(
-                await readMcpConnectionReadiness({ publicMcpUrl }, requireMcpToolConnectionConfig(operationContext)),
-            ),
     }),
 ];

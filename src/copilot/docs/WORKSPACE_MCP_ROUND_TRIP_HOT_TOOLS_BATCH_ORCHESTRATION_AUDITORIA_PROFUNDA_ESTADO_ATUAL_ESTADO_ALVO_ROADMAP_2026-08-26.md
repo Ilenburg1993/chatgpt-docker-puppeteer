@@ -2,12 +2,51 @@
 
 ## Auditoria profunda, programa de correções, programa de upgrades e governança permanente — 2026-08-26
 
+> **Auditoria suplementar independente da superfície de tools:**
+> `WORKSPACE_MCP_TOOL_SURFACE_AUDITORIA_SUPLEMENTAR_RACIONALIZACAO_DESTINO_131_TOOLS_2026-08-27.md`.
+> Ela audita separadamente o destino, consolidação e eventual retirada das 131 tools do baseline e
+> **não substitui nem reordena os gates deste roadmap de round-trip**. Implementação suplementar já
+> iniciou: W1/W2/W3 e SUP-2/W4/W5/W6 + SUP-3/W7/W8 levaram o catálogo source-side a **89 tools /
+> 131.652 B**; os dois plan-batch owners também foram aposentados após preview parity em `dryRun`.
+> `mcp_latency_pulse` e `mcp_client_latency_evidence` foram explicitamente preservados porque
+> continuam sendo instrumentos do próprio programa de latência/round-trip.
+>
+> > SUP-1/W3 também preservou o maintenance composite por compressão real de round-trips e evitou
+> > remover `mcp_cloudflare_edge_policy_plan` porque plan/apply ainda não têm policy parity.
+> > SUP-2/W4 consolidou validation state, quarantine reads e Copilot session reads, além de retirar
+> > o score sintético de autonomia. `llmb_live_runs` permanece separado para preservar a leitura
+> > SQLite barata sem acionar readiness mais caro. SUP-2/W5 consolidou meta e connection locais:
+> > capabilities agora possui views summary/session/status; connection readiness possui views
+> > readiness/profile/url-check/current-url/auth-profile. Issuer diagnostics continua separado
+> > `fixed-external`; readiness foi corrigido para authority local. Full source: **101 tools /
+> > 138.558 B**; `mcp-fast`/`mcp-full` verdes com **748/748 testes MCP**. SUP-2/W6 absorveu
+> > persisted runs em `llmb_live_readiness(view=runs)` com prova causal de zero readiness
+> > fingerprint reads. `llmb_live_test_plan` foi preservado como preview read/local porque o run é
+> > write/open-world/model-provider. Full source: **100 tools / 138.225 B**; 750/750 testes MCP
+> > verdes. SUP-3/W7 consolidou nove reads Cloudflare `fixed-external` em
+> > `mcp_cloudflare_edge_snapshot(view=...)`, preservando dispatch opt-in e remote compact. O edge
+> > apply foi corrigido para criar backup apenas imediatamente antes de mutação real confirmada.
+> > Full source: **91 tools / 132.741 B**; latency **53 / 96.461 B**; 754/754 testes MCP verdes.
+> > SUP-3/W8 consolidou os dois mutation entry points em
+> > `mcp_cloudflare_edge_policy_apply(target=...)` e metrics/benchmark-plan em
+> > `mcp_cloudflare_metrics_snapshot(view=metrics|transport-plan)`, mantendo backup create/list e
+> > read snapshot separados por recovery/authority. Full source: **89 tools / 131.652 B**; latency
+> > **52 / 95.952 B**; 755/755 testes MCP verdes. SUP-3 está materialmente concluída.
+>
 > **Status do documento:** CANÔNICO / VIVO / REFERÊNCIA OBRIGATÓRIA.
 >
-> **Revisão documental:** 9.1 — **REAUDITORIA PÓS-III-B3 CONCLUÍDA / ROADMAP III-B REORDENADO POR
-> NOVA EVIDÊNCIA / III-B4-0 DERIVED-INDEX SOURCE-GENERATION INTEGRITY É O PRÓXIMO GATE P0 / NENHUMA
-> NOVA TRANSFORMAÇÃO DE CÓDIGO NESTA REVISÃO**. Roadmaps I e II permanecem concluídos e publicados;
-> III-A permanece encerrado; III-B1 Recovery Recipe, III-B2 Exact Bounded Self-Repair e III-B3 Patch
+> **Revisão operacional atual:** 9.7 — **III-B4-0 SOURCE CERTIFIED / III-B4-1 SOURCE INVESTIGATION CONCLUÍDA / III-B4-2 V11 SOURCE CERTIFIED +
+> EFFECTIVE EXECUTION-POLICY CONTENT-FREE / RAW→DERIVED V11 PARITY EXATA / WIRE DESCRIPTORS INALTERADOS /
+> BROAD GATES VERDES SOB SOURCE BARRIER ESTÁVEL; B4-3 CONTINUA BLOQUEADA ATÉ EVIDÊNCIA LIVE V11**. A revisão 9.2 permanece como investigação de
+> entrada; 44.11 registra a implementação e 44.12 registra a certificação broad final e a decisão de
+> avançar para B4-1. O runtime live conectado continua separado até rollout/reload explícito. O
+> checkpoint de tool-surface permanece W8 (**89 tools / 131.652 B**); B4-0 não alterou advertisement
+> nem semantic contracts da tool surface.
+>
+> **Revisão anterior:** 9.1 — **REAUDITORIA PÓS-III-B3 CONCLUÍDA / ROADMAP III-B REORDENADO POR NOVA
+> EVIDÊNCIA / III-B4-0 DERIVED-INDEX SOURCE-GENERATION INTEGRITY É O PRÓXIMO GATE P0 / NENHUMA NOVA
+> TRANSFORMAÇÃO DE CÓDIGO NESTA REVISÃO**. Roadmaps I e II permanecem concluídos e publicados; III-A
+> permanece encerrado; III-B1 Recovery Recipe, III-B2 Exact Bounded Self-Repair e III-B3 Patch
 > Target Groups V3 estão encerrados code+runtime live. O checkpoint técnico completo foi publicado
 > em `4aec813148b5cc8fd5586733b47cef808fe5245d` com `main == origin/main` e worktree limpa antes
 > desta investigação documental. A nova auditoria encontrou um bug P0 de duplicação cross-identity
@@ -6105,3 +6144,1039 @@ permite saber se qualquer redução posterior é real:
 > **uma fonte lógica de audit deve ser ingerida exatamente uma vez, independentemente de como o
 > filesystem a reexpõe fisicamente; uma geração realmente nova deve permanecer distinguível e
 > preservada.**
+
+---
+
+# 44. Revisão 9.2 — reentrada operacional e implementação III-B4-0
+
+## 44.1 Escopo da reauditoria e contexto reconstruído
+
+Esta revisão não parte do resumo da sessão anterior. Foram relidos integralmente, nesta rodada:
+
+- este documento canônico, **6.136 linhas / 283.386 B**, SHA-256 de entrada
+  `9245c72d8da72d917f3801505a6b8adf34057ef9815e389abed95b682cf94c6a`;
+- `src/copilot/mcp/observability/audit/service.js`, **651 linhas**;
+- `src/copilot/mcp/diagnostics/latency/round-trip/analytics.js`, **673 linhas**;
+- `src/copilot/mcp/diagnostics/latency/round-trip/normalizer.js`, **207 linhas**;
+- `tests/unit/copilot/mcp/test_mcp_round_trip_analytics.spec.js`, **1.317 linhas**;
+- o fresh range snapshot de Application Infra e os consumidores/composition boundaries da capability
+  de analytics.
+
+A branch continua `main == origin/main` no commit `e1af41704`, mas o worktree contém a implementação
+suplementar W1–W8 ainda não publicada e uma **W9 parcial não certificada**. A W9 havia removido os
+três Git plan definitions de `git-write.js` antes de migrar semantic contracts/guidance/tests. O
+resultado foi reproduzido diretamente no registry source-side:
+
+```text
+MCP semantic contract coverage mismatch:
+missing=none
+stale=git_stage_plan,git_commit_plan,git_push_plan
+```
+
+O strict typecheck isolado permanecia verde, provando que este é um invariant runtime/catalog e não
+um erro de tipos. A ordem operacional desta revisão é, portanto:
+
+1. restaurar **somente** a transação W9 incompleta para o boundary W8 certificado;
+2. manter todo W1–W8 intacto;
+3. executar III-B4-0 isoladamente como P0, conforme já determinado pela revisão 9.1;
+4. só retomar SUP-4/W9 depois de a authority derivada estar corrigida e certificada.
+
+Isso não rebaixa o roadmap suplementar: apenas impede que uma alteração independente e ainda
+inconsistente contamine a prova causal de B4-0.
+
+## 44.2 Reprodução atual do P0 — 2026-08-28
+
+A reprodução read-only atual confirmou e ampliou o diagnóstico da revisão 9.1.
+
+### Backing JSONL atual
+
+```text
+path = src/copilot/.ai/audit/mcp-tool-calls.jsonl
+size = ~40,46 MB
+dev:ino = 2128:178412
+raw lines = 109.350
+```
+
+Sob cutoffs calculados na mesma rodada:
+
+| janela | raw audit rows | raw `tool_call_started` | raw eventos indexáveis v9 |
+| -----: | -------------: | ----------------------: | ------------------------: |
+|     1d |         10.043 |                   2.181 |                     5.368 |
+|     7d |         41.466 |                  12.786 |                    28.952 |
+|    14d |         75.733 |              **26.829** |                **58.248** |
+
+### Derived SQLite atual — ainda v9 e não confiável em 14d
+
+```text
+source_identity=2128:178412  rows=58.245  starts=26.827
+source_identity=2096:178412  rows=22.579  starts=10.975
+TOTAL                         rows=80.824  starts=37.802
+```
+
+A join por `(source_offset,event,tool,ts_ms)` encontrou **22.578 duplicate-prefix rows** entre as
+duas physical identities. O cursor `mcp-audit:v9` estava em `2128:178412`, offset ~40,45 MB.
+
+Com cutoff SQLite próprio no mesmo instante:
+
+| janela | derived rows | derived starts | leitura                                           |
+| -----: | -----------: | -------------: | ------------------------------------------------- |
+|     1d |        5.366 |          2.180 | paridade efetiva; diferença transitória de cursor |
+|     7d |       28.950 |         12.785 | paridade efetiva; diferença transitória de cursor |
+|    14d |   **80.825** |     **37.803** | contaminado pelo prefixo histórico duplicado      |
+
+A diferença 14d de starts é praticamente a geração antiga inteira. Isso confirma que o defeito não é
+agregação estatística: é **identity/ingestion authority**.
+
+## 44.3 Causa raiz confirmada no source
+
+O source v9 usa `dev:ino` para duas funções que precisam ser distintas:
+
+1. **physical backing identity** — detectar que o path passou a apontar para outro inode/device;
+2. **logical source generation** — namespace de unicidade dos offsets ingeridos.
+
+Quando o cursor possui identity A e `readSlice(offset)` devolve identity B, o `sync()` atual
+executa:
+
+```text
+offset = 0
+expectedIdentity = B
+continue
+```
+
+mas mantém as rows de A. O mesmo prefixo reaparece então como `(B, source_offset)`, formando uma
+segunda história lógica para os mesmos bytes.
+
+O segundo ramo é igualmente perigoso: quando `resetRequired` ocorre sob a mesma physical identity, o
+código faz `DELETE FROM events WHERE source_identity = currentIdentity`. Isso trata truncation/
+copytruncate como autorização para apagar toda a história daquela geração.
+
+O writer atual é append-only, mas o reader/index precisa continuar correto mesmo sob rebind,
+replacement, restore, copytruncate ou filesystem remount. A correção não pode depender do
+comportamento feliz do writer atual.
+
+## 44.4 Invariants normativos B4-0
+
+A implementação v10 deve obedecer simultaneamente aos seguintes invariants:
+
+1. **JSONL é source of record; SQLite continua inteiramente rebuildable.**
+2. `physicalFileIdentity` e `sourceGeneration` são conceitos e campos distintos.
+3. um physical rebind só cria nova geração quando a continuidade de bytes não pode ser provada.
+4. o caminho comum mantém um **boundary anchor** content-free: SHA-256 domain-separated de no máximo
+   os últimos **4 KiB** imediatamente anteriores ao offset certificado. Esse anchor prova o
+   boundary, **não o prefixo inteiro**.
+5. paralelamente, o cursor mantém um SHA-256 **record hash-chain** content-free de todos os records
+   JSONL newline-committed até o offset. O chain é atualizado incrementalmente no caminho comum.
+6. se `dev:ino` mudar e o boundary anchor continuar igual, `rebind` só pode ser aceito após um
+   **full-prefix proof** raro: recomputar o hash-chain de `[0,cursorOffset]` em um snapshot físico
+   consistente e provar igualdade com o chain persistido. Boundary igual sem full-prefix equality é
+   `new-generation:replacement`, não rebind.
+7. os tokens incluem versão/domain/boundary ou record offsets/bytes conforme o primitive e nunca são
+   devolvidos como conteúdo bruto ao caller; outputs públicos expõem apenas presença/versão.
+8. file size < cursor offset => nova geração lógica; história antiga permanece.
+9. boundary anchor divergente => nova geração lógica, seja o `dev:ino` igual ou diferente; história
+   antiga permanece. Em physical rebind com boundary igual, o full-prefix chain decide.
+10. physical identity igual **não** autoriza confiar no boundary: o anchor continua protegendo
+    copytruncate/rewrite+regrow próximo ao cursor. O writer authority permanece append-only; provar
+    arbitrariamente todo o prefixo sob o mesmo inode em todo append exigiria O(n) por sync e não é o
+    contrato desta faixa.
+11. source temporariamente ausente não deve destruir/avançar cursor existente.
+12. nenhuma mudança de generation pode depender de global row dedupe.
+13. insert de eventos + avanço do cursor/generation permanece uma transação SQLite única.
+14. crash antes da transação pode repetir leitura, mas não pode duplicar rows; crash depois da
+    transação deve retomar do novo cursor.
+15. retention permanece temporal e cross-generation; nunca é usada como mecanismo de reset.
+16. ambiguity/race entre range snapshots deve falhar de forma visível/conservadora, nunca ingerir
+    bytes sob lineage não comprovada.
+
+## 44.5 State machine fechada antes do código
+
+| estado do cursor/source      | evidência atual                                                | decisão                               | efeito no histórico                           |
+| ---------------------------- | -------------------------------------------------------------- | ------------------------------------- | --------------------------------------------- |
+| sem cursor, arquivo presente | qualquer                                                       | `bootstrap g1 @ 0`                    | inicia geração                                |
+| sem cursor, arquivo ausente  | n/a                                                            | `source-absent`                       | nenhuma mutação                               |
+| cursor @ 0                   | arquivo presente                                               | mesma geração; physical pode rebinder | nenhuma reingestão                            |
+| cursor > 0                   | `size >= offset` e anchor igual                                | `append/idle`                         | continua do offset                            |
+| cursor > 0 + physical mudou  | `size >= offset`, boundary igual **e full-prefix chain igual** | `rebind`                              | **mesma geração**, atualiza physical identity |
+| cursor > 0                   | `size < offset`                                                | `new-generation:truncated`            | preserva geração anterior; nova @ 0           |
+| cursor > 0 + physical igual  | anchor divergente                                              | `new-generation:rewrite`              | preserva geração anterior; nova @ 0           |
+| cursor > 0 + physical mudou  | boundary divergente **ou full-prefix chain divergente**        | `new-generation:replacement`          | preserva geração anterior; nova @ 0           |
+| qualquer                     | source ausente                                                 | `source-absent`                       | cursor anterior intacto                       |
+| qualquer                     | snapshot/boundary/prefix-proof race                            | `fail-visible`                        | nenhum ingest/cursor advance                  |
+
+“True rotation” não precisa ser inferida de `dev:ino` por si. Se o novo backing contém exatamente o
+mesmo prefixo certificado, ele é semanticamente a mesma fonte lógica para fins de ingestão; se não
+contém, nasce nova geração. Isso é mais forte e mais portátil que tentar adivinhar a intenção do
+filesystem.
+
+## 44.6 Contrato do audit slice v10
+
+`readSlice` deixa de decidir reset policy. Seu papel passa a ser somente fornecer uma observação
+física consistente e bounded:
+
+- `physicalFileIdentity`;
+- `fileBytes`;
+- `requestedOffset`, `startOffset`, `nextOffset`;
+- `offsetPastEnd` em vez de reler silenciosamente offset zero;
+- entries **somente newline-committed**; trailing partial line nunca avança cursor;
+- `eventLimitReached` corta o byte cursor exatamente após o último event devolvido, sem skip;
+- `continuityAtStart` / `continuityAtNext` como boundary anchors SHA-256;
+- `sequenceAtStart` / `sequenceAtNext` como SHA-256 record chain incremental;
+- `readPrefixProof({offset})` como caminho raro O(prefix) usado exclusivamente para certificar
+  physical rebind quando o boundary local sozinho não prova o prefixo completo;
+- nenhuma linha/raw payload dentro da continuity/sequence metadata; cursor público mostra apenas
+  `tokenPresent`.
+
+Para não criar race nova, boundary prefix + chunk + next boundary pertencem ao **mesmo range
+snapshot**. No rebind, o prefix proof usa outro snapshot fisicamente consistente e sua
+`physicalFileIdentity` deve ser idêntica à do slice observado; disagreement falha fechado em vez de
+classificar lineage. Um record sem newline é pendente, não inválido/consumido. Um record maior que o
+slice budget sem newline falha visivelmente (`EAUDITRECORDTOOLARGE`) em vez de produzir
+zero-progress loop.
+
+## 44.7 Estratégia de schema/rebuild v10
+
+A revisão 9.2 rejeita reinterpretar as rows v9 contaminadas. O plano é:
+
+- bump `MCP_ROUND_TRIP_NORMALIZER_VERSION` para **10**;
+- introduzir metadata própria de schema do derived index; não usar `PRAGMA user_version` porque o
+  SQLite é compartilhado por outros owners;
+- ao primeiro owner mutável v10, reconstruir explicitamente as tabelas **derivadas** de round-trip;
+  isso é permitido porque o JSONL permanece authority;
+- o read-only snapshot deve reconhecer v9/metadata ausente como `rebuild-required` e **não**
+  publicar a janela contaminada durante a transição;
+- event rows v10 usam `source_generation + source_offset` como chave lógica e carregam
+  `physical_file_identity` apenas como evidence diagnóstica;
+- cursor v10 persiste geração lógica, sequence, physical identity atual, byte offset, file bytes,
+  continuity token/window e counters bounded de rebind/new-generation;
+- nenhuma tabela externa ao owner round-trip conhece hoje esses nomes; a busca source-wide confirmou
+  que a migração está encapsulada em `analytics.js` + testes.
+
+A troca de schema deve ser transacional. Não haverá compat shim de leitura v9: ou a derived index
+está materializada como v10, ou o snapshot read-only informa indisponibilidade/rebuild requerido.
+
+## 44.8 Test matrix causal — obrigatória antes da implementação principal
+
+- [x] append normal, mesma physical identity e anchor contínuo;
+- [x] idle/EOF repetido é idempotente;
+- [x] mesmo conteúdo/prefixo sob novo `dev` e inode equivalente => **rebind sem replay**;
+- [x] mesmo conteúdo/prefixo sob `dev:ino` totalmente diferente => **rebind sem replay**;
+- [x] physical identity nova com prefixo divergente => nova geração, ambas preservadas;
+- [x] replacement menor que cursor => nova geração, ambas preservadas;
+- [x] copytruncate-like na mesma physical identity => nova geração, história anterior preservada;
+- [x] rewrite+regrow acima do cursor com anchor divergente => nova geração;
+- [x] restart em boundary de chunk/newline não perde nem duplica evento;
+- [x] crash lógico entre rows e cursor é coberto pela transação única;
+- [x] retention elimina somente por `ts_ms`, inclusive cross-generation;
+- [x] source ausente preserva cursor e não inventa geração;
+- [x] race cross-snapshot falha sem ingest;
+- [x] repeated sync após rebind/rotation é idempotente;
+- [x] read-only snapshot v9/sem meta não publica analytics contaminado.
+- [x] physical rebind com **mesmos últimos 4 KiB mas byte antigo divergente** não é aceito como
+      rebind;
+- [x] `maxEvents` não avança o cursor além do último event realmente devolvido;
+- [x] trailing JSONL sem newline permanece pendente e é consumido somente após commit por `\n`;
+- [x] matching schema com normalizer generation stale é `rebuild-required`;
+- [x] index parcialmente reconstruído é `materializing/catch-up-required`, nunca authority
+      publicável;
+
+## 44.9 Plano executável III-B4-0 — revisão 9.2
+
+### Fase A — restaurar boundary certificado e congelar unrelated work
+
+- [x] reverter somente a meia-W9 de `git-write.js` ao estado W8;
+- [x] provar registry novamente construível em 89 tools e semantic coverage exata;
+- [x] não prosseguir SUP-4/W9 durante B4-0.
+
+### Fase B — continuity contract do raw reader
+
+- [x] adicionar continuity anchor bounded/domain-separated ao audit slice;
+- [x] separar `physicalFileIdentity` de qualquer conceito lógico;
+- [x] remover reset-to-zero policy do reader; expor `offsetPastEnd`;
+- [x] adicionar testes reais do audit capability para anchor, append, rebind e race-safe behavior.
+
+### Fase C — derived index v10
+
+- [x] bump normalizer/index generation para v10;
+- [x] introduzir schema metadata próprio;
+- [x] substituir `source_identity` por `source_generation` + `physical_file_identity` no schema v10;
+- [x] implementar cursor v10 com continuity proof e generation counters;
+- [x] implementar state machine da seção 44.5;
+- [x] eliminar `DELETE source_identity` como reset mechanism;
+- [x] manter rows + cursor atomicamente transacionais;
+- [x] tornar snapshot read-only fail-closed para schema anterior.
+
+### Fase D — causal/unit/static gates
+
+- [x] fechar integralmente a matrix 44.8;
+- [x] focused `test_mcp_audit` + `test_mcp_round_trip_analytics`;
+- [x] strict typecheck;
+- [ ] lint changed;
+- [ ] architecture contract se boundary/import mudar;
+- [x] `git diff --check`.
+
+### Fase E — rebuild real isolado e raw↔derived authority gate
+
+Para não mutar o SQLite live enquanto o MCP v9 conectado ainda pode executar seu monitor:
+
+- [x] criar SQLite temporário isolado;
+- [x] usar o **JSONL real atual** através do owner v10 para catch-up completo;
+- [x] comparar raw vs derived sob o mesmo `now`, cutoff e filtro para 1d/7d/14d;
+- [x] `duplicatePrefixReplayCount == 0`;
+- [x] provar rebind testado sem replay e true new-generation preservando duas histórias;
+- [x] medir bytes/chunks/duração do catch-up e do incremental EOF para regressão de performance.
+
+### Fase F — broad source certification
+
+- [x] `mcp-fast` sobre source estável;
+- [x] `mcp-full` sobre os mesmos bytes;
+- [x] registrar fingerprints/contagens finais relevantes;
+- [x] atualizar esta seção com before/after real e decisão explícita sobre B4-1;
+- [ ] somente depois preparar rollout/reload live de v10 e a acceptance runtime correspondente.
+
+## 44.10 Critérios objetivos de fechamento B4-0
+
+B4-0 **não** é concluída apenas porque os testes passam. O gate source exige:
+
+1. nenhuma replay duplication em rebind causal;
+2. duas gerações preservadas em replacement/rotation causal;
+3. truncation/rewrite sem `DELETE` histórico;
+4. snapshot fail-closed enquanto schema antigo não foi reconstruído;
+5. JSONL real -> SQLite temporário v10 com paridade de starts/eventos indexáveis sob cutoffs iguais;
+6. repeated catch-up idempotente;
+7. custo incremental bounded e sem regressão material;
+8. broad suite verde sobre bytes congelados.
+
+O **gate live** permanece separado: o database conectado hoje continua v9 até restart/promotion. Ele
+só volta a ser authority para janela longa após o runtime v10 materializar o novo index e repetir o
+gate de paridade no processo promovido.
+
+## 44.11 Checkpoint de implementação 9.3 — candidate pré-broad
+
+### 44.11.1 Bugs/gaps adicionais encontrados e corrigidos durante B4-0
+
+A implementação test-first expôs problemas que não estavam todos explícitos na revisão 9.2. Eles
+foram corrigidos na mesma faixa porque afetam diretamente integridade ou publicabilidade da derived
+authority:
+
+1. **cross-inode prefix replay P0** — corrigido pela separação physical identity / logical
+   generation;
+2. **boundary anchor de 4 KiB era insuficiente como prova do prefixo inteiro** — reclassificado como
+   boundary anchor; physical rebind agora exige full-prefix SHA-256 record chain;
+3. **`maxEvents` podia causar data loss** — o reader devolvia só N eventos, mas avançava
+   `nextOffset` por todo o chunk; agora byte cursor para exatamente após o último event devolvido;
+4. **trailing partial JSONL podia ser consumido cedo demais** — newline virou commit marker
+   explícito; fragmento sem `\n` permanece pendente sem contar como invalid line;
+5. **record > slice sem newline podia criar zero-progress** — agora falha visivelmente com
+   `EAUDITRECORDTOOLARGE`;
+6. **schema v10 parcialmente materializado podia ser publicado** — monitor usa 1 chunk/ciclo;
+   snapshots agora ficam `materializing/catch-up-required` até `byteOffset >= fileBytes`;
+7. **generation validity considerava só schema version** — agora exige `schema_version` **e**
+   `normalizer_version`;
+8. **race no rebuild metadata check** — o check de generation é repetido dentro da write
+   transaction, impedindo segundo processo de derrubar um v10 recém-reconstruído;
+9. **shape do snapshot unavailable estava duplicado e incompleto** — agora deriva do summarizer
+   canônico, incluindo `recoveryRecipes`, `exactSelfRepair`, `optionPolicies` e futuros campos;
+10. **sync failure shape era parcial** — success/failure agora compartilham a estrutura de lineage,
+    materialization e proof counters;
+11. **full-prefix proof não tinha telemetry** — monitor/runtime-health retêm proof count/bytes, além
+    de rebind/new-generation sequence/transition.
+
+### 44.11.2 Prova causal final antes dos gates broad
+
+Focused state atual:
+
+- audit capability, analytics e source-generation filesystem E2E: **49/49 verdes**;
+- monitor + wire tool + dashboard/tool integration: **70/70 verdes**;
+- strict `src/copilot`: **verde**;
+- `git diff --check`: **verde**.
+
+Casos particularmente fortes:
+
+- byte-identical `rename` para inode novo + append => uma única logical generation, sem replay;
+- replacement com prefixo realmente divergente => geração nova, história anterior preservada;
+- replacement >4 KiB que altera somente um record antigo e mantém **os mesmos últimos 4 KiB** =>
+  boundary anchor coincide, full-prefix chain diverge, portanto `g2` é criado corretamente;
+- copytruncate/rewrite+regrow => geração nova sem `DELETE` histórico;
+- cursor insert abortado por trigger SQLite => event rows também fazem rollback;
+- source ausente => cursor certificado permanece intacto;
+- partial catch-up => rows podem existir internamente, mas `available=false` até materialização
+  completa.
+
+### 44.11.3 Full-prefix proof — custo observado no audit real
+
+Contra o JSONL live com **40.613.830 B**, uma recomputação completa read-only de prefix proof
+consumiu **40.613.830 B em ~359,6 ms**, com `sourcePresent=true`, `prefixAvailable=true`, boundary
+window de 4 KiB e sequence proof v1. O arquivo permaneceu na mesma physical identity durante a
+medição.
+
+Esse O(prefix) não está no hot path: só ocorre quando `physicalFileIdentity` muda **e** o boundary
+anchor ainda coincide. O append path continua incremental e atualiza o hash-chain apenas para
+records novos.
+
+### 44.11.4 Gate raw↔derived real final após todos os hardenings
+
+Foi criado outro SQLite temporário isolado e usado um snapshot estável do **JSONL real**, sem tocar
+`data/copilot.sqlite` do runtime v9 conectado.
+
+```text
+raw snapshot bytes       = 40.625.243
+raw lines                = 109.590
+raw invalid JSON lines   = 5
+raw normalized events    = 80.371
+v10 catch-up chunks      = 10 x ~4 MiB
+v10 indexed events       = 80.371
+full-prefix proofs build = 0
+full-prefix proof bytes  = 0
+catch-up duration        = ~10.476,95 ms
+EOF next sync            = 1 chunk / 0 B / 0 events / ~5,22 ms
+duplicatePrefixReplay    = 0
+logical generations      = 1 (g1) no rebuild normal
+schema/normalizer        = 10 / 10
+sequence proof           = v1 / tokenPresent=true
+```
+
+Com **o mesmo `now`** para raw e derived:
+
+| janela | raw rows | v10 rows | delta rows | raw starts | v10 starts | delta starts |
+| -----: | -------: | -------: | ---------: | ---------: | ---------: | -----------: |
+|     1d |    5.326 |    5.326 |      **0** |      2.181 |      2.181 |        **0** |
+|     7d |   29.085 |   29.085 |      **0** |     12.842 |     12.842 |        **0** |
+|    14d |   58.411 |   58.411 |      **0** |     26.900 |     26.900 |        **0** |
+
+Portanto o candidate atual fecha simultaneamente a inflação histórica observada no v9 e a paridade
+raw↔derived sob o owner v10 fortalecido. O custo de rebuild subiu modestamente em relação à medição
+anterior (~9,75 s -> ~10,48 s) por causa do hash-chain por record; o hot EOF permaneceu na ordem de
+milissegundos e o build normal executou **zero** full-prefix proofs.
+
+### 44.11.5 Estado dos gates e próximos passos imediatos
+
+Concluído:
+
+- [x] Fase A — boundary W8 restaurado;
+- [x] Fase B — raw continuity/sequence contract;
+- [x] Fase C — derived v10 + state machine;
+- [x] causal matrix expandida;
+- [x] focused tests;
+- [x] strict;
+- [x] diff-check;
+- [x] Fase E — rebuild real isolado e parity exata.
+
+Ainda obrigatório antes de chamar B4-0 de source-certified:
+
+- [x] `lint:copilot:changed`;
+- [x] architecture contract/check;
+- [x] `mcp-fast` sobre bytes estáveis;
+- [x] `mcp-full` sobre os mesmos bytes;
+- [x] fingerprint/contagens finais e atualização deste roadmap;
+- [x] decisão explícita de avançar ou não para III-B4-1.
+
+O SQLite/runtime **live** continua deliberadamente v9 até um rollout/reload posterior. Não usar o
+live 14d como authority antes da promotion v10 e do gate runtime pós-restart.
+
+
+## 44.12 Revisão 9.4 — certificação broad final de B4-0 e liberação de B4-1
+
+### 44.12.1 Source barrier final
+
+Após o primeiro broad gate revelar que os novos counters de source-generation faziam o payload compacto
+normal de `mcp_runtime_health` ultrapassar 6 KiB, a observabilidade foi tornada **evidence-sparse**:
+
+- `sourceTransition` só é publicado quando reset/rebind/new-generation/sequence/transition realmente
+  existem;
+- `prefixProof` só é publicado quando ao menos um full-prefix proof ocorreu;
+- o monitor interno preserva os counters completos; nenhum diagnóstico raro foi perdido;
+- o hot payload normal voltou ao budget anterior.
+
+O focused regression correspondente fechou **10/10**. A candidate pós-correção foi congelada por
+`source-barrier capture-worktree`:
+
+```text
+barrier schema         = copilot.repository-source-barrier v2
+entries                = 95
+absent/tombstone       = 11
+candidate fingerprint  = cda30849d014a55f9f4f0a709b31d9ccc12b01829128c2fa793755e57abb2669
+```
+
+### 44.12.2 `mcp-fast` e `mcp-full` sobre exatamente os mesmos bytes
+
+`mcp-fast`:
+
+```text
+success      = true
+typecheck    = green
+test files   = 127/127
+tests        = 769/769
+duration     = ~70,7 s
+barrier end  = cda30849d014a55f9f4f0a709b31d9ccc12b01829128c2fa793755e57abb2669
+```
+
+`mcp-full`, sem qualquer source mutation entre os dois gates:
+
+```text
+success               = true
+strict typecheck       = green
+lint changed           = green (78 files)
+docs contract          = green
+architecture contract  = green
+full Copilot lint      = green
+unit MCP files         = 127/127
+unit MCP tests         = 769/769
+duration               = ~113,7 s
+barrier end            = cda30849d014a55f9f4f0a709b31d9ccc12b01829128c2fa793755e57abb2669
+```
+
+Logo B4-0 não depende apenas de focused fixtures: a mesma árvore passou pelos broad gates completos sem
+mudança de bytes durante nenhum deles.
+
+### 44.12.3 Architecture ratchet encontrado no broad-prep
+
+O primeiro architecture gate encontrou somente:
+
+```text
+#copilot/mcp/public/transport/http/stateful/router
+closure = 620.878 B
+standard tier limit = 614.400 B
+```
+
+Não havia cycle, unresolved import, alias mismatch, owner mismatch, import-purity finding ou mutable
+state gap. A investigação mostrou que esse public surface:
+
+- já é carregado por `await import(...)` no HTTP adapter;
+- tinha baseline histórico individual de `608.791 B` e teto individual de `913.187 B`;
+- portanto já era semanticamente um graph heavy/lazy quase no teto `standard` antes de B4-0.
+
+A correção foi **reclassificar somente esse alias de `standard` para `heavy`**, sem elevar nenhum teto
+global e mantendo o baseline individual como ratchet. O architecture contract final ficou integralmente
+verde (`cycles=[]`, manifest/cost/import-purity/owners/mutable-state sem violations).
+
+### 44.12.4 Fingerprints e surface source atuais
+
+B4-0 não altera a tool surface. A árvore certificada mantém o boundary W8:
+
+```text
+full tools          = 89
+full envelope       = 131.652 B
+full fingerprint    = 19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac
+latency tools       = 52
+latency envelope    = 95.952 B
+latency fingerprint = 93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d
+CAPABILITIES_VERSION = 71
+```
+
+Hashes dos principais owners B4-0 no checkpoint broad:
+
+```text
+audit/service.js                         29b0d26575a0f759c3d6825f978f4326bc0d065c989fac02d0a2507f5025382b
+round-trip/analytics.js                  89f8439aa5dd706e9e12dc42968697c72147beffb6e03c6f856ffcaf044fb389
+round-trip/monitor.js                    c38bbcb970dcdcc9253a10bf1f58d36c049f0402a871fd698f3ec108fea4cf4f
+round-trip/normalizer.js                 94fb73000d7257be5c4befbe173dfcfb55cca70dd13d63c1235f0deebb72ec50
+round-trip/summary.js                    a97cdded64bf75f0c62ea11bbab1270b55833fd3b0b44d595404c0f8ff335337
+runtime-health/runtime.js                527cb3d928433f1092e563b439b344ffb6d5fe2bf6a7edbc3fb07ebe9d6ec889
+```
+
+### 44.12.5 Decisão de gate
+
+**III-B4-0 está SOURCE CERTIFIED.** Os oito critérios de 44.10 foram satisfeitos no source candidate.
+O gate live continua separado: o processo conectado ainda precisa de rollout/reload v10 e acceptance
+runtime antes de a derived 14d live voltar a ser usada como promotion authority.
+
+**III-B4-1 está liberado para investigação/experimento source-side.** A liberação não autoriza tornar
+uma reduced surface default. O primeiro passo é recalcular toda a frontier usando a realidade pós-W8:
+**89 tools full / 52 latency**, e não o antigo baseline 131/71. A frontier deve ser derivada novamente
+do raw JSONL/current descriptors e manter `full` como fallback/default até A/B host-side real.
+
+Checklist de transição:
+
+- [x] B4-0 causal matrix;
+- [x] raw↔derived parity real;
+- [x] incremental/performance gate;
+- [x] strict/lint/docs/architecture;
+- [x] `mcp-fast` 769/769;
+- [x] `mcp-full` 769/769;
+- [x] stable source barrier durante ambos broad gates;
+- [x] registrar fingerprints/source counts;
+- [x] liberar B4-1 **somente para investigação e experimentação reversível**;
+- [ ] recalcular B4-1 Pareto frontier 98% / 99% / 99,5% sobre o catálogo atual;
+- [ ] medir descriptor/envelope/input-schema bytes dos candidates;
+- [ ] classificar misses como normal-workflow vs escalation/exception;
+- [ ] somente depois desenhar A/B host-side; nenhum default change nesta etapa inicial.
+
+
+## 44.13 III-B4-1 — rebaseline pós-W8, frontier exata e decisão source-side
+
+B4-1 foi reaberta somente depois da certificação source de B4-0. O baseline antigo `131 full / 71
+latency` não é mais operacional: a racionalização suplementar W1→W8 reduziu o catálogo source para
+**89 tools**, com `latency=52`.
+
+### 44.13.1 Authority usada e normalização histórica
+
+O runtime live conectado ainda pertence à geração anterior e, portanto, o raw JSONL recente contém
+entry points já aposentados no source. Para não confundir “nome antigo” com “capacidade ausente”, a
+medição source-side usou:
+
+1. **raw JSONL direto** como authority de calls;
+2. catálogo source W8 como authority de tools disponíveis;
+3. ledger de migração W1→W8 para projetar nomes aposentados no owner atual;
+4. duas retiradas sem call replacement (`repo_index_invalidate`, hoje coherence automática, e
+   `mcp_golden_prompts`, hoje fixture/docs) tratadas separadamente em vez de virarem misses falsos.
+
+Snapshot principal: aproximadamente `2026-08-28T04:16:51Z`.
+
+```text
+full source     = 89 tools / 131.652 B
+latency source  = 52 tools / 95.952 B
+full inputSchema bytes    = 66.595
+latency inputSchema bytes = 49.578
+```
+
+### 44.13.2 Coverage raw normalizada da `latency`
+
+```text
+24h addressable starts = 2.163
+latency covered        = 2.083 = 96,301%
+
+7d addressable starts  = 12.893
+latency covered        = 12.671 = 98,278%
+
+14d addressable starts = 26.946
+latency covered        = 25.523 = 94,720%
+```
+
+A janela 14d continua sendo **histórica/cohort-drift**, não alvo para decidir um default estático de
+agosto: nela aparecem fluxos Git granulares, LLM-B e entry points de campanhas anteriores em volume
+muito maior que no workload atual.
+
+### 44.13.3 Pareto frontier exata — menor número de additions, depois menor descriptor cost
+
+Foi resolvido um problema 0/1 bounded sobre as 37 tools fora de `latency`, exigindo simultaneamente o
+threshold em 24h e 7d. O objetivo lexicográfico foi:
+
+1. menor número de tools adicionadas;
+2. em empate, menor soma de descriptor bytes.
+
+| alvo simultâneo | tools | additions | envelope SDK | economia vs full | coverage 24h | coverage 7d |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 98% | 55 | 3 | 98.056 B | 33.596 B | 98,058% | 98,790% |
+| 99% | 57 | 5 | 100.158 B | 31.494 B | 99,029% | 99,108% |
+| 99,5% | 62 | 10 | 104.760 B | 26.892 B | 99,538% | 99,504% |
+
+Candidate 98% exato:
+
+```text
+mcp_tool_payload_audit
+mcp_smoke_workspace
+mcp_reload_status
+```
+
+Candidate 99% exato:
+
+```text
+mcp_tool_payload_audit
+mcp_smoke_workspace
+mcp_reload_plan
+mcp_reload_status
+mcp_reload_schedule
+```
+
+Candidate 99,5% exato adiciona ainda:
+
+```text
+git_stage
+git_commit
+git_push
+llmb_live_readiness
+mcp_oauth_friction_audit
+```
+
+### 44.13.4 Por que a frontier bruta não deve virar mode/default
+
+A decomposição dos **misses da `latency`** mostrou:
+
+```text
+24h misses = 80
+51,3% admin-restart
+20,0% measurement
+12,5% admin-diagnostic
+11,3% git-fallback
+ 2,5% repo-specialist
+ 2,5% llmb-workload
+
+7d misses = 222
+31,1% admin-restart
+25,7% git-fallback
+20,3% admin-diagnostic
+ 9,5% measurement
+ 5,9% llmb-workload
+ 3,6% repo-specialist
+ 3,6% admin-maintenance
+ 0,5% repo-maintenance
+```
+
+Logo o déficit de coverage global é predominantemente **cohort/campaign-specific**. No subconjunto
+`core coding = latency + repo-specialist`, a própria `latency` cobre:
+
+```text
+24h = 99,9041%
+7d  = 99,9369%
+14d = 99,8123%
+```
+
+Isso falsifica a hipótese de que “faltam várias tools normais” no surface de baixa latência. O que
+falta são principalmente controles de restart/admin, instrumentation da própria campanha, fallback
+Git granular e workloads especializados.
+
+### 44.13.5 Decisão source-side B4-1
+
+**Não criar agora um novo static mode `high-coverage-99`/`99.5`.** Isso cristalizaria no contrato uma
+lista dominada pela campanha atual de restart/payload/validation e transformaria telemetry recente em
+arquitetura permanente.
+
+A infraestrutura necessária para um A/B reversível **já existe**:
+
+```text
+COPILOT_MCP_TOOL_SURFACE=latency
+COPILOT_MCP_TOOL_SURFACE_INCLUDE=<candidate additions>
+```
+
+Portanto:
+
+- `full` continua default/fallback;
+- `latency` continua candidate core-coding;
+- additions serão fornecidas como configuração do experimento, não como novo enum permanente;
+- o A/B host-side só deve ocorrer depois do rollout live da geração atual e com uma cohort que não
+  misture artificialmente a própria campanha de instrumentação;
+- misses devem ser reportados por classe de workload, não apenas por count agregado.
+
+Checklist B4-1 source-side:
+
+- [x] rebaseline sobre catálogo atual 89/52;
+- [x] raw-direct + migration-aware coverage;
+- [x] frontier 98/99/99,5 simultânea em 24h/7d;
+- [x] envelope/input-schema medidos pelo SDK real;
+- [x] misses classificados em core vs admin/recovery/integration;
+- [x] full fallback permanece trivial;
+- [x] rejeitado novo mode estático permanente neste checkpoint;
+- [ ] rollout live da geração source atual;
+- [ ] A/B host-side real com `latency + include`, usando cohort controlada;
+- [ ] medir TTFT/selection error/fallback rate no host antes de qualquer mudança de default.
+
+**Status:** investigação e preparação source-side de B4-1 concluídas; promotion/default change **não
+aprovados**. O item live/A-B permanece aberto e não bloqueia a instrumentação observacional de B4-2,
+desde que B4-2 não use o derived live v9 como authority.
+
+
+## 44.14 III-B4-2 — plano normativo de effective execution-policy telemetry
+
+A investigação B4-2 começa com uma distinção epistemológica: `executionMode` é útil como label
+operacional, mas não prova separadamente qual preflight path, failure policy e classe de concurrency
+**foram efetivamente executados**. Também não é correto reconstruir isso dos args, porque defaults e
+branches mudam o run real.
+
+### 44.14.1 Evidência raw antes da mudança
+
+No raw JSONL dos últimos 14 dias existem `1.834` completions de `repo_apply_patch_batch`:
+
+```text
+1.690  executionMode ausente / geração histórica pré-telemetria
+   99  patch-apply:per-target-fast:fail-fast | success
+   27  patch-apply:per-target-fast:fail-fast | resultState legado/null
+   14  patch-apply:per-target-fast:fail-fast | domain-failure
+    3  patch-dry-run:best-effort | success
+    1  patch-apply:global-preflight:fail-fast:post-validated | success
+```
+
+Entre os `144` completions que já possuem `executionMode`, **140** usam `per-target-fast + fail-fast`.
+Esse padrão é materialmente diferente do default de schema `per-target-fast + best-effort`; portanto
+B4-3 não pode desenhar profiles a partir do default documentado nem a partir dos args crus.
+
+### 44.14.2 Owner da verdade efetiva
+
+`workspace/repository/write/patch-batch/workflow.js` já calcula antes/ao executar:
+
+```text
+effectiveApplyMode
+effectiveFailureMode
+effectiveConcurrency
+preflightElided
+preflightElisionReason
+run/preflight/applyRun.execution.concurrency
+```
+
+`protocol/tools/contracts/result.js` já possui o `ResultExecutionHint`, interno, non-enumerable e fora
+do wire MCP. O registry lê esse hint somente depois do handler e projeta facts content-free no
+`tool_call_completed`. Portanto esse é o menor owner correto para transportar a política efetiva até
+a camada de audit, sem serializar `args` ou `structuredContent` arbitrário.
+
+### 44.14.3 Taxonomia bounded
+
+Adicionar ao internal execution hint três dimensões fechadas:
+
+```text
+executionPolicyClass:
+  dry-run
+  preflight-blocked
+  direct-apply
+  preflight-gated-apply
+  atomic-preflight-elided-apply
+
+executionFailurePolicyClass:
+  best-effort
+  fail-fast
+
+executionConcurrencyClass:
+  sequential
+  parallel-bounded
+```
+
+A classe de concurrency é derivada do número **efetivamente usado** (`1 => sequential`, `>1 =>
+parallel-bounded`). O número exato não será persistido nesta fase; ele acrescentaria cardinalidade e
+não é necessário para responder a pergunta arquitetural de B4-3.
+
+### 44.14.4 Matriz branch → telemetria
+
+| branch efetivo | `executionPolicyClass` | failure policy registrada | concurrency registrada |
+| --- | --- | --- | --- |
+| patch dry-run | `dry-run` | `best-effort` do `run` real | `run.execution.concurrency` |
+| global preflight bloqueou apply | `preflight-blocked` | `best-effort` do preflight real | `preflight.execution.concurrency` |
+| `per-target-fast` apply | `direct-apply` | `effectiveFailureMode` do apply | `applyRun.execution.concurrency` |
+| `global-preflight`, multi-target, preflight passou | `preflight-gated-apply` | `effectiveFailureMode` do apply | `applyRun.execution.concurrency` |
+| `global-preflight`, single-target, preflight elidido por atomicidade | `atomic-preflight-elided-apply` | `effectiveFailureMode` do apply | `applyRun.execution.concurrency` |
+
+O campo `executionMode` existente permanece para compatibilidade/diagnóstico; os novos enums são a
+authority analítica para política efetiva.
+
+### 44.14.5 Derived-index generation
+
+A adição de colunas muda a forma sanitizada persistida. A geração será elevada de `10` para **`11`**:
+
+- `MCP_ROUND_TRIP_NORMALIZER_VERSION = 11`;
+- `MCP_ROUND_TRIP_INDEX_SCHEMA_VERSION = 11`;
+- novo cursor `mcp-audit:v11`;
+- rebuild continua explícito a partir do raw JSONL;
+- toda a state machine de source-generation, boundary anchor e full-prefix proof criada em B4-0
+  permanece semanticamente inalterada.
+
+O rollout live ainda está v9; por isso a promoção futura pode legitimamente reconstruir direto para
+v11, sem precisar materializar v10 em produção primeiro.
+
+### 44.14.6 Summary esperado
+
+O summary deve publicar um bloco bounded `executionPolicies` com:
+
+- authority/version/caveat;
+- `observedCalls` e coverage sobre completions elegíveis;
+- counts por `executionPolicyClass`;
+- counts por `executionFailurePolicyClass`;
+- counts por `executionConcurrencyClass`;
+- distribuição por tool e por runtime cohort, bounded por `top`/cohorts existentes;
+- nenhuma persistência de target, path, patch text, args livres ou concurrency number.
+
+Pre-v11 rows ficam explicitamente fora do denominador observado, nunca inferidas como default.
+
+### 44.14.7 Plano executável e gates
+
+- [x] localizar owner de política efetiva no patch workflow;
+- [x] localizar transporte interno non-wire (`ResultExecutionHint`);
+- [x] definir taxonomia bounded e matriz branch→fact;
+- [x] adicionar enums sanitizados ao execution hint;
+- [x] projetar enums no registry audit completion;
+- [x] instrumentar todos os branches de `repo_apply_patch_batch` com valores do run real;
+- [x] elevar normalizer/schema/cursor para v11 e persistir três colunas;
+- [x] adicionar summary `executionPolicies` com coverage/caveat;
+- [x] provar content-free em normalizer/index tests;
+- [x] provar dry-run/preflight-blocked não herdam policy hipotética do apply;
+- [x] provar single-target global-preflight como `atomic-preflight-elided-apply`;
+- [x] provar direct/gated apply com failure/concurrency efetivos;
+- [ ] strict + lint + architecture se boundary pública mudar;
+- [x] verificar fingerprint/tool-count **inalterados** (B4-2 não deve alterar wire descriptor);
+- [x] rebuild raw→derived isolado e medir distribuição natural v11;
+- [ ] `mcp-fast` e `mcp-full` sob source barrier estável antes de encerrar B4-2;
+- [ ] somente depois decidir B4-3; profile enum continua **não presumido**.
+
+
+## 44.15 Checkpoint B4-2 v11 — candidate pré-broad
+
+### 44.15.1 Implementação efetiva
+
+A telemetria foi implementada no owner do **estado realmente executado**, não por inspeção de args:
+
+- `ResultExecutionHint` interno/non-enumerable ganhou três enums fechados;
+- `repo_apply_patch_batch` popula os enums a partir de `workflow.run`, `workflow.preflight` ou
+  `workflow.applyRun`, conforme o branch que de fato executou;
+- registry projeta apenas esses enums sanitizados no `tool_call_completed`;
+- normalizer rejeita qualquer string fora da taxonomia;
+- derived index passou de schema/normalizer 10 para **11**, rebuild-only;
+- summary publica `executionPolicies` com eligibility/coverage e distribuições bounded;
+- `mcp_round_trip_analytics` preserva o bloco completo;
+- `mcp_latency_dashboard` preserva apenas uma projeção compacta da evidência global.
+
+Taxonomia implementada:
+
+```text
+policy:
+  dry-run
+  preflight-blocked
+  direct-apply
+  preflight-gated-apply
+  atomic-preflight-elided-apply
+
+failure:
+  best-effort
+  fail-fast
+
+concurrency:
+  sequential
+  parallel-bounded
+```
+
+Um teste causal capturou exatamente por que a policy não pode vir dos args: `targetConcurrency=4`
+com apenas um target executou concurrency efetiva `1` e foi corretamente classificado como
+`sequential`.
+
+### 44.15.2 Gate focado
+
+```text
+capture layer: tools + audit correlation            = 80/80 green
+analytics/source-generation/audit                    = 52/52 green
+focused ampliado tool/audit/analytics/monitor/health = 143/143 green
+projection tool + compact dashboard                  = 69/69 green
+strict typecheck                                     = green
+git diff --check                                     = green
+```
+
+Os cinco branches de patch-batch estão explicitamente cobertos. Strings open-ended como
+`caller-defined-policy`, `retry-until-success` ou `c128` são descartadas pelo normalizer e não entram
+no SQLite.
+
+### 44.15.3 Gate real raw→derived v11
+
+Snapshot estável do raw atual em `2026-08-28T04:30:57.045Z`:
+
+```text
+raw bytes                         = 41.037.277
+invalid JSON lines                = 5
+schema_version                    = 11
+normalizer_version                = 11
+source generation                 = mcp-audit:v11:g1
+rebuild                           ≈ 3.401,6 ms
+sourceIntegrity                   = materialized
+lagBytes                          = 0
+EOF incremental sync             ≈ 6,83 ms
+EOF processed/indexed             = 0 / 0
+```
+
+Paridade com o mesmo cutoff de 14d:
+
+```text
+raw non-synthetic normalized rows = 58.283
+derived indexedRows               = 58.283
+delta                             = 0
+
+raw starts                        = 27.019
+derived starts                    = 27.019
+delta                             = 0
+```
+
+Policy evidence no raw **pré-rollout v11**:
+
+```text
+repo_apply_patch_batch eligible completions = 1.834
+raw completions com 3 enums v11             = 0
+derived executionPolicies.observedCalls     = 0
+persisted policy rows                       = 0
+coverageRate                                = 0
+```
+
+Esse zero é o resultado correto e obrigatório: o runtime live atual ainda não produz a nova
+telemetria. A implementação **não inferiu** policy histórica de `executionMode`, request args ou
+defaults. Portanto B4-3 continua bloqueada até existir uma cohort live v11 suficiente.
+
+### 44.15.4 Wire invariance
+
+B4-2 não alterou input/output descriptors MCP:
+
+```text
+full tools               = 89
+full fingerprint         = 19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac
+latency tools            = 52
+latency fingerprint      = 93ed1020a86ab6f1bb07ced9c04651ecae80feefe4197ba7278ae61aa62f290d
+repo_apply_patch_batch   = wire-v1:345553b0bc26ad02
+```
+
+Os novos facts viajam somente no hint interno e no audit result metadata.
+
+### 44.15.5 Bugs/gaps adicionais corrigidos durante B4-2
+
+1. duas authority strings de catch-up ainda hardcodavam `v10`; agora derivam da geração corrente e os
+   testes exigem `v11-catch-up-required`;
+2. um rebuild abortado podia deixar o snapshot JSONL temporário da investigação; o artefato foi
+   removido e o gate real passou a usar cleanup em `finally`;
+3. o summary interno calculava `executionPolicies`, mas `mcp_round_trip_analytics` o descartava na
+   projeção wire — corrigido;
+4. o dashboard compacto também descartava a nova policy — corrigido;
+5. ao adicionar a policy descobriu-se que o dashboard **materializado** já podia exceder 6 KiB antes
+   dela. A medição isolada encontrou `6.651 B`, dos quais a policy nova era somente `131 B`;
+6. o compact view carregava caveats/authority/subtotais quase detalhados em `lineageContext`,
+   `executionAccounting` e `payloadAccounting`. Esses blocos foram reduzidos a sinais decisórios,
+   preservando a forma completa no modo detalhado/tool dedicada, sem elevar o SLO de 6 KiB.
+
+### 44.15.6 Estado do gate e ordem seguinte
+
+- [x] taxonomia efetiva bounded;
+- [x] captura do run real, não dos args;
+- [x] persistência/summary v11 content-free;
+- [x] raw→derived v11 parity e zero retroactive inference;
+- [x] wire fingerprint invariance;
+- [x] projeções operacionais tool/dashboard;
+- [x] compact dashboard novamente dentro de 6 KiB;
+- [x] lint changed + docs + architecture sobre a candidate final;
+- [x] `mcp-fast` sob source barrier estável;
+- [x] `mcp-full` sob os mesmos bytes;
+- [x] certificar B4-2 source-side;
+- [ ] **não iniciar B4-3** sem rollout live e coverage v11 material;
+- [ ] após certificar B4-2, investigar III-B4-4 como próximo trabalho source-side independente de
+      B4-3, salvo se o rollout live for realizado antes.
+
+
+### 44.15.7 Certificação source-side final — revisão 9.7
+
+A candidate final foi congelada por `source-barrier capture-worktree` com:
+
+```text
+fingerprint = 7ff82ba158f02ee9ef72230ced02b9a41d9a064fa5f61d51f3f3348bd54e4426
+entries     = 99
+tombstones  = 11
+```
+
+Sobre **exatamente os mesmos bytes**:
+
+```text
+mcp-fast:
+  typecheck = green
+  127/127 test files
+  778/778 tests
+  duration ≈ 70,7 s
+
+mcp-full:
+  typecheck          = green
+  lint-changed       = green (82 files)
+  docs-contract      = green
+  architecture       = green
+  lint-full          = green
+  127/127 test files
+  778/778 tests
+  duration ≈ 116,3 s (wall ≈ 118,3 s)
+  source barrier     = unchanged
+```
+
+A duração do `mcp-full` atual não foi hang: o custo dominante medido foi `unit-mcp` (~72,9 s),
+seguido de `lint-full` (~21,2 s) e `architecture-contract` (~19,8 s). O comando pode permanecer
+silencioso por intervalos longos e depois emitir grande volume de logs de smoke/OAuth, o que produz
+percepção de travamento no cliente. Para ciclos normais, não repetir `mcp-full` sem mutation de source;
+usar focused/strict/changed-lint durante a onda e reservar o full para promotion barriers. Uma futura
+faixa de performance do validation harness pode melhorar progress reporting e eliminar trabalho
+redundante, sem enfraquecer o gate.
+
+**Decisão:** III-B4-2 está `SOURCE CERTIFIED`. B4-3 permanece bloqueada até rollout live v11 e
+coverage material de `executionPolicies`; o próximo trabalho source-side independente pode seguir
+para B4-4.

@@ -85,13 +85,11 @@ function findRepoWriteTool(name, definitions = TEST_REPO_WRITE_TOOLS, operationC
 
 const applyPatchTool = findRepoWriteTool('repo_apply_patch');
 const applyPatchBatchTool = findRepoWriteTool('repo_apply_patch_batch');
-const applyFileBatchPlanTool = findRepoWriteTool('repo_apply_file_batch_plan');
 const applyFileBatchTool = findRepoWriteTool('repo_apply_file_batch');
 const writeFileTool = findRepoWriteTool('repo_write_file');
 const createFileTool = findRepoWriteTool('repo_create_file');
 const moveFileTool = findRepoWriteTool('repo_move_file');
-const listQuarantineTool = findRepoWriteTool('repo_list_quarantine');
-const inspectQuarantinedFileTool = findRepoWriteTool('repo_inspect_quarantined_file');
+const quarantineStatusTool = findRepoWriteTool('repo_quarantine_status');
 const quarantineFileTool = findRepoWriteTool('repo_quarantine_file');
 const restoreQuarantinedFileTool = findRepoWriteTool('repo_restore_quarantined_file');
 const removeFileTool = findRepoWriteTool('repo_remove_file');
@@ -299,21 +297,22 @@ describe('copilot MCP repo write tools', () => {
         await assert.rejects(() => fs.access(filePath));
     });
 
-    it('plans bounded file batches without mutating files', async () => {
-        assert.ok(applyFileBatchPlanTool);
+    it('previews bounded file batches on the canonical owner without mutating files', async () => {
+        assert.ok(applyFileBatchTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
         const created = path.join(dir, 'batch-plan-created.txt');
 
-        const plan = await applyFileBatchPlanTool.handler({
+        const plan = await applyFileBatchTool.handler({
             operations: [{ type: 'create_file', path: created, content: 'planned batch\\n' }],
+            dryRun: true,
         });
 
         assert.equal(plan.isError, undefined);
         assert.equal(plan.structuredContent['success'], true);
         assert.equal(plan.structuredContent['plannedTool'], 'repo_apply_file_batch');
+        assert.equal(plan.structuredContent['applyRequiresConfirmBatch'], true);
         assert.equal(plan.structuredContent['dryRun'], true);
         assert.equal(plan.structuredContent['operationCount'], 1);
-        assert.equal(plan.structuredContent['nextCall'].tool, 'repo_apply_file_batch');
         await assert.rejects(() => fs.access(created));
     });
 
@@ -456,7 +455,6 @@ describe('copilot MCP repo write tools', () => {
     });
 
     it('supports dependent create then move operations in one file batch', async () => {
-        assert.ok(applyFileBatchPlanTool);
         assert.ok(applyFileBatchTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
         const created = path.join(dir, 'batch-created-then-moved.txt');
@@ -466,12 +464,7 @@ describe('copilot MCP repo write tools', () => {
             { type: 'create_file', path: created, content: 'created then moved\\n' },
             { type: 'move_file', source: created, destination: moved },
         ];
-        const plan = await applyFileBatchPlanTool.handler({ operations });
-        assert.equal(plan.isError, undefined);
-        assert.equal(plan.structuredContent['success'], true);
-        assert.equal(plan.structuredContent['operations'][1].virtualSource, true);
-
-        const dryRun = await applyFileBatchTool.handler({ operations });
+        const dryRun = await applyFileBatchTool.handler({ operations, dryRun: true });
         assert.equal(dryRun.isError, undefined);
         assert.equal(dryRun.structuredContent['success'], true);
         assert.equal(dryRun.structuredContent['operations'][1].virtualSource, true);
@@ -485,9 +478,29 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(await fs.readFile(moved, 'utf8'), 'created then moved\\n');
     });
 
+    it('previews quarantine without minting a mutable workspace capability', async () => {
+        assert.ok(quarantineFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'quarantine-preview.txt');
+        await fs.writeFile(filePath, 'preview only\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
+
+        const preview = await quarantineFileTool.handler({ path: filePath, dryRun: true });
+
+        assert.equal(preview.isError, undefined);
+        assert.equal(preview.structuredContent['success'], true);
+        assert.equal(preview.structuredContent['plannedTool'], 'repo_quarantine_file');
+        assert.equal(preview.structuredContent['dryRun'], true);
+        assert.equal(preview.structuredContent['restorable'], true);
+        assert.equal(await fs.readFile(filePath, 'utf8'), 'preview only\n');
+        const stats = getValidatedMutableWorkspacePathStats();
+        assert.equal(stats.issued, 0);
+        assert.equal(stats.accepted, 0);
+    });
+
     it('quarantines and restores files through a reversible workspace flow', async () => {
-        assert.ok(listQuarantineTool);
-        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineStatusTool);
+        assert.ok(quarantineStatusTool);
         assert.ok(quarantineFileTool);
         assert.ok(restoreQuarantinedFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
@@ -503,12 +516,12 @@ describe('copilot MCP repo write tools', () => {
         assert.equal((await fs.stat(metadataPath)).mode & 0o777, 0o600);
 
         const quarantineId = String(quarantined.structuredContent['quarantineId']);
-        const listed = await listQuarantineTool.handler({ status: 'quarantined', limit: 20 });
+        const listed = await quarantineStatusTool.handler({ action: 'list', status: 'quarantined', limit: 20 });
         assert.equal(listed.isError, undefined);
         const listedItems = /** @type {{ quarantineId?: string }[]} */ (listed.structuredContent['items']);
         assert.ok(listedItems.some((item) => item.quarantineId === quarantineId));
 
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);
         assert.equal(typeof inspected.structuredContent['dataSha256'], 'string');
@@ -592,7 +605,7 @@ describe('copilot MCP repo write tools', () => {
     });
 
     it('restores the previous destination when restore metadata commit fails', async () => {
-        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineStatusTool);
         assert.ok(quarantineFileTool);
         assert.ok(restoreQuarantinedFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
@@ -631,7 +644,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(destination, 'utf8'), 'previous destination\n');
 
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);
         assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
@@ -678,7 +691,7 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(controller.signal.aborted, true);
         assert.ok(writeCount >= 3, 'rollback must publish cancellation-shielded metadata repair');
         assert.equal(await fs.readFile(destination, 'utf8'), 'destination survives cancel\n');
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['restorable'], true);
         assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
@@ -709,15 +722,33 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(await fs.readFile(source, 'utf8'), 'restore once\n');
     });
 
+    it('rejects fields that belong to the other quarantine status projection', async () => {
+        assert.ok(quarantineStatusTool);
+        const listConflict = await quarantineStatusTool.handler({
+            action: 'list',
+            quarantineId: 'quarantine-item',
+        });
+        assert.equal(listConflict.isError, true);
+        assert.equal(listConflict.structuredContent['code'], 'ERR_QUARANTINE_STATUS_INACTIVE_FIELDS');
+
+        const inspectConflict = await quarantineStatusTool.handler({
+            action: 'inspect',
+            quarantineId: 'quarantine-item',
+            limit: 5,
+        });
+        assert.equal(inspectConflict.isError, true);
+        assert.equal(inspectConflict.structuredContent['code'], 'ERR_QUARANTINE_STATUS_INACTIVE_FIELDS');
+    });
+
     it('rejects non-canonical quarantine identifiers before resolving paths', async () => {
-        assert.ok(inspectQuarantinedFileTool);
-        const result = await inspectQuarantinedFileTool.handler({ quarantineId: '../quarantine-item' });
+        assert.ok(quarantineStatusTool);
+        const result = await quarantineStatusTool.handler({ action: 'inspect', quarantineId: '../quarantine-item' });
         assert.equal(result.isError, true);
         assert.equal(result.structuredContent['code'], 'ERR_QUARANTINE_NOT_FOUND');
     });
 
     it('rejects forged quarantine backup paths without deleting their target', async () => {
-        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineStatusTool);
         assert.ok(quarantineFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
         const source = path.join(dir, 'forged-backup-source.txt');
@@ -740,14 +771,14 @@ describe('copilot MCP repo write tools', () => {
         };
         await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
 
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, true);
         assert.equal(inspected.structuredContent['code'], 'ERR_QUARANTINE_NOT_FOUND');
         assert.equal(await fs.readFile(protectedFile, 'utf8'), 'protected\n');
     });
 
     it('does not inspect or restore a quarantined data symlink', async () => {
-        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineStatusTool);
         assert.ok(quarantineFileTool);
         assert.ok(restoreQuarantinedFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
@@ -762,7 +793,7 @@ describe('copilot MCP repo write tools', () => {
         await fs.rm(quarantinePath);
         await fs.symlink(target, quarantinePath);
 
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['dataExists'], false);
         assert.equal(inspected.structuredContent['restorable'], false);
@@ -792,7 +823,7 @@ describe('copilot MCP repo write tools', () => {
     });
 
     it('reconciles a restore journal after the data move completed', async () => {
-        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineStatusTool);
         assert.ok(quarantineFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
         const source = path.join(dir, 'journal-source.txt');
@@ -816,7 +847,7 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
         await fs.rename(quarantinePath, destination);
 
-        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        const inspected = await quarantineStatusTool.handler({ action: 'inspect', quarantineId });
         assert.equal(inspected.isError, undefined);
         assert.equal(inspected.structuredContent['metadata'].status, 'restored');
         assert.equal(inspected.structuredContent['metadata'].transaction, null);

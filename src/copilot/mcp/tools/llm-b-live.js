@@ -202,16 +202,45 @@ export const llmBLiveTools = [
         description:
             'Run the canonical read-only Model Gateway/terminal LLM-B readiness audit. Does not start the terminal or call providers.',
         inputSchema: {
-            includeSqliteRuntimeHealth: z.boolean().optional(),
+            view: z.enum(['readiness', 'runs']).optional()['describe']('Read projection. Default: readiness.'),
+            includeSqliteRuntimeHealth: z.boolean().optional()['describe']('view=readiness only.'),
             includeDetails: z
                 .boolean()
                 .optional()
-                ['describe']('Return the complete readiness tree. Default: compact operational view.'),
+                ['describe']('view=readiness only: return the complete readiness tree. Default: compact view.'),
+            limit: z.number().int().min(1).max(100).optional()['describe']('view=runs only: persisted run limit. Default: 20.'),
         },
 
-        handler: async ({ includeSqliteRuntimeHealth, includeDetails }, operationContext) => {
+        handler: async ({ view, includeSqliteRuntimeHealth, includeDetails, limit }, operationContext) => {
+            const projection = view ?? 'readiness';
             const workspace = requireMcpToolWorkspace(operationContext);
             const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
+            if (projection === 'runs') {
+                if (includeSqliteRuntimeHealth !== undefined || includeDetails !== undefined) {
+                    return errorResult('includeSqliteRuntimeHealth/includeDetails are valid only with view=readiness.', {
+                        code: 'ERR_LLMB_LIVE_READ_VIEW_FIELDS',
+                        view: projection,
+                    });
+                }
+                const result = await readModelGatewayPersistedLiveRuns(workspace, limit ?? 20, {
+                    environmentAuthority,
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                });
+                if (!result.success || !result.parsed) {
+                    return errorResult(result.error ?? 'LLM-B live runs did not return valid JSON.', {
+                        code: 'ERR_LLMB_LIVE_RUNS',
+                        stderr: result.stderr,
+                        stdoutTail: result.stdout.slice(-8000),
+                    });
+                }
+                return okResult(result.parsed, JSON.stringify(result.parsed, null, 2));
+            }
+            if (limit !== undefined) {
+                return errorResult('limit is valid only with view=runs.', {
+                    code: 'ERR_LLMB_LIVE_READ_VIEW_FIELDS',
+                    view: projection,
+                });
+            }
             const execution = await executeModelGatewayLiveReadiness(workspace, includeSqliteRuntimeHealth === true, {
                 environmentAuthority,
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
@@ -239,32 +268,6 @@ export const llmBLiveTools = [
                 strategy: 'conservative-estimate',
                 source: 'llmb-live-readiness',
             });
-        },
-    }),
-    defineMcpRawTool({
-        name: 'llmb_live_runs',
-        title: 'LLM-B persisted live runs',
-        description:
-            'Read persisted Model Gateway terminal live scenario summaries from SQLite. This never calls a provider.',
-        inputSchema: {
-            limit: z.number().int().min(1).max(100).optional(),
-        },
-
-        handler: async ({ limit }, operationContext) => {
-            const workspace = requireMcpToolWorkspace(operationContext);
-            const environmentAuthority = requireMcpToolModelGatewayLiveRunEnvironmentAuthority(operationContext);
-            const result = await readModelGatewayPersistedLiveRuns(workspace, limit ?? 20, {
-                environmentAuthority,
-                ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
-            });
-            if (!result.success || !result.parsed) {
-                return errorResult(result.error ?? 'LLM-B live runs did not return valid JSON.', {
-                    code: 'ERR_LLMB_LIVE_RUNS',
-                    stderr: result.stderr,
-                    stdoutTail: result.stdout.slice(-8000),
-                });
-            }
-            return okResult(result.parsed, JSON.stringify(result.parsed, null, 2));
         },
     }),
     defineMcpRawTool({
@@ -448,7 +451,7 @@ export const llmBLiveTools = [
                         outDir: manifest.outDir,
                         logPath: manifest.logPath,
                         plan,
-                        next: 'Use llmb_live_runs to inspect detachedRuns and the persisted SQLite result; do not start a duplicate provider run while status=running.',
+                        next: 'Use llmb_live_readiness view=runs to inspect detachedRuns and the persisted SQLite result; do not start a duplicate provider run while status=running.',
                     };
                     return okResult(structured, JSON.stringify(structured, null, 2));
                 }

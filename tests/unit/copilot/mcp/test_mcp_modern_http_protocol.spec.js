@@ -23,7 +23,7 @@ function createInMemoryMcpFetch(handler) {
 }
 
 describe('MCP 2026 modern HTTP protocol', () => {
-    it('negotiates 2026-07-28 and preserves the canonical 131-tool surface in memory', async () => {
+    it('negotiates 2026-07-28 and preserves the canonical 89-tool surface in memory', async () => {
         const handler = createMcpModernHttpHandler(() => createCopilotMcpServer(), { keepAliveMs: 0 });
         const client = new Client(
             { name: 'workspace-modern-protocol-test', version: '1.0.0' },
@@ -43,8 +43,8 @@ describe('MCP 2026 modern HTTP protocol', () => {
             const wireTools = await client.listTools();
             const expectedNames = new Set(getCanonicalMcpTools().map((tool) => tool.name));
 
-            assert.equal(wireTools.tools.length, 131);
-            assert.equal(expectedNames.size, 131);
+            assert.equal(wireTools.tools.length, 89);
+            assert.equal(expectedNames.size, 89);
             assert.deepEqual(new Set(wireTools.tools.map((tool) => tool.name)), expectedNames);
         } finally {
             await client.close().catch(() => {});

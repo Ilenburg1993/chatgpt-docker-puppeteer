@@ -59,7 +59,7 @@ export async function runMcpWorkspaceSmoke(workspace, tunnelConfig, options) {
         const scan = await scanDirectoryValidated(resolved.validatedReadPath, { depth: 1 });
         return { entries: scan.entries.length, blockedEntries: scan.blockedEntries };
     });
-    await runCheck(checks, 'repo_root_tree_redaction', async () => {
+    await runCheck(checks, 'repo_tree_root_redaction', async () => {
         const resolved = await workspace.resolveValidatedReadPath('.');
         if (!resolved.ok) throw new Error(resolved.reason);
         const scan = await scanDirectoryValidated(resolved.validatedReadPath, { depth: 1, showHidden: true });

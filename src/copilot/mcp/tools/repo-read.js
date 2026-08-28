@@ -378,30 +378,6 @@ export const repoReadTools = [
             ),
     }),
     defineMcpRawTool({
-        name: 'repo_root_tree',
-        title: 'Repository root tree',
-        description: 'List files and directories at the real workspace root. Equivalent to repo_tree with path=".".',
-        inputSchema: {
-            recursive: z.boolean().optional()['describe']('Whether to recurse into children. Default: false.'),
-            depth: z.number().int().min(1).max(8).optional()['describe']('Maximum recursion depth. Default: 2.'),
-            maxEntries: z.number().int().min(1).max(2000).optional()['describe']('Maximum entries returned.'),
-            showHidden: z.boolean().optional()['describe']('Include dotfiles. Default: false.'),
-        },
-
-        handler: async ({ recursive, depth, maxEntries, showHidden }, operationContext) =>
-            frameRepositoryReadOperation(
-                await readRepositoryTree(requireMcpToolWorkspace(operationContext), {
-                    path: '.',
-                    ...(recursive === undefined ? {} : { recursive }),
-                    ...(depth === undefined ? {} : { depth }),
-                    ...(maxEntries === undefined ? {} : { maxEntries }),
-                    ...(showHidden === undefined ? {} : { showHidden }),
-                }),
-                undefined,
-                'tree',
-            ),
-    }),
-    defineMcpRawTool({
         name: 'repo_root_redaction_status',
         title: 'Repository root redaction status',
         description:

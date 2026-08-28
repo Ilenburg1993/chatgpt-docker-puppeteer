@@ -153,7 +153,7 @@ export function readMcpToolTargetCorrelation(toolName, args) {
             return [readObjectField(item['args'], 'path')];
         });
     } else if (
-        ['repo_apply_patch_batch', 'repo_patch_batch_plan'].includes(toolName) &&
+        toolName === 'repo_apply_patch_batch' &&
         Array.isArray(args['targets'])
     ) {
         candidates = args['targets'].map((item) => readObjectField(item, 'path'));
@@ -167,7 +167,6 @@ export function readMcpToolTargetCorrelation(toolName, args) {
             'repo_read_file_chunks',
             'repo_file_stats',
             'repo_apply_patch',
-            'repo_patch_plan',
             'repo_write_file',
             'repo_create_file',
             'repo_quarantine_file',

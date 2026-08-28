@@ -273,11 +273,7 @@ function buildIndependentPatchAttemptOptions(operation, index, dryRun, relativeP
         ...(!dryRun ? durabilityOption(operation['durability']) : {}),
         advisoryLimits: {
             tool:
-                typeof operation['__toolName'] === 'string'
-                    ? operation['__toolName']
-                    : dryRun
-                      ? 'repo_patch_batch_plan'
-                      : 'repo_apply_patch_batch',
+                typeof operation['__toolName'] === 'string' ? operation['__toolName'] : 'repo_apply_patch_batch',
             index,
             oldStringChars: String(operation['old_string'] ?? '').length,
             newStringChars: String(operation['new_string'] ?? '').length,
@@ -608,7 +604,7 @@ async function runPatchTarget(runtime, target, dryRun) {
             ...createRepositoryPatchResultValidationOption(resolved.relative),
             ...durabilityOption(target.durability),
             advisoryLimits: {
-                tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
+                tool: 'repo_apply_patch_batch',
                 groupedSameFile: true,
                 operationCount: target.entries.length,
             },

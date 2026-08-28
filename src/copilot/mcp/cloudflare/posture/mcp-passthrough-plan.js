@@ -44,14 +44,14 @@ export async function buildCloudflareMcpPassthroughPlan(options = {}) {
             'Expression must remain scoped to mcp.aurelin.org dynamic MCP/OAuth routes only.',
             'Do not disable or skip http_ratelimit in this rule.',
             'Do not weaken unrelated website routes on the same zone.',
-            'Apply only after backup and after reviewing mcp_cloudflare_skip_audit findings.',
+            'Review mcp_cloudflare_edge_snapshot view=skip first; a real confirmed apply creates the backup automatically immediately before mutation.',
         ],
         recommendedValidationSequence: [
-            'mcp_cloudflare_edge_backup_create',
-            'mcp_cloudflare_mcp_passthrough_diff',
-            'apply only this http_config_settings rule in a future bounded apply tool or Cloudflare dashboard/API review',
-            'mcp_cloudflare_config_audit',
-            'mcp_cloudflare_skip_audit',
+            'mcp_cloudflare_edge_policy_apply target=passthrough dryRun=true',
+            'mcp_cloudflare_edge_snapshot view=skip',
+            'mcp_cloudflare_edge_policy_apply target=passthrough dryRun=false confirmApply=true only when preview is clean',
+            'mcp_cloudflare_edge_snapshot view=config',
+            'mcp_cloudflare_edge_snapshot view=skip',
             'mcp_connector_smoke_refresh',
         ],
     };
@@ -86,6 +86,11 @@ export async function diffCloudflareMcpPassthroughPlan(options = {}) {
         mode: 'diff-only',
         appliesChanges: false,
         endpoint: plan['endpoint'],
+        desiredPlan: {
+            desiredRuleset: plan['desiredRuleset'],
+            safetyInvariants: plan['safetyInvariants'],
+            recommendedValidationSequence: plan['recommendedValidationSequence'],
+        },
         desiredRule,
         actual: {
             inspectedConfigRulesets: configRulesets.length,
@@ -103,7 +108,7 @@ export async function diffCloudflareMcpPassthroughPlan(options = {}) {
         recommendation: {
             nextStep:
                 gaps.length > 0
-                    ? 'Create or update the scoped MCP passthrough http_config_settings rule after backup/review.'
+                    ? 'Preview the scoped rule with mcp_cloudflare_edge_policy_apply target=passthrough dryRun=true, then apply only after review.'
                     : 'No MCP passthrough config mutation appears necessary.',
             applyScope: 'single ruleRef copilot-mcp-passthrough-config-v1 only',
             doNotApplyYet: true,
@@ -145,35 +150,23 @@ function buildDesiredMcpPassthroughRule(hostname) {
 }
 
 /**
- * Guarded apply for the single MCP passthrough configuration rule.
+ * Decide whether a passthrough preview may proceed to the mutation-only backup boundary.
+ * Pure and exported only through the testing membrane; production apply uses the same decision.
  *
- * @param {{ authority?: import('../environment-authority.js').CloudflareEnvironmentAuthority; env?: NodeJS.ProcessEnv; dryRun?: boolean; confirmApply?: boolean; now?: Date }} [options]
- * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ * @param {Record<string, unknown> & { ok?: boolean }} diff
+ * @param {{ dryRun?: boolean; confirmApply?: boolean }} [options]
  */
-export async function applyCloudflareMcpPassthroughPlan(options = {}) {
+export function buildCloudflareMcpPassthroughApplyDecision(diff, options = {}) {
     const dryRun = options.dryRun !== false;
     const confirmApply = options.confirmApply === true;
-    const [{ default: Cloudflare }, { createCloudflareEdgeBackup }] = await Promise.all([
-        import('cloudflare'),
-        import('#copilot/mcp/public/cloudflare/edge'),
-    ]);
-    const backup = await createCloudflareEdgeBackup({
-        ...(options.authority ? { authority: options.authority } : {}),
-        ...(options.env ? { env: options.env } : {}),
-        ...(options.now ? { now: options.now } : {}),
-        label: dryRun ? 'passthrough-preflight' : 'passthrough-pre-apply',
-    });
-    const [config, diff] = await Promise.all([
-        readCloudflareRemoteApiConfig(options),
-        diffCloudflareMcpPassthroughPlan(options),
-    ]);
-    const desiredRule = buildDesiredMcpPassthroughApiRule(config.publicHostname);
+    const endpoint = asRecord(diff['endpoint']);
+    const desiredRule = buildDesiredMcpPassthroughApiRule(String(endpoint['publicHostname'] ?? 'mcp.aurelin.org'));
     const diffRecord = asRecord(diff['diff']);
     const critical = Array.isArray(diff['critical']) ? diff['critical'] : [];
     const needsCreate = diffRecord['needsCreate'] === true;
     const needsUpdate = diffRecord['needsUpdate'] === true;
     const alreadySatisfied = diffRecord['alreadySatisfied'] === true;
-    const preflightOk = backup.ok === true && diff.ok === true && critical.length === 0;
+    const preflightOk = diff.ok === true && critical.length === 0;
     const plan = {
         phase: PHASE,
         ref: RULE_REF,
@@ -184,6 +177,32 @@ export async function applyCloudflareMcpPassthroughPlan(options = {}) {
         preservesExistingRules: true,
         rule: desiredRule,
     };
+    return {
+        dryRun,
+        confirmApply,
+        preflightOk,
+        alreadySatisfied,
+        desiredRule,
+        plan,
+        backupRequired: preflightOk && !dryRun && confirmApply && !alreadySatisfied,
+    };
+}
+
+/**
+ * Guarded apply for the single MCP passthrough configuration rule.
+ *
+ * @param {{ authority?: import('../environment-authority.js').CloudflareEnvironmentAuthority; env?: NodeJS.ProcessEnv; dryRun?: boolean; confirmApply?: boolean; now?: Date }} [options]
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+export async function applyCloudflareMcpPassthroughPlan(options = {}) {
+    const diff = await diffCloudflareMcpPassthroughPlan(options);
+    const decision = buildCloudflareMcpPassthroughApplyDecision(diff, options);
+    const { dryRun, confirmApply, preflightOk, alreadySatisfied, desiredRule, plan } = decision;
+    const backupPreview = {
+        requiredBeforeMutation: true,
+        created: false,
+        reason: 'Dry-run and unconfirmed preview are side-effect-free; backup is created only immediately before a real mutation.',
+    };
 
     if (dryRun || !confirmApply || alreadySatisfied) {
         return {
@@ -193,18 +212,19 @@ export async function applyCloudflareMcpPassthroughPlan(options = {}) {
             appliesChanges: false,
             dryRun: true,
             confirmApply,
-            backup,
+            backup: backupPreview,
+            desiredPlan: diff['desiredPlan'] ?? null,
             preflight: summarizePassthroughPreflight(diff),
             plan,
             blockedReason: alreadySatisfied
                 ? 'MCP passthrough config rule is already satisfied.'
                 : preflightOk
-                  ? 'Set dryRun=false and confirmApply=true to apply only this rule.'
+                  ? 'Set dryRun=false and confirmApply=true to create a backup and apply only this rule.'
                   : 'Preflight is not clean; do not apply MCP passthrough config rule.',
         };
     }
 
-    if (!preflightOk) {
+    if (!decision.backupRequired) {
         return {
             ok: false,
             success: true,
@@ -212,14 +232,40 @@ export async function applyCloudflareMcpPassthroughPlan(options = {}) {
             appliesChanges: false,
             dryRun,
             confirmApply,
-            backup,
+            backup: backupPreview,
+            desiredPlan: diff['desiredPlan'] ?? null,
             preflight: summarizePassthroughPreflight(diff),
             plan,
-            blockedReason: 'MCP passthrough apply requires clean backup/diff preflight.',
+            blockedReason: 'MCP passthrough apply requires clean diff preflight before backup or mutation.',
         };
     }
 
+    const { createCloudflareEdgeBackup } = await import('#copilot/mcp/public/cloudflare/edge');
+    const backup = await createCloudflareEdgeBackup({
+        ...(options.authority ? { authority: options.authority } : {}),
+        ...(options.env ? { env: options.env } : {}),
+        ...(options.now ? { now: options.now } : {}),
+        label: 'passthrough-pre-apply',
+    });
+    if (backup.ok !== true) {
+        return {
+            ok: false,
+            success: true,
+            mode: 'guarded-mcp-passthrough-apply',
+            appliesChanges: false,
+            dryRun: false,
+            confirmApply,
+            backup,
+            desiredPlan: diff['desiredPlan'] ?? null,
+            preflight: summarizePassthroughPreflight(diff),
+            plan,
+            blockedReason: 'MCP passthrough mutation aborted because the mandatory backup did not complete.',
+        };
+    }
+
+    const config = await readCloudflareRemoteApiConfig(options);
     if (!config.apiToken) throw new Error('CLOUDFLARE_API_TOKEN is required to apply MCP passthrough config rule.');
+    const { default: Cloudflare } = await import('cloudflare');
     const client = new Cloudflare({ apiToken: config.apiToken, maxRetries: 1, timeout: 15000 });
     const zoneId = await resolveCloudflareZoneId(client, config);
     const result = await applyDesiredMcpPassthroughRule(client, zoneId, desiredRule);
@@ -231,12 +277,13 @@ export async function applyCloudflareMcpPassthroughPlan(options = {}) {
         dryRun: false,
         confirmApply,
         backup,
+        desiredPlan: diff['desiredPlan'] ?? null,
         preflight: summarizePassthroughPreflight(diff),
         plan,
         applied: result,
         nextActions: [
-            'Run mcp_cloudflare_config_audit.',
-            'Run mcp_cloudflare_mcp_passthrough_diff.',
+            'Run mcp_cloudflare_edge_snapshot view=config.',
+            'Run mcp_cloudflare_edge_snapshot view=passthrough-diff.',
             'Run mcp_connector_smoke_refresh.',
         ],
     };

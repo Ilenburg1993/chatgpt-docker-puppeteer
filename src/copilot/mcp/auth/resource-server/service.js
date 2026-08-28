@@ -1596,7 +1596,7 @@ async function verifyBearerToken(
                 requiredScopes,
                 code: 'MCP_AUTH_SCOPE_MISSING',
                 message: `Bearer token is missing required scope(s): ${missingScopes.join(', ')}.`,
-                hint: 'Request the connector OAuth flow with the scopes reported by mcp_auth_profile.',
+                hint: 'Request the connector OAuth flow with the scopes reported by mcp_connection_readiness view=auth-profile.',
                 challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
                     error: 'insufficient_scope',
                     errorDescription: `Missing required scope(s): ${missingScopes.join(', ')}.`,
@@ -1733,7 +1733,7 @@ export async function authorizeMcpToolCall(
             requiredScopes,
             code: 'MCP_AUTH_REQUIRED',
             message: 'MCP OAuth bearer token is required for this tool.',
-            hint: 'Use mcp_auth_profile to inspect the current auth mode and required scopes.',
+            hint: 'Use mcp_connection_readiness view=auth-profile to inspect the current auth mode and required scopes.',
             challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
                 error: 'invalid_token',
                 errorDescription: 'Bearer token is required for this tool.',

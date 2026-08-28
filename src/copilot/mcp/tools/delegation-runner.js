@@ -77,7 +77,7 @@ function buildMissionPlan(mission) {
     if (mission === 'benchmark-transport') {
         return [
             {
-                step: 'mcp_cloudflare_transport_benchmark_plan',
+                step: 'mcp_cloudflare_metrics_snapshot view=transport-plan',
                 effect: 'Read the fixed benchmark design and last persisted run.',
             },
             {
@@ -85,7 +85,7 @@ function buildMissionPlan(mission) {
                 effect: 'Detached runner measures quic/auto/http2 and restores the initial control.',
             },
             {
-                step: 'mcp_cloudflare_transport_benchmark_plan',
+                step: 'mcp_cloudflare_metrics_snapshot view=transport-plan',
                 effect: 'Read persisted comparison after the runner completes.',
             },
         ];
@@ -287,7 +287,7 @@ export const delegateToRepoAutonomyRunnerTool = defineMcpRawTool({
                 autoPromotion: false,
                 note: 'The detached runner may cause transient connector interruptions while switching profiles; it always attempts to restore the initial control.',
                 nextStep:
-                    'After the runner settles, call mcp_cloudflare_transport_benchmark_plan to read the persisted run and comparison.',
+                    'After the runner settles, call mcp_cloudflare_metrics_snapshot view=transport-plan to read the persisted run and comparison.',
             });
         }
 

@@ -175,6 +175,13 @@ export function summarizeMcpRoundTripRows(rows, options) {
     let discontinuityMaxMs = 0;
 
     const executionByTool = new Map();
+    const executionPolicyClasses = new Map();
+    const executionFailurePolicyClasses = new Map();
+    const executionConcurrencyClasses = new Map();
+    const executionPoliciesByTool = new Map();
+    const executionPolicyCohorts = new Map();
+    let executionPolicyEligibleCalls = 0;
+    let executionPolicyObservedCalls = 0;
     const payloadByTool = new Map();
     const resultStates = new Map();
     const resultClasses = new Map();
@@ -651,6 +658,18 @@ export function summarizeMcpRoundTripRows(rows, options) {
             caveat: 'Only continuationTransportRequired represents result data omitted by the batch transport budget. Availability/recommendation do not imply another model→tool round trip is required; legacyContinuationRequired is historical v6 metadata and is excluded from induced-continuation metrics.',
             byTool: renderExecutionByTool(executionByTool, repeatAfterBatchByTool, options.top),
         },
+        executionPolicies: {
+            authority: 'sanitized-effective-execution-policy-metadata-v11',
+            eligibleCalls: executionPolicyEligibleCalls,
+            observedCalls: executionPolicyObservedCalls,
+            coverageRate: ratio(executionPolicyObservedCalls, executionPolicyEligibleCalls),
+            byPolicyClass: mapToObject(executionPolicyClasses),
+            byFailurePolicyClass: mapToObject(executionFailurePolicyClasses),
+            byConcurrencyClass: mapToObject(executionConcurrencyClasses),
+            byTool: renderExecutionPolicyByTool(executionPoliciesByTool, options.top),
+            byRuntimeCohort: renderExecutionPolicyCohorts(executionPolicyCohorts),
+            caveat: 'Only repo_apply_patch_batch completions emitted with v11 effective-policy metadata are observed. Pre-v11 completions are retained as eligible-but-unobserved and are never inferred from request args, defaults or executionMode strings. Exact concurrency, targets, paths, patches and free-form args are not persisted.',
+        },
         payloadAccounting: {
             authority: 'bounded-result-byte-accounting-plus-lineage-aware-heavy-result-followup-pressure',
             heavyResultThresholdBytes: HEAVY_RESULT_THRESHOLD_BYTES,
@@ -1058,8 +1077,37 @@ export function summarizeMcpRoundTripRows(rows, options) {
     }
 
     /** @param {Record<string, unknown>} row @param {string} toolName */
+    function recordExecutionPolicy(row, toolName) {
+        if (toolName !== 'repo_apply_patch_batch') return;
+        executionPolicyEligibleCalls += 1;
+        const policyClass = stringOrNull(row['execution_policy_class'] ?? row['executionPolicyClass']);
+        const failurePolicyClass = stringOrNull(
+            row['execution_failure_policy_class'] ?? row['executionFailurePolicyClass'],
+        );
+        const concurrencyClass = stringOrNull(row['execution_concurrency_class'] ?? row['executionConcurrencyClass']);
+        if (!policyClass || !failurePolicyClass || !concurrencyClass) return;
+        executionPolicyObservedCalls += 1;
+        increment(executionPolicyClasses, policyClass);
+        increment(executionFailurePolicyClasses, failurePolicyClass);
+        increment(executionConcurrencyClasses, concurrencyClass);
+        mergeExecutionPolicyMetric(
+            requireExecutionPolicyMetric(executionPoliciesByTool, toolName),
+            policyClass,
+            failurePolicyClass,
+            concurrencyClass,
+        );
+        mergeExecutionPolicyMetric(
+            requireExecutionPolicyMetric(executionPolicyCohorts, cohortKey(row)),
+            policyClass,
+            failurePolicyClass,
+            concurrencyClass,
+        );
+    }
+
+    /** @param {Record<string, unknown>} row @param {string} toolName */
     function recordExecutionCompletion(row, toolName) {
         executionCompletedCalls += 1;
+        recordExecutionPolicy(row, toolName);
         const logicalOperations = positiveIntegerOrNull(row['logical_operations'] ?? row['logicalOperations']);
         const failedOperations = nonNegativeIntegerOrNull(row['failed_operations'] ?? row['failedOperations']) ?? 0;
         const skippedOperations = nonNegativeIntegerOrNull(row['skipped_operations'] ?? row['skippedOperations']) ?? 0;
@@ -1169,236 +1217,25 @@ export function summarizeMcpRoundTripRows(rows, options) {
  * @param {string} authority
  */
 export function buildUnavailableRoundTripSnapshot(windowMs, includeSynthetic, authority) {
+    const completeness = {
+        rowsEligible: 0,
+        rowsAnalyzed: 0,
+        maxRows: 0,
+        truncated: false,
+        selection: 'unavailable',
+        coverageRatio: 0,
+    };
+    const empty = summarizeMcpRoundTripRows([], {
+        windowMs,
+        top: 1,
+        includeSynthetic,
+        completeness,
+    });
     return {
         available: false,
-        schemaVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
-        normalizerVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
+        ...empty,
         authority,
-        windowMs,
-        includeSynthetic,
-        indexedRows: 0,
-        completeness: {
-            rowsEligible: 0,
-            rowsAnalyzed: 0,
-            maxRows: 0,
-            truncated: false,
-            selection: 'unavailable',
-            coverageRatio: 0,
-        },
-        callPairing: {
-            startedCallCount: 0,
-            terminalCallCount: 0,
-            pairedCallCount: 0,
-            orphanStartCount: 0,
-            orphanTerminalCount: 0,
-            missingCallIdStartCount: 0,
-            missingCallIdTerminalCount: 0,
-            pairingCoverage: null,
-            terminalEvents: [...MCP_TOOL_CALL_TERMINAL_EVENTS],
-        },
-        topTransitions: [],
-        lineageContext: {
-            authority: 'sanitized-request-meta-trace-context-state-on-tool-call-starts',
-            traceContextStateCounts: {},
-            validTraceStartCount: 0,
-            startedCallCount: 0,
-            validTraceStartRate: null,
-            caveat: 'Only the sanitized trace-context state is retained. Raw traceparent, tracestate and baggage are neither exposed here nor persisted in the derived index.',
-        },
-        failures: emptyFailureAnalytics(),
-        resultOutcomes: emptyResultOutcomeAnalytics(),
-        sequenceEvidence: emptySequenceEvidence(),
-        retryTax: emptyRetryTaxAnalytics(),
-        recovery: emptyRecoveryAnalytics(),
-        workflowPressure: emptyWorkflowPressure(),
-        executionAccounting: emptyExecutionAccounting(),
-        payloadAccounting: {
-            authority: 'bounded-result-byte-accounting-plus-lineage-aware-heavy-result-followup-pressure',
-            heavyResultThresholdBytes: HEAVY_RESULT_THRESHOLD_BYTES,
-            heavyResultFollowups: {
-                temporalReadFollowupCount: 0,
-                lineageReadFollowupCount: 0,
-                sameTargetRereadCount: 0,
-                caveat: 'A follow-up after a heavy result is observational pressure only. Same-target reread requires matching lineage, exact target identity and the same inspection tool; none of these counters proves avoidability.',
-            },
-            byTool: [],
-        },
-        runtimeCohorts: {
-            generationMixDetected: false,
-            knownCohortCount: 0,
-            unknownCallCount: 0,
-            callsByCohort: {},
-        },
-        optimizationEvidence: emptyOptimizationEvidence(),
-        discontinuities: {
-            thresholdMs: MAX_INTERACTIVE_TRANSITION_GAP_MS,
-            count: 0,
-            totalMs: 0,
-            maxMs: 0,
-        },
-        toolStarts: [],
-    };
-}
-
-function emptyFailureAnalytics() {
-    return {
-        byCode: {},
-        byClass: {},
-        byRetryability: {},
-        causalFailureCount: 0,
-        recoveryRequiredTargetCount: 0,
-        inlineNextActionTargetCount: 0,
-        inlineRecoveryAnchorTargetCount: 0,
-        inlineNextActionCoverage: null,
-        inlineRecoveryAnchorCoverage: null,
-        byRuntimeCohort: {},
-    };
-}
-
-function emptyResultOutcomeAnalytics() {
-    return {
-        authority: 'sanitized-tool-completion-result-metadata-v5',
-        completedCalls: 0,
-        observedOutcomeCalls: 0,
-        outcomeCoverageRate: null,
-        codedCalls: 0,
-        failureCalls: 0,
-        optionConfigFailures: 0,
-        preconditionFailures: 0,
-        domainOrUnknownFailures: 0,
-        uncodedFailures: 0,
-        optionErrorRate: null,
-        optionErrorShareOfFailures: null,
-        byState: {},
-        byClass: {},
-        byCode: {},
-        byTool: [],
-        byRuntimeCohort: {},
-        caveat: 'Outcome fields are authoritative only for completions emitted after the v5 registry rollout. Replayed historical completions that never persisted result outcome metadata remain explicitly unobserved and are excluded from optionErrorRate.',
-    };
-}
-
-function emptySequenceEvidence() {
-    return {
-        authority: 'quiescent-burst-temporal-adjacency-not-workflow-causality',
-        recurringTransitions: [],
-        recurringTransitionCount: 0,
-        lineageAuthority: 'matching-sanitized-w3c-trace-key-when-provided-by-client',
-        lineageBoundTransitions: [],
-        lineageBoundTransitionCount: 0,
-        lineageKnownPairCount: 0,
-        lineageUnknownPairCount: 0,
-        lineageKnownRate: null,
-        unknownLineageTransitionCount: 0,
-        crossTracePairRejectedCount: 0,
-        activeOverlapExcludedCount: 0,
-    };
-}
-
-function emptyRetryTaxAnalytics() {
-    return {
-        authority: 'failure-completion-to-first-same-tool-repeat-with-sanitized-lineage-v6',
-        windowMs: RECOVERY_WINDOW_MS,
-        retryTaxCalls: 0,
-        retryTaxGapMs: 0,
-        retryTaxAverageGapMs: 0,
-        retryTaxInterveningCalls: 0,
-        byTool: {},
-        byFailureSignalClass: {},
-        byResultCode: {},
-        temporalPressure: {
-            sameToolAdjacentAfterFailureCount: 0,
-            sameExactTargetAdjacentAfterFailureCount: 0,
-            totalGapMs: 0,
-            caveat: 'Quiescent temporal adjacency only; without matching lineage it is repeat pressure, not retry tax.',
-        },
-        lineageBound: {
-            candidateWithLineageCount: 0,
-            candidateWithoutLineageCount: 0,
-            sameToolRepeatCount: 0,
-            sameToolRepeatGapMs: 0,
-            targetOverlapRepeatCount: 0,
-            byFailureSignalClass: {},
-            pendingCandidateCount: 0,
-        },
-        caveat: 'retryTaxCalls requires same sanitized trace, same tool, exact-single target identity on both calls and target overlap. Same-tool lineage repeats without exact target identity remain pressure only.',
-    };
-}
-
-function emptyRecoveryAnalytics() {
-    const temporalPressure = {
-        traceCount: 0,
-        withInspectionCount: 0,
-        withoutInspectionCount: 0,
-        roundTrips: 0,
-        totalGapMs: 0,
-        averageGapMs: 0,
-        caveat: 'Temporal pressure only; it may cross unrelated workflows when trace lineage is unavailable.',
-    };
-    return {
-        authority: 'temporal-pressure-plus-lineage-bound-v4',
-        temporalPressure,
-        lineageBound: {
-            candidateWithLineageCount: 0,
-            candidateWithoutLineageCount: 0,
-            unknownRecoveryLineageCount: 0,
-            traceCount: 0,
-            withInspectionCount: 0,
-            roundTrips: 0,
-            totalGapMs: 0,
-            averageGapMs: 0,
-            sameTargetTraceCount: 0,
-            sameTargetWithInspectionCount: 0,
-            pendingCandidateCount: 0,
-        },
-    };
-}
-
-function emptyWorkflowPressure() {
-    return {
-        authority: 'temporal-adjacency-unless-lineage-counterpart-is-explicitly-named',
-        planThenApplyCount: 0,
-        lineagePlanThenApplyCount: 0,
-        planThenApplyByPair: {},
-        validatorPollCount: 0,
-        patchThenValidatorTransitions: 0,
-        lineagePatchThenValidatorTransitions: 0,
-        compositePostValidationCount: 0,
-        gitGranularCalls: 0,
-        gitGranularByTool: {},
-        gitOneShotCalls: 0,
-        gitGranularToOneShotRatio: null,
-    };
-}
-
-function emptyExecutionAccounting() {
-    return {
-        completedCalls: 0,
-        accountedCalls: 0,
-        accountingCoverageRate: null,
-        logicalOperations: 0,
-        coalescedLogicalOperations: 0,
-        batchCalls: 0,
-        saturatedBatchCalls: 0,
-        truncatedOperations: 0,
-        continuationAvailableCalls: 0,
-        continuationAvailableOperations: 0,
-        continuationTransportRequiredCalls: 0,
-        continuationTransportRequiredOperations: 0,
-        continuationRecommendedCalls: 0,
-        continuationRecommendedOperations: 0,
-        legacyContinuationRequiredCalls: 0,
-        repeatAfterBatch: { unsaturatedComplete: 0, saturated: 0, truncated: 0, transportRequired: 0 },
-        caveat: 'Only continuationTransportRequired represents result data omitted by the batch transport budget. Availability/recommendation do not imply another model→tool round trip is required; legacyContinuationRequired is historical v6 metadata and is excluded from induced-continuation metrics.',
-        byTool: [],
-    };
-}
-
-function emptyOptimizationEvidence() {
-    return {
-        newCompositeRecommendation: 'none-from-analytics-alone',
-        existingMechanisms: [],
-        caveat: 'Temporal pressure only ranks investigation targets. Lineage and semantic review are required before classifying a round trip as avoidable.',
+        completeness,
     };
 }
 
@@ -1742,6 +1579,55 @@ function renderResultOutcomeCohorts(cohorts) {
         [...cohorts.entries()]
             .sort((left, right) => Number(right[1]?.calls ?? 0) - Number(left[1]?.calls ?? 0))
             .map(([key, metric]) => [key, projectResultOutcomeMetric(metric)]),
+    );
+}
+
+/** @param {Map<string, any>} metrics @param {string} key */
+function requireExecutionPolicyMetric(metrics, key) {
+    const existing = metrics.get(key);
+    if (existing) return existing;
+    const metric = {
+        observedCalls: 0,
+        policyClasses: new Map(),
+        failurePolicyClasses: new Map(),
+        concurrencyClasses: new Map(),
+    };
+    metrics.set(key, metric);
+    return metric;
+}
+
+/** @param {any} metric @param {string} policyClass @param {string} failurePolicyClass @param {string} concurrencyClass */
+function mergeExecutionPolicyMetric(metric, policyClass, failurePolicyClass, concurrencyClass) {
+    metric.observedCalls += 1;
+    increment(metric.policyClasses, policyClass);
+    increment(metric.failurePolicyClasses, failurePolicyClass);
+    increment(metric.concurrencyClasses, concurrencyClass);
+}
+
+/** @param {any} metric */
+function projectExecutionPolicyMetric(metric) {
+    return {
+        observedCalls: metric.observedCalls,
+        byPolicyClass: mapToObject(metric.policyClasses),
+        byFailurePolicyClass: mapToObject(metric.failurePolicyClasses),
+        byConcurrencyClass: mapToObject(metric.concurrencyClasses),
+    };
+}
+
+/** @param {Map<string, any>} byTool @param {number} top */
+function renderExecutionPolicyByTool(byTool, top) {
+    return [...byTool.entries()]
+        .map(([tool, metric]) => ({ tool, ...projectExecutionPolicyMetric(metric) }))
+        .sort((left, right) => right.observedCalls - left.observedCalls || left.tool.localeCompare(right.tool))
+        .slice(0, top);
+}
+
+/** @param {Map<string, any>} cohorts */
+function renderExecutionPolicyCohorts(cohorts) {
+    return Object.fromEntries(
+        [...cohorts.entries()]
+            .sort((left, right) => Number(right[1]?.observedCalls ?? 0) - Number(left[1]?.observedCalls ?? 0))
+            .map(([key, metric]) => [key, projectExecutionPolicyMetric(metric)]),
     );
 }
 

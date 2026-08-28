@@ -1,7 +1,7 @@
 // @ts-check
 /** Sanitized MCP audit-event normalizer for the rebuildable round-trip index. */
 
-export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 9;
+export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 11;
 
 export const MCP_TOOL_CALL_TERMINAL_EVENTS = Object.freeze([
     'tool_call_completed',
@@ -76,6 +76,15 @@ export function normalizeMcpRoundTripAuditEvent(event) {
         failedOperations: nonNegativeIntegerOrNull(event['failedOperations']),
         skippedOperations: nonNegativeIntegerOrNull(event['skippedOperations']),
         executionMode: boundedStringOrNull(event['executionMode'], 96),
+        executionPolicyClass: enumOrNull(event['executionPolicyClass'], [
+            'dry-run',
+            'preflight-blocked',
+            'direct-apply',
+            'preflight-gated-apply',
+            'atomic-preflight-elided-apply',
+        ]),
+        executionFailurePolicyClass: enumOrNull(event['executionFailurePolicyClass'], ['best-effort', 'fail-fast']),
+        executionConcurrencyClass: enumOrNull(event['executionConcurrencyClass'], ['sequential', 'parallel-bounded']),
         batchSize: positiveIntegerOrNull(event['batchSize']),
         batchCapacity: positiveIntegerOrNull(event['batchCapacity']),
         resultBudgetBytes: nonNegativeIntegerOrNull(event['resultBudgetBytes']),

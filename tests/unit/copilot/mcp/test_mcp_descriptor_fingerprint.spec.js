@@ -66,13 +66,16 @@ describe('MCP wire descriptor fingerprint authority', () => {
         });
     });
 
-    it('keeps the full canonical fingerprint byte-for-byte compatible while adding per-tool identities', () => {
+    it('pins the intentional canonical surface fingerprint and per-tool identities', () => {
         const snapshot = buildMcpToolWireDescriptorSnapshot(getCanonicalMcpTools());
         assert.equal(snapshot.schemaVersion, 2);
         assert.equal(snapshot.fingerprintKind, 'tools-list-wire-sha256-v1');
-        assert.equal(snapshot.fingerprint, '2449c418de55b14c51ac8760fe42612d521bc62d7c2e461a8a356942f739cfa7');
+        assert.equal(snapshot.descriptors.length, 89);
+        assert.equal(snapshot.fingerprint, '19d1ec79ab66919609cec98d092e9a68b613ecfaf95b3c6872988a47958201ac');
         assert.equal(snapshot.toolRevisionTokens['repo_apply_patch_batch'], 'wire-v1:345553b0bc26ad02');
-        assert.equal(snapshot.toolRevisionTokens['repo_patch_batch_plan'], 'wire-v1:5394ee0968c76fdc');
+        assert.equal(snapshot.toolRevisionTokens['run_copilot_validator'], 'wire-v1:20ada120b6f14572');
+        assert.equal(snapshot.toolRevisionTokens['repo_index_build'], 'wire-v1:adb3e310dcd61693');
+        assert.equal('repo_patch_batch_plan' in snapshot.toolRevisionTokens, false);
         assert.equal(Object.keys(snapshot.toolFingerprints).length, snapshot.descriptors.length);
         assert.equal(Object.keys(snapshot.toolRevisionTokens).length, snapshot.descriptors.length);
         for (const descriptor of snapshot.descriptors.slice(0, 5)) {

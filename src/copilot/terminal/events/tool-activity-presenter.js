@@ -133,7 +133,6 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     'workspace.search_files': 'Buscar arquivos',
     repo_status: 'Status do repo',
     repo_tree: 'Listar repo',
-    repo_root_tree: 'Listar raiz do repo',
     repo_read_file: 'Ler arquivo',
     repo_read_file_chunks: 'Ler arquivo em blocos',
     repo_search_text: 'Buscar texto',

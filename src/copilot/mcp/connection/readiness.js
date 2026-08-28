@@ -129,10 +129,10 @@ async function buildConnectorStateSummary(cloudflareConfig) {
  */
 function buildCanonicalSmokePrompts() {
     return [
-        'Use o conector Repo DevContainer MCP e chame mcp_auth_profile.',
-        'Chame chatgpt_connector_current_url_status e confirme success=true.',
+        'Use o conector Repo DevContainer MCP e chame mcp_connection_readiness view=auth-profile.',
+        'Chame mcp_connection_readiness view=current-url e confirme success=true.',
         'Chame mcp_connection_readiness e confirme oauth.blockers vazio e http2Plus.defaultPolicy=HTTP/2+.',
-        'Chame mcp_cloudflare_remote_audit e confirme que o origin remoto está sincronizado com HTTP/2+ antes de restart h2.',
+        'Chame mcp_cloudflare_edge_snapshot view=remote e confirme que o origin remoto está sincronizado com HTTP/2+ antes de restart h2.',
         'Chame mcp_oauth_issuer_diagnostics e confirme authorization_endpoint, token_endpoint, PKCE S256, resource_parameter_supported e JWKS.',
         'Chame repo_status.',
         'Chame repo_tree path="src/copilot/mcp" maxDepth=2.',
@@ -436,7 +436,10 @@ export async function readMcpPostRestartReadiness(workspace, cloudflareConfig, a
                 : 'Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.',
         );
     }
-    if (ready) nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
+    if (ready)
+        nextActions.push(
+            'Start with repo_status; use mcp_capabilities_summary view=session only when task-routing guidance is useful, and mcp_validation_dashboard when validation state matters.',
+        );
     return {
         success: true,
         ready,
@@ -459,7 +462,7 @@ export async function readMcpPostRestartReadiness(workspace, cloudflareConfig, a
         chatgpt: {
             authentication: formatChatGptConnectorAuthentication(authConfig),
             recommendedFirstCalls: ready
-                ? ['mcp_session_profile', 'mcp_validation_dashboard', 'repo_status']
+                ? ['repo_status', 'mcp_capabilities_summary view=session', 'mcp_validation_dashboard']
                 : ['mcp_tunnel_status', 'mcp_connector_smoke_refresh'],
         },
         nextActions,

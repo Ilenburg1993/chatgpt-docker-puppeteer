@@ -8,18 +8,17 @@
 import { buildToolPayloadAudit } from '#copilot/mcp/public/diagnostics/tool-payload';
 import {
     classifyMcpToolContractRisk,
-    defineMcpRawTool,
     readMcpDescriptorObservationState,
 } from '#copilot/mcp/public/protocol/catalog';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
-    okResult,
     requireMcpToolAuthConfig,
     requireMcpToolPayloadAuditConfig,
     requireMcpToolSurface,
 } from '#copilot/mcp/public/protocol/tools';
 import { readMcpToolOptionContractCoverage } from '#copilot/mcp/public/tools/catalog/option-contracts';
+import { MCP_TOOL_CONTRACTS_VERSION } from '#copilot/mcp/public/tools/catalog/semantic-contracts';
 import { buildMcpWorkflowStatusProjection } from '#copilot/mcp/public/workflow-policy';
 
 const NEVER_REMEMBER_APPROVAL_TOOLS = Object.freeze(['job_cancel']);
@@ -147,16 +146,12 @@ function summarizeTool(tool) {
 }
 
 /**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
+ * Build the explicit heavy/status projection used by mcp_capabilities_summary view=status.
+ * The tools/list payload summary remains cached per process configuration.
+ *
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
  */
-export const mcpToolsStatusTool = defineMcpRawTool({
-    name: 'mcp_tools_status',
-    title: 'MCP tools status',
-    description:
-        'Return compact MCP tool counts, risk classes and approval strategy without repeating the full tools/list registry.',
-    inputSchema: {},
-
-    handler: async (_args, operationContext) => {
+export async function readMcpToolsStatus(operationContext) {
         const auth = requireMcpToolAuthConfig(operationContext);
         const toolPayloadConfig = requireMcpToolPayloadAuditConfig(operationContext);
         const toolSurface = requireMcpToolSurface(operationContext);
@@ -185,7 +180,8 @@ export const mcpToolsStatusTool = defineMcpRawTool({
         }
         const optionContractCoverage = readMcpToolOptionContractCoverage();
         const descriptorRevisionProfile = {
-            authority: 'registry-tools-list-wire-fingerprint',
+            authority: 'canonical-tool-contract-version+registry-tools-list-wire-fingerprint',
+            semanticContractVersion: MCP_TOOL_CONTRACTS_VERSION,
             globalFingerprint: toolSurface.descriptorFingerprint ?? null,
             fingerprintKind: toolSurface.descriptorFingerprintKind ?? null,
             semanticProfileToken: `option-contract:${optionContractCoverage.version}`,
@@ -196,7 +192,7 @@ export const mcpToolsStatusTool = defineMcpRawTool({
                 revisionToken: toolSurface.toolDescriptorRevisionTokens?.[name] ?? null,
             })),
         };
-        return okResult({
+        return {
             success: true,
             totalTools: summaries.length,
             readOnlyCount: readOnly.length,
@@ -225,7 +221,7 @@ export const mcpToolsStatusTool = defineMcpRawTool({
                 oauthBroadInitialGrantCompatibility: broadInitialGrant,
                 writeActionsMayStillPrompt: true,
                 preferredStrategy:
-                    'Use the direct bounded one-shot tool when intent is clear; use plan tools only when preview, escalation, or a separate approval boundary adds information.',
+                    'Use the direct bounded one-shot tool when intent is clear; prefer its dryRun/preview mode when available, and use a separate plan tool only when it provides distinct functionality.',
             },
             executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
             executionLimits: MCP_TOOL_EXECUTION_LIMITS,
@@ -254,123 +250,5 @@ export const mcpToolsStatusTool = defineMcpRawTool({
             approvalFrictionProfile: buildApprovalFrictionProfile(summaries),
             wirePayloadAudit,
             detailsTool: 'mcp_capabilities_summary',
-        });
-    },
-});
-
-/**
- * @param {number} value
- * @param {number} max
- * @returns {number}
- */
-function clampScore(value, max) {
-    return Math.max(0, Math.min(max, Math.round(value)));
-}
-
-/**
- * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
- */
-export const mcpAutonomyPowerScoreTool = defineMcpRawTool({
-    name: 'mcp_autonomy_power_score',
-    title: 'MCP autonomy power score',
-    description:
-        'Return a deterministic autonomy score for the ChatGPT connector based on tool coverage, annotations, metadata, auth posture and validation readiness.',
-    inputSchema: {},
-
-    handler: async (_args, operationContext) => {
-        const auth = requireMcpToolAuthConfig(operationContext);
-        const tools = requireMcpToolSurface(operationContext).tools;
-        const summaries = tools.map(summarizeTool);
-        const readOnly = summaries.filter((tool) => tool.readOnly);
-        const boundedWrite = summaries.filter((tool) => tool.contract.mutation === 'bounded-write');
-        const destructive = summaries.filter((tool) => tool.destructive);
-        const openWorld = summaries.filter((tool) => tool.openWorld);
-        const planOnly = summaries.filter((tool) => tool.name.endsWith('_plan') || tool.name.includes('_plan_'));
-        const specificOutputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
-        const securityMetadataCoverage =
-            summaries.length === 0
-                ? 0
-                : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0)
-                      .length / summaries.length;
-        const broadInitialGrant = auth.scopesSupported.every((scope) => auth.initialScopes.includes(scope));
-        const scoreParts = {
-            toolSurface: clampScore((summaries.length / 66) * 18, 18),
-            lowFrictionReads: clampScore((readOnly.length / Math.max(1, summaries.length)) * 18, 18),
-            writeSafety: clampScore(
-                (boundedWrite.length > 0 ? 9 : 0) + (planOnly.length >= 5 ? 7 : planOnly.length),
-                16,
-            ),
-            metadata: clampScore(10 + securityMetadataCoverage * 10, 20),
-            validation: clampScore(
-                [
-                    'mcp_run_safe_validation_suite',
-                    'run_typecheck_copilot',
-                    'run_lint_copilot',
-                    'run_unit_copilot',
-                ].filter((name) => summaries.some((tool) => tool.name === name)).length * 3,
-                12,
-            ),
-            authPosture: clampScore(
-                auth.enforcement === 'off'
-                    ? 6
-                    : auth.staticBearerConfigured || (auth.expectedIssuer && auth.jwksUri)
-                      ? 10
-                      : 4,
-                10,
-            ),
-            promptFriction: clampScore(openWorld.length === 0 ? 6 : 2, 6),
         };
-        const score = Object.values(scoreParts).reduce((total, value) => total + value, 0);
-        const blockers = [];
-        if (openWorld.length > 0) blockers.push('Open-world tools increase host-side prompt friction.');
-        if (securityMetadataCoverage < 1) blockers.push('Some tools still lack securitySchemes metadata.');
-        if (auth.enforcement !== 'off' && !auth.staticBearerConfigured && !(auth.expectedIssuer && auth.jwksUri)) {
-            blockers.push('Auth enforcement is enabled without a configured static token or OAuth/JWKS verifier.');
-        }
-        const authAdvisories = broadInitialGrant
-            ? [
-                  'OAuth uses the max-autonomy initial grant by default so the workspace does not spend round-trips on reauthorization. Per-tool required scopes and runtime authorization remain explicit contracts; host-side approval prompts are a separate client policy.',
-              ]
-            : auth.stepUpPreferred
-              ? [
-                    'OAuth is explicitly running in least-privilege mode and therefore expects per-tool step-up when broader authority is needed; this is opt-in for this workspace.',
-                ]
-              : [];
-        return okResult({
-            success: true,
-            score,
-            grade: score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D',
-            scoreParts,
-            toolCounts: {
-                total: summaries.length,
-                readOnly: readOnly.length,
-                boundedWrite: boundedWrite.length,
-                destructive: destructive.length,
-                openWorld: openWorld.length,
-                planOnly: planOnly.length,
-            },
-            coverage: {
-                outputSchemaPolicy: 'specific-only',
-                specificOutputSchemaCount,
-                securityMetadata: securityMetadataCoverage,
-            },
-            auth: {
-                mode: auth.mode,
-                enforcement: auth.enforcement,
-                authorizationServersConfigured: auth.authorizationServers.length > 0,
-                initialScopes: [...auth.initialScopes],
-                initialScopeProfile: auth.initialScopeProfile,
-                stepUpPreferred: auth.stepUpPreferred,
-                broadInitialGrant,
-                jwksUriConfigured: Boolean(auth.jwksUri),
-                staticBearerConfigured: auth.staticBearerConfigured,
-            },
-            blockers,
-            authAdvisories,
-            nextActions:
-                blockers.length === 0
-                    ? ['Run mcp_golden_prompts in a real ChatGPT session and compare observed prompt friction.']
-                    : blockers,
-        });
-    },
-});
+}

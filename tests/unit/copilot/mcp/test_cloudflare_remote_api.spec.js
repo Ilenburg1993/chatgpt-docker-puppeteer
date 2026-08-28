@@ -1,8 +1,7 @@
-import { compareRemoteConfig } from '#copilot/mcp/public/cloudflare/remote';
+import { compactCloudflareRemoteAudit, compareRemoteConfig } from '#copilot/mcp/public/cloudflare/remote';
 import { parseMcpEnvironmentFile } from '#copilot/mcp/public/process/environment';
 import { getCloudflareClient } from '#copilot/testing/mcp/cloudflare/remote';
 import { describe, expect, it } from 'vitest';
-import { compactCloudflareRemoteAudit } from '../../../../src/copilot/mcp/tools/cloudflare-remote.js';
 
 /**
  * @returns {import('#copilot/mcp/public/cloudflare/remote').CloudflareRemoteApiConfig}

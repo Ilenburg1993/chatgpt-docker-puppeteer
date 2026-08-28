@@ -135,7 +135,7 @@ async function auditCloudflareSkipPostureUncached(auditConfig, options) {
                 preferredNextStep: 'Resolve zone permissions before planning skip/config rules.',
                 rationale: ['Zone ID could not be resolved.'],
             },
-            nextActions: ['Re-run mcp_cloudflare_skip_audit after the permission change.'],
+            nextActions: ['Re-run mcp_cloudflare_edge_snapshot view=skip after the permission change.'],
         };
     }
 
@@ -267,7 +267,7 @@ export function analyzeSkipPosture(skipRules, configBaseline, context) {
             rationale,
         },
         nextActions: [
-            'Create mcp_cloudflare_mcp_passthrough_plan for scoped http_config_settings on MCP/OAuth routes.',
+            'Preview the scoped http_config_settings rule with mcp_cloudflare_edge_policy_apply target=passthrough dryRun=true.',
             'Do not skip http_ratelimit broadly.',
             'Use skip only for products that cannot be safely disabled via configuration rules or after trace/security-event evidence.',
         ],

@@ -37,6 +37,14 @@ describe('MCP round-trip analytics monitor', () => {
                         lagBytes: 0,
                         complete: true,
                         reset: false,
+                        rebound: true,
+                        rebindsThisSync: 1,
+                        newGenerationsThisSync: 0,
+                        prefixProofsThisSync: 1,
+                        prefixProofBytesThisSync: 4096,
+                        sourceIntegrity: {
+                            cursor: { generationSequence: 2, lastTransition: 'rebind' },
+                        },
                     };
                 },
             }),
@@ -60,6 +68,16 @@ describe('MCP round-trip analytics monitor', () => {
         assert.equal(state.lastIndexedEvents, 1200);
         assert.equal(state.lastLagBytes, 0);
         assert.equal(state.lastComplete, true);
+        assert.equal(state.lastReset, false);
+        assert.equal(state.lastRebound, true);
+        assert.equal(state.lastRebindsThisSync, 1);
+        assert.equal(state.lastNewGenerationsThisSync, 0);
+        assert.equal(state.lastPrefixProofsThisSync, 1);
+        assert.equal(state.lastPrefixProofBytesThisSync, 4096);
+        assert.equal(state.totalPrefixProofs, 1);
+        assert.equal(state.totalPrefixProofBytes, 4096);
+        assert.equal(state.lastGenerationSequence, 2);
+        assert.equal(state.lastTransition, 'rebind');
         assert.equal(callbacks.length, 1);
     });
 

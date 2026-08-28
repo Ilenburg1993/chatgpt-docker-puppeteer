@@ -707,7 +707,7 @@ export function readMcpConnectionAuthProfile(input = {}, connectionConfig) {
                 : [
                       'Confirm the authorization server publishes OAuth metadata.',
                       'Run mcp_oauth_issuer_diagnostics.',
-                      'Run chatgpt_connector_current_url_status.',
+                      'Run mcp_connection_readiness view=current-url.',
                       'Confirm ChatGPT receives the protected resource metadata URL and returns scoped bearer tokens.',
                   ],
     };
@@ -808,7 +808,7 @@ export async function diagnoseMcpOAuthIssuer(input = {}, connectionConfig) {
         nextSteps:
             firstOk && summary.ready && (clientMetadataSummary?.ready ?? true)
                 ? [
-                      'Run mcp_auth_profile and verify accepted audiences/resource claim policy.',
+                      'Run mcp_connection_readiness view=auth-profile and verify accepted audiences/resource claim policy.',
                       'Run make copilot-mcp-oauth-smoke or the repo OAuth smoke command.',
                       'Create/reconnect the ChatGPT connector with Authentication=OAuth.',
                   ]

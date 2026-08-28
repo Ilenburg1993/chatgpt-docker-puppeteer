@@ -54,7 +54,7 @@ describe('copilot MCP registry', () => {
         const firstNames = first.map((tool) => tool.name);
         const secondNames = second.map((tool) => tool.name);
 
-        assert.equal(first.length, 131);
+        assert.equal(first.length, 89);
         assert.equal(new Set(firstNames).size, first.length);
         assert.deepEqual(secondNames, firstNames);
         assert.notStrictEqual(second, first);
@@ -76,12 +76,7 @@ describe('copilot MCP registry', () => {
         const names = tools.map((tool) => tool.name).sort();
 
         assert.deepEqual(names, [
-            'chatgpt_connector_current_url_status',
-            'chatgpt_connector_profile',
-            'chatgpt_connector_url_check',
-            'claude_connector_profile',
-            'copilot_session_get',
-            'copilot_sessions_list',
+            'copilot_sessions',
             'delegate_to_repo_autonomy_runner',
             'fetch',
             'git_branch_info',
@@ -98,49 +93,30 @@ describe('copilot MCP registry', () => {
             'job_cancel',
             'job_get_output',
             'job_get_summary',
-            'job_list',
             'llmb_live_readiness',
-            'llmb_live_runs',
             'llmb_live_test_cancel',
             'llmb_live_test_plan',
             'llmb_live_test_run',
             'mcp_apps_sdk_readiness',
-            'mcp_auth_profile',
-            'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
             'mcp_cleanup_ai_artifacts',
             'mcp_client_latency_evidence',
-            'mcp_cloudflare_config_audit',
-            'mcp_cloudflare_edge_audit',
             'mcp_cloudflare_edge_backup_create',
             'mcp_cloudflare_edge_backups_list',
             'mcp_cloudflare_edge_policy_apply',
-            'mcp_cloudflare_edge_policy_diff',
-            'mcp_cloudflare_edge_policy_plan',
             'mcp_cloudflare_edge_snapshot',
-            'mcp_cloudflare_mcp_passthrough_apply',
-            'mcp_cloudflare_mcp_passthrough_diff',
-            'mcp_cloudflare_mcp_passthrough_plan',
             'mcp_cloudflare_metrics_snapshot',
-            'mcp_cloudflare_plan_capabilities_audit',
-            'mcp_cloudflare_post_change_gates',
-            'mcp_cloudflare_remote_audit',
-            'mcp_cloudflare_skip_audit',
-            'mcp_cloudflare_transport_benchmark_plan',
             'mcp_connection_readiness',
             'mcp_connector_smoke_refresh',
             'mcp_dependency_outdated',
             'mcp_dependency_upgrade',
             'mcp_devcontainer_network_control_plane_refresh',
             'mcp_devcontainer_network_posture_audit',
-            'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
-            'mcp_last_validation_summary',
             'mcp_latency_attribution',
             'mcp_latency_dashboard',
             'mcp_latency_pulse',
             'mcp_maintenance_apply_safe_fixes',
-            'mcp_maintenance_plan',
             'mcp_oauth_friction_audit',
             'mcp_oauth_issuer_diagnostics',
             'mcp_openai_endpoint_latency',
@@ -151,21 +127,16 @@ describe('copilot MCP registry', () => {
             'mcp_round_trip_analytics',
             'mcp_run_safe_validation_suite',
             'mcp_runtime_health',
-            'mcp_session_profile',
             'mcp_smoke_workspace',
             'mcp_tool_payload_audit',
-            'mcp_tools_status',
             'mcp_tunnel_status',
             'mcp_validation_dashboard',
-            'mcp_validation_plan',
             'project_doctor',
             'repo_apply_file_batch',
-            'repo_apply_file_batch_plan',
             'repo_apply_patch',
             'repo_apply_patch_batch',
             'repo_bulk_inspect',
             'repo_create_file',
-            'repo_create_file_plan',
             'repo_diff_files',
             'repo_file_outline',
             'repo_file_stats',
@@ -173,25 +144,16 @@ describe('copilot MCP registry', () => {
             'repo_find_orphan_imports',
             'repo_find_symbol_usages',
             'repo_index_build',
-            'repo_index_find_symbol',
-            'repo_index_invalidate',
-            'repo_index_refresh_plan',
             'repo_index_search',
             'repo_index_status',
-            'repo_inspect_quarantined_file',
-            'repo_list_quarantine',
             'repo_move_file',
-            'repo_move_file_plan',
-            'repo_patch_batch_plan',
-            'repo_patch_plan',
             'repo_quarantine_file',
-            'repo_quarantine_file_plan',
+            'repo_quarantine_status',
             'repo_read_file',
             'repo_read_file_chunks',
             'repo_remove_file',
             'repo_restore_quarantined_file',
             'repo_root_redaction_status',
-            'repo_root_tree',
             'repo_search_text',
             'repo_status',
             'repo_symbol_search',
@@ -199,10 +161,6 @@ describe('copilot MCP registry', () => {
             'repo_working_set',
             'repo_write_file',
             'run_copilot_validator',
-            'run_lint_copilot',
-            'run_project_doctor',
-            'run_typecheck_copilot',
-            'run_unit_copilot',
             'search',
             'terminal_exec',
             'terminal_session_control',
@@ -218,7 +176,7 @@ describe('copilot MCP registry', () => {
 
         assert.equal(names.has('mcp_latency_attribution'), false);
         assert.equal(names.has('mcp_latency_dashboard'), true);
-        assert.equal(names.has('claude_connector_profile'), true);
+        assert.equal(names.has('mcp_connection_readiness'), true);
         assert.equal(names.has('repo_read_file'), true);
         assert.equal(names.has('search'), true);
         assert.equal(names.has('fetch'), true);
@@ -226,6 +184,54 @@ describe('copilot MCP registry', () => {
         assert.equal(names.has('repo_create_file'), false);
         assert.equal(names.has('repo_remove_file'), false);
         assert.ok(tools.every((tool) => tool.annotations.destructiveHint !== true));
+    });
+
+    it('keeps include/exclude overrides deterministic, diagnosable and safely reversible', () => {
+        const policy = createMcpToolSurfacePolicy({
+            mode: 'minimal',
+            include: ['project_doctor', 'unknown_include'],
+            exclude: ['mcp_latency_dashboard', 'project_doctor', 'unknown_exclude'],
+        });
+        const selected = getCanonicalMcpTools({ toolSurfacePolicy: policy });
+        const names = new Set(selected.map((tool) => tool.name));
+        assert.equal(names.has('repo_status'), true);
+        assert.equal(names.has('mcp_latency_dashboard'), false);
+        assert.equal(names.has('project_doctor'), false);
+        assert.equal(names.has('unknown_include'), false);
+
+        const state = getCanonicalMcpToolSurfaceState();
+        assert.equal(state['mode'], 'minimal');
+        assert.deepEqual(state['include'], ['project_doctor', 'unknown_include']);
+        assert.deepEqual(state['exclude'], ['mcp_latency_dashboard', 'project_doctor', 'unknown_exclude']);
+        assert.deepEqual(state['unknownInclude'], ['unknown_include']);
+        assert.deepEqual(state['unknownExclude'], ['unknown_exclude']);
+        assert.equal(state['allowEmpty'], false);
+    });
+
+    it('falls back to the complete surface on an accidental empty projection unless allowEmpty is explicit', () => {
+        const full = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'full' }) });
+        const minimal = getCanonicalMcpTools({ toolSurfacePolicy: createMcpToolSurfacePolicy({ mode: 'minimal' }) });
+        const minimalNames = minimal.map((tool) => tool.name);
+
+        const safePolicy = createMcpToolSurfacePolicy({
+            mode: 'minimal',
+            exclude: minimalNames,
+        });
+        const safeProjection = getCanonicalMcpTools({ toolSurfacePolicy: safePolicy });
+        assert.equal(safeProjection.length, full.length);
+        assert.deepEqual(
+            safeProjection.map((tool) => tool.name),
+            full.map((tool) => tool.name),
+        );
+
+        const explicitEmpty = createMcpToolSurfacePolicy({
+            mode: 'minimal',
+            exclude: minimalNames,
+            allowEmpty: true,
+        });
+        assert.deepEqual(getCanonicalMcpTools({ toolSurfacePolicy: explicitEmpty }), []);
+        assert.equal(getCanonicalMcpToolSurfaceState()['selectedTools'], 0);
+        assert.equal(getCanonicalMcpToolSurfaceState()['allowEmpty'], true);
     });
 
     it.each(MCP_TOOL_SURFACE_MODES)(
@@ -267,14 +273,14 @@ describe('copilot MCP registry', () => {
             assert.equal(names.has(name), true, name);
         }
         assert.ok(latency.length < full.length);
-        assert.equal(latency.length, 71);
+        assert.equal(latency.length, 52);
     });
 
     it('warns before the configured tool-count limit is exhausted', () => {
         const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
         const oldPercent = process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
         try {
-            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '150';
+            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '110';
             process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = '80';
             resetCanonicalMcpToolsCacheForTests();
             getCanonicalMcpTools();
@@ -402,15 +408,15 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
         const coverage = readMcpToolContractCoverage();
         assert.deepEqual(coverage, {
-            total: 131,
-            readOnly: 93,
-            boundedWrite: 30,
+            total: 89,
+            readOnly: 56,
+            boundedWrite: 25,
             destructive: 8,
             openWorld: 10,
-            idempotent: 92,
-            scopes: { read: 89, write: 20, validate: 9, admin: 13 },
-            cancellation: { cancellable: 31, boundedNonCancellable: 88, notApplicable: 12 },
-            output: { specific: 10, intentionalUntyped: 121 },
+            idempotent: 55,
+            scopes: { read: 56, write: 19, validate: 2, admin: 12 },
+            cancellation: { cancellable: 26, boundedNonCancellable: 57, notApplicable: 6 },
+            output: { specific: 10, intentionalUntyped: 79 },
         });
         assert.equal(tools.length, coverage.total);
         for (const tool of tools) {
@@ -424,6 +430,16 @@ describe('copilot MCP registry', () => {
         }
     });
 
+    it('keeps consolidated connection readiness local while issuer diagnostics retain external authority', () => {
+        const tools = getCanonicalMcpTools();
+        const readiness = tools.find((tool) => tool.name === 'mcp_connection_readiness');
+        const issuer = tools.find((tool) => tool.name === 'mcp_oauth_issuer_diagnostics');
+        assert.ok(readiness);
+        assert.ok(issuer);
+        assert.equal(readiness.contract.authority.network, 'local');
+        assert.equal(issuer.contract.authority.network, 'fixed-external');
+    });
+
     it('pins terminal_session_read as cancellable after event-driven long-poll rollout', () => {
         const tool = getCanonicalMcpTools().find((item) => item.name === 'terminal_session_read');
         assert.ok(tool?.execution);
@@ -433,15 +449,12 @@ describe('copilot MCP registry', () => {
         assert.match(tool.execution.rationale, /releases only the read waiter/u);
     });
 
-    it('assigns the readiness-specific drain rationale only to llmb_live_readiness', () => {
+    it('pins the combined LLM-B read owner cancellation rationale on llmb_live_readiness', () => {
         const tools = getCanonicalMcpTools();
-        const repoStatus = tools.find((tool) => tool.name === 'repo_status');
         const readiness = tools.find((tool) => tool.name === 'llmb_live_readiness');
-        assert.ok(repoStatus?.execution);
         assert.ok(readiness?.execution);
-        assert.equal(repoStatus.execution.rationale.includes('Fresh readiness'), false);
         assert.match(readiness.execution.rationale, /call-scoped subprocess/u);
-        assert.match(readiness.execution.rationale, /settles only after child close/u);
+        assert.match(readiness.execution.rationale, /settles only after owned child close/u);
     });
 
     it('does not invoke a handler when cancellation already happened', async () => {

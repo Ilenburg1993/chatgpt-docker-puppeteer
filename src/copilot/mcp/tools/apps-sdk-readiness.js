@@ -193,7 +193,7 @@ export const mcpAppsSdkReadinessTool = defineMcpRawTool({
                 hasWidgetResource && !hasWidgetDescription
                     ? 'Add openai/widgetDescription to reduce redundant widget narration.'
                     : 'Keep descriptions concise and tool-focused.',
-                'Continue reducing approval prompts through readOnlyHint, plan tools, batched writes, and remembered approvals for bounded-write tools.',
+                'Continue reducing approval prompts through readOnlyHint, canonical-owner dryRun previews, batched writes, and remembered approvals for bounded-write tools; keep separate plan tools only when functionally distinct.',
             ],
         });
     },

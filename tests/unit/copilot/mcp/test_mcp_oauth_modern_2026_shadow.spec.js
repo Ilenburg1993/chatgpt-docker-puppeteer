@@ -178,7 +178,7 @@ describe('MCP OAuth + modern 2026 shadow', () => {
             assert.equal(shadow.config.stepUpPreferred, false);
 
             const tools = await shadow.client.listTools();
-            assert.equal(tools.tools.length, 131);
+            assert.equal(tools.tools.length, 89);
             const read = await shadow.client.callTool({ name: 'repo_status', arguments: {} });
             assert.notEqual(read.isError, true);
             const readStructured = /** @type {Record<string, unknown>} */ (read.structuredContent ?? {});

@@ -157,7 +157,7 @@ export const mcpOAuthFrictionAuditTool = defineMcpRawTool({
             compatibilityRetirement,
             reauthRisk: critical.length > 0 ? 'high' : warnings.length > 0 ? 'medium' : 'low',
             approvalImpact:
-                'OAuth grants scoped repository authority to ChatGPT. Host write/destructive confirmations are controlled by ChatGPT host policy and must be reduced through accurate annotations, plan tools, batched writes, and remembered approvals.',
+                'OAuth grants scoped repository authority to ChatGPT. Host write/destructive confirmations are controlled by ChatGPT host policy; prefer accurate annotations, canonical-owner dryRun previews, batched writes, and remembered approvals when offered. Retain separate plan tools only when they provide a distinct functional contract.',
             warnings,
             critical,
             recommendedFixes: buildRecommendedFixes({ warnings, critical }),
@@ -249,7 +249,7 @@ function buildRecommendedFixes(input) {
     if (input.critical.length === 0 && input.warnings.length === 0) {
         return [
             'Keep OAuth metadata stable, refresh-token rotation enabled, and per-tool scopes least-authority; use a broad initial grant only when real-client compatibility evidence requires it.',
-            'Continue reducing write confirmation count with plan tools, repo_apply_file_batch, and remembered approvals when offered by chatgpt.com.',
+            'Continue reducing write confirmation count with canonical-owner dryRun previews, repo_apply_file_batch, and remembered approvals when offered by chatgpt.com; use separate plan tools only for distinct functionality.',
         ];
     }
     return [

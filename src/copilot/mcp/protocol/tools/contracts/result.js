@@ -25,6 +25,9 @@
  *     failedOperations?: number;
  *     skippedOperations?: number;
  *     mode?: string;
+ *     executionPolicyClass?: 'dry-run' | 'preflight-blocked' | 'direct-apply' | 'preflight-gated-apply' | 'atomic-preflight-elided-apply';
+ *     executionFailurePolicyClass?: 'best-effort' | 'fail-fast';
+ *     executionConcurrencyClass?: 'sequential' | 'parallel-bounded';
  *     batchSize?: number;
  *     batchCapacity?: number;
  *     resultBudgetBytes?: number;
@@ -40,6 +43,15 @@
 
 const RESULT_SIZE_HINT_SYMBOL = Symbol.for('copilot.mcp.resultSizeHint');
 const RESULT_EXECUTION_HINT_SYMBOL = Symbol.for('copilot.mcp.resultExecutionHint');
+const EXECUTION_POLICY_CLASSES = /** @type {const} */ ([
+    'dry-run',
+    'preflight-blocked',
+    'direct-apply',
+    'preflight-gated-apply',
+    'atomic-preflight-elided-apply',
+]);
+const EXECUTION_FAILURE_POLICY_CLASSES = /** @type {const} */ (['best-effort', 'fail-fast']);
+const EXECUTION_CONCURRENCY_CLASSES = /** @type {const} */ (['sequential', 'parallel-bounded']);
 
 /**
  * @param {unknown} value
@@ -133,12 +145,24 @@ export function withResultExecutionHint(result, hint) {
         hint.continuationAvailable === true || continuationAvailableOperations > 0 || continuationTransportRequired;
     const continuationRecommended =
         hint.continuationRecommended === true || continuationRecommendedOperations > 0 || continuationTransportRequired;
+    const executionPolicyClass = enumStringOrUndefined(hint.executionPolicyClass, EXECUTION_POLICY_CLASSES);
+    const executionFailurePolicyClass = enumStringOrUndefined(
+        hint.executionFailurePolicyClass,
+        EXECUTION_FAILURE_POLICY_CLASSES,
+    );
+    const executionConcurrencyClass = enumStringOrUndefined(
+        hint.executionConcurrencyClass,
+        EXECUTION_CONCURRENCY_CLASSES,
+    );
     Object.defineProperty(result, RESULT_EXECUTION_HINT_SYMBOL, {
         value: {
             logicalOperations,
             failedOperations,
             skippedOperations,
             mode: typeof hint.mode === 'string' && hint.mode.trim() ? hint.mode.trim().slice(0, 80) : undefined,
+            ...(executionPolicyClass ? { executionPolicyClass } : {}),
+            ...(executionFailurePolicyClass ? { executionFailurePolicyClass } : {}),
+            ...(executionConcurrencyClass ? { executionConcurrencyClass } : {}),
             ...(batchSize !== undefined ? { batchSize } : {}),
             ...(batchCapacity !== undefined ? { batchCapacity } : {}),
             ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
@@ -187,11 +211,23 @@ export function getResultExecutionHint(result) {
         record['continuationRecommendedOperations'],
         logicalOperations,
     );
+    const executionPolicyClass = enumStringOrUndefined(record['executionPolicyClass'], EXECUTION_POLICY_CLASSES);
+    const executionFailurePolicyClass = enumStringOrUndefined(
+        record['executionFailurePolicyClass'],
+        EXECUTION_FAILURE_POLICY_CLASSES,
+    );
+    const executionConcurrencyClass = enumStringOrUndefined(
+        record['executionConcurrencyClass'],
+        EXECUTION_CONCURRENCY_CLASSES,
+    );
     return {
         logicalOperations: Math.floor(logicalOperations),
         failedOperations: Math.max(0, Math.floor(Number(record['failedOperations']) || 0)),
         skippedOperations: Math.max(0, Math.floor(Number(record['skippedOperations']) || 0)),
         ...(typeof record['mode'] === 'string' ? { mode: record['mode'] } : {}),
+        ...(executionPolicyClass ? { executionPolicyClass } : {}),
+        ...(executionFailurePolicyClass ? { executionFailurePolicyClass } : {}),
+        ...(executionConcurrencyClass ? { executionConcurrencyClass } : {}),
         ...(batchSize !== undefined ? { batchSize } : {}),
         ...(batchCapacity !== undefined ? { batchCapacity } : {}),
         ...(resultBudgetBytes !== undefined ? { resultBudgetBytes } : {}),
@@ -203,6 +239,13 @@ export function getResultExecutionHint(result) {
         ...(record['continuationRecommended'] === true ? { continuationRecommended: true } : {}),
         ...(continuationRecommendedOperations > 0 ? { continuationRecommendedOperations } : {}),
     };
+}
+
+/** @template {string} T @param {unknown} value @param {readonly T[]} allowed @returns {T | undefined} */
+function enumStringOrUndefined(value, allowed) {
+    return typeof value === 'string' && allowed.includes(/** @type {T} */ (value))
+        ? /** @type {T} */ (value)
+        : undefined;
 }
 
 /** @param {unknown} value @param {number} max */

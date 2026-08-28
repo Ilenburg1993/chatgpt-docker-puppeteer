@@ -63,12 +63,25 @@ export const mcpToolPayloadAuditTool = defineMcpRawTool({
             tools: [...surface.tools],
         }));
         const usageWindowMs = (usageWindowHours ?? 24) * 60 * 60 * 1000;
+        const usageRuntimeSourceBinding = 'controlled-promotion';
         const usageSnapshot = await requireMcpToolRoundTripAnalyticsCapability(operationContext).summarize({
             windowMs: usageWindowMs,
-            top: 100,
+            top: 500,
             includeSynthetic: false,
             sync: false,
+            runtimeSourceBinding: usageRuntimeSourceBinding,
         });
+        if (usageSnapshot.queryScope?.runtimeSourceBinding !== usageRuntimeSourceBinding) {
+            throw new Error(
+                'MCP tool-surface usage comparison requires a controlled-promotion filtered analytics window.',
+            );
+        }
+        const usageCompleteness = usageSnapshot.completeness;
+        const usageSourceIntegrity = usageSnapshot.sourceIntegrity;
+        const usageEvidenceComplete =
+            usageSourceIntegrity?.status === 'materialized' &&
+            usageCompleteness?.truncated === false &&
+            Number(usageCompleteness.coverageRatio) === 1;
         const usageToolStarts = Array.isArray(usageSnapshot.toolStarts)
             ? usageSnapshot.toolStarts
                   .map((row) => ({ tool: String(row?.tool ?? ''), count: Number(row?.count ?? 0) }))
@@ -81,9 +94,17 @@ export const mcpToolPayloadAuditTool = defineMcpRawTool({
                 config,
                 ...(samples === undefined ? {} : { samples }),
                 usageToolStarts,
+                usageEvidenceComplete,
             }),
             usageAuthority: {
                 source: 'round-trip-derived-index',
+                population: 'promoted-runtime-tool-starts-in-current-catalog',
+                runtimeSourceBinding: usageRuntimeSourceBinding,
+                excludeSynthetic: true,
+                excludeNonCurrentTools: true,
+                coverageUsable: usageEvidenceComplete,
+                completeness: usageCompleteness,
+                sourceIntegrityStatus: usageSourceIntegrity?.status ?? null,
                 windowMs: usageWindowMs,
                 sync: false,
                 indexedRows: usageSnapshot.indexedRows,

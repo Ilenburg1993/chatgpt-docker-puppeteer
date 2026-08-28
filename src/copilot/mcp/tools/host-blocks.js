@@ -85,7 +85,7 @@ function classifyByEvidence(input) {
             confidence: 'high',
             severity: 'medium',
             reason: 'The host rejected the input before MCP while this origin generation has not observed a fresh tools/list. A stale ChatGPT approved-action snapshot is plausible, but the origin cannot observe that administrative state directly; use Refresh/review before attributing the failure to MCP runtime drift.',
-            recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary'],
+            recommendedAlternatives: ['mcp_capabilities_summary view=status', 'mcp_capabilities_summary'],
         };
     }
 
@@ -97,7 +97,7 @@ function classifyByEvidence(input) {
                 confidence: 'high',
                 severity: 'medium',
                 reason: 'The MCP handler was not reached and network/Cloudflare evidence is present.',
-                recommendedAlternatives: ['mcp_tunnel_status', 'chatgpt_connector_current_url_status'],
+                recommendedAlternatives: ['mcp_tunnel_status', 'mcp_connection_readiness view=current-url'],
             };
         }
         return {
@@ -106,7 +106,7 @@ function classifyByEvidence(input) {
             confidence: 'high',
             severity: 'medium',
             reason: 'The MCP server did not receive the call, so the block happened before the MCP handler.',
-            recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary', 'mcp_host_block_diagnostics'],
+            recommendedAlternatives: ['mcp_capabilities_summary view=status', 'mcp_capabilities_summary', 'mcp_host_block_diagnostics'],
         };
     }
     if (httpStatus === 401 || wwwAuthenticatePresent === true) {
@@ -116,7 +116,7 @@ function classifyByEvidence(input) {
             confidence: 'high',
             severity: 'medium',
             reason: 'The request reached the MCP/auth layer and received an OAuth challenge or 401.',
-            recommendedAlternatives: ['mcp_auth_profile', 'mcp_oauth_issuer_diagnostics'],
+            recommendedAlternatives: ['mcp_connection_readiness view=auth-profile', 'mcp_oauth_issuer_diagnostics'],
         };
     }
     if (schemaErrorPresent === true || httpStatus === 400 || httpStatus === 422) {
@@ -126,7 +126,7 @@ function classifyByEvidence(input) {
             confidence: 'high',
             severity: 'low',
             reason: 'The request reached the MCP server but was rejected by schema/argument validation.',
-            recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary'],
+            recommendedAlternatives: ['mcp_capabilities_summary view=status', 'mcp_capabilities_summary'],
         };
     }
     if (mcpAuditEventPresent === true || toolResultIsError === true) {
@@ -136,7 +136,7 @@ function classifyByEvidence(input) {
             confidence: mcpAuditEventPresent === true ? 'high' : 'medium',
             severity: 'medium',
             reason: 'The tool reached MCP execution and failed inside the server/tool handler path.',
-            recommendedAlternatives: ['mcp_runtime_health', 'mcp_last_validation_summary'],
+            recommendedAlternatives: ['mcp_runtime_health', 'mcp_validation_dashboard'],
         };
     }
     if (mcpReachedServer === true) {
@@ -146,7 +146,7 @@ function classifyByEvidence(input) {
             confidence: 'medium',
             severity: 'medium',
             reason: 'The call reached MCP, but available evidence is insufficient to isolate auth, schema, handler or downstream failure.',
-            recommendedAlternatives: ['mcp_runtime_health', 'mcp_tunnel_status', 'mcp_auth_profile'],
+            recommendedAlternatives: ['mcp_runtime_health', 'mcp_tunnel_status', 'mcp_connection_readiness view=auth-profile'],
         };
     }
     return null;
@@ -176,7 +176,7 @@ function classifyHostBlock(input) {
             layer: 'chatgpt-host',
             confidence: 'medium',
             reason: 'The host reported a network-level connector failure, usually outside tool metadata.',
-            recommendedAlternatives: ['chatgpt_connector_current_url_status', 'mcp_tunnel_status'],
+            recommendedAlternatives: ['mcp_connection_readiness view=current-url', 'mcp_tunnel_status'],
         };
     }
     if (toolName.includes('url_check') || argsShape.includes('url')) {
@@ -186,17 +186,17 @@ function classifyHostBlock(input) {
             confidence: 'medium',
             severity: 'medium',
             reason: 'The host may dislike public URL arguments in tool inputs.',
-            recommendedAlternatives: ['chatgpt_connector_current_url_status', 'mcp_tunnel_status'],
+            recommendedAlternatives: ['mcp_connection_readiness view=current-url', 'mcp_tunnel_status'],
         };
     }
-    if (toolName.includes('root_tree') && (argsShape.includes('showhidden') || argsShape.includes('hidden'))) {
+    if (toolName === 'repo_tree' && (argsShape.includes('showhidden') || argsShape.includes('hidden'))) {
         return {
             code: 'HOST_HIDDEN_LISTING_BLOCK',
             layer: 'chatgpt-host',
             confidence: 'medium',
             severity: 'medium',
             reason: 'The host may treat hidden file listing as sensitive even when the MCP redacts protected names.',
-            recommendedAlternatives: ['repo_root_redaction_status', 'repo_root_tree without showHidden'],
+            recommendedAlternatives: ['repo_root_redaction_status', 'repo_tree path="." without showHidden'],
         };
     }
     if (toolName.includes('remove') || toolName.includes('delete') || operationKind.includes('destructive')) {
@@ -206,7 +206,7 @@ function classifyHostBlock(input) {
             confidence: 'medium',
             severity: 'high',
             reason: 'The host classified the requested action as destructive.',
-            recommendedAlternatives: ['repo_quarantine_file_plan', 'repo_quarantine_file'],
+            recommendedAlternatives: ['repo_quarantine_file', 'repo_apply_file_batch'],
         };
     }
     if (toolName.includes('run_') || toolName.includes('validator') || operationKind.includes('validation')) {
@@ -216,7 +216,7 @@ function classifyHostBlock(input) {
             confidence: 'medium',
             severity: 'medium',
             reason: 'The host blocked starting a validation job.',
-            recommendedAlternatives: ['mcp_validation_plan', 'mcp_last_validation_summary'],
+            recommendedAlternatives: ['run_copilot_validator', 'mcp_validation_dashboard'],
         };
     }
     if (toolName.endsWith('_plan') || operationKind.includes('plan')) {
@@ -226,7 +226,7 @@ function classifyHostBlock(input) {
             confidence: 'medium',
             severity: 'low',
             reason: 'A read-only planning call was blocked; this is likely host-side heuristic friction.',
-            recommendedAlternatives: ['mcp_capabilities_summary', 'mcp_session_profile'],
+            recommendedAlternatives: ['mcp_capabilities_summary', 'mcp_capabilities_summary view=session'],
         };
     }
     return {
@@ -235,7 +235,7 @@ function classifyHostBlock(input) {
         confidence: 'low',
         severity: 'medium',
         reason: 'The available evidence is insufficient to isolate the blocking layer.',
-        recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary', 'mcp_golden_prompts'],
+        recommendedAlternatives: ['mcp_capabilities_summary view=status', 'mcp_capabilities_summary', 'mcp_connection_readiness'],
     };
 }
 
@@ -340,8 +340,8 @@ export const mcpHostBlockDiagnosticsTool = defineMcpRawTool({
             nextSteps: [
                 'Prefer the recommendedAlternatives list before retrying the blocked tool.',
                 classification.code === 'LIKELY_STALE_CHATGPT_ACTION_SNAPSHOT'
-                    ? 'Do not add a plan call just to work around schema rejection. Compare mcp_tools_status origin capability truth, then use the ChatGPT app/action Refresh or administrative review flow when the approved action snapshot may be stale; reconnect alone is not evidence of snapshot refresh.'
-                    : 'Use a *_plan tool only when preview, destructive-risk review, or a separate approval boundary adds information; plan is not a generic recovery step.',
+                    ? 'Do not add a plan call just to work around schema rejection. Compare mcp_capabilities_summary view=status origin capability truth, then use the ChatGPT app/action Refresh or administrative review flow when the approved action snapshot may be stale; reconnect alone is not evidence of snapshot refresh.'
+                    : 'Prefer dryRun/preview on the canonical owner when available; use a separate *_plan tool only when it provides distinct functionality. Planning is not a generic recovery step.',
                 'If the block is network/tunnel related, verify the permanent connector/tunnel state before changing transport or DNS.',
                 'Record the auditTemplate fields in the external ChatGPT audit report.',
             ],

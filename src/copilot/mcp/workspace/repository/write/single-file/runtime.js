@@ -186,10 +186,27 @@ export async function executeRepositoryCreateFile(runtime, input) {
     const content = input.content ?? '';
     const diff = buildInlineDiffPreview('', content, { contextLines: 0, maxLines: input.maxDiffLines ?? 2_000 });
     try {
+        const destinationExists = await pathExists(runtime, resolved.resolved);
+        if (destinationExists) {
+            return failure(`Destino ja existe: ${resolved.relative}`, {
+                path: resolved.relative,
+                code: 'EEXIST',
+                destinationExists: true,
+            });
+        }
         if (input.dryRun === true) {
             return {
                 ok: true,
-                value: { success: true, path: resolved.relative, dryRun: true, bytesWritten: 0 },
+                value: {
+                    success: true,
+                    plannedTool: 'repo_create_file',
+                    path: resolved.relative,
+                    dryRun: true,
+                    bytesWritten: 0,
+                    destinationExists: false,
+                    contentChars: content.length,
+                    createParentDirs: input.createParentDirs !== false,
+                },
                 diff,
                 text: 'Create file dry run complete; diff preview suppressed.',
                 audit: { event: 'repo_create_file_dry_run', tool: 'repo_create_file', path: resolved.relative },
@@ -265,9 +282,11 @@ export async function executeRepositoryMoveFile(runtime, input) {
                     dryRun: true,
                     source: source.relative,
                     destination: destination.relative,
+                    plannedTool: 'repo_move_file',
                     sourceBytes: sourceStats.size,
                     destinationExists,
                     overwrite: input.overwrite === true,
+                    requiresConfirmOverwrite: destinationExists && input.overwrite === true,
                 },
                 audit: {
                     event: 'repo_move_file_dry_run',
@@ -335,7 +354,7 @@ export async function inspectRepositoryQuarantinedFile(runtime, quarantineId, in
     if (!metadata)
         return failure('Quarantine metadata not found.', {
             code: 'ERR_QUARANTINE_NOT_FOUND',
-            hint: 'Use repo_list_quarantine to discover available quarantineId values.',
+            hint: 'Use repo_quarantine_status action=list to discover available quarantineId values.',
             quarantineId,
         });
     const paths = resolveQuarantinePaths(runtime, metadata.quarantineId);
@@ -358,7 +377,9 @@ export async function inspectRepositoryQuarantinedFile(runtime, quarantineId, in
 
 /** @param {RepoWriteRuntime} runtime @param {{path:string;dryRun?:boolean}} input @returns {Promise<RepoWriteOperationOutcome>} */
 export async function executeRepositoryQuarantineFile(runtime, input) {
-    const resolved = await runtime.workspace.resolveWritePath(input.path);
+    const resolved = await runtime.workspace.resolveWritePath(input.path, {
+        issueMutableCapability: input.dryRun !== true,
+    });
     if (!resolved.ok) return failure(resolved.reason, /** @type {Record<string, unknown>} */ (resolved));
     try {
         const stats = await repoWriteStat(runtime, resolved.resolved);
@@ -374,8 +395,12 @@ export async function executeRepositoryQuarantineFile(runtime, input) {
                 ok: true,
                 value: {
                     success: true,
+                    plannedTool: 'repo_quarantine_file',
                     dryRun: true,
                     path: resolved.relative,
+                    type: 'file',
+                    sizeBytes: stats.size,
+                    restorable: true,
                     quarantineId,
                     quarantinePath: runtime.workspace.toRelativePath(paths.dataPath),
                     metadataPath: runtime.workspace.toRelativePath(paths.metadataPath),

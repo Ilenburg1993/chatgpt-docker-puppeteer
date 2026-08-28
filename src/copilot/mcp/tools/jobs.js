@@ -6,13 +6,11 @@
  */
 
 import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
-import { readMcpProjectDoctor } from '#copilot/mcp/public/diagnostics/project-doctor';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     errorResult,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
-    requireMcpToolGitConfig,
     requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
@@ -20,11 +18,11 @@ import {
 import {
     cancelValidationJob,
     executeValidatorRequest,
-    listValidationJobs,
-    readLastValidationSummary,
     readValidationDashboard,
     readValidationJobOutput,
     readValidationJobSummary,
+    resolveFocusedUnitTestCommand,
+    resolveValidatorCommand,
     startValidatorJobOperation,
 } from '#copilot/mcp/public/validation';
 import { z } from 'zod';
@@ -52,6 +50,7 @@ const validatorRequestSchema = z.object({
     waitForCompletion: z.boolean().optional(),
     waitMs: validatorWaitMsSchema.optional(),
     failureTailBytes: validatorFailureTailBytesSchema.optional(),
+    dryRun: z.boolean().optional(),
 });
 const {
     maxBatchRequests: MAX_VALIDATOR_BATCH_REQUESTS,
@@ -90,6 +89,66 @@ function frameValidationJobOperation(operation) {
     return operation.ok
         ? okResult(operation.structured, operation.text)
         : errorResult(operation.message, operation.details);
+}
+
+const VALIDATION_ESCALATION_POLICY = Object.freeze([
+    'inspect-static-evidence',
+    'run-one-focused-test-if-needed',
+    'run-typecheck-if-contracts-changed',
+    'run-broad-suite-only-for-cross-cutting-risk-or-release-gate',
+]);
+
+/** @param {z.infer<typeof validatorRequestSchema>} request */
+function previewValidatorRequest(request) {
+    try {
+        if (request.validator === 'unit-focused') {
+            if (!request.testFile) {
+                return errorResult('unit-focused dry-run requires testFile.', {
+                    code: 'ERR_VALIDATOR_PREVIEW_TEST_FILE_REQUIRED',
+                });
+            }
+            const command = resolveFocusedUnitTestCommand([request.testFile]);
+            return okResult({
+                success: true,
+                dryRun: true,
+                plannedTool: 'run_copilot_validator',
+                strategy: 'focused-first',
+                breadth: 'file-scoped',
+                validator: request.validator,
+                testFile: request.testFile,
+                command: command.command,
+                args: command.args,
+                escalationPolicy: VALIDATION_ESCALATION_POLICY,
+            });
+        }
+        if (request.testFile !== undefined) {
+            return errorResult('testFile is only valid with validator=unit-focused.', {
+                code: 'ERR_VALIDATOR_PREVIEW_TEST_FILE_INACTIVE',
+                validator: request.validator,
+            });
+        }
+        const command = resolveValidatorCommand(
+            /** @type {import('#copilot/mcp/public/validation').CopilotValidatorName} */ (request.validator),
+        );
+        return okResult({
+            success: true,
+            dryRun: true,
+            plannedTool: 'run_copilot_validator',
+            strategy: String(request.validator).startsWith('suite-') ? 'explicit-broad-escalation' : 'validator-preview',
+            breadth: String(request.validator).startsWith('suite-') ? 'broad' : 'validator-scoped',
+            broadValidation: String(request.validator).startsWith('suite-'),
+            validator: request.validator,
+            command: command.command,
+            args: command.args,
+            escalationPolicy: VALIDATION_ESCALATION_POLICY,
+        });
+    } catch (error) {
+        return errorResult('Validator dry-run rejected the requested validator.', {
+            code: 'ERR_VALIDATOR_PREVIEW_REJECTED',
+            validator: request.validator,
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
 }
 
 /**
@@ -151,55 +210,9 @@ function compactValidatorBatchResults(execution, requests) {
 }
 
 /**
- * @param {import('#copilot/mcp/public/validation').CopilotValidatorName} validator
- * @param {string} name
- * @param {string} title
- * @param {string} description
- * @returns {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition}
- */
-function buildValidatorAliasTool(validator, name, title, description) {
-    return defineMcpRawTool({
-        name,
-        title,
-        description,
-        inputSchema: {
-            timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Timeout ms.'),
-        },
-
-        handler: async ({ timeoutMs }, operationContext) =>
-            frameValidationJobOperation(
-                await startValidatorJobOperation(
-                    validator,
-                    requireMcpToolWorkspace(operationContext),
-                    requireMcpToolValidationConfig(operationContext),
-                    { timeoutMs, ...(operationContext?.signal ? { signal: operationContext.signal } : {}) },
-                ),
-            ),
-    });
-}
-
-/**
  * @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition[]}
  */
 export const jobTools = [
-    buildValidatorAliasTool(
-        'typecheck',
-        'run_typecheck_copilot',
-        'Run Copilot typecheck',
-        'Start the canonical strict typecheck job for src/copilot.',
-    ),
-    buildValidatorAliasTool(
-        'lint',
-        'run_lint_copilot',
-        'Run Copilot lint',
-        'Start the canonical lint job for src/copilot and unit tests.',
-    ),
-    buildValidatorAliasTool(
-        'unit-copilot',
-        'run_unit_copilot',
-        'Run Copilot unit tests',
-        'Start the canonical full unit test job for src/copilot.',
-    ),
     defineMcpRawTool({
         name: 'mcp_run_safe_validation_suite',
         title: 'Run safe MCP validation suite',
@@ -229,23 +242,6 @@ export const jobTools = [
         },
     }),
     defineMcpRawTool({
-        name: 'run_project_doctor',
-        title: 'Run project doctor',
-        description: 'Return the Copilot MCP project doctor report.',
-        inputSchema: {
-            includeScripts: z.boolean().optional()['describe']('Include scripts. Default: true.'),
-        },
-
-        handler: async ({ includeScripts }, operationContext) =>
-            okResult(
-                await readMcpProjectDoctor(requireMcpToolWorkspace(operationContext), {
-                    ...(includeScripts === undefined ? {} : { includeScripts }),
-                    gitConfig: requireMcpToolGitConfig(operationContext),
-                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
-                }),
-            ),
-    }),
-    defineMcpRawTool({
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
         description:
@@ -272,6 +268,10 @@ export const jobTools = [
                 ['describe'](
                     'Short log tail returned in the same call only when a waited validator fails. Default 4000.',
                 ),
+            dryRun: z
+                .boolean()
+                .optional()
+                ['describe']('Preview the exact allowlisted validator command without starting a job. With no validator, return inspect-first guidance.'),
             batch: z
                 .array(validatorRequestSchema)
                 .min(1)
@@ -301,6 +301,7 @@ export const jobTools = [
                 waitForCompletion,
                 waitMs,
                 failureTailBytes,
+                dryRun,
                 batch,
                 batchFailureMode,
                 batchConcurrency,
@@ -316,7 +317,8 @@ export const jobTools = [
                     timeoutMs !== undefined ||
                     waitForCompletion !== undefined ||
                     waitMs !== undefined ||
-                    failureTailBytes !== undefined
+                    failureTailBytes !== undefined ||
+                    dryRun !== undefined
                 ) {
                     return errorResult('Do not mix validator batch and single-validator fields.', {
                         code: 'ERR_VALIDATOR_BATCH_CONFLICTING_MODE',
@@ -334,6 +336,7 @@ export const jobTools = [
                                     index,
                                 });
                             }
+                            if (parsed.data.dryRun === true) return previewValidatorRequest(parsed.data);
                             return frameValidationJobOperation(
                                 await executeValidatorRequest(
                                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
@@ -405,6 +408,26 @@ export const jobTools = [
                     code: 'ERR_VALIDATOR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
+            if (
+                dryRun === true &&
+                validator === undefined &&
+                testFile === undefined &&
+                timeoutMs === undefined &&
+                waitForCompletion === undefined &&
+                waitMs === undefined &&
+                failureTailBytes === undefined
+            ) {
+                return okResult({
+                    success: true,
+                    dryRun: true,
+                    strategy: 'inspect-first',
+                    recommendation: 'no-validator-yet',
+                    breadth: 'none',
+                    plannedTool: null,
+                    escalationPolicy: VALIDATION_ESCALATION_POLICY,
+                    hint: 'Inspect the causal diff first; provide validator only when execution adds material evidence.',
+                });
+            }
             const parsed = validatorRequestSchema.safeParse({
                 validator,
                 testFile,
@@ -412,6 +435,7 @@ export const jobTools = [
                 waitForCompletion,
                 waitMs,
                 failureTailBytes,
+                dryRun,
             });
             if (!parsed.success) {
                 return errorResult('Single validator request is invalid.', {
@@ -419,6 +443,7 @@ export const jobTools = [
                     hint: 'Provide validator, and testFile only when validator=unit-focused.',
                 });
             }
+            if (parsed.data.dryRun === true) return previewValidatorRequest(parsed.data);
             return frameValidationJobOperation(
                 await executeValidatorRequest(
                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
@@ -430,47 +455,55 @@ export const jobTools = [
         },
     }),
     defineMcpRawTool({
-        name: 'job_list',
-        title: 'List validator jobs',
-        description: 'List active and recent validator jobs, including persisted manifests.',
-        inputSchema: {
-            status: jobStatusSchema.optional()['describe']('Status filter.'),
-            validator: validatorSchema.optional().describe('Validator filter.'),
-            limit: z.number().int().min(1).max(200).optional()['describe']('Max jobs. Default: 50.'),
-            includeCompleted: z.boolean().optional()['describe']('Include finished jobs. Default: true.'),
-        },
-
-        handler: async ({ status, validator, limit, includeCompleted }) =>
-            frameValidationJobOperation(await listValidationJobs({ status, validator, limit, includeCompleted })),
-    }),
-    defineMcpRawTool({
-        name: 'mcp_last_validation_summary',
-        title: 'Last MCP validation summary',
-        description: 'Return the latest persisted job per validator without starting validation.',
-        inputSchema: {
-            validator: validatorSchema.optional().describe('Validator filter.'),
-            includeOutputTail: z.boolean().optional()['describe']('Include short log tails. Default: false.'),
-            tailBytes: z.number().int().min(1000).max(20000).optional()['describe']('Tail bytes.'),
-        },
-
-        handler: async ({ validator, includeOutputTail, tailBytes }) =>
-            frameValidationJobOperation(await readLastValidationSummary({ validator, includeOutputTail, tailBytes })),
-    }),
-    defineMcpRawTool({
         name: 'mcp_validation_dashboard',
         title: 'MCP validation dashboard',
-        description: 'Return compact validation status without starting jobs or long logs.',
+        description:
+            'Read validator state through one bounded owner: dashboard summary, filtered job list, or latest-per-validator summaries.',
         inputSchema: {
-            includeRunning: z.boolean().optional()['describe']('Include running jobs. Default: true.'),
-            includeLatest: z.boolean().optional()['describe']('Include latest jobs. Default: true.'),
-            includeDetails: z.boolean().optional()['describe']('Include job arrays. Default: false.'),
-            limit: z.number().int().min(10).max(200).optional()['describe']('Max manifests. Default: 80.'),
+            view: z
+                .enum(['dashboard', 'list', 'latest'])
+                .optional()
+                ['describe']('Projection to read. Default: dashboard.'),
+            status: jobStatusSchema.optional()['describe']('view=list only: status filter.'),
+            validator: validatorSchema.optional().describe('view=list|latest only: validator filter.'),
+            limit: z.number().int().min(1).max(200).optional()['describe']('view=dashboard|list: max manifests/jobs.'),
+            includeCompleted: z.boolean().optional()['describe']('view=list only: include finished jobs. Default: true.'),
+            includeOutputTail: z.boolean().optional()['describe']('view=latest only: include short output tails.'),
+            tailBytes: z.number().int().min(1000).max(20000).optional()['describe']('view=latest only: output tail bytes.'),
+            includeRunning: z.boolean().optional()['describe']('view=dashboard only: include running jobs in details.'),
+            includeLatest: z.boolean().optional()['describe']('view=dashboard only: include latest jobs in details.'),
+            includeDetails: z.boolean().optional()['describe']('view=dashboard only: include job arrays. Default: false.'),
         },
 
-        handler: async ({ includeRunning, includeLatest, includeDetails, limit }, operationContext) =>
+        handler: async (
+            {
+                view,
+                status,
+                validator,
+                limit,
+                includeCompleted,
+                includeOutputTail,
+                tailBytes,
+                includeRunning,
+                includeLatest,
+                includeDetails,
+            },
+            operationContext,
+        ) =>
             frameValidationJobOperation(
                 await readValidationDashboard(
-                    { includeRunning, includeLatest, includeDetails, limit },
+                    {
+                        view,
+                        status,
+                        validator,
+                        limit,
+                        includeCompleted,
+                        includeOutputTail,
+                        tailBytes,
+                        includeRunning,
+                        includeLatest,
+                        includeDetails,
+                    },
                     requireMcpToolValidationConfig(operationContext),
                 ),
             ),

@@ -212,7 +212,7 @@ async function auditCloudflareConfigPostureUncached(auditConfig, snapshotOptions
             ],
             nextActions: [
                 'Create a read-only Cloudflare audit token with Zone:Read, Zone Settings:Read and Zone Rulesets:Read.',
-                'Re-run mcp_cloudflare_config_audit after the permission change.',
+                'Re-run mcp_cloudflare_edge_snapshot view=config after the permission change.',
             ],
         };
     }

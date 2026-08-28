@@ -12,8 +12,6 @@ import {
     auditRepositoryOrphanImports,
     buildRepositoryIndex,
     findRepositoryImports,
-    findRepositoryIndexSymbol,
-    invalidateRepositoryIndex,
     readRepositoryIndexStatus,
     searchRepositoryIndex,
 } from '#copilot/mcp/public/indexing/repository';
@@ -80,6 +78,10 @@ export const repoIndexTools = [
                 .boolean()
                 .optional()
                 ['describe']('Remove missing files from the indexed slice. Default: safe auto-prune.'),
+            dryRun: z
+                .boolean()
+                .optional()
+                ['describe']('Validate path/options and return the planned index refresh without mutating the index.'),
         },
 
         handler: async (
@@ -94,11 +96,39 @@ export const repoIndexTools = [
                 concurrency,
                 maxFiles,
                 pruneMissing,
+                dryRun,
             },
             operationContext,
-        ) =>
-            frameRepositoryIndexOperation(
-                await buildRepositoryIndex(requireMcpToolWorkspace(operationContext), {
+        ) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            if (dryRun === true) {
+                const resolved = await workspace.resolveReadPath(
+                    typeof path === 'string' && path.trim() ? path : 'src/copilot',
+                );
+                if (!resolved.ok) return errorResult(resolved.reason, resolved);
+                return okResult({
+                    success: true,
+                    dryRun: true,
+                    plannedTool: 'repo_index_build',
+                    path: resolved.relative,
+                    workspaceRoot: workspace.workspaceRoot,
+                    currentStats: workspace.indexRegistry.status(),
+                    plannedOptions: {
+                        workspaceRoot: workspace.workspaceRoot,
+                        recursive: recursive ?? true,
+                        depth: depth ?? 20,
+                        respectGitignore: respectGitignore ?? true,
+                        include: include ?? [],
+                        exclude: exclude ?? [],
+                        extensions: extensions ?? [],
+                        concurrency: concurrency ?? 8,
+                        maxFiles: maxFiles ?? 25_000,
+                        pruneMissing: pruneMissing ?? true,
+                    },
+                });
+            }
+            return frameRepositoryIndexOperation(
+                await buildRepositoryIndex(workspace, {
                     path,
                     recursive,
                     depth,
@@ -111,7 +141,8 @@ export const repoIndexTools = [
                     pruneMissing,
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
-            ),
+            );
+        },
     }),
     defineMcpRawTool({
         name: 'repo_index_search',
@@ -145,34 +176,6 @@ export const repoIndexTools = [
                     cursor,
                     includePattern,
                     excludePattern,
-                }),
-            ),
-    }),
-    defineMcpRawTool({
-        name: 'repo_index_find_symbol',
-        title: 'Find repository symbol in index',
-        description:
-            'Search persisted symbols in the shared local index. Use after repo_index_build for fast navigation.',
-        inputSchema: {
-            symbol: z.string().min(1)['describe']('Symbol name or substring.'),
-            maxResults: z
-                .number()
-                .int()
-                .positive()
-                .max(500)
-                .optional()
-                ['describe']('Maximum returned rows. Default: 50.'),
-            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_find_symbol call.'),
-            exactMatch: z.boolean().optional()['describe']('Require exact symbol name. Default: false.'),
-        },
-
-        handler: async ({ symbol, maxResults, cursor, exactMatch }, operationContext) =>
-            frameRepositoryIndexOperation(
-                findRepositoryIndexSymbol(requireMcpToolWorkspace(operationContext), {
-                    symbol,
-                    maxResults,
-                    cursor,
-                    exactMatch,
                 }),
             ),
     }),
@@ -256,19 +259,6 @@ export const repoIndexTools = [
                     maxResults,
                     cursor,
                 }),
-            ),
-    }),
-    defineMcpRawTool({
-        name: 'repo_index_invalidate',
-        title: 'Invalidate repository index path',
-        description: 'Invalidate a workspace file or directory in the shared local IO index after edits.',
-        inputSchema: {
-            path: z.string().min(1)['describe']('Workspace-relative file or directory path to invalidate.'),
-        },
-
-        handler: async ({ path }, operationContext) =>
-            frameRepositoryIndexOperation(
-                await invalidateRepositoryIndex(requireMcpToolWorkspace(operationContext), path),
             ),
     }),
 ];

@@ -95,6 +95,7 @@ function compactRoundTripAnalytics(snapshot) {
         schemaVersion: snapshot.schemaVersion,
         normalizerVersion: snapshot.normalizerVersion,
         authority: snapshot.authority,
+        sourceIntegrity: snapshot.sourceIntegrity,
         windowMs: snapshot.windowMs,
         indexedRows: snapshot.indexedRows,
         completeness,
@@ -104,7 +105,12 @@ function compactRoundTripAnalytics(snapshot) {
     if (!snapshot.available) return identity;
     return {
         ...identity,
-        lineageContext: snapshot.lineageContext,
+        lineageContext: {
+            validTraceStartCount: snapshot.lineageContext.validTraceStartCount,
+            startedCallCount: snapshot.lineageContext.startedCallCount,
+            validTraceStartRate: snapshot.lineageContext.validTraceStartRate,
+            traceContextStateCounts: snapshot.lineageContext.traceContextStateCounts,
+        },
         callPairing: {
             pairedCallCount: snapshot.callPairing.pairedCallCount,
             orphanStartCount: snapshot.callPairing.orphanStartCount,
@@ -134,6 +140,14 @@ function compactRoundTripAnalytics(snapshot) {
             inlineNextActionCoverage: snapshot.failures.inlineNextActionCoverage,
             inlineRecoveryAnchorCoverage: snapshot.failures.inlineRecoveryAnchorCoverage,
         },
+        executionPolicies: {
+            eligible: snapshot.executionPolicies.eligibleCalls,
+            observed: snapshot.executionPolicies.observedCalls,
+            coverage: snapshot.executionPolicies.coverageRate,
+            policy: snapshot.executionPolicies.byPolicyClass,
+            failure: snapshot.executionPolicies.byFailurePolicyClass,
+            concurrency: snapshot.executionPolicies.byConcurrencyClass,
+        },
         executionAccounting: {
             accountedCalls: snapshot.executionAccounting.accountedCalls,
             accountingCoverageRate: snapshot.executionAccounting.accountingCoverageRate,
@@ -142,20 +156,19 @@ function compactRoundTripAnalytics(snapshot) {
             batchCalls: snapshot.executionAccounting.batchCalls,
             saturatedBatchCalls: snapshot.executionAccounting.saturatedBatchCalls,
             truncatedOperations: snapshot.executionAccounting.truncatedOperations,
-            continuationAvailableCalls: snapshot.executionAccounting.continuationAvailableCalls,
-            continuationAvailableOperations: snapshot.executionAccounting.continuationAvailableOperations,
-            continuationTransportRequiredCalls: snapshot.executionAccounting.continuationTransportRequiredCalls,
-            continuationTransportRequiredOperations:
-                snapshot.executionAccounting.continuationTransportRequiredOperations,
-            continuationRecommendedCalls: snapshot.executionAccounting.continuationRecommendedCalls,
-            continuationRecommendedOperations: snapshot.executionAccounting.continuationRecommendedOperations,
-            legacyContinuationRequiredCalls: snapshot.executionAccounting.legacyContinuationRequiredCalls,
-            repeatAfterBatch: snapshot.executionAccounting.repeatAfterBatch,
+            continuationPressure: {
+                availableCalls: snapshot.executionAccounting.continuationAvailableCalls,
+                transportRequiredCalls: snapshot.executionAccounting.continuationTransportRequiredCalls,
+                recommendedCalls: snapshot.executionAccounting.continuationRecommendedCalls,
+            },
         },
         payloadAccounting: {
             heavyResultThresholdBytes: snapshot.payloadAccounting.heavyResultThresholdBytes,
-            heavyResultFollowups: snapshot.payloadAccounting.heavyResultFollowups,
-            byTool: snapshot.payloadAccounting.byTool.slice(0, 3),
+            heavyResultFollowups: {
+                temporalReadFollowupCount: snapshot.payloadAccounting.heavyResultFollowups.temporalReadFollowupCount,
+                lineageReadFollowupCount: snapshot.payloadAccounting.heavyResultFollowups.lineageReadFollowupCount,
+                sameTargetRereadCount: snapshot.payloadAccounting.heavyResultFollowups.sameTargetRereadCount,
+            },
         },
         runtimeCohorts: {
             generationMixDetected: snapshot.runtimeCohorts.generationMixDetected,

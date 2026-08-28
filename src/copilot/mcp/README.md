@@ -114,7 +114,7 @@ No runtime atual, **reconnect** não é um único fenômeno. Diagnóstico e oper
 
 O smoke canônico usa **MCP 2026-07-28 pelo SDK oficial v2** e CIMD. O caminho stateful/SSE 2025 e
 DCR são compatibilidade opt-in e devem ser rotulados como tal. `mcp_runtime_health` e
-`mcp_tools_status` expõem `descriptorObservation`, cujo scope é somente o que esta geração do origin
+`mcp_capabilities_summary view=status` expõe `descriptorObservation`, cujo scope é somente o que esta geração do origin
 observou; `chatgptActionSnapshot.observableFromOrigin=false` é intencional.
 
 Depois de mudar descriptors/actions, use o fluxo de **Refresh/review do app no ChatGPT** quando o
@@ -146,7 +146,6 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 
 - `repo_status`
 - `repo_tree`
-- `repo_root_tree`
 - `repo_read_file`
 - `repo_read_file_chunks`
 - `repo_file_stats`
@@ -158,10 +157,8 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `repo_index_status`
 - `repo_index_build`
 - `repo_index_search`
-- `repo_index_find_symbol`
 - `repo_find_imports`
 - `repo_find_orphan_imports`
-- `repo_index_invalidate`
 - `git_status`
 - `git_diff`
 - `git_log`
@@ -170,22 +167,14 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `git_commit_plan` / `git_commit`
 - `git_push_plan` / `git_push`
 - `mcp_reload_plan` / `mcp_reload_status` / `mcp_reload_schedule`
-- `llmb_live_readiness`
-- `llmb_live_runs`
+- `llmb_live_readiness` (`readiness|runs`)
 - `llmb_live_test_plan` / `llmb_live_test_run`
 - `project_doctor`
 - `run_copilot_validator`
-- `run_typecheck_copilot`
-- `run_lint_copilot`
-- `run_unit_copilot`
-- `run_project_doctor`
-- `job_list`
 - `job_get_output`
 - `job_cancel`
-- `chatgpt_connector_profile`
-- `chatgpt_connector_url_check`
-- `copilot_sessions_list`
-- `copilot_session_get`
+- `mcp_connection_readiness` (`readiness|profile|url-check|current-url|auth-profile`)
+- `copilot_sessions`
 - `repo_write_file`
 - `repo_create_file`
 - `repo_apply_patch`
@@ -271,17 +260,19 @@ node src/copilot/mcp/cli/index.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
-offline. `copilot_sessions_list` continua descrevendo apenas sessões SDK registradas **no processo
+offline. `copilot_sessions action=list` continua descrevendo apenas sessões SDK registradas **no processo
 MCP atual**; o terminal externo é outro processo. Para evidência operacional desse runtime separado,
 use o control plane allowlisted:
 
-- `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn. Fresh calls
-  usam subprocesso supervisionado call-scoped; cancellation/timeout encerram o process group e
-  aguardam `close`, inclusive quando o child está dentro de trabalho nativo `better-sqlite3`.
-  Operational cache é bounded a 30 s e só aceita snapshot estável; a security redaction proof tem
-  identity/lifetime independente, context/fingerprint-bound. O wire default é task-first e compacto;
-  use `includeDetails=true` apenas quando precisar da árvore diagnóstica completa;
-- `llmb_live_runs`: lê o histórico live persistido no SQLite;
+- `llmb_live_readiness view=readiness`: executa somente o readiness canônico, sem provider/model
+  turn. Fresh calls usam subprocesso supervisionado call-scoped; cancellation/timeout encerram o
+  process group e aguardam `close`, inclusive quando o child está dentro de trabalho nativo
+  `better-sqlite3`. Operational cache é bounded a 30 s e só aceita snapshot estável; a security
+  redaction proof tem identity/lifetime independente, context/fingerprint-bound. O wire default é
+  task-first e compacto; use `includeDetails=true` apenas quando precisar da árvore diagnóstica
+  completa;
+- `llmb_live_readiness view=runs`: chama diretamente o fixed read-only persisted-runs command e lê o
+  histórico live persistido no SQLite + detached manifests; não executa o readiness path;
 - `llmb_live_test_cancel`: cancela somente um run detached pelo `runId` estrito depois de verificar
   em `/proc` que o PID ainda pertence ao harness e ao `out-dir` registrados, evitando o risco de PID
   reciclado;
@@ -326,10 +317,8 @@ explícita nos argumentos.
 
 As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B:
 
-- `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` ou `repo_root_tree` para a
-  raiz real.
-- `repo_tree` e `repo_root_tree` redigem caminhos protegidos na listagem e retornam
-  `blockedEntriesCount`.
+- `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` para a raiz real.
+- `repo_tree` com `path="."` redige caminhos protegidos na listagem e retorna `blockedEntriesCount`.
 - `repo_search_text` aceita `contextLines` de 0 a 48, `cursor` retornado por `nextCursor` e separa
   `returnedMatchCount`, `returnedLineCount`, `totalMatchCount` e `totalLineCount`.
 - `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com
@@ -340,11 +329,12 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
 - `repo_diff_files` usa o diff canonico de IO para comparar dois arquivos do workspace.
 - `repo_find_symbol_usages` espelha `find_symbol_usages` para analise de impacto textual com busca
   whole-word por padrao.
-- `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes.
+- `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes, usando o
+  indice simbolico compartilhado como fast path e `rg` como fallback de completude quando necessario.
 - `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor
   runtime da LLM-B.
-- `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_index_find_symbol`,
-  `repo_find_imports`, `repo_find_orphan_imports` e `repo_index_invalidate` espelham a familia
+- `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_find_imports`,
+  `repo_find_orphan_imports` espelha a família
   `workspace_index_*`/`workspace_find_imports` usando a mesma engine FTS5/simbolica compartilhada.
 
 Erros recuperaveis usam contratos estaveis em `structuredContent`:

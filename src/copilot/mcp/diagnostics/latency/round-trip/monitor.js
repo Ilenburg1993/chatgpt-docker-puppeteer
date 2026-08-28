@@ -46,6 +46,15 @@ function createInitialState() {
         lastLagBytes: /** @type {number | null} */ (null),
         lastComplete: /** @type {boolean | null} */ (null),
         lastReset: false,
+        lastRebound: false,
+        lastRebindsThisSync: 0,
+        lastNewGenerationsThisSync: 0,
+        lastPrefixProofsThisSync: 0,
+        lastPrefixProofBytesThisSync: 0,
+        totalPrefixProofs: 0,
+        totalPrefixProofBytes: 0,
+        lastGenerationSequence: /** @type {number | null} */ (null),
+        lastTransition: /** @type {string | null} */ (null),
     };
 }
 
@@ -171,6 +180,8 @@ async function runMonitorCycle(intervalMs, setTimeoutFn, syncFn, generation) {
         const processedBytes = nonNegativeInteger(result['processedBytes']);
         const indexedEvents = nonNegativeInteger(result['indexedEvents']);
         const nextRunCount = monitorState.runs + 1;
+        const sourceIntegrity = recordOrEmpty(result['sourceIntegrity']);
+        const sourceCursor = recordOrEmpty(sourceIntegrity['cursor']);
         monitorState = {
             ...monitorState,
             running: false,
@@ -188,6 +199,16 @@ async function runMonitorCycle(intervalMs, setTimeoutFn, syncFn, generation) {
             lastLagBytes: nullableNonNegativeInteger(result['lagBytes']),
             lastComplete: typeof result['complete'] === 'boolean' ? result['complete'] : null,
             lastReset: result['reset'] === true,
+            lastRebound: result['rebound'] === true,
+            lastRebindsThisSync: nonNegativeInteger(result['rebindsThisSync']),
+            lastNewGenerationsThisSync: nonNegativeInteger(result['newGenerationsThisSync']),
+            lastPrefixProofsThisSync: nonNegativeInteger(result['prefixProofsThisSync']),
+            lastPrefixProofBytesThisSync: nonNegativeInteger(result['prefixProofBytesThisSync']),
+            totalPrefixProofs: monitorState.totalPrefixProofs + nonNegativeInteger(result['prefixProofsThisSync']),
+            totalPrefixProofBytes:
+                monitorState.totalPrefixProofBytes + nonNegativeInteger(result['prefixProofBytesThisSync']),
+            lastGenerationSequence: nullableNonNegativeInteger(sourceCursor['generationSequence']),
+            lastTransition: typeof sourceCursor['lastTransition'] === 'string' ? sourceCursor['lastTransition'] : null,
         };
         logMcp(success ? 'DEBUG' : 'WARN', 'MCP round-trip analytics monitor cycle completed.', {
             success,
@@ -197,6 +218,12 @@ async function runMonitorCycle(intervalMs, setTimeoutFn, syncFn, generation) {
             lagBytes: monitorState.lastLagBytes,
             complete: monitorState.lastComplete,
             reset: monitorState.lastReset,
+            rebound: monitorState.lastRebound,
+            newGenerationsThisSync: monitorState.lastNewGenerationsThisSync,
+            prefixProofsThisSync: monitorState.lastPrefixProofsThisSync,
+            prefixProofBytesThisSync: monitorState.lastPrefixProofBytesThisSync,
+            generationSequence: monitorState.lastGenerationSequence,
+            transition: monitorState.lastTransition,
         });
     } catch (error) {
         if (generation !== monitorGeneration || !monitorState.enabled) return;
@@ -216,6 +243,13 @@ async function runMonitorCycle(intervalMs, setTimeoutFn, syncFn, generation) {
             scheduleNext(intervalMs, intervalMs, setTimeoutFn, syncFn, generation);
         }
     }
+}
+
+/** @param {unknown} value */
+function recordOrEmpty(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /** @param {unknown} value */

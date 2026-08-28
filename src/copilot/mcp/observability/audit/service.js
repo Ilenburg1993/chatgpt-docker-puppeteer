@@ -7,6 +7,7 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { createJsonlBatchQueue } from '#copilot/infra/public/persistence/jsonl/queue';
+import { createHash } from 'node:crypto';
 import { MCP_AUDIT_PROCESS_CONFIG_KIND } from './config.js';
 
 const MAX_AUDIT_QUEUE_LINES = 10_000;
@@ -14,6 +15,13 @@ const DEFAULT_AUDIT_HISTORY_TAIL_BYTES = 4 * 1024 * 1024;
 const MAX_AUDIT_HISTORY_TAIL_BYTES = 16 * 1024 * 1024;
 const DEFAULT_AUDIT_HISTORY_EVENTS = 25_000;
 const MAX_AUDIT_HISTORY_EVENTS = 100_000;
+const MCP_AUDIT_CONTINUITY_VERSION = 1;
+const MCP_AUDIT_CONTINUITY_WINDOW_BYTES = 4 * 1024;
+const MCP_AUDIT_CONTINUITY_DOMAIN = 'copilot-mcp-audit-continuity:v1';
+const MCP_AUDIT_SEQUENCE_VERSION = 1;
+const MCP_AUDIT_SEQUENCE_DOMAIN = 'copilot-mcp-audit-sequence:v1';
+const MCP_AUDIT_SEQUENCE_SEED = createHash('sha256').update(`${MCP_AUDIT_SEQUENCE_DOMAIN}\0seed`, 'utf8').digest('hex');
+const MCP_AUDIT_SEQUENCE_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const MCP_COMPATIBILITY_OBSERVATION_EVENT = 'mcp_compat_observation';
 const MCP_COMPATIBILITY_OBSERVATION_SCHEMA_VERSION = 2;
 const MCP_COMPATIBILITY_OBSERVATION_READABLE_SCHEMA_VERSIONS = Object.freeze([1, 2]);
@@ -93,8 +101,10 @@ export function createMcpAuditCapability(config) {
             readMcpCompatibilitySummary(runtime, options),
         readTail: (/** @type {{ tailBytes?: number; maxEvents?: number }} */ options = {}) =>
             readMcpAuditEventTail(runtime, options),
-        readSlice: (/** @type {{ offset?: number; maxBytes?: number; maxEvents?: number }} */ options = {}) =>
-            readMcpAuditEventSlice(runtime, options),
+        readSlice: (
+            /** @type {{ offset?: number; maxBytes?: number; maxEvents?: number; sequenceToken?: string | null }} */ options = {},
+        ) => readMcpAuditEventSlice(runtime, options),
+        readPrefixProof: (/** @type {{ offset: number }} */ options) => readMcpAuditPrefixProof(runtime, options),
         flush: () => flushMcpAuditEvents(runtime),
     });
 }
@@ -244,7 +254,7 @@ async function readMcpAuditEventTail(runtime, options = {}) {
  * JSON line. The file identity lets derived indexes detect rotation/replacement.
  *
  * @param {McpAuditRuntime} runtime
- * @param {{ offset?: number; maxBytes?: number; maxEvents?: number }} [options]
+ * @param {{ offset?: number; maxBytes?: number; maxEvents?: number; sequenceToken?: string | null }} [options]
  */
 async function readMcpAuditEventSlice(runtime, options = {}) {
     const requestedOffset = Math.max(0, Math.floor(Number(options.offset ?? 0) || 0));
@@ -253,85 +263,167 @@ async function readMcpAuditEventSlice(runtime, options = {}) {
     const auditFile = runtime.config.filePath;
     try {
         await runtime.writer.flush();
-        let snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
-            start: requestedOffset,
-            maxBytes,
+        const continuityStartByte = Math.max(0, requestedOffset - MCP_AUDIT_CONTINUITY_WINDOW_BYTES);
+        const continuityPrefixBytes = requestedOffset - continuityStartByte;
+        const snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
+            start: continuityStartByte,
+            maxBytes: maxBytes + continuityPrefixBytes,
             rejectSymlink: true,
         });
-        const resetRequired = requestedOffset > snapshot.sizeBytes;
-        if (resetRequired) {
-            snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
-                start: 0,
-                maxBytes,
-                rejectSymlink: true,
-            });
-        }
         const fileBytes = snapshot.sizeBytes;
-        const fileIdentity = `${String(snapshot.dev)}:${String(snapshot.ino)}`;
-        const startOffset = resetRequired ? 0 : requestedOffset;
-        const bytesToRead = snapshot.bytesRead;
-        if (bytesToRead <= 0) {
+        const physicalFileIdentity = `${String(snapshot.dev)}:${String(snapshot.ino)}`;
+        const offsetPastEnd = requestedOffset > fileBytes;
+        if (offsetPastEnd) {
             return {
                 ok: true,
-                fileIdentity,
+                sourcePresent: true,
+                physicalFileIdentity,
                 fileBytes,
                 requestedOffset,
-                startOffset,
-                nextOffset: startOffset,
+                startOffset: fileBytes,
+                nextOffset: requestedOffset,
                 bytesRead: 0,
-                complete: startOffset >= fileBytes,
-                resetRequired,
+                complete: true,
+                offsetPastEnd: true,
+                eventLimitReached: false,
+                pendingPartialLineBytes: 0,
+                continuityAtStart: null,
+                continuityAtNext: null,
+                sequenceAtStart: null,
+                sequenceAtNext: null,
                 parsedEvents: 0,
                 invalidLines: 0,
                 events: [],
+                entries: [],
                 error: null,
             };
         }
 
-        const buffer = snapshot.content;
-        let completeBytes = bytesToRead;
-        const reachedEof = !snapshot.truncatedAfter;
-        if (!reachedEof) {
-            const lastNewline = buffer.lastIndexOf(0x0a);
-            completeBytes = lastNewline >= 0 ? lastNewline + 1 : 0;
+        // Because requestedOffset <= fileBytes, the consistent snapshot necessarily begins at continuityStartByte and
+        // contains the complete bounded prefix needed to anchor the cursor. The caller-visible bytesRead excludes this
+        // internal prefix so ingestion accounting continues to describe only newly processed audit bytes.
+        const relativeDataStart = requestedOffset - snapshot.startByte;
+        if (relativeDataStart < 0 || relativeDataStart > snapshot.content.byteLength) {
+            throw createAuditContinuityError('Audit snapshot did not cover the requested cursor boundary.');
         }
-        const text = completeBytes > 0 ? buffer.subarray(0, completeBytes).toString('utf8') : '';
+        const continuityAtStart = buildAuditContinuityAnchor(
+            requestedOffset,
+            snapshot.content.subarray(0, relativeDataStart),
+        );
+        const sequenceAtStart = readAuditSequenceStart(requestedOffset, options.sequenceToken);
+        const dataBuffer = snapshot.content.subarray(relativeDataStart);
+        const dataBytesAvailable = dataBuffer.byteLength;
+        if (dataBytesAvailable <= 0) {
+            return {
+                ok: true,
+                sourcePresent: true,
+                physicalFileIdentity,
+                fileBytes,
+                requestedOffset,
+                startOffset: requestedOffset,
+                nextOffset: requestedOffset,
+                bytesRead: 0,
+                complete: requestedOffset >= fileBytes,
+                offsetPastEnd: false,
+                eventLimitReached: false,
+                pendingPartialLineBytes: 0,
+                continuityAtStart,
+                continuityAtNext: continuityAtStart,
+                sequenceAtStart,
+                sequenceAtNext: sequenceAtStart,
+                parsedEvents: 0,
+                invalidLines: 0,
+                events: [],
+                entries: [],
+                error: null,
+            };
+        }
+
+        // Newline is the JSONL commit marker. Never advance over a trailing partial record, even at EOF: another
+        // writer/process may still complete it after this consistent snapshot. Likewise, an event-count cap must stop
+        // the byte cursor at the last event actually returned instead of silently skipping later records in the chunk.
+        const lastNewline = dataBuffer.lastIndexOf(0x0a);
+        const newlineAlignedBytes = lastNewline >= 0 ? lastNewline + 1 : 0;
+        if (snapshot.truncatedAfter && newlineAlignedBytes === 0 && dataBytesAvailable > 0) {
+            const error = /** @type {Error & { code?: string }} */ (
+                new Error(
+                    `MCP audit record exceeds the ${String(maxBytes)} byte slice budget before a newline boundary.`,
+                )
+            );
+            error.code = 'EAUDITRECORDTOOLARGE';
+            throw error;
+        }
+        const completeBuffer = newlineAlignedBytes > 0 ? dataBuffer.subarray(0, newlineAlignedBytes) : Buffer.alloc(0);
         /** @type {Record<string, unknown>[]} */
         const events = [];
         /** @type {{ sourceOffset: number; event: Record<string, unknown> }[]} */
         const entries = [];
         let invalidLines = 0;
-        let lineOffset = startOffset;
-        for (const rawLine of text.split('\n')) {
-            const lineBytes = Buffer.byteLength(rawLine, 'utf8') + 1;
-            const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+        let consumedBytes = 0;
+        let hitEventLimit = false;
+        let sequenceToken = sequenceAtStart?.token ?? null;
+        while (consumedBytes < completeBuffer.byteLength) {
+            const newlineIndex = completeBuffer.indexOf(0x0a, consumedBytes);
+            if (newlineIndex < 0) break;
+            const recordEnd = newlineIndex + 1;
+            const recordBuffer = completeBuffer.subarray(consumedBytes, recordEnd);
+            const lineBuffer = completeBuffer.subarray(consumedBytes, newlineIndex);
+            const lineOffset = requestedOffset + consumedBytes;
+            const lineWithoutCr =
+                lineBuffer.byteLength > 0 && lineBuffer[lineBuffer.byteLength - 1] === 0x0d
+                    ? lineBuffer.subarray(0, lineBuffer.byteLength - 1)
+                    : lineBuffer;
+            const line = lineWithoutCr.toString('utf8');
             if (line.trim()) {
                 try {
                     const value = JSON.parse(line);
                     if (value && typeof value === 'object' && !Array.isArray(value)) {
-                        if (events.length < maxEvents) {
-                            const event = /** @type {Record<string, unknown>} */ (value);
-                            events.push(event);
-                            entries.push({ sourceOffset: lineOffset, event });
-                        }
+                        const event = /** @type {Record<string, unknown>} */ (value);
+                        events.push(event);
+                        entries.push({ sourceOffset: lineOffset, event });
                     } else invalidLines += 1;
                 } catch {
                     invalidLines += 1;
                 }
             }
-            lineOffset += lineBytes;
+            if (sequenceToken) sequenceToken = advanceAuditSequenceToken(sequenceToken, lineOffset, recordBuffer);
+            consumedBytes = recordEnd;
+            if (events.length >= maxEvents) {
+                hitEventLimit = true;
+                break;
+            }
         }
-        const nextOffset = startOffset + completeBytes;
+        const nextOffset = requestedOffset + consumedBytes;
+        const eventLimitReached = hitEventLimit && nextOffset < fileBytes;
+        const relativeNextOffset = relativeDataStart + consumedBytes;
+        const nextWindowStart = Math.max(0, relativeNextOffset - MCP_AUDIT_CONTINUITY_WINDOW_BYTES);
+        const continuityAtNext = buildAuditContinuityAnchor(
+            nextOffset,
+            snapshot.content.subarray(nextWindowStart, relativeNextOffset),
+        );
+        const sequenceAtNext = sequenceToken
+            ? Object.freeze({ version: MCP_AUDIT_SEQUENCE_VERSION, algorithm: 'sha256-chain', token: sequenceToken })
+            : null;
+        const pendingPartialLineBytes = snapshot.truncatedAfter
+            ? 0
+            : Math.max(0, dataBytesAvailable - newlineAlignedBytes);
         return {
             ok: true,
-            fileIdentity,
+            sourcePresent: true,
+            physicalFileIdentity,
             fileBytes,
             requestedOffset,
-            startOffset,
+            startOffset: requestedOffset,
             nextOffset,
-            bytesRead: completeBytes,
-            complete: nextOffset >= fileBytes,
-            resetRequired,
+            bytesRead: consumedBytes,
+            complete: !eventLimitReached && pendingPartialLineBytes === 0 && nextOffset >= fileBytes,
+            offsetPastEnd: false,
+            eventLimitReached,
+            pendingPartialLineBytes,
+            continuityAtStart,
+            continuityAtNext,
+            sequenceAtStart,
+            sequenceAtNext,
             parsedEvents: events.length,
             invalidLines,
             events,
@@ -343,36 +435,219 @@ async function readMcpAuditEventSlice(runtime, options = {}) {
         if (code === 'ENOENT') {
             return {
                 ok: true,
-                fileIdentity: null,
+                sourcePresent: false,
+                physicalFileIdentity: null,
                 fileBytes: 0,
                 requestedOffset,
                 startOffset: 0,
-                nextOffset: 0,
+                nextOffset: requestedOffset,
                 bytesRead: 0,
-                complete: true,
-                resetRequired: requestedOffset > 0,
+                complete: requestedOffset === 0,
+                offsetPastEnd: requestedOffset > 0,
+                eventLimitReached: false,
+                pendingPartialLineBytes: 0,
+                continuityAtStart: null,
+                continuityAtNext: null,
+                sequenceAtStart: null,
+                sequenceAtNext: null,
                 parsedEvents: 0,
                 invalidLines: 0,
                 events: [],
+                entries: [],
                 error: null,
             };
         }
         return {
             ok: false,
-            fileIdentity: null,
+            sourcePresent: null,
+            physicalFileIdentity: null,
             fileBytes: 0,
             requestedOffset,
-            startOffset: 0,
-            nextOffset: 0,
+            startOffset: requestedOffset,
+            nextOffset: requestedOffset,
             bytesRead: 0,
             complete: false,
-            resetRequired: false,
+            offsetPastEnd: false,
+            eventLimitReached: false,
+            pendingPartialLineBytes: 0,
+            continuityAtStart: null,
+            continuityAtNext: null,
+            sequenceAtStart: null,
+            sequenceAtNext: null,
             parsedEvents: 0,
             invalidLines: 0,
             events: [],
+            entries: [],
             error: error instanceof Error ? error.message : String(error),
         };
     }
+}
+
+/**
+ * Recompute the complete committed JSONL prefix chain in one physically consistent snapshot. This O(prefix) path is
+ * reserved for physical rebinds; ordinary append sync remains incremental and uses only the bounded boundary anchor.
+ *
+ * @param {McpAuditRuntime} runtime
+ * @param {{ offset: number }} options
+ */
+async function readMcpAuditPrefixProof(runtime, options) {
+    const offset = Math.max(0, Math.floor(Number(options?.offset ?? 0) || 0));
+    const auditFile = runtime.config.filePath;
+    try {
+        await runtime.writer.flush();
+        const snapshot = await runtime.auditFs.readBytesRangeFresh(auditFile, {
+            start: 0,
+            maxBytes: offset,
+            rejectSymlink: true,
+        });
+        const physicalFileIdentity = `${String(snapshot.dev)}:${String(snapshot.ino)}`;
+        if (snapshot.sizeBytes < offset || snapshot.startByte !== 0 || snapshot.bytesRead !== offset) {
+            return {
+                ok: true,
+                sourcePresent: true,
+                prefixAvailable: false,
+                physicalFileIdentity,
+                fileBytes: snapshot.sizeBytes,
+                offset,
+                bytesRead: snapshot.bytesRead,
+                continuityAtOffset: null,
+                sequenceAtOffset: null,
+                error: null,
+            };
+        }
+        const prefix = snapshot.content.subarray(0, offset);
+        if (offset > 0 && prefix[offset - 1] !== 0x0a) {
+            throw createAuditContinuityError(
+                'Persisted MCP audit cursor is not aligned to a committed newline boundary.',
+            );
+        }
+        const sequenceToken = computeAuditSequenceToken(prefix);
+        const windowStart = Math.max(0, offset - MCP_AUDIT_CONTINUITY_WINDOW_BYTES);
+        return {
+            ok: true,
+            sourcePresent: true,
+            prefixAvailable: true,
+            physicalFileIdentity,
+            fileBytes: snapshot.sizeBytes,
+            offset,
+            bytesRead: offset,
+            continuityAtOffset: buildAuditContinuityAnchor(offset, prefix.subarray(windowStart)),
+            sequenceAtOffset: Object.freeze({
+                version: MCP_AUDIT_SEQUENCE_VERSION,
+                algorithm: 'sha256-chain',
+                token: sequenceToken,
+            }),
+            error: null,
+        };
+    } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+        if (code === 'ENOENT') {
+            return {
+                ok: true,
+                sourcePresent: false,
+                prefixAvailable: false,
+                physicalFileIdentity: null,
+                fileBytes: 0,
+                offset,
+                bytesRead: 0,
+                continuityAtOffset: null,
+                sequenceAtOffset: null,
+                error: null,
+            };
+        }
+        return {
+            ok: false,
+            sourcePresent: null,
+            prefixAvailable: false,
+            physicalFileIdentity: null,
+            fileBytes: 0,
+            offset,
+            bytesRead: 0,
+            continuityAtOffset: null,
+            sequenceAtOffset: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+/** @param {number} offset @param {unknown} priorToken */
+function readAuditSequenceStart(offset, priorToken) {
+    if (offset === 0) {
+        return Object.freeze({
+            version: MCP_AUDIT_SEQUENCE_VERSION,
+            algorithm: 'sha256-chain',
+            token: MCP_AUDIT_SEQUENCE_SEED,
+        });
+    }
+    const token = normalizeAuditSequenceToken(priorToken);
+    return token ? Object.freeze({ version: MCP_AUDIT_SEQUENCE_VERSION, algorithm: 'sha256-chain', token }) : null;
+}
+
+/** @param {unknown} value */
+function normalizeAuditSequenceToken(value) {
+    return typeof value === 'string' && MCP_AUDIT_SEQUENCE_TOKEN_PATTERN.test(value) ? value : null;
+}
+
+/** @param {string} priorToken @param {number} sourceOffset @param {Buffer} recordBuffer */
+function advanceAuditSequenceToken(priorToken, sourceOffset, recordBuffer) {
+    const hash = createHash('sha256');
+    hash.update(MCP_AUDIT_SEQUENCE_DOMAIN, 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(priorToken, 'hex');
+    hash.update('\0', 'utf8');
+    hash.update(String(sourceOffset), 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(String(recordBuffer.byteLength), 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(recordBuffer);
+    return hash.digest('hex');
+}
+
+/** @param {Buffer} prefix */
+function computeAuditSequenceToken(prefix) {
+    let token = MCP_AUDIT_SEQUENCE_SEED;
+    let offset = 0;
+    while (offset < prefix.byteLength) {
+        const newlineIndex = prefix.indexOf(0x0a, offset);
+        if (newlineIndex < 0) {
+            throw createAuditContinuityError('MCP audit prefix proof encountered an unterminated JSONL record.');
+        }
+        const recordEnd = newlineIndex + 1;
+        token = advanceAuditSequenceToken(token, offset, prefix.subarray(offset, recordEnd));
+        offset = recordEnd;
+    }
+    return token;
+}
+
+/** @param {number} offset @param {Buffer} content */
+function buildAuditContinuityAnchor(offset, content) {
+    const windowBytes = content.byteLength;
+    const windowStart = Math.max(0, offset - windowBytes);
+    const hash = createHash('sha256');
+    hash.update(MCP_AUDIT_CONTINUITY_DOMAIN, 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(String(offset), 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(String(windowStart), 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(String(windowBytes), 'utf8');
+    hash.update('\0', 'utf8');
+    hash.update(content);
+    return Object.freeze({
+        version: MCP_AUDIT_CONTINUITY_VERSION,
+        algorithm: 'sha256',
+        offset,
+        windowStart,
+        windowBytes,
+        token: hash.digest('hex'),
+    });
+}
+
+/** @param {string} message */
+function createAuditContinuityError(message) {
+    const error = /** @type {Error & { code?: string }} */ (new Error(message));
+    error.code = 'EAUDITCONTINUITY';
+    return error;
 }
 
 /**

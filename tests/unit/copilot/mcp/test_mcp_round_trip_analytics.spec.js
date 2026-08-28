@@ -3,6 +3,7 @@
 import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { afterEach, describe, it } from 'vitest';
 
 import { readMcpRoundTripAnalyticsSnapshot } from '#copilot/mcp/public/diagnostics/latency/round-trip';
@@ -52,26 +53,90 @@ function setJson(values) {
     return JSON.stringify(values);
 }
 
-function emptySlice(offset = 0, fileIdentity = 'dev:ino-a', fileBytes = offset) {
+/** @param {number} offset @param {string} [lineage] */
+function continuityAnchor(offset, lineage = 'lineage-a') {
+    const windowBytes = Math.min(4096, offset);
+    return {
+        version: 1,
+        algorithm: 'sha256',
+        offset,
+        windowStart: offset - windowBytes,
+        windowBytes,
+        token: createHash('sha256')
+            .update(`${lineage}:${String(offset)}`)
+            .digest('hex'),
+    };
+}
+
+/** @param {number} offset */
+function sequenceProof(offset) {
+    return {
+        version: 1,
+        algorithm: 'sha256-chain',
+        token: createHash('sha256')
+            .update(`synthetic-sequence:${String(offset)}`)
+            .digest('hex'),
+    };
+}
+
+/**
+ * @param {{
+ *   offset?: number;
+ *   nextOffset?: number;
+ *   fileBytes?: number;
+ *   physicalFileIdentity?: string;
+ *   lineage?: string;
+ *   entries?: {sourceOffset:number;event:Record<string,unknown>}[];
+ *   parsedEvents?: number;
+ *   invalidLines?: number;
+ *   complete?: boolean;
+ *   sourcePresent?: boolean;
+ *   offsetPastEnd?: boolean;
+ * }} [options]
+ */
+function auditSlice(options = {}) {
+    const offset = options.offset ?? 0;
+    const nextOffset = options.nextOffset ?? offset;
+    const fileBytes = options.fileBytes ?? nextOffset;
+    const sourcePresent = options.sourcePresent !== false;
+    const offsetPastEnd = options.offsetPastEnd === true || (sourcePresent && offset > fileBytes);
+    const lineage = options.lineage ?? 'lineage-a';
+    const entries = options.entries ?? [];
     return {
         ok: true,
-        fileIdentity,
-        fileBytes,
+        sourcePresent,
+        physicalFileIdentity: sourcePresent ? (options.physicalFileIdentity ?? 'dev:ino-a') : null,
+        fileBytes: sourcePresent ? fileBytes : 0,
         requestedOffset: offset,
-        startOffset: offset,
-        nextOffset: offset,
-        bytesRead: 0,
-        complete: true,
-        resetRequired: false,
-        parsedEvents: 0,
-        invalidLines: 0,
-        entries: [],
-        events: [],
+        startOffset: offsetPastEnd ? fileBytes : offset,
+        nextOffset,
+        bytesRead: offsetPastEnd || !sourcePresent ? 0 : Math.max(0, nextOffset - offset),
+        complete: options.complete ?? (sourcePresent ? nextOffset >= fileBytes : offset === 0),
+        offsetPastEnd,
+        continuityAtStart: sourcePresent && !offsetPastEnd ? continuityAnchor(offset, lineage) : null,
+        continuityAtNext: sourcePresent && !offsetPastEnd ? continuityAnchor(nextOffset, lineage) : null,
+        sequenceAtStart: sourcePresent && !offsetPastEnd ? sequenceProof(offset) : null,
+        sequenceAtNext: sourcePresent && !offsetPastEnd ? sequenceProof(nextOffset) : null,
+        parsedEvents: options.parsedEvents ?? entries.length,
+        invalidLines: options.invalidLines ?? 0,
+        entries,
+        events: entries.map((item) => item.event),
         error: null,
     };
 }
 
-describe('MCP incremental round-trip analytics v6', () => {
+function emptySlice(offset = 0, physicalFileIdentity = 'dev:ino-a', fileBytes = offset, lineage = 'lineage-a') {
+    return auditSlice({
+        offset,
+        nextOffset: offset,
+        physicalFileIdentity,
+        fileBytes,
+        lineage,
+        complete: offset >= fileBytes,
+    });
+}
+
+describe('MCP incremental round-trip analytics v11', () => {
     it('normalizes only bounded correlation/execution metadata and never indexes raw sensitive payload fields', () => {
         const normalized = normalizeMcpRoundTripAuditEvent({
             ts: iso(10_000),
@@ -89,6 +154,9 @@ describe('MCP incremental round-trip analytics v6', () => {
             failedOperations: 1,
             skippedOperations: 1,
             executionMode: 'patch-apply:per-target-fast:best-effort',
+            executionPolicyClass: 'direct-apply',
+            executionFailurePolicyClass: 'best-effort',
+            executionConcurrencyClass: 'parallel-bounded',
             batchSize: 5,
             batchCapacity: 128,
             resultBudgetBytes: 1_000_000,
@@ -130,6 +198,9 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(normalized?.traceKey, 'a'.repeat(32));
         assert.equal(normalized?.targetKeysJson, setJson(['b'.repeat(32), 'c'.repeat(32)]));
         assert.equal(normalized?.logicalOperations, 5);
+        assert.equal(normalized?.executionPolicyClass, 'direct-apply');
+        assert.equal(normalized?.executionFailurePolicyClass, 'best-effort');
+        assert.equal(normalized?.executionConcurrencyClass, 'parallel-bounded');
         assert.equal(normalized?.batchSize, 5);
         assert.equal(normalized?.batchCapacity, 128);
         assert.equal(normalized?.truncatedOperations, 2);
@@ -152,6 +223,24 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(normalized?.optionIgnoredCount, 1);
         const serialized = JSON.stringify(normalized);
         for (const forbidden of ['secret-not-derived', 'must-not-be-indexed', 'traceparent', 'baggage', 'old_string']) {
+            assert.equal(serialized.includes(forbidden), false, forbidden);
+        }
+    });
+
+    it('rejects open-ended execution-policy strings instead of persisting arbitrary policy cardinality', () => {
+        const normalized = normalizeMcpRoundTripAuditEvent({
+            ts: iso(11_000),
+            event: 'tool_call_completed',
+            tool: 'repo_apply_patch_batch',
+            executionPolicyClass: 'caller-defined-policy',
+            executionFailurePolicyClass: 'retry-until-success',
+            executionConcurrencyClass: 'c128',
+        });
+        assert.equal(normalized?.executionPolicyClass, null);
+        assert.equal(normalized?.executionFailurePolicyClass, null);
+        assert.equal(normalized?.executionConcurrencyClass, null);
+        const serialized = JSON.stringify(normalized);
+        for (const forbidden of ['caller-defined-policy', 'retry-until-success', 'c128']) {
             assert.equal(serialized.includes(forbidden), false, forbidden);
         }
     });
@@ -522,6 +611,43 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(summary.payloadAccounting.heavyResultFollowups.lineageReadFollowupCount, 1);
         assert.equal(summary.payloadAccounting.heavyResultFollowups.sameTargetRereadCount, 1);
         assert.match(summary.payloadAccounting.heavyResultFollowups.caveat, /observational pressure/u);
+    });
+
+    it('aggregates v11 effective execution policies without inferring legacy patch completions', () => {
+        const summary = summarizeMcpRoundTripRows(
+            [
+                row(1, 1_000, 'tool_call_completed', 'repo_apply_patch_batch', 'legacy', {
+                    execution_mode: 'patch-apply:per-target-fast:fail-fast',
+                    runtime_epoch_id: 'epoch-old',
+                }),
+                row(2, 1_100, 'tool_call_completed', 'repo_apply_patch_batch', 'direct', {
+                    execution_policy_class: 'direct-apply',
+                    execution_failure_policy_class: 'fail-fast',
+                    execution_concurrency_class: 'parallel-bounded',
+                    runtime_epoch_id: 'epoch-new',
+                }),
+                row(3, 1_200, 'tool_call_completed', 'repo_apply_patch_batch', 'dry', {
+                    execution_policy_class: 'dry-run',
+                    execution_failure_policy_class: 'best-effort',
+                    execution_concurrency_class: 'sequential',
+                    runtime_epoch_id: 'epoch-new',
+                }),
+                row(4, 1_300, 'tool_call_completed', 'repo_read_file', 'other', {
+                    runtime_epoch_id: 'epoch-new',
+                }),
+            ],
+            { windowMs: 10_000, top: 20, includeSynthetic: false },
+        );
+        assert.equal(summary.executionPolicies.eligibleCalls, 3);
+        assert.equal(summary.executionPolicies.observedCalls, 2);
+        assert.equal(summary.executionPolicies.coverageRate, 0.6667);
+        assert.deepEqual(summary.executionPolicies.byPolicyClass, { 'direct-apply': 1, 'dry-run': 1 });
+        assert.deepEqual(summary.executionPolicies.byFailurePolicyClass, { 'fail-fast': 1, 'best-effort': 1 });
+        assert.deepEqual(summary.executionPolicies.byConcurrencyClass, { 'parallel-bounded': 1, sequential: 1 });
+        assert.equal(summary.executionPolicies.byTool[0]?.tool, 'repo_apply_patch_batch');
+        assert.equal(summary.executionPolicies.byTool[0]?.observedCalls, 2);
+        assert.equal(summary.executionPolicies.byRuntimeCohort['epoch:epoch-new']?.observedCalls, 2);
+        assert.match(summary.executionPolicies.caveat, /never inferred/u);
     });
 
     it('separates optional continuation from transport-required continuation in batch accounting', () => {
@@ -932,9 +1058,16 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.deepEqual(after, before);
     });
 
-    it('migrates an older derived event table with v5 result-outcome/correlation/accounting columns', () => {
+    it('fails closed on a legacy derived schema, then rebuilds it as v11 from the raw reader', async () => {
         const db = createDb();
         db.exec(`
+            CREATE TABLE copilot_mcp_round_trip_cursor (
+                cursor_id TEXT PRIMARY KEY,
+                file_identity TEXT,
+                byte_offset INTEGER NOT NULL,
+                file_bytes INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL
+            ) STRICT;
             CREATE TABLE copilot_mcp_round_trip_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_identity TEXT NOT NULL,
@@ -942,76 +1075,70 @@ describe('MCP incremental round-trip analytics v6', () => {
                 ts_ms INTEGER NOT NULL,
                 event TEXT NOT NULL,
                 tool TEXT,
-                duration_ms INTEGER,
-                is_error INTEGER,
-                code TEXT,
-                failure_class TEXT,
-                retryability TEXT,
-                recovery_required INTEGER,
-                workflow_success INTEGER,
-                partial INTEGER,
-                apply_mode TEXT,
-                operation_count INTEGER,
-                target_count INTEGER,
-                applied_count INTEGER,
-                failed_count INTEGER,
-                causal_failure_count INTEGER,
-                aborted_operation_count INTEGER,
-                recovery_required_target_count INTEGER,
-                convergence_candidate_count INTEGER,
-                synthetic INTEGER NOT NULL DEFAULT 0 CHECK(synthetic IN (0, 1)),
+                synthetic INTEGER NOT NULL DEFAULT 0 CHECK(synthetic IN (0,1)),
                 UNIQUE(source_identity, source_offset)
             ) STRICT;
+            INSERT INTO copilot_mcp_round_trip_cursor
+                (cursor_id,file_identity,byte_offset,file_bytes,updated_at_ms)
+            VALUES ('mcp-audit:v9','legacy:ino',100,100,1);
+            INSERT INTO copilot_mcp_round_trip_events
+                (source_identity,source_offset,ts_ms,event,tool,synthetic)
+            VALUES ('legacy:ino',0,90000,'tool_call_started','legacy_tool',0);
         `);
-        createMcpRoundTripAnalytics({
+        const before = readMcpRoundTripAnalyticsSnapshot({
             db: adaptBetterSqliteDatabase(db),
-            readSlice: async () => emptySlice(),
+            now: () => 100_000,
+            windowMs: 20_000,
         });
+        assert.equal(before.available, false);
+        assert.equal(before.sourceIntegrity?.status, 'rebuild-required');
+        assert.match(String(before.authority), /v11-rebuild-required/u);
+
+        const event = entry(0, {
+            ts: iso(90_000),
+            event: 'tool_call_started',
+            tool: 'repo_read_file',
+            callId: 'fresh-a',
+        });
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => 100_000,
+            readSlice: async ({ offset = 0 } = {}) =>
+                offset === 0
+                    ? auditSlice({ offset: 0, nextOffset: 100, fileBytes: 100, entries: [event] })
+                    : emptySlice(offset, 'dev:ino-a', 100),
+        });
+        const report = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(report.schemaVersion, 11);
+        assert.equal(report.normalizerVersion, 11);
+        assert.equal(report.indexedRows, 1);
+        assert.deepEqual(
+            report.toolStarts.map((item) => item.tool),
+            ['repo_read_file'],
+        );
+        assert.equal(report.sourceIntegrity?.indexSchemaVersion, 11);
+
+        const meta = db
+            .prepare(
+                "SELECT schema_version,normalizer_version,schema_created_at_ms FROM copilot_mcp_round_trip_meta WHERE meta_id='current'",
+            )
+            .get();
+        assert.deepEqual(meta, { schema_version: 11, normalizer_version: 11, schema_created_at_ms: 100_000 });
         const columns = /** @type {{ name: string }[]} */ (
             db.prepare('PRAGMA table_info(copilot_mcp_round_trip_events)').all()
         );
+        assert.equal(
+            columns.some((column) => column.name === 'source_generation'),
+            true,
+        );
+        assert.equal(
+            columns.some((column) => column.name === 'physical_file_identity'),
+            true,
+        );
         for (const name of [
-            'call_id',
-            'trace_key',
-            'target_keys_json',
-            'runtime_source_fingerprint',
-            'result_code',
-            'result_state',
-            'result_class',
-            'recovery_recipe_count',
-            'retry_safe_recovery_recipe_count',
-            'suggested_recovery_recipe_count',
-            'manual_recovery_recipe_count',
-            'no_retry_recovery_recipe_count',
-            'exact_self_repair_attempted_count',
-            'exact_self_repair_succeeded_count',
-            'exact_self_repair_failed_closed_count',
-            'option_contract_version',
-            'option_policy_coverage',
-            'option_mode',
-            'option_declared_count',
-            'option_requested_count',
-            'option_effective_requested_count',
-            'option_defaulted_count',
-            'option_normalized_count',
-            'option_ignored_count',
-            'option_coerced_count',
-            'option_rejected_count',
-            'option_conflict_count',
-            'logical_operations',
-            'batch_size',
-            'batch_capacity',
-            'truncated_operations',
-            'continuation_required',
-            'continuation_available',
-            'continuation_available_operations',
-            'continuation_transport_required',
-            'continuation_transport_required_operations',
-            'continuation_recommended',
-            'continuation_recommended_operations',
-            'result_bytes',
-            'duplicate_text_bytes',
-            'causal_by_code_json',
+            'execution_policy_class',
+            'execution_failure_policy_class',
+            'execution_concurrency_class',
         ]) {
             assert.equal(
                 columns.some((column) => column.name === name),
@@ -1019,57 +1146,62 @@ describe('MCP incremental round-trip analytics v6', () => {
                 name,
             );
         }
+        assert.equal(
+            columns.some((column) => column.name === 'source_identity'),
+            false,
+        );
+        assert.equal(Number(db.prepare('SELECT COUNT(*) AS count FROM copilot_mcp_round_trip_events').get().count), 1);
     });
 
-    it('replays from zero when only the v8 normalizer cursor exists and materializes the v9 cursor', async () => {
+    it('treats a matching schema with a stale normalizer generation as rebuild-required', async () => {
         const db = createDb();
-        const nowMs = 100_000;
+        db.exec(`
+            CREATE TABLE copilot_mcp_round_trip_meta (
+                meta_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                normalizer_version INTEGER NOT NULL,
+                schema_created_at_ms INTEGER NOT NULL
+            ) STRICT;
+            INSERT INTO copilot_mcp_round_trip_meta
+                (meta_id,schema_version,normalizer_version,schema_created_at_ms)
+            VALUES ('current',11,10,1);
+            CREATE TABLE copilot_mcp_round_trip_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_generation TEXT NOT NULL,
+                physical_file_identity TEXT,
+                source_offset INTEGER NOT NULL,
+                ts_ms INTEGER NOT NULL,
+                event TEXT NOT NULL,
+                tool TEXT,
+                synthetic INTEGER NOT NULL DEFAULT 0 CHECK(synthetic IN (0,1)),
+                UNIQUE(source_generation,source_offset)
+            ) STRICT;
+        `);
+        const snapshot = readMcpRoundTripAnalyticsSnapshot({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => 100_000,
+            windowMs: 20_000,
+        });
+        assert.equal(snapshot.available, false);
+        assert.equal(snapshot.sourceIntegrity?.indexSchemaVersion, 11);
+        assert.equal(snapshot.sourceIntegrity?.indexNormalizerVersion, 10);
+        assert.equal(snapshot.sourceIntegrity?.expectedNormalizerVersion, 11);
+        assert.equal(snapshot.sourceIntegrity?.status, 'rebuild-required');
+        assert.match(String(snapshot.authority), /schema-11-normalizer-10/u);
+
         const analytics = createMcpRoundTripAnalytics({
             db: adaptBetterSqliteDatabase(db),
-            now: () => nowMs,
-            readSlice: async ({ offset = 0 } = {}) => ({
-                ok: true,
-                fileIdentity: 'dev:ino-a',
-                fileBytes: 100,
-                requestedOffset: offset,
-                startOffset: offset,
-                nextOffset: 100,
-                bytesRead: offset === 0 ? 100 : 0,
-                complete: true,
-                resetRequired: false,
-                parsedEvents: offset === 0 ? 1 : 0,
-                invalidLines: 0,
-                entries:
-                    offset === 0
-                        ? [
-                              entry(0, {
-                                  ts: iso(90_000),
-                                  event: 'repo_apply_patch_failed',
-                                  tool: 'repo_apply_patch',
-                                  code: 'ERR_PATCH_NOT_FOUND',
-                                  failureClass: 'stale-context',
-                                  retryability: 'caller-refresh',
-                              }),
-                          ]
-                        : [],
-                events: [],
-                error: null,
-            }),
+            now: () => 100_000,
+            readSlice: async ({ offset = 0 } = {}) => emptySlice(offset, 'dev:ino-a', 0),
         });
-        db.prepare(
-            `INSERT OR REPLACE INTO copilot_mcp_round_trip_cursor
-             (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
-             VALUES ('mcp-audit:v8', 'dev:ino-a', 900, 900, ?)`,
-        ).run(nowMs - 1_000);
-        const report = await analytics.summarize({ windowMs: 20_000 });
-        assert.equal(report.schemaVersion, 9);
-        assert.equal(report.normalizerVersion, 9);
-        assert.deepEqual(report.failures.byClass, { 'stale-context': 1 });
-        const cursor = db
-            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v9'")
+        const rebuilt = await analytics.sync();
+        assert.equal(rebuilt.ok, true);
+        const meta = db
+            .prepare(
+                "SELECT schema_version,normalizer_version FROM copilot_mcp_round_trip_meta WHERE meta_id='current'",
+            )
             .get();
-        assert.ok(cursor && typeof cursor === 'object');
-        assert.equal(Number(/** @type {Record<string, unknown>} */ (cursor)['byte_offset']), 100);
+        assert.deepEqual(meta, { schema_version: 11, normalizer_version: 11 });
     });
 
     it('marks an over-budget analytics window incomplete and retains the newest bounded tail', async () => {
@@ -1088,22 +1220,7 @@ describe('MCP incremental round-trip analytics v6', () => {
             maxSummaryRows: 3,
             readSlice: async ({ offset = 0 } = {}) =>
                 offset === 0
-                    ? {
-                          ok: true,
-                          fileIdentity: 'dev:ino-a',
-                          fileBytes: 50,
-                          requestedOffset: 0,
-                          startOffset: 0,
-                          nextOffset: 50,
-                          bytesRead: 50,
-                          complete: true,
-                          resetRequired: false,
-                          parsedEvents: events.length,
-                          invalidLines: 0,
-                          entries: events,
-                          events: events.map((item) => item.event),
-                          error: null,
-                      }
+                    ? auditSlice({ offset: 0, nextOffset: 50, fileBytes: 50, entries: events })
                     : emptySlice(offset, 'dev:ino-a', 50),
         });
         const report = await analytics.summarize({ windowMs: 20_000 });
@@ -1119,7 +1236,7 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.match(report.authority, /bounded-newest-tail/u);
     });
 
-    it('indexes slices idempotently and excludes synthetic rows by default', async () => {
+    it('indexes slices idempotently, excludes synthetic rows by default and keeps one logical generation', async () => {
         const db = createDb();
         const nowMs = 100_000;
         /** @type {number[]} */
@@ -1139,25 +1256,9 @@ describe('MCP incremental round-trip analytics v6', () => {
         ];
         const readSlice = async ({ offset = 0 } = {}) => {
             requestedOffsets.push(offset);
-            if (offset === 0) {
-                return {
-                    ok: true,
-                    fileIdentity: 'dev:ino-a',
-                    fileBytes: 300,
-                    requestedOffset: 0,
-                    startOffset: 0,
-                    nextOffset: 300,
-                    bytesRead: 300,
-                    complete: true,
-                    resetRequired: false,
-                    parsedEvents: events.length,
-                    invalidLines: 0,
-                    entries: events,
-                    events: events.map((item) => item.event),
-                    error: null,
-                };
-            }
-            return emptySlice(offset, 'dev:ino-a', 300);
+            return offset === 0
+                ? auditSlice({ offset: 0, nextOffset: 300, fileBytes: 300, entries: events })
+                : emptySlice(offset, 'dev:ino-a', 300);
         };
         const analytics = createMcpRoundTripAnalytics({
             db: adaptBetterSqliteDatabase(db),
@@ -1170,15 +1271,131 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(first.indexedRows, 2);
         assert.equal(first.failures.byCode['ERR_PATCH_NOT_FOUND'], undefined);
         assert.equal(first.ingestion?.cursor?.byteOffset, 300);
+        assert.equal(first.ingestion?.cursor?.generationSequence, 1);
 
         const second = await analytics.summarize({ windowMs: 20_000 });
         assert.equal(second.ingestion?.indexedEvents, 0);
         assert.equal(second.indexedRows, 2);
         assert.deepEqual(requestedOffsets, [0, 300]);
+        assert.equal(
+            Number(
+                db.prepare('SELECT COUNT(DISTINCT source_generation) AS count FROM copilot_mcp_round_trip_events').get()
+                    .count,
+            ),
+            1,
+        );
 
         const includingSynthetic = await analytics.summarize({ windowMs: 20_000, includeSynthetic: true, sync: false });
         assert.equal(includingSynthetic.indexedRows, 3);
         assert.deepEqual(includingSynthetic.failures.byCode, { ERR_PATCH_NOT_FOUND: 1 });
+    });
+
+    it('filters bounded summaries by runtime source binding before computing completeness and tool coverage', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        const events = [
+            entry(0, {
+                ts: iso(90_000),
+                event: 'tool_call_started',
+                tool: 'promoted_tool',
+                callId: 'promoted-a',
+                runtimeSourceBinding: 'controlled-promotion',
+                runtimeSourceFingerprint: 'a'.repeat(64),
+            }),
+            entry(100, {
+                ts: iso(91_000),
+                event: 'tool_call_completed',
+                tool: 'promoted_tool',
+                callId: 'promoted-a',
+                runtimeSourceBinding: 'controlled-promotion',
+                runtimeSourceFingerprint: 'a'.repeat(64),
+            }),
+            entry(200, {
+                ts: iso(92_000),
+                event: 'tool_call_started',
+                tool: 'manual_tool',
+                callId: 'manual-a',
+                runtimeSourceBinding: 'manual-unbound',
+            }),
+            entry(300, {
+                ts: iso(93_000),
+                event: 'tool_call_completed',
+                tool: 'manual_tool',
+                callId: 'manual-a',
+                runtimeSourceBinding: 'manual-unbound',
+            }),
+        ];
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            maxSummaryRows: 2,
+            readSlice: async ({ offset = 0 } = {}) =>
+                offset === 0
+                    ? auditSlice({ offset: 0, nextOffset: 400, fileBytes: 400, entries: events })
+                    : emptySlice(offset, 'dev:ino-a', 400),
+        });
+
+        const unfiltered = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(unfiltered.completeness.rowsEligible, 4);
+        assert.equal(unfiltered.completeness.truncated, true);
+        assert.deepEqual(unfiltered.toolStarts, [{ tool: 'manual_tool', count: 1 }]);
+
+        const promoted = await analytics.summarize({
+            windowMs: 20_000,
+            sync: false,
+            runtimeSourceBinding: 'controlled-promotion',
+        });
+        assert.deepEqual(promoted.queryScope, {
+            includeSynthetic: false,
+            runtimeSourceBinding: 'controlled-promotion',
+        });
+        assert.deepEqual(promoted.completeness, {
+            rowsEligible: 2,
+            rowsAnalyzed: 2,
+            maxRows: 2,
+            truncated: false,
+            selection: 'complete-window',
+            coverageRatio: 1,
+        });
+        assert.deepEqual(promoted.toolStarts, [{ tool: 'promoted_tool', count: 1 }]);
+        assert.equal(promoted.callPairing.startedCallCount, 1);
+        assert.equal(promoted.callPairing.pairedCallCount, 1);
+
+        await assert.rejects(
+            () => analytics.summarize({ windowMs: 20_000, sync: false, runtimeSourceBinding: 'bad binding' }),
+            /bounded machine-like source binding/u,
+        );
+    });
+
+    it('keeps machine-level tool-start coverage above the public top-100 display cap', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        const events = Array.from({ length: 130 }, (_, index) =>
+            entry(index * 100, {
+                ts: iso(90_000 + index),
+                event: 'tool_call_started',
+                tool: `historical_tool_${String(index).padStart(3, '0')}`,
+                callId: `call-${String(index)}`,
+                runtimeSourceBinding: 'controlled-promotion',
+            }),
+        );
+        const fileBytes = events.length * 100;
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            readSlice: async ({ offset = 0 } = {}) =>
+                offset === 0
+                    ? auditSlice({ offset: 0, nextOffset: fileBytes, fileBytes, entries: events })
+                    : emptySlice(offset, 'dev:ino-a', fileBytes),
+        });
+        const report = await analytics.summarize({
+            windowMs: 20_000,
+            top: 500,
+            runtimeSourceBinding: 'controlled-promotion',
+        });
+        assert.equal(report.toolStarts.length, 130);
+        assert.equal(report.toolStarts[0]?.count, 1);
+        assert.equal(report.queryScope?.runtimeSourceBinding, 'controlled-promotion');
     });
 
     it('bounds background-style sync work per call without reducing explicit catch-up capacity', async () => {
@@ -1189,22 +1406,14 @@ describe('MCP incremental round-trip analytics v6', () => {
         const readSlice = async ({ offset = 0 } = {}) => {
             offsets.push(offset);
             const nextOffset = Math.min(300, offset + 100);
-            return {
-                ok: true,
-                fileIdentity: 'dev:ino-budget',
-                fileBytes: 300,
-                requestedOffset: offset,
-                startOffset: offset,
+            return auditSlice({
+                offset,
                 nextOffset,
-                bytesRead: nextOffset - offset,
+                fileBytes: 300,
+                physicalFileIdentity: 'dev:ino-budget',
+                lineage: 'budget-lineage',
                 complete: nextOffset >= 300,
-                resetRequired: false,
-                parsedEvents: 0,
-                invalidLines: 0,
-                entries: [],
-                events: [],
-                error: null,
-            };
+            });
         };
         const analytics = createMcpRoundTripAnalytics({
             db: adaptBetterSqliteDatabase(db),
@@ -1219,6 +1428,15 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(bounded.complete, false);
         assert.equal(bounded.lagBytes, 200);
         assert.equal(bounded.cursor?.byteOffset, 100);
+        const duringCatchUp = readMcpRoundTripAnalyticsSnapshot({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            windowMs: 20_000,
+        });
+        assert.equal(duringCatchUp.available, false);
+        assert.equal(duringCatchUp.sourceIntegrity?.status, 'materializing');
+        assert.equal(duringCatchUp.sourceIntegrity?.lagBytes, 200);
+        assert.match(String(duringCatchUp.authority), /v11-catch-up-required/u);
 
         const catchUp = await analytics.sync();
         assert.equal(catchUp.chunkBudget, 3);
@@ -1226,31 +1444,72 @@ describe('MCP incremental round-trip analytics v6', () => {
         assert.equal(catchUp.complete, true);
         assert.equal(catchUp.lagBytes, 0);
         assert.equal(catchUp.cursor?.byteOffset, 300);
+        const afterCatchUp = readMcpRoundTripAnalyticsSnapshot({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            windowMs: 20_000,
+        });
+        assert.equal(afterCatchUp.available, true);
+        assert.equal(afterCatchUp.sourceIntegrity?.status, 'materialized');
+        assert.equal(afterCatchUp.sourceIntegrity?.lagBytes, 0);
         assert.deepEqual(offsets, [0, 100, 200]);
     });
 
-    it('keeps old-identity history while restarting ingestion at zero for a rotated audit file', async () => {
+    it('does not publish a partial analytics window when explicit sync exhausts its catch-up budget', async () => {
         const db = createDb();
         const nowMs = 100_000;
-        let generation = 'a';
-        /** @type {{ generation: string; offset: number }[]} */
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            maxChunks: 1,
+            readSlice: async ({ offset = 0 } = {}) => {
+                const nextOffset = Math.min(200, offset + 100);
+                return auditSlice({
+                    offset,
+                    nextOffset,
+                    fileBytes: 200,
+                    lineage: 'partial-catch-up',
+                    entries:
+                        offset === 0
+                            ? [
+                                  entry(0, {
+                                      ts: iso(90_000),
+                                      event: 'tool_call_started',
+                                      tool: 'must-not-publish-yet',
+                                      callId: 'a',
+                                  }),
+                              ]
+                            : [],
+                    complete: nextOffset >= 200,
+                });
+            },
+        });
+        const report = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(report.available, false);
+        assert.equal(report.indexedRows, 0);
+        assert.equal(report.ingestion?.complete, false);
+        assert.equal(report.sourceIntegrity?.status, 'materializing');
+        assert.equal(report.sourceIntegrity?.lagBytes, 100);
+        assert.match(String(report.authority), /v11-catch-up-required/u);
+        assert.equal(Number(db.prepare('SELECT COUNT(*) AS count FROM copilot_mcp_round_trip_events').get().count), 1);
+    });
+
+    it('treats byte-identical physical replacement as rebind of the same generation without prefix replay', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        let phase = 'a';
+        /** @type {{phase:string;offset:number}[]} */
         const calls = [];
         const readSlice = async ({ offset = 0 } = {}) => {
-            calls.push({ generation, offset });
-            if (generation === 'a') {
+            calls.push({ phase, offset });
+            if (phase === 'a') {
                 return offset === 0
-                    ? {
-                          ok: true,
-                          fileIdentity: 'dev:ino-a',
-                          fileBytes: 100,
-                          requestedOffset: 0,
-                          startOffset: 0,
+                    ? auditSlice({
+                          offset: 0,
                           nextOffset: 100,
-                          bytesRead: 100,
-                          complete: true,
-                          resetRequired: false,
-                          parsedEvents: 1,
-                          invalidLines: 0,
+                          fileBytes: 100,
+                          physicalFileIdentity: 'dev:ino-a',
+                          lineage: 'shared-prefix',
                           entries: [
                               entry(0, {
                                   ts: iso(90_000),
@@ -1259,40 +1518,118 @@ describe('MCP incremental round-trip analytics v6', () => {
                                   callId: 'a',
                               }),
                           ],
-                          events: [],
-                          error: null,
-                      }
-                    : emptySlice(offset, 'dev:ino-a', 100);
+                      })
+                    : emptySlice(offset, 'dev:ino-a', 100, 'shared-prefix');
+            }
+            return offset === 100
+                ? auditSlice({
+                      offset: 100,
+                      nextOffset: 120,
+                      fileBytes: 120,
+                      physicalFileIdentity: 'otherdev:otherino',
+                      lineage: 'shared-prefix',
+                      entries: [
+                          entry(100, {
+                              ts: iso(95_000),
+                              event: 'tool_call_started',
+                              tool: 'repo_search_text',
+                              callId: 'b',
+                          }),
+                      ],
+                  })
+                : emptySlice(offset, 'otherdev:otherino', 120, 'shared-prefix');
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            readPrefixProof: async ({ offset }) => ({
+                ok: true,
+                sourcePresent: true,
+                prefixAvailable: true,
+                physicalFileIdentity: phase === 'a' ? 'dev:ino-a' : 'otherdev:otherino',
+                fileBytes: phase === 'a' ? 100 : 120,
+                offset,
+                bytesRead: offset,
+                continuityAtOffset: continuityAnchor(offset, 'shared-prefix'),
+                sequenceAtOffset: sequenceProof(offset),
+                error: null,
+            }),
+            now: () => nowMs,
+            maxChunks: 3,
+        });
+        const first = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(first.indexedRows, 1);
+        phase = 'b';
+        const second = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(second.ingestion?.reset, false);
+        assert.equal(second.ingestion?.rebound, true);
+        assert.equal(second.ingestion?.rebindsThisSync, 1);
+        assert.equal(second.ingestion?.newGenerationsThisSync, 0);
+        assert.equal(second.ingestion?.cursor?.generationSequence, 1);
+        assert.equal(second.ingestion?.cursor?.rebindCount, 1);
+        assert.equal(second.ingestion?.cursor?.physicalFileIdentity, 'otherdev:otherino');
+        assert.equal(second.indexedRows, 2);
+        assert.deepEqual(second.toolStarts.map((item) => item.tool).sort(), ['repo_read_file', 'repo_search_text']);
+        assert.deepEqual(calls, [
+            { phase: 'a', offset: 0 },
+            { phase: 'b', offset: 100 },
+        ]);
+        const third = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(third.ingestion?.indexedEvents, 0);
+        assert.equal(third.indexedRows, 2);
+        assert.equal(
+            Number(
+                db.prepare('SELECT COUNT(DISTINCT source_generation) AS count FROM copilot_mcp_round_trip_events').get()
+                    .count,
+            ),
+            1,
+        );
+    });
+
+    it('starts a new preserved generation when a new physical file fails the cursor continuity anchor', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        let phase = 'a';
+        const readSlice = async ({ offset = 0 } = {}) => {
+            if (phase === 'a') {
+                return offset === 0
+                    ? auditSlice({
+                          offset: 0,
+                          nextOffset: 100,
+                          fileBytes: 100,
+                          physicalFileIdentity: 'dev:ino-a',
+                          lineage: 'generation-a',
+                          entries: [
+                              entry(0, {
+                                  ts: iso(90_000),
+                                  event: 'tool_call_started',
+                                  tool: 'repo_read_file',
+                                  callId: 'a',
+                              }),
+                          ],
+                      })
+                    : emptySlice(offset, 'dev:ino-a', 100, 'generation-a');
             }
             if (offset > 0) {
-                return {
-                    ...emptySlice(offset, 'dev:ino-b', 120),
-                    complete: false,
-                };
+                return auditSlice({
+                    offset,
+                    nextOffset: 120,
+                    fileBytes: 120,
+                    physicalFileIdentity: 'dev:ino-b',
+                    lineage: 'generation-b',
+                    complete: true,
+                });
             }
-            return {
-                ok: true,
-                fileIdentity: 'dev:ino-b',
-                fileBytes: 120,
-                requestedOffset: 0,
-                startOffset: 0,
+            return auditSlice({
+                offset: 0,
                 nextOffset: 120,
-                bytesRead: 120,
-                complete: true,
-                resetRequired: false,
-                parsedEvents: 1,
-                invalidLines: 0,
+                fileBytes: 120,
+                physicalFileIdentity: 'dev:ino-b',
+                lineage: 'generation-b',
                 entries: [
-                    entry(0, {
-                        ts: iso(95_000),
-                        event: 'tool_call_started',
-                        tool: 'repo_search_text',
-                        callId: 'b',
-                    }),
+                    entry(0, { ts: iso(95_000), event: 'tool_call_started', tool: 'repo_search_text', callId: 'b' }),
                 ],
-                events: [],
-                error: null,
-            };
+            });
         };
         const analytics = createMcpRoundTripAnalytics({
             db: adaptBetterSqliteDatabase(db),
@@ -1300,18 +1637,268 @@ describe('MCP incremental round-trip analytics v6', () => {
             now: () => nowMs,
             maxChunks: 3,
         });
-        const first = await analytics.summarize({ windowMs: 20_000 });
-        assert.equal(first.indexedRows, 1);
-        generation = 'b';
+        await analytics.summarize({ windowMs: 20_000 });
+        phase = 'b';
         const second = await analytics.summarize({ windowMs: 20_000 });
         assert.equal(second.ingestion?.reset, true);
-        assert.equal(second.ingestion?.cursor?.fileIdentity, 'dev:ino-b');
+        assert.equal(second.ingestion?.newGenerationsThisSync, 1);
+        assert.equal(second.ingestion?.cursor?.generationSequence, 2);
+        assert.equal(second.ingestion?.cursor?.physicalChangeGenerationCount, 1);
         assert.equal(second.indexedRows, 2);
-        assert.deepEqual(second.toolStarts.map((item) => item.tool).sort(), ['repo_read_file', 'repo_search_text']);
-        assert.deepEqual(calls, [
-            { generation: 'a', offset: 0 },
-            { generation: 'b', offset: 100 },
-            { generation: 'b', offset: 0 },
+        const generations = db
+            .prepare(
+                'SELECT source_generation,COUNT(*) AS count FROM copilot_mcp_round_trip_events GROUP BY source_generation ORDER BY source_generation',
+            )
+            .all();
+        assert.deepEqual(generations, [
+            { source_generation: 'mcp-audit:v11:g1', count: 1 },
+            { source_generation: 'mcp-audit:v11:g2', count: 1 },
         ]);
+    });
+
+    it('preserves prior history on same-physical copytruncate-like shrink', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        let phase = 'a';
+        const readSlice = async ({ offset = 0 } = {}) => {
+            if (phase === 'a') {
+                return offset === 0
+                    ? auditSlice({
+                          offset: 0,
+                          nextOffset: 100,
+                          fileBytes: 100,
+                          physicalFileIdentity: 'dev:ino-a',
+                          lineage: 'generation-a',
+                          entries: [
+                              entry(0, {
+                                  ts: iso(90_000),
+                                  event: 'tool_call_started',
+                                  tool: 'repo_read_file',
+                                  callId: 'a',
+                              }),
+                          ],
+                      })
+                    : emptySlice(offset, 'dev:ino-a', 100, 'generation-a');
+            }
+            if (offset > 50) {
+                return auditSlice({
+                    offset,
+                    nextOffset: offset,
+                    fileBytes: 50,
+                    physicalFileIdentity: 'dev:ino-a',
+                    lineage: 'generation-b',
+                    offsetPastEnd: true,
+                });
+            }
+            return auditSlice({
+                offset: 0,
+                nextOffset: 50,
+                fileBytes: 50,
+                physicalFileIdentity: 'dev:ino-a',
+                lineage: 'generation-b',
+                entries: [
+                    entry(0, { ts: iso(95_000), event: 'tool_call_started', tool: 'repo_search_text', callId: 'b' }),
+                ],
+            });
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            maxChunks: 3,
+        });
+        await analytics.summarize({ windowMs: 20_000 });
+        phase = 'b';
+        const second = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(second.ingestion?.cursor?.generationSequence, 2);
+        assert.equal(second.ingestion?.cursor?.truncationGenerationCount, 1);
+        assert.equal(second.indexedRows, 2);
+        assert.equal(
+            Number(
+                db.prepare('SELECT COUNT(DISTINCT source_generation) AS count FROM copilot_mcp_round_trip_events').get()
+                    .count,
+            ),
+            2,
+        );
+    });
+
+    it('preserves prior history on same-physical rewrite/regrow with a divergent anchor', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        let phase = 'a';
+        const readSlice = async ({ offset = 0 } = {}) => {
+            if (phase === 'a') {
+                return offset === 0
+                    ? auditSlice({
+                          offset: 0,
+                          nextOffset: 100,
+                          fileBytes: 100,
+                          physicalFileIdentity: 'dev:ino-a',
+                          lineage: 'generation-a',
+                          entries: [
+                              entry(0, {
+                                  ts: iso(90_000),
+                                  event: 'tool_call_started',
+                                  tool: 'repo_read_file',
+                                  callId: 'a',
+                              }),
+                          ],
+                      })
+                    : emptySlice(offset, 'dev:ino-a', 100, 'generation-a');
+            }
+            if (offset > 0) {
+                return auditSlice({
+                    offset,
+                    nextOffset: 140,
+                    fileBytes: 140,
+                    physicalFileIdentity: 'dev:ino-a',
+                    lineage: 'rewritten-prefix',
+                });
+            }
+            return auditSlice({
+                offset: 0,
+                nextOffset: 140,
+                fileBytes: 140,
+                physicalFileIdentity: 'dev:ino-a',
+                lineage: 'rewritten-prefix',
+                entries: [
+                    entry(0, { ts: iso(95_000), event: 'tool_call_started', tool: 'repo_search_text', callId: 'b' }),
+                ],
+            });
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            maxChunks: 3,
+        });
+        await analytics.summarize({ windowMs: 20_000 });
+        phase = 'b';
+        const second = await analytics.summarize({ windowMs: 20_000 });
+        assert.equal(second.ingestion?.cursor?.generationSequence, 2);
+        assert.equal(second.ingestion?.cursor?.rewriteGenerationCount, 1);
+        assert.equal(second.ingestion?.cursor?.physicalChangeGenerationCount, 0);
+        assert.equal(second.indexedRows, 2);
+    });
+
+    it('preserves the certified cursor while the source path is temporarily absent', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        let present = true;
+        const readSlice = async ({ offset = 0 } = {}) => {
+            if (!present) return auditSlice({ offset, nextOffset: offset, sourcePresent: false });
+            return offset === 0
+                ? auditSlice({
+                      offset: 0,
+                      nextOffset: 100,
+                      fileBytes: 100,
+                      entries: [
+                          entry(0, {
+                              ts: iso(90_000),
+                              event: 'tool_call_started',
+                              tool: 'repo_read_file',
+                              callId: 'a',
+                          }),
+                      ],
+                  })
+                : emptySlice(offset, 'dev:ino-a', 100);
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+        });
+        const first = await analytics.sync();
+        assert.equal(first.cursor?.byteOffset, 100);
+        present = false;
+        const second = await analytics.sync();
+        assert.equal(second.sourcePresent, false);
+        assert.equal(second.cursor?.byteOffset, 100);
+        assert.equal(second.cursor?.generationSequence, 1);
+        assert.equal(second.newGenerationsThisSync, 0);
+    });
+
+    it('rolls back event rows and cursor together when cursor persistence fails', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        const event = entry(0, { ts: iso(90_000), event: 'tool_call_started', tool: 'repo_read_file', callId: 'a' });
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            now: () => nowMs,
+            readSlice: async ({ offset = 0 } = {}) =>
+                offset === 0
+                    ? auditSlice({ offset: 0, nextOffset: 100, fileBytes: 100, entries: [event] })
+                    : emptySlice(offset, 'dev:ino-a', 100),
+        });
+        db.exec(`
+            CREATE TRIGGER fail_round_trip_cursor_insert
+            BEFORE INSERT ON copilot_mcp_round_trip_cursor
+            BEGIN
+                SELECT RAISE(ABORT, 'fail-cursor');
+            END;
+        `);
+        await assert.rejects(() => analytics.sync(), /fail-cursor/u);
+        assert.equal(Number(db.prepare('SELECT COUNT(*) AS count FROM copilot_mcp_round_trip_events').get().count), 0);
+        assert.equal(Number(db.prepare('SELECT COUNT(*) AS count FROM copilot_mcp_round_trip_cursor').get().count), 0);
+        db.exec('DROP TRIGGER fail_round_trip_cursor_insert');
+        const retry = await analytics.sync();
+        assert.equal(retry.indexedEvents, 1);
+        assert.equal(Number(db.prepare('SELECT COUNT(*) AS count FROM copilot_mcp_round_trip_events').get().count), 1);
+        assert.equal(retry.cursor?.byteOffset, 100);
+    });
+
+    it('applies retention by timestamp across logical generations rather than deleting by physical identity', async () => {
+        const db = createDb();
+        const nowMs = 10_000_000;
+        let phase = 'a';
+        const readSlice = async ({ offset = 0 } = {}) => {
+            if (phase === 'a') {
+                return offset === 0
+                    ? auditSlice({
+                          offset: 0,
+                          nextOffset: 100,
+                          fileBytes: 100,
+                          lineage: 'old-generation',
+                          entries: [
+                              entry(0, {
+                                  ts: iso(1_000_000),
+                                  event: 'tool_call_started',
+                                  tool: 'old_tool',
+                                  callId: 'a',
+                              }),
+                          ],
+                      })
+                    : emptySlice(offset, 'dev:ino-a', 100, 'old-generation');
+            }
+            if (offset > 0) {
+                return auditSlice({
+                    offset,
+                    nextOffset: 120,
+                    fileBytes: 120,
+                    physicalFileIdentity: 'dev:ino-b',
+                    lineage: 'new-generation',
+                });
+            }
+            return auditSlice({
+                offset: 0,
+                nextOffset: 120,
+                fileBytes: 120,
+                physicalFileIdentity: 'dev:ino-b',
+                lineage: 'new-generation',
+                entries: [entry(0, { ts: iso(9_900_000), event: 'tool_call_started', tool: 'new_tool', callId: 'b' })],
+            });
+        };
+        const analytics = createMcpRoundTripAnalytics({
+            db: adaptBetterSqliteDatabase(db),
+            readSlice,
+            now: () => nowMs,
+            retentionMs: 3_600_000,
+            maxChunks: 3,
+        });
+        await analytics.sync();
+        phase = 'b';
+        await analytics.sync();
+        const rows = db.prepare('SELECT tool,source_generation FROM copilot_mcp_round_trip_events ORDER BY tool').all();
+        assert.deepEqual(rows, [{ tool: 'new_tool', source_generation: 'mcp-audit:v11:g2' }]);
     });
 });
