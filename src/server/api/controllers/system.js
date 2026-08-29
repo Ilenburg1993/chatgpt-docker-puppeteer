@@ -66,7 +66,7 @@ router.post('/agents/:id/command', async (req, res) => {
 
     try {
         // Auditoria obrigatória da intenção de comando administrativo
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('REMOTE_COMMAND', {
             target_robot: id,
             command,
@@ -168,7 +168,7 @@ router.post('/control/:action', async (req, res) => {
                 request_id: req.id,
             });
         }
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('PROCESS_CONTROL', { action, source: 'API', request_id: req.id });
         const result = await system.controlAgent(action);
         return res.json({

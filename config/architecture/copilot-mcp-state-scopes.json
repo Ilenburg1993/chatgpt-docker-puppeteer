@@ -258,31 +258,6 @@
       "rationale": "Auto-build retains at most eight diagnostic generation states; active promises drain on settle and process-host owns cancellation."
     },
     {
-      "path": "src/copilot/mcp/indexing/repository/orphan-imports.js",
-      "ownerId": "mcp.indexing.repository",
-      "scope": "workspace",
-      "lifecycle": "bounded-cache",
-      "boundedness": "single-value",
-      "bound": "single workspace-root TTL snapshot",
-      "resetOrDispose": null,
-      "migrationTarget": false,
-      "declarations": [
-        {
-          "name": "packageImportEntriesPromise",
-          "kind": "let"
-        },
-        {
-          "name": "packageImportEntriesExpiresAtMs",
-          "kind": "let"
-        },
-        {
-          "name": "packageImportEntriesWorkspaceRoot",
-          "kind": "let"
-        }
-      ],
-      "rationale": "Package import metadata is one TTL-cached workspace snapshot."
-    },
-    {
       "path": "src/copilot/mcp/integrations/model-gateway/live-runs/readiness.js",
       "ownerId": "mcp.integrations.model-gateway.live-runs",
       "scope": "process",
@@ -376,9 +351,13 @@
         {
           "name": "nodePtyModule",
           "kind": "let"
+        },
+        {
+          "name": "terminalProcessExitCleanupInstalled",
+          "kind": "let"
         }
       ],
-      "rationale": "Terminal session registry is hard-bounded and physically pruned; node-pty is one lazy module binding."
+      "rationale": "Terminal session registry is hard-bounded and physically pruned; node-pty is one lazy module binding; process-exit cleanup installs exactly once per runtime."
     },
     {
       "path": "src/copilot/mcp/registry/runtime.js",

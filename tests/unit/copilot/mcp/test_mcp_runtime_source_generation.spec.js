@@ -8,6 +8,7 @@ import { describe, it } from 'vitest';
 import { createMcpProcessConfig } from '#copilot/mcp/public/composition/process-config';
 import {
     MCP_RUNTIME_SOURCE_PROMOTION_ENV,
+    buildMcpRuntimeGenerationCertificate,
     buildMcpRuntimeSourcePromotionEnvironment,
     createMcpRuntimeSourceGeneration,
     projectMcpRuntimeSourcePromotionEnvironment,
@@ -56,6 +57,42 @@ describe('MCP runtime source generation authority', () => {
         assert.throws(() => {
             /** @type {any} */ (generation).sourceBinding = 'manual-unbound';
         }, TypeError);
+    });
+
+    it('projects a stable certificate that binds process, source proof and registered tool surface', () => {
+        const generation = createMcpRuntimeSourceGeneration(buildMcpRuntimeSourcePromotionEnvironment(PROMOTION));
+        const first = buildMcpRuntimeGenerationCertificate(generation, {
+            evidence: 'operation-context-frozen',
+            toolCount: 84,
+            descriptorFingerprint: 'b'.repeat(64),
+            descriptorFingerprintKind: 'test-wire-descriptor-set-sha256',
+        });
+        const same = buildMcpRuntimeGenerationCertificate(generation, {
+            evidence: 'operation-context-frozen',
+            toolCount: 84,
+            descriptorFingerprint: 'b'.repeat(64),
+            descriptorFingerprintKind: 'test-wire-descriptor-set-sha256',
+        });
+        const changedSurface = buildMcpRuntimeGenerationCertificate(generation, {
+            evidence: 'operation-context-frozen',
+            toolCount: 85,
+            descriptorFingerprint: 'c'.repeat(64),
+            descriptorFingerprintKind: 'test-wire-descriptor-set-sha256',
+        });
+
+        assert.equal(first.runtime.runtimeEpochId, generation.runtimeEpochId);
+        assert.equal(first.runtime.nodeVersion, process.version);
+        assert.equal(first.source.proof, 'source-barrier-bound');
+        assert.equal(first.source.sourceBarrierFingerprint, PROMOTION.sourceBarrierFingerprint);
+        assert.equal(first.toolSurface.toolCount, 84);
+        assert.equal(first.toolSurface.evidence, 'operation-context-frozen');
+        assert.match(first.certificateFingerprint, /^[a-f0-9]{64}$/u);
+        assert.equal(first.certificateFingerprint, same.certificateFingerprint);
+        assert.notEqual(first.certificateFingerprint, changedSurface.certificateFingerprint);
+        assert.equal(Object.isFrozen(first), true);
+        assert.equal(Object.isFrozen(first.runtime), true);
+        assert.equal(Object.isFrozen(first.source), true);
+        assert.equal(Object.isFrozen(first.toolSurface), true);
     });
 
     it('rejects partial or malformed promotion metadata instead of degrading ambiguously', () => {

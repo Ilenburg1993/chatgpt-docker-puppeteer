@@ -12,10 +12,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 11.336,
-        "wallMs": 66.473,
-        "rssMiB": 58.695,
-        "rssDeltaMiB": 3
+        "importMs": 3.66,
+        "wallMs": 31.256,
+        "rssMiB": 46.102,
+        "rssDeltaMiB": 4
       }
     },
     {
@@ -23,10 +23,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.864,
-        "wallMs": 57.791,
-        "rssMiB": 56.199,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.594,
+        "wallMs": 28.287,
+        "rssMiB": 45.801,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -34,10 +34,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.27,
-        "wallMs": 57.383,
-        "rssMiB": 56.352,
-        "rssDeltaMiB": 0.75
+        "importMs": 2.782,
+        "wallMs": 27.629,
+        "rssMiB": 45.809,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -45,10 +45,10 @@
       "audience": "composition",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.904,
-        "wallMs": 56.002,
-        "rssMiB": 56.23,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.673,
+        "wallMs": 28.392,
+        "rssMiB": 45.828,
+        "rssDeltaMiB": 3.75
       }
     },
     {
@@ -56,10 +56,10 @@
       "audience": "composition",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.271,
-        "wallMs": 28.847,
-        "rssMiB": 45.152,
-        "rssDeltaMiB": 3.25
+        "importMs": 2.295,
+        "wallMs": 27.706,
+        "rssMiB": 45.195,
+        "rssDeltaMiB": 3.125
       }
     },
     {
@@ -67,10 +67,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 7.859,
-        "wallMs": 61.98,
-        "rssMiB": 58.059,
-        "rssDeltaMiB": 2.25
+        "importMs": 14.737,
+        "wallMs": 39.236,
+        "rssMiB": 52.418,
+        "rssDeltaMiB": 10.434
       }
     },
     {
@@ -78,10 +78,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 209.221,
-        "wallMs": 268.889,
-        "rssMiB": 135.125,
-        "rssDeltaMiB": 79.289
+        "importMs": 301.043,
+        "wallMs": 336.183,
+        "rssMiB": 203.727,
+        "rssDeltaMiB": 161.707
       }
     },
     {
@@ -89,10 +89,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 200.747,
-        "wallMs": 260.572,
-        "rssMiB": 133.129,
-        "rssDeltaMiB": 77.355
+        "importMs": 290.707,
+        "wallMs": 324.038,
+        "rssMiB": 200.609,
+        "rssDeltaMiB": 158.664
       }
     },
     {
@@ -100,10 +100,10 @@
       "audience": "composition",
       "costTier": "standard",
       "metrics": {
-        "importMs": 15.542,
-        "wallMs": 68.996,
-        "rssMiB": 60.57,
-        "rssDeltaMiB": 4.875
+        "importMs": 12.516,
+        "wallMs": 40.127,
+        "rssMiB": 49.809,
+        "rssDeltaMiB": 7.809
       }
     },
     {
@@ -111,10 +111,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 164.071,
-        "wallMs": 220.824,
-        "rssMiB": 121.914,
-        "rssDeltaMiB": 66.23
+        "importMs": 220.953,
+        "wallMs": 253.095,
+        "rssMiB": 179.824,
+        "rssDeltaMiB": 137.898
       }
     },
     {
@@ -122,10 +122,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 120.586,
-        "wallMs": 179.69,
-        "rssMiB": 119.527,
-        "rssDeltaMiB": 63.91
+        "importMs": 148.518,
+        "wallMs": 176.284,
+        "rssMiB": 126.652,
+        "rssDeltaMiB": 84.715
       }
     },
     {
@@ -133,10 +133,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 121.641,
-        "wallMs": 178.426,
-        "rssMiB": 119.926,
-        "rssDeltaMiB": 64.25
+        "importMs": 142.268,
+        "wallMs": 172.286,
+        "rssMiB": 125.035,
+        "rssDeltaMiB": 83
       }
     },
     {
@@ -144,10 +144,10 @@
       "audience": "composition",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 52.779,
-        "wallMs": 107.996,
-        "rssMiB": 77.801,
-        "rssDeltaMiB": 22.145
+        "importMs": 73.155,
+        "wallMs": 100.886,
+        "rssMiB": 85.559,
+        "rssDeltaMiB": 43.613
       }
     },
     {
@@ -155,10 +155,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.337,
-        "wallMs": 55.662,
-        "rssMiB": 56.367,
-        "rssDeltaMiB": 0.625
+        "importMs": 7.279,
+        "wallMs": 31.872,
+        "rssMiB": 48.973,
+        "rssDeltaMiB": 7
       }
     },
     {
@@ -166,10 +166,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.117,
-        "wallMs": 56.906,
-        "rssMiB": 55.965,
-        "rssDeltaMiB": 0.5
+        "importMs": 3.004,
+        "wallMs": 32.231,
+        "rssMiB": 45.953,
+        "rssDeltaMiB": 4
       }
     },
     {
@@ -177,10 +177,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.602,
-        "wallMs": 54.88,
-        "rssMiB": 56.344,
-        "rssDeltaMiB": 0.625
+        "importMs": 2.558,
+        "wallMs": 28.903,
+        "rssMiB": 45.809,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -188,10 +188,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.763,
-        "wallMs": 53.378,
-        "rssMiB": 56.328,
-        "rssDeltaMiB": 0.625
+        "importMs": 2.924,
+        "wallMs": 29.682,
+        "rssMiB": 45.84,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -199,10 +199,10 @@
       "audience": "runtime",
       "costTier": "standard",
       "metrics": {
-        "importMs": 12.231,
-        "wallMs": 69.613,
-        "rssMiB": 58.98,
-        "rssDeltaMiB": 3.25
+        "importMs": 15.497,
+        "wallMs": 42.635,
+        "rssMiB": 51.137,
+        "rssDeltaMiB": 9.125
       }
     },
     {
@@ -210,10 +210,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 8.056,
-        "wallMs": 64.786,
-        "rssMiB": 58.246,
-        "rssDeltaMiB": 2.5
+        "importMs": 18.173,
+        "wallMs": 41.847,
+        "rssMiB": 52.758,
+        "rssDeltaMiB": 10.75
       }
     },
     {
@@ -221,10 +221,32 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 8.683,
-        "wallMs": 64.837,
-        "rssMiB": 57.66,
-        "rssDeltaMiB": 2
+        "importMs": 4.233,
+        "wallMs": 30.912,
+        "rssMiB": 46.387,
+        "rssDeltaMiB": 4.375
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/indexing/graph",
+      "audience": "runtime",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 2.963,
+        "wallMs": 29.65,
+        "rssMiB": 45.773,
+        "rssDeltaMiB": 3.875
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/indexing/module-resolution",
+      "audience": "runtime",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 64.368,
+        "wallMs": 92.745,
+        "rssMiB": 85.176,
+        "rssDeltaMiB": 43.184
       }
     },
     {
@@ -232,10 +254,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 17.452,
-        "wallMs": 71.018,
-        "rssMiB": 60.172,
-        "rssDeltaMiB": 4.375
+        "importMs": 18.74,
+        "wallMs": 45.049,
+        "rssMiB": 52.801,
+        "rssDeltaMiB": 10.797
       }
     },
     {
@@ -243,10 +265,10 @@
       "audience": "runtime",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 160.059,
-        "wallMs": 217.308,
-        "rssMiB": 121.293,
-        "rssDeltaMiB": 65.641
+        "importMs": 218.358,
+        "wallMs": 252.65,
+        "rssMiB": 179.371,
+        "rssDeltaMiB": 137.398
       }
     },
     {
@@ -254,10 +276,10 @@
       "audience": "runtime",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 125.929,
-        "wallMs": 183.413,
-        "rssMiB": 119.793,
-        "rssDeltaMiB": 64.145
+        "importMs": 154.63,
+        "wallMs": 183.623,
+        "rssMiB": 128,
+        "rssDeltaMiB": 85.949
       }
     },
     {
@@ -265,10 +287,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.523,
-        "wallMs": 55.289,
-        "rssMiB": 55.965,
-        "rssDeltaMiB": 0.625
+        "importMs": 4.233,
+        "wallMs": 30.781,
+        "rssMiB": 46.176,
+        "rssDeltaMiB": 4.125
       }
     },
     {
@@ -276,10 +298,10 @@
       "audience": "runtime",
       "costTier": "heavy",
       "metrics": {
-        "importMs": 134.582,
-        "wallMs": 194.398,
-        "rssMiB": 119.953,
-        "rssDeltaMiB": 64.281
+        "importMs": 157.501,
+        "wallMs": 191.077,
+        "rssMiB": 128.945,
+        "rssDeltaMiB": 86.855
       }
     },
     {
@@ -287,10 +309,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.986,
-        "wallMs": 55.147,
-        "rssMiB": 55.992,
-        "rssDeltaMiB": 0.5
+        "importMs": 3.129,
+        "wallMs": 28.985,
+        "rssMiB": 45.828,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -298,10 +320,10 @@
       "audience": "composition",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.915,
-        "wallMs": 57.558,
-        "rssMiB": 56.297,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.745,
+        "wallMs": 28.106,
+        "rssMiB": 45.801,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -309,10 +331,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 17.856,
-        "wallMs": 75.51,
-        "rssMiB": 60.656,
-        "rssDeltaMiB": 4.875
+        "importMs": 15.544,
+        "wallMs": 43.808,
+        "rssMiB": 50.621,
+        "rssDeltaMiB": 8.625
       }
     },
     {
@@ -320,10 +342,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.052,
-        "wallMs": 58.865,
-        "rssMiB": 56.352,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.907,
+        "wallMs": 29.015,
+        "rssMiB": 46.02,
+        "rssDeltaMiB": 4
       }
     },
     {
@@ -331,10 +353,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.12,
-        "wallMs": 57.112,
-        "rssMiB": 56.293,
-        "rssDeltaMiB": 0.625
+        "importMs": 2.946,
+        "wallMs": 28.574,
+        "rssMiB": 45.988,
+        "rssDeltaMiB": 4
       }
     },
     {
@@ -342,10 +364,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.911,
-        "wallMs": 55.691,
-        "rssMiB": 56.031,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.641,
+        "wallMs": 27.239,
+        "rssMiB": 45.809,
+        "rssDeltaMiB": 3.75
       }
     },
     {
@@ -353,10 +375,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.903,
-        "wallMs": 59.345,
-        "rssMiB": 56.367,
-        "rssDeltaMiB": 0.625
+        "importMs": 3.695,
+        "wallMs": 30.647,
+        "rssMiB": 46.301,
+        "rssDeltaMiB": 4.25
       }
     },
     {
@@ -364,10 +386,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 1.866,
-        "wallMs": 55.189,
-        "rssMiB": 56.031,
-        "rssDeltaMiB": 0.5
+        "importMs": 2.683,
+        "wallMs": 29.636,
+        "rssMiB": 45.801,
+        "rssDeltaMiB": 3.875
       }
     },
     {
@@ -375,10 +397,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 20.33,
-        "wallMs": 76.825,
-        "rssMiB": 61.461,
-        "rssDeltaMiB": 6.051
+        "importMs": 31.296,
+        "wallMs": 56.609,
+        "rssMiB": 60.742,
+        "rssDeltaMiB": 18.809
       }
     },
     {
@@ -386,10 +408,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 8.318,
-        "wallMs": 65.071,
-        "rssMiB": 57.695,
-        "rssDeltaMiB": 1.875
+        "importMs": 4.532,
+        "wallMs": 34.419,
+        "rssMiB": 46.809,
+        "rssDeltaMiB": 4.875
       }
     },
     {
@@ -397,10 +419,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 2.828,
-        "wallMs": 56.98,
-        "rssMiB": 56.395,
-        "rssDeltaMiB": 0.625
+        "importMs": 3.776,
+        "wallMs": 32.984,
+        "rssMiB": 46.242,
+        "rssDeltaMiB": 4.25
       }
     },
     {
@@ -408,10 +430,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 3.021,
-        "wallMs": 57.017,
-        "rssMiB": 56.809,
-        "rssDeltaMiB": 1.125
+        "importMs": 5.412,
+        "wallMs": 29.761,
+        "rssMiB": 48.27,
+        "rssDeltaMiB": 6.25
       }
     },
     {
@@ -419,10 +441,10 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 3.616,
-        "wallMs": 59.1,
-        "rssMiB": 57.039,
-        "rssDeltaMiB": 1.25
+        "importMs": 6.528,
+        "wallMs": 31.142,
+        "rssMiB": 49.25,
+        "rssDeltaMiB": 7.25
       }
     },
     {
@@ -430,10 +452,32 @@
       "audience": "runtime",
       "costTier": "micro",
       "metrics": {
-        "importMs": 11.22,
-        "wallMs": 65.333,
-        "rssMiB": 58.434,
-        "rssDeltaMiB": 2.75
+        "importMs": 15.041,
+        "wallMs": 39.815,
+        "rssMiB": 50.563,
+        "rssDeltaMiB": 8.559
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/process/execution",
+      "audience": "runtime",
+      "costTier": "standard",
+      "metrics": {
+        "importMs": 14.316,
+        "wallMs": 39.033,
+        "rssMiB": 50.398,
+        "rssDeltaMiB": 8.375
+      }
+    },
+    {
+      "alias": "#copilot/infra/public/process/supervision",
+      "audience": "runtime",
+      "costTier": "micro",
+      "metrics": {
+        "importMs": 2.637,
+        "wallMs": 29.492,
+        "rssMiB": 45.832,
+        "rssDeltaMiB": 3.75
       }
     },
     {
@@ -441,10 +485,10 @@
       "audience": "runtime",
       "costTier": "standard",
       "metrics": {
-        "importMs": 16.815,
-        "wallMs": 73.363,
-        "rssMiB": 60.063,
-        "rssDeltaMiB": 4.375
+        "importMs": 21.444,
+        "wallMs": 44.423,
+        "rssMiB": 54.309,
+        "rssDeltaMiB": 12.375
       }
     }
   ]

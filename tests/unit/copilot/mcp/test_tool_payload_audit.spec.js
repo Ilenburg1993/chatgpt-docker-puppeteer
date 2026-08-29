@@ -187,7 +187,7 @@ describe('MCP tools/list payload audit', () => {
             operationContext,
         );
         const structured = /** @type {Record<string, any>} */ (result.structuredContent);
-        assert.equal(structured['currentSurface']['toolCount'], 84);
+        assert.equal(structured['currentSurface']['toolCount'], 88);
         assert.equal(structured['comparison']['measurement'], 'sdk-in-memory-tools/list-surface-matrix');
         assert.equal(structured['comparison']['usageSample']['totalObservedCalls'], 170);
         assert.equal(structured['comparison']['surfaces'].length, 6);
@@ -216,8 +216,8 @@ describe('MCP tools/list payload audit', () => {
             sync: false,
             runtimeSourceBinding: 'controlled-promotion',
         });
-        assert.equal(currentTools.length, 84);
-        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 84);
+        assert.equal(currentTools.length, 88);
+        assert.equal(operationContext.capabilities.toolSurface?.tools.length, 88);
     });
 
     it('accepts declared surface aliases and rejects unknown hidden names', () => {

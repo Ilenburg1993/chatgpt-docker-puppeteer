@@ -10,7 +10,7 @@ set defined by:
 
 Authoritative semantic source:
 
-- `@typescript/native` 7.x
+- `typescript` 7.x (instalação canônica única do workspace)
 - `tsc --lsp --stdio`
 - standard LSP methods mapped by the local compatibility layer
 

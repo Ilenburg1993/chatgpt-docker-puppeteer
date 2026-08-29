@@ -2,6 +2,7 @@
 /** Exact public membrane for validated repository read/navigation operations. */
 
 export { diffRepositoryFiles, readRepositoryFile, readRepositoryFileChunks, readRepositoryFileStats } from '../file-operations.js';
+export { readRepositoryInventory } from '../inventory.js';
 export {
     auditRepositoryRootRedaction,
     findRepositorySymbolUsages,

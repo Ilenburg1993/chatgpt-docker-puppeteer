@@ -50,6 +50,14 @@ const OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: WORKSPACE,
+        principal: Object.freeze({
+            version: 'mcp-principal-v1',
+            key: 'test-specific-output-principal',
+            mode: 'test',
+            verified: true,
+            resource: 'workspace:test',
+            audience: 'workspace:test',
+        }),
         config: PROCESS_HOST.processConfig.toolConfig,
         capabilities: Object.freeze({ ...PROCESS_HOST.toolCapabilities, toolSurface: TOOL_SURFACE }),
     },
@@ -147,6 +155,31 @@ describe('MCP specific output-schema runtime parity', () => {
             const forget = findTool('terminal_session_control');
             await forget.handler({ action: 'forget', sessionId }, OPERATION_CONTEXT);
         }
+    });
+
+    it('distinguishes terminal control-plane tool errors from executed-command domain failures', async () => {
+        const execTool = findTool('terminal_exec');
+        const commandFailure = await execTool.handler(
+            { command: process.execPath, args: ['-e', 'process.exit(7)'], shell: false, timeoutMs: 5_000 },
+            OPERATION_CONTEXT,
+        );
+        assert.equal(commandFailure.isError, undefined);
+        assert.equal(commandFailure.structuredContent?.['success'], false);
+        assert.equal(commandFailure.structuredContent?.['exitCode'], 7);
+        assert.equal(
+            normalizeOutputSchema(execTool.outputSchema).safeParse(commandFailure.structuredContent).success,
+            true,
+        );
+
+        const readTool = findTool('terminal_session_read');
+        const missingSession = await readTool.handler(
+            { action: 'status', sessionId: 'missing-terminal-session' },
+            OPERATION_CONTEXT,
+        );
+        assert.equal(missingSession.isError, true);
+        assert.equal(missingSession.structuredContent?.['success'], false);
+        assert.equal(missingSession.structuredContent?.['code'], 'ERR_TERMINAL_SESSION_NOT_FOUND');
+        assert.equal(normalizeOutputSchema(readTool.outputSchema).safeParse(missingSession.structuredContent).success, true);
     });
 
     it('validates Company Knowledge search/fetch structuredContent against the exact published schemas', async () => {

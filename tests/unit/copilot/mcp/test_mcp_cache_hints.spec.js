@@ -125,21 +125,21 @@ describe('MCP 2026 descriptor cache hints', () => {
         assert.equal('tools' in (full.discover ?? {}), false);
         assert.equal(full.list.ttlMs, EXPECTED_TOOLS_LIST_TTL_MS);
         assert.equal(full.list.cacheScope, 'private');
-        assert.equal(full.list.tools.length, 84);
+        assert.equal(full.list.tools.length, 88);
         assert.deepEqual(full.rpcMethods, ['server/discover', 'tools/list']);
 
-        assert.equal(firstLatency.list.tools.length, 51);
+        assert.equal(firstLatency.list.tools.length, 55);
         assert.deepEqual(firstLatency.rpcMethods, ['server/discover', 'tools/list']);
         assert.notEqual(firstLatency.serverVersion, full.serverVersion);
         assert.notEqual(firstLatency.manifest['descriptorFingerprint'], full.manifest['descriptorFingerprint']);
 
-        assert.equal(secondLatency.list.tools.length, 51);
+        assert.equal(secondLatency.list.tools.length, 55);
         assert.equal(secondLatency.serverVersion, firstLatency.serverVersion);
         assert.equal(secondLatency.manifest['descriptorFingerprint'], firstLatency.manifest['descriptorFingerprint']);
         assert.deepEqual(secondLatency.rpcMethods, ['server/discover']);
 
         assert.equal(shorterLatency.list.ttlMs, 60_000);
-        assert.equal(shorterLatency.list.tools.length, 51);
+        assert.equal(shorterLatency.list.tools.length, 55);
         assert.notEqual(shorterLatency.serverVersion, firstLatency.serverVersion);
         assert.equal(shorterLatency.manifest['descriptorFingerprint'], firstLatency.manifest['descriptorFingerprint']);
         assert.notEqual(
@@ -235,8 +235,8 @@ describe('MCP 2026 descriptor cache hints', () => {
         try {
             await client.connect(transport);
             assert.deepEqual(client.autoOpenedSubscription?.honoredFilter, { toolsListChanged: true });
-            assert.equal((await client.listTools()).tools.length, 84);
-            assert.equal((await client.listTools()).tools.length, 84);
+            assert.equal((await client.listTools()).tools.length, 88);
+            assert.equal((await client.listTools()).tools.length, 88);
             assert.deepEqual(rpcMethods, ['server/discover', 'subscriptions/listen', 'tools/list']);
 
             handler.notify.toolsChanged();
@@ -248,7 +248,7 @@ describe('MCP 2026 descriptor cache hints', () => {
             ]);
             assert.deepEqual(notification, { error: null, items: null });
 
-            assert.equal((await client.listTools()).tools.length, 84);
+            assert.equal((await client.listTools()).tools.length, 88);
             assert.deepEqual(rpcMethods, ['server/discover', 'subscriptions/listen', 'tools/list', 'tools/list']);
         } finally {
             await client.close().catch(() => {});
@@ -266,7 +266,7 @@ describe('MCP 2026 descriptor cache hints', () => {
             const list = await client.listTools();
 
             assert.equal(client.getProtocolEra(), 'legacy');
-            assert.equal(list.tools.length, 84);
+            assert.equal(list.tools.length, 88);
             assert.equal('ttlMs' in list, false);
             assert.equal('cacheScope' in list, false);
         } finally {

@@ -297,6 +297,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
                     timeoutMs: 30_000,
                     signal: controller.signal,
                     environmentAuthority: authority,
+                    ownerPrincipalKey: 'test-llmb-owner-a',
                 },
                 {
                     createRunUuid: () => '11111111-1111-4111-8111-111111111111',
@@ -362,6 +363,7 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
                 plan: { invokesModel: false, invokesRealProvider: false },
                 timeoutMs: 30_000,
                 environmentAuthority: authority,
+                ownerPrincipalKey: 'test-llmb-owner-a',
             },
             {
                 createRunUuid: () => '22222222-2222-4222-8222-222222222222',
@@ -370,6 +372,9 @@ describe('MCP Model Gateway live-run authority boundaries', () => {
         );
         assert.equal(manifestWrites, 1);
         assert.equal(manifest.pid, 515152);
+        assert.equal(manifest.ownerPrincipalKey, 'test-llmb-owner-a');
+        assert.equal(manifest.timeoutMs, 30_000);
+        assert.equal(manifest.deadlineAtMs, manifest.startedAtMs + 30_000);
         assert.equal(unrefCalled, true);
         assert.equal(killCalls, 0);
     });

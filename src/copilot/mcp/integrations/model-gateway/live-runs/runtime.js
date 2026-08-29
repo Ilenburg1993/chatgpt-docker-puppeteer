@@ -10,7 +10,7 @@
  */
 
 import { readLinuxProcessArgv } from '#copilot/infra/public/platform/process/introspection';
-import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -21,6 +21,8 @@ const DETACHED_LIVE_RUNS_DIR = 'src/copilot/.ai/mcp/llmb-live-runs';
 export const DETACHED_LIVE_RUN_ID_RE = /^mcp-[0-9a-f-]{36}$/u;
 const DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES = 128 * 1024;
 const DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS = 30_000;
+const DEFAULT_DETACHED_LIVE_RUN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_DETACHED_LIVE_RUN_RETAIN_COMPLETED = 20;
 const DEFAULT_LIVE_COMMAND_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
 /** @type {Map<string, { created:number; terminated:number; current:number; cancelled:number; timedOut:number; outputLimited:number; abnormalExit:number }>} */
@@ -56,8 +58,11 @@ export function resetModelGatewayLiveCommandLifecycleForTests() {
  * @property {string} runId
  * @property {number} pid
  * @property {number} startedAtMs
+ * @property {number | undefined} [timeoutMs] Legacy manifests may omit the recoverable deadline contract.
+ * @property {number | undefined} [deadlineAtMs] Legacy manifests may omit the recoverable deadline contract.
  * @property {string} outDir
  * @property {string | undefined} [logPath]
+ * @property {string | undefined} [ownerPrincipalKey]
  * @property {Record<string, unknown>} plan
  */
 
@@ -419,17 +424,19 @@ export async function runModelGatewayLiveReadinessProcess(workspace, includeSqli
  *
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {number} limit
- * @param {{ signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} options
+ * @param {{ signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority; ownerPrincipalKey?: string }} options
  */
 export async function readModelGatewayPersistedLiveRuns(workspace, limit, options) {
     if (!options?.environmentAuthority) {
         throw new TypeError('Reading Model Gateway live runs requires an explicit environment authority.');
     }
     const boundedLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+    const ownerPrincipalKey = normalizeOptionalLiveRunOwnerPrincipalKey(options.ownerPrincipalKey);
+    const sourceWindowLimit = ownerPrincipalKey ? 100 : boundedLimit;
     const result = await runModelGatewayLiveCommand({
         workspace,
         command: 'runs',
-        args: ['--json', '--limit', String(boundedLimit)],
+        args: ['--json', '--limit', String(sourceWindowLimit)],
         timeoutMs: 60_000,
         environmentAuthority: options.environmentAuthority,
         ...(options.signal ? { signal: options.signal } : {}),
@@ -447,12 +454,32 @@ export async function readModelGatewayPersistedLiveRuns(workspace, limit, option
             error: result.error ?? 'LLM-B live runs did not return valid JSON.',
         };
     }
-    parsed['detachedRuns'] = await listDetachedLiveRuns(workspace);
+    if (!ownerPrincipalKey) {
+        parsed['detachedRuns'] = await listDetachedLiveRuns(workspace);
+        return { ...result, success: true, parsed, error: null };
+    }
+    const detachedRuns = await listDetachedLiveRuns(workspace, {
+        limit: 500,
+        ownerPrincipalKey,
+    });
+    const ownedRunIds = new Set(detachedRuns.map((row) => String(row['runId'] ?? '')).filter(Boolean));
+    const sourceRuns = Array.isArray(parsed['runs']) ? parsed['runs'] : [];
+    const ownedRuns = sourceRuns
+        .filter((row) => row && typeof row === 'object' && ownedRunIds.has(String(row['runId'] ?? '')))
+        .slice(0, boundedLimit);
+    parsed['runs'] = ownedRuns;
+    parsed['detachedRuns'] = detachedRuns.slice(0, boundedLimit);
+    parsed['count'] = ownedRuns.length;
+    parsed['limit'] = boundedLimit;
+    parsed['visibility'] = 'principal-owned-detached-runs';
+    parsed['ownerProvenance'] = 'detached-manifest';
+    parsed['completeness'] = 'bounded-global-source-window';
+    parsed['sourceWindowLimit'] = sourceWindowLimit;
     return { ...result, success: true, parsed, error: null };
 }
 
 /**
- * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} input
+ * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority; ownerPrincipalKey: string }} input
  * @returns {Promise<DetachedLiveRunManifest>}
  */
 export async function spawnDetachedLiveRun(input) {
@@ -465,12 +492,13 @@ export async function spawnDetachedLiveRun(input) {
  * Acceptance is deliberately later than `spawn`: the manifest must be durable and the caller still active. Before
  * that point any abort or persistence failure terminates and drains the child tree and removes a partial manifest.
  *
- * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority }} input
+ * @param {{ workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability; args: string[]; plan: Record<string, unknown>; timeoutMs: number; signal?: AbortSignal; environmentAuthority: import('./environment.js').ModelGatewayLiveRunEnvironmentAuthority; ownerPrincipalKey: string }} input
  * @param {{ spawnChild?: typeof spawn; createRunUuid?: () => string }} dependencies
  * @returns {Promise<DetachedLiveRunManifest>}
  */
 export async function spawnDetachedLiveRunWithDependencies(input, dependencies) {
     const { workspace } = input;
+    const ownerPrincipalKey = requireLiveRunOwnerPrincipalKey(input.ownerPrincipalKey);
     const runId = `mcp-${dependencies.createRunUuid?.() ?? randomUUID()}`;
     if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) throw new Error('Generated detached LLM-B live run id is invalid.');
     const outDir = `artifacts/terminal-live/${runId}`;
@@ -532,14 +560,19 @@ export async function spawnDetachedLiveRunWithDependencies(input, dependencies) 
             await supervisor.closed;
             throw input.signal.reason ?? new Error('Detached LLM-B live run aborted during spawn.');
         }
+        const startedAtMs = Date.now();
+        const timeoutMs = normalizeDetachedLiveRunTimeoutMs(input.timeoutMs);
         /** @type {DetachedLiveRunManifest} */
         const manifest = {
             schema: 'llmb-live-detached-run',
             runId,
             pid: child.pid,
-            startedAtMs: Date.now(),
+            startedAtMs,
+            timeoutMs,
+            deadlineAtMs: startedAtMs + timeoutMs,
             outDir,
             logPath,
+            ownerPrincipalKey,
             plan: input.plan,
         };
         await workspaceIo.writeFileAtomic(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
@@ -602,6 +635,26 @@ export async function readDetachedLiveRunManifest(workspace, manifestPath, expec
         const expectedOutDir = `artifacts/terminal-live/${parsed.runId}`;
         const expectedLogPath = `${expectedOutDir}/detached.runner.log`;
         if (parsed.outDir !== expectedOutDir || parsed.logPath !== expectedLogPath) return null;
+        if (
+            parsed.ownerPrincipalKey !== undefined &&
+            (typeof parsed.ownerPrincipalKey !== 'string' || !normalizeOptionalLiveRunOwnerPrincipalKey(parsed.ownerPrincipalKey))
+        ) {
+            return null;
+        }
+        const hasTimeoutMs = parsed.timeoutMs !== undefined;
+        const hasDeadlineAtMs = parsed.deadlineAtMs !== undefined;
+        if (hasTimeoutMs !== hasDeadlineAtMs) return null;
+        if (hasTimeoutMs) {
+            if (
+                !Number.isInteger(parsed.timeoutMs) ||
+                parsed.timeoutMs < 1_000 ||
+                typeof parsed.deadlineAtMs !== 'number' ||
+                !Number.isFinite(parsed.deadlineAtMs) ||
+                parsed.deadlineAtMs !== parsed.startedAtMs + parsed.timeoutMs
+            ) {
+                return null;
+            }
+        }
         return /** @type {DetachedLiveRunManifest} */ (parsed);
     } catch {
         return null;
@@ -615,12 +668,13 @@ export async function readDetachedLiveRunManifestById(workspace, runId) {
 
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
- * @param {{ limit?: number; nowMs?: number }} [options]
+ * @param {{ limit?: number; nowMs?: number; ownerPrincipalKey?: string }} [options]
  */
 export async function listDetachedLiveRuns(workspace, options = {}) {
     const directory = detachedLiveRunsDirectory(workspace);
     const limit = Math.max(1, Math.min(500, Math.trunc(options.limit ?? 20)));
     const nowMs = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
+    const ownerPrincipalKey = normalizeOptionalLiveRunOwnerPrincipalKey(options.ownerPrincipalKey);
     const workspaceIo = workspace.io;
     await workspaceIo.mkdirPathLocked(directory, { recursive: true });
     const entries = await workspaceIo
@@ -634,17 +688,29 @@ export async function listDetachedLiveRuns(workspace, options = {}) {
         if (!DETACHED_LIVE_RUN_ID_RE.test(expectedRunId)) continue;
         const manifest = await readDetachedLiveRunManifest(workspace, join(directory, entry), expectedRunId);
         if (!manifest) continue;
+        if (ownerPrincipalKey && manifest.ownerPrincipalKey !== ownerPrincipalKey) continue;
         const summaryPath = join(workspace.workspaceRoot, manifest.outDir, 'summary.md');
         const summaryStats = await workspaceIo
             .statPath(summaryPath)
             .then((result) => result.stats)
             .catch(() => null);
+        const logStats = manifest.logPath
+            ? await workspaceIo
+                  .statPath(join(workspace.workspaceRoot, manifest.logPath))
+                  .then((result) => result.stats)
+                  .catch(() => null)
+            : null;
         const summaryReady = summaryStats?.isFile() === true;
         const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
         const pidPresent = processIdentity.alive;
         const pidAlive = process.platform === 'win32' ? pidPresent : processIdentity.verified;
+        const lastActivityAtMs = Math.max(
+            manifest.startedAtMs,
+            summaryStats?.isFile() === true ? Number(summaryStats.mtimeMs) : 0,
+            logStats?.isFile() === true ? Number(logStats.mtimeMs) : 0,
+        );
         rows.push({
-            ...manifest,
+            ...publicDetachedLiveRunManifest(manifest),
             status: summaryReady
                 ? pidAlive
                     ? 'artifacts_ready_process_alive'
@@ -661,9 +727,45 @@ export async function listDetachedLiveRuns(workspace, options = {}) {
             ageMs: Math.max(0, nowMs - manifest.startedAtMs),
             summaryAgeMs: summaryReady ? Math.max(0, nowMs - Number(summaryStats?.mtimeMs ?? nowMs)) : null,
             summaryPath: summaryReady ? `${manifest.outDir}/summary.md` : null,
+            lastActivityAtMs,
+            lastActivityAgeMs: Math.max(0, nowMs - lastActivityAtMs),
+            deadlineAtMs: manifest.deadlineAtMs ?? null,
+            deadlineAgeMs:
+                typeof manifest.deadlineAtMs === 'number' ? Math.max(0, nowMs - manifest.deadlineAtMs) : null,
+            deadlineRecoverable: typeof manifest.deadlineAtMs === 'number',
         });
     }
     return rows.sort((left, right) => right.startedAtMs - left.startedAtMs).slice(0, limit);
+}
+
+/** @param {DetachedLiveRunManifest} manifest */
+function publicDetachedLiveRunManifest(manifest) {
+    const { ownerPrincipalKey: _ownerPrincipalKey, ...publicManifest } = manifest;
+    return publicManifest;
+}
+
+/** @param {string | undefined} ownerPrincipalKey */
+function normalizeOptionalLiveRunOwnerPrincipalKey(ownerPrincipalKey) {
+    const normalized = String(ownerPrincipalKey ?? '').trim();
+    return normalized && normalized.length <= 256 ? normalized : '';
+}
+
+/** @param {string | undefined} ownerPrincipalKey */
+function requireLiveRunOwnerPrincipalKey(ownerPrincipalKey) {
+    const normalized = normalizeOptionalLiveRunOwnerPrincipalKey(ownerPrincipalKey);
+    if (!normalized) {
+        throw Object.assign(new TypeError('Detached LLM-B live runs require an authorization-derived principal key.'), {
+            code: 'ERR_LLMB_LIVE_OWNER_REQUIRED',
+        });
+    }
+    return normalized;
+}
+
+/** @param {unknown} value */
+function normalizeDetachedLiveRunTimeoutMs(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) throw new TypeError('Detached LLM-B live run timeout must be finite.');
+    return Math.max(1_000, Math.min(30 * 60_000, Math.trunc(numeric)));
 }
 
 /** @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace @param {DetachedLiveRunManifest} manifest */
@@ -681,14 +783,39 @@ export async function inspectDetachedLiveRunCompletion(workspace, manifest) {
 }
 
 /**
+ * Remove persisted state only after process absence is re-proved from the canonical manifest. Artifacts are removed
+ * before the manifest so a partial cleanup retains the recovery pointer rather than an orphaned directory.
+ *
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {string} runId
+ */
+async function deleteStoppedDetachedLiveRunState(workspace, runId) {
+    const manifest = await readDetachedLiveRunManifestById(workspace, runId);
+    if (!manifest) return { deleted: false, alreadyDeleted: true, reason: 'manifest-not-found' };
+    const identity = await inspectDetachedLiveRunProcessIdentity(manifest);
+    if (identity.alive) return { deleted: false, alreadyDeleted: false, reason: `pid-present:${identity.reason}` };
+    await workspace.io.removePathLocked(manifest.outDir, {
+        recursive: true,
+        force: true,
+        recursiveConfirmation: manifest.outDir,
+        durability: 'file-and-directory',
+    });
+    await workspace.io.deleteFileLocked(detachedLiveRunManifestPath(workspace, runId), { captureRollback: false });
+    return { deleted: true, alreadyDeleted: false, reason: 'stopped-retention-expired' };
+}
+
+/**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {{
  *     nowMs?: number;
  *     graceMs?: number;
+ *     retentionMs?: number;
+ *     retainCompleted?: number;
  *     audit?: Pick<ReturnType<typeof import('#copilot/mcp/public/observability').createMcpAuditCapability>, 'append'>;
  *     deps?: {
  *         listRuns?: () => Promise<Record<string, any>[]>;
  *         cancelRun?: (runId: string) => Promise<{ cancelled: boolean; alreadyStopped?: boolean }>;
+ *         deleteRunState?: (runId: string) => Promise<{ deleted: boolean; alreadyDeleted?: boolean; reason?: string }>;
  *     };
  * }} [options]
  */
@@ -697,6 +824,14 @@ export async function reapCompletedDetachedLiveRuns(workspace, options = {}) {
     const graceMs = Math.max(
         5_000,
         Math.min(10 * 60_000, Math.trunc(options.graceMs ?? DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS)),
+    );
+    const retentionMs = Math.max(
+        60_000,
+        Math.min(90 * 24 * 60 * 60 * 1000, Math.trunc(options.retentionMs ?? DEFAULT_DETACHED_LIVE_RUN_RETENTION_MS)),
+    );
+    const retainCompleted = Math.max(
+        0,
+        Math.min(500, Math.trunc(options.retainCompleted ?? DEFAULT_DETACHED_LIVE_RUN_RETAIN_COMPLETED)),
     );
     const listRuns = options.deps?.listRuns ?? (() => listDetachedLiveRuns(workspace, { limit: 500, nowMs }));
     const cancelRun =
@@ -707,7 +842,7 @@ export async function reapCompletedDetachedLiveRuns(workspace, options = {}) {
             const result = await cancelDetachedLiveRun(manifest);
             if (result.cancelled) {
                 await options.audit?.append({
-                    event: 'llmb_live_test_completed_process_reaped',
+                    event: 'llmb_live_test_process_reaped',
                     tool: 'mcp_startup_maintenance',
                     runId,
                     pid: manifest.pid,
@@ -716,24 +851,71 @@ export async function reapCompletedDetachedLiveRuns(workspace, options = {}) {
             }
             return result;
         });
+    const deleteRunState = options.deps?.deleteRunState ?? ((runId) => deleteStoppedDetachedLiveRunState(workspace, runId));
     const rows = await listRuns();
-    const candidates = rows.filter(
-        (row) =>
+    const candidates = rows.filter((row) => {
+        if (row?.['processIdentity'] !== 'verified') return false;
+        const completedGraceExpired =
             row?.['status'] === 'artifacts_ready_process_alive' &&
-            row?.['processIdentity'] === 'verified' &&
             typeof row?.['summaryAgeMs'] === 'number' &&
-            row['summaryAgeMs'] >= graceMs,
-    );
+            row['summaryAgeMs'] >= graceMs;
+        const deadlineGraceExpired =
+            typeof row?.['deadlineAtMs'] === 'number' && nowMs >= Number(row['deadlineAtMs']) + graceMs;
+        return completedGraceExpired || deadlineGraceExpired;
+    });
     /** @type {string[]} */
     const reapedRunIds = [];
+    /** @type {string[]} */
+    const timedOutRunIds = [];
     /** @type {{ runId: string; error: string }[]} */
     const failures = [];
     for (const row of candidates) {
         const runId = typeof row?.runId === 'string' ? row.runId : '';
         if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) continue;
+        const timedOut = typeof row?.['deadlineAtMs'] === 'number' && nowMs >= Number(row['deadlineAtMs']) + graceMs;
         try {
             const result = await cancelRun(runId);
-            if (result.cancelled) reapedRunIds.push(runId);
+            if (result.cancelled) {
+                reapedRunIds.push(runId);
+                if (timedOut) timedOutRunIds.push(runId);
+            }
+        } catch (error) {
+            failures.push({ runId, error: error instanceof Error ? error.message : String(error) });
+        }
+    }
+
+    const postReapRows = await listRuns();
+    const stoppedRows = postReapRows
+        .filter((row) => row?.['pidPresent'] === false && typeof row?.['lastActivityAtMs'] === 'number')
+        .sort((left, right) => Number(right['lastActivityAtMs']) - Number(left['lastActivityAtMs']));
+    const protectedRunIds = new Set(
+        stoppedRows
+            .slice(0, retainCompleted)
+            .map((row) => String(row?.['runId'] ?? ''))
+            .filter((runId) => DETACHED_LIVE_RUN_ID_RE.test(runId)),
+    );
+    const retentionCandidates = stoppedRows.filter(
+        (row) =>
+            !protectedRunIds.has(String(row?.['runId'] ?? '')) &&
+            typeof row?.['lastActivityAgeMs'] === 'number' &&
+            Number(row['lastActivityAgeMs']) >= retentionMs,
+    );
+    /** @type {string[]} */
+    const deletedRunIds = [];
+    for (const row of retentionCandidates) {
+        const runId = String(row?.['runId'] ?? '');
+        if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) continue;
+        try {
+            const result = await deleteRunState(runId);
+            if (!result.deleted) continue;
+            deletedRunIds.push(runId);
+            await options.audit?.append({
+                event: 'llmb_live_test_retention_deleted',
+                tool: 'mcp_startup_maintenance',
+                runId,
+                retentionMs,
+                retainCompleted,
+            });
         } catch (error) {
             failures.push({ runId, error: error instanceof Error ? error.message : String(error) });
         }
@@ -743,8 +925,16 @@ export async function reapCompletedDetachedLiveRuns(workspace, options = {}) {
         candidateCount: candidates.length,
         reapedCount: reapedRunIds.length,
         reapedRunIds,
+        timedOutCount: timedOutRunIds.length,
+        timedOutRunIds,
+        retentionCandidateCount: retentionCandidates.length,
+        deletedCount: deletedRunIds.length,
+        deletedRunIds,
+        retainedStoppedCount: Math.min(retainCompleted, stoppedRows.length),
         failureCount: failures.length,
         failures,
         graceMs,
+        retentionMs,
+        retainCompleted,
     };
 }

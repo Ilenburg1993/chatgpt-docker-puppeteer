@@ -8,7 +8,7 @@ import {
 import { probeHealth } from '#copilot/mcp/public/cloudflare/observability';
 import { createCloudflareManagedProcessController } from '#copilot/mcp/public/cloudflare/process';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { buildMcpServerChildEnvironment } from './server-child-environment.js';

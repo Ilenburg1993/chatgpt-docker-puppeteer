@@ -358,7 +358,7 @@ router.post('/', async (req, res) => {
             });
             created = true;
 
-            // eslint-disable-next-line @typescript-eslint/await-thenable
+            // oxlint-disable-next-line typescript/await-thenable
             await audit('CREATE_TASK', {
                 id: safeId,
                 source: 'GUI',
@@ -566,7 +566,7 @@ async function handleTaskUpdate(req, res) {
             }
         }
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('EDIT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -838,7 +838,7 @@ router.post('/:id/approve', async (req, res) => {
             /* ignore */
         }
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('APPROVE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -886,7 +886,7 @@ router.post('/:id/reject', async (req, res) => {
             /* ignore */
         }
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('REJECT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -911,7 +911,7 @@ router.post('/:id/pause', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PAUSE', { task_id: safeId });
         if (!control) return;
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('PAUSE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -926,7 +926,7 @@ router.post('/:id/resume', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_RESUME', { task_id: safeId });
         if (!control) return;
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('RESUME_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -942,7 +942,7 @@ router.post('/:id/unblock', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_UNBLOCK', { task_id: safeId });
         if (!control) return;
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('UNBLOCK_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -958,7 +958,7 @@ router.post('/:id/retry', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_RETRY', { task_id: safeId });
         if (!control) return;
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('RETRY_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -976,7 +976,7 @@ router.delete('/:id/purge', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PURGE', { task_id: safeId });
         if (!control) return;
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('PURGE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, operation: control.operation, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -995,7 +995,7 @@ router.delete('/:id', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_CANCEL', { task_id: safeId });
         if (!control) return;
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('DELETE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({
             success: true,
@@ -1326,7 +1326,7 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
 router.post('/retry-failed', async (req, res) => {
     try {
         const count = retryFailedTasks();
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('RETRY_BATCH', { count, request_id: req.id });
         recordEvent({
             entityType: 'queue',
@@ -1359,7 +1359,7 @@ router.post('/retry-failed', async (req, res) => {
 router.post('/clear', async (req, res) => {
     try {
         const report = clearQueuePreserveRunning();
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('CLEAR_QUEUE', { ...report, request_id: req.id });
         recordEvent({
             entityType: 'queue',

@@ -515,7 +515,7 @@ async function boot() {
                     log('INFO', `[BOOT] ✅ Chrome Proxy Service online (porta ${proxyPort})`);
 
                     // ✅ Emite evento NERV: Proxy iniciado
-                    // eslint-disable-next-line @typescript-eslint/await-thenable
+                    // oxlint-disable-next-line typescript/await-thenable
                     await sendEvent(
                         nerv,
                         ActorRole.INFRA,
@@ -853,7 +853,7 @@ async function boot() {
                     const workerId = identityNow.robot_id || `worker-${process.pid}`;
 
                     taskProjector = new TaskStateProjector({ nerv, workerId });
-                    // eslint-disable-next-line @typescript-eslint/await-thenable
+                    // oxlint-disable-next-line typescript/await-thenable
                     await taskProjector.start();
                     if (
                         /** @type {any} */ (taskProjector).isRunning &&
@@ -895,7 +895,7 @@ async function boot() {
                         intervalMs: Number(process.env['HEARTBEAT_WATCHDOG_INTERVAL_MS'] || 60000) || 60000, // 1min default
                         staleThresholdMs: Number(process.env['HEARTBEAT_STALE_THRESHOLD_MS'] || 180000) || 180000, // 3min default
                     });
-                    // eslint-disable-next-line @typescript-eslint/await-thenable
+                    // oxlint-disable-next-line typescript/await-thenable
                     await heartbeatWatchdog.start();
                     if (
                         /** @type {any} */ (heartbeatWatchdog).isActive &&
@@ -933,7 +933,7 @@ async function boot() {
                             orchestrationMs: Number(process.env['TASK_ORCHESTRATION_INTERVAL_MS'] || 1250) || 1250,
                         },
                     });
-                    // eslint-disable-next-line @typescript-eslint/await-thenable
+                    // oxlint-disable-next-line typescript/await-thenable
                     await agentLoop.start();
                     if (/** @type {any} */ (agentLoop).isRunning && !(/** @type {any} */ (agentLoop).isRunning())) {
                         log('WARN', '[BOOT] AgentLoop.start() completou mas loop não está running');
@@ -1408,7 +1408,7 @@ async function shutdown(context, options = {}) {
                     const reconciler = await import('./server/supervisor/reconcilier.js').then((m) => m.default ?? m);
                     if (reconciler && typeof reconciler.stop === 'function') {
                         try {
-                            // eslint-disable-next-line @typescript-eslint/await-thenable
+                            // oxlint-disable-next-line typescript/await-thenable
                             await reconciler.stop();
                             log('DEBUG', '[SHUTDOWN] Reconciler parado');
                         } catch (/** @type {any} */ err) {
@@ -1464,7 +1464,7 @@ async function shutdown(context, options = {}) {
                             const { sendEvent } = await import('#nerv/adapters/high_level_adapter');
                             const { ActionCode, ActorRole } = await import('#shared/nerv/constants');
 
-                            // eslint-disable-next-line @typescript-eslint/await-thenable
+                            // oxlint-disable-next-line typescript/await-thenable
                             await sendEvent(
                                 nerv,
                                 ActorRole.INFRA,

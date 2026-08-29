@@ -18,6 +18,15 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'mcp-recovery-recipe-unit-process-host',
     backgroundServices: false,
 });
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-recovery-recipe-principal',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -30,6 +39,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_PROCESS_HOST.workspace,
+        principal: TEST_PRINCIPAL,
         config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_PROCESS_HOST.toolCapabilities,
     },
@@ -46,6 +56,7 @@ const DISABLED_SELF_REPAIR_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_PROCESS_HOST.workspace,
+        principal: TEST_PRINCIPAL,
         config: {
             ...TEST_PROCESS_HOST.processConfig.toolConfig,
             repositoryPatch: readMcpRepositoryPatchConfig({ COPILOT_MCP_PATCH_EXACT_SELF_REPAIR_DISABLED: 'true' }),

@@ -30,6 +30,14 @@ function createAutonomyOperationContext() {
         },
         {
             workspace: AUTONOMY_WORKSPACE,
+            principal: Object.freeze({
+                version: 'mcp-principal-v1',
+                key: 'test-autonomy-principal',
+                mode: 'test',
+                verified: true,
+                resource: 'workspace:test',
+                audience: 'workspace:test',
+            }),
             config: AUTONOMY_PROCESS_HOST.processConfig.toolConfig,
             capabilities: AUTONOMY_PROCESS_HOST.toolCapabilities,
         },
@@ -314,6 +322,7 @@ describe('MCP governed autonomy mutations', () => {
         const cancelled = [];
         const oldVerified = 'mcp-11111111-1111-4111-8111-111111111111';
         const failingVerified = 'mcp-22222222-2222-4222-8222-222222222222';
+        const timedOutVerified = 'mcp-66666666-6666-4666-8666-666666666666';
         const result = await reapCompletedDetachedLiveRuns(AUTONOMY_WORKSPACE, {
             nowMs: 100_000,
             graceMs: 30_000,
@@ -349,6 +358,13 @@ describe('MCP governed autonomy mutations', () => {
                         processIdentity: 'verified',
                         summaryAgeMs: null,
                     },
+                    {
+                        runId: timedOutVerified,
+                        status: 'running',
+                        processIdentity: 'verified',
+                        summaryAgeMs: null,
+                        deadlineAtMs: 60_000,
+                    },
                 ],
                 cancelRun: async (runId) => {
                     cancelled.push(runId);
@@ -358,12 +374,58 @@ describe('MCP governed autonomy mutations', () => {
             },
         });
 
-        assert.deepEqual(cancelled, [oldVerified, failingVerified]);
-        assert.equal(result.scannedCount, 5);
-        assert.equal(result.candidateCount, 2);
-        assert.equal(result.reapedCount, 1);
-        assert.deepEqual(result.reapedRunIds, [oldVerified]);
+        assert.deepEqual(cancelled, [oldVerified, failingVerified, timedOutVerified]);
+        assert.equal(result.scannedCount, 6);
+        assert.equal(result.candidateCount, 3);
+        assert.equal(result.reapedCount, 2);
+        assert.deepEqual(result.reapedRunIds, [oldVerified, timedOutVerified]);
+        assert.equal(result.timedOutCount, 1);
+        assert.deepEqual(result.timedOutRunIds, [timedOutVerified]);
         assert.equal(result.failureCount, 1);
         assert.equal(result.failures[0]?.runId, failingVerified);
+    });
+
+    it('retains recent stopped detached runs and deletes only expired stopped state as a manifest-backed unit', async () => {
+        const recent = 'mcp-77777777-7777-4777-8777-777777777777';
+        const expired = 'mcp-88888888-8888-4888-8888-888888888888';
+        /** @type {string[]} */
+        const deleted = [];
+        const rows = [
+            {
+                runId: recent,
+                status: 'artifacts_ready',
+                processIdentity: 'process-not-alive',
+                pidPresent: false,
+                lastActivityAtMs: 90_000,
+                lastActivityAgeMs: 10_000,
+            },
+            {
+                runId: expired,
+                status: 'artifacts_ready',
+                processIdentity: 'process-not-alive',
+                pidPresent: false,
+                lastActivityAtMs: 1_000,
+                lastActivityAgeMs: 99_000,
+            },
+        ];
+        const result = await reapCompletedDetachedLiveRuns(AUTONOMY_WORKSPACE, {
+            nowMs: 100_000,
+            retentionMs: 60_000,
+            retainCompleted: 1,
+            deps: {
+                listRuns: async () => rows,
+                cancelRun: async () => ({ cancelled: false, alreadyStopped: true }),
+                deleteRunState: async (runId) => {
+                    deleted.push(runId);
+                    return { deleted: true };
+                },
+            },
+        });
+
+        assert.deepEqual(deleted, [expired]);
+        assert.equal(result.retentionCandidateCount, 1);
+        assert.equal(result.deletedCount, 1);
+        assert.deepEqual(result.deletedRunIds, [expired]);
+        assert.equal(result.retainedStoppedCount, 1);
     });
 });

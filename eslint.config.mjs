@@ -1,39 +1,35 @@
 // @ts-check
 import js from '@eslint/js';
+import { defineConfig } from 'eslint/config';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
-import tseslint from 'typescript-eslint';
 
 /**
- * eslint.config.mjs — Consolidado com typescript-eslint (ESLint 10 + tseslint 8)
+ * eslint.config.mjs — ESLint 10 para JS/ESM e regras arquiteturais; type-awareness TS7 vive no gate Oxlint/tsgolint.
  *
  * ─── Zonas ──────────────────────────────────────────────────────────────────── 0. global-ignores — pastas excluídas
  * globalmente
  *
- * 1. base — parser TS + recommended (sem type-info): todos os .js/.mjs
- * 2. src-type-checked — regras type-aware via projeto TypeScript explícito
- * 3. core — zonas críticas: regras estritas + type-checked
+ * 1. base — parser ECMAScript nativo + recommended: todos os .js/.mjs
+ * 2. type-aware — delegado a Oxlint/tsgolint sobre TS7, fora desta config
+ * 3. core — zonas críticas: regras estritas
  * 4. backend — Node.js geral (mais permissivo que core)
  * 5. browser — contexto Puppeteer/page.evaluate (globals.browser)
  * 6. tests — node:test runner (relaxado, type-check desabilitado)
  * 7. scripts — automação / configs (warnings, type-check desabilitado)
  * 8. cjs — configs CommonJS (ex.: pm2/ecosystem)
  *
- * ─── typescript-eslint (projeto TS explícito) ────────────────────────────────────────────────────── O lint type-aware
- * usa `parserOptions.project: ['./tsconfig.node.json']`. Um projeto único e explícito evita que o Project Service
- * reclassifique arquivos entre projetos configurados/inferidos durante uma varredura ampla. O parser continua usando a
- * dependência TS6 localizada exigida pelo typescript-eslint; compilação e editor usam TS7 nativo.
- *
- * Os consumidores TypeScript no projeto: A) VS Code TS7 nativo — editor, IntelliSense e hover; B) `tsc` TS7 nativo —
- * validação estrutural; C) ESLint + tseslint + TS6 compatível — análise type-aware em CI e pre-commit.
+ * ─── TypeScript 7 ───────────────────────────────────────────────────────────────────────────────────
+ * ESLint não carrega uma segunda engine TypeScript. Arquivos TS e as três regras type-aware de segurança de Promises
+ * são validados por `oxlint --type-aware`/`oxlint-tsgolint`, que usa typescript-go/TS7. `tsc`/strict continuam sendo a
+ * autoridade de compilação. Assim lint sintático/arquitetural e semântica TS têm owners distintos, sem compatibility TS6.
  *
  * ─── Convenções ───────────────────────────────────────────────────────────────
  *
  * - "_" sempre permitido como descarte (all zones)
  * - backend tolera nomes arquiteturais frequentes (e, err, log, path…)
- * - @typescript-eslint/no-unused-vars substitui no-unused-vars em arquivos JS (melhor suporte a destructuring, tipos
- *   JSDoc, parâmetros rest)
- * - no-undef desabilitado onde o parser TS já garante escopo
+ * - no-unused-vars nativo é configurado por zona com os mesmos padrões de descarte já adotados pelo projeto
+ * - no-undef permanece ativo via eslint:recommended; globals Node/browser são declarados por zona
  * - Ignoramos dashboard-ui (Vue) — tem seu próprio vue-tsc
  */
 
@@ -47,6 +43,7 @@ const GLOBAL_IGNORES = [
     'public/**',
     'src/dashboard-ui/**',
     'scripts/dist/**',
+    '**/*.{ts,mts,cts,tsx}',
     '.kilo/**',
     // Artefatos gerados (declarations TypeScript, tipos compilados)
     'tmp/**',
@@ -58,7 +55,7 @@ const GLOBAL_IGNORES = [
     '.venv/**',
 ];
 
-// ─── Regras @typescript-eslint/no-unused-vars reutilizadas por zona ───────────
+// ─── Regras no-unused-vars reutilizadas por zona ─────────────────────────────
 /** @type {import('eslint').Linter.RuleEntry} */
 const UNUSED_VARS_BACKEND = [
     'error',
@@ -166,7 +163,7 @@ const TOOLS_IO_SYNTAX_RESTRICTIONS = [
     },
 ];
 
-export default tseslint.config(
+export default defineConfig(
     // ======================================================
     // 0. Global ignores (único ponto de verdade)
     // ======================================================
@@ -175,14 +172,12 @@ export default tseslint.config(
     },
 
     // ======================================================
-    // 1. Base: parser typescript-eslint + recommended sem type-info
-    //    Aplica para TODOS os .js/.mjs/.ts do projeto.
-    //    O parser TS substitui o espree padrão e entende JSDoc generics,
-    //    decorators, optional chaining e demais extensões de sintaxe TS.
+    // 1. Base: parser ECMAScript nativo + eslint:recommended.
+    //    Aplica a JS/ESM. TypeScript é intencionalmente excluído desta engine e validado pelo lane TS7/Oxlint.
     // ======================================================
     {
-        files: ['**/*.{js,mjs,ts,mts}'],
-        extends: [js.configs.recommended, ...tseslint.configs.recommended],
+        files: ['**/*.{js,mjs}'],
+        extends: [js.configs.recommended],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',
@@ -191,93 +186,11 @@ export default tseslint.config(
             },
         },
         rules: {
-            // O @typescript-eslint/no-unused-vars já entende tipos JSDoc e é
-            // preferido sobre no-unused-vars nativo para arquivos com TS parser.
-            'no-unused-vars': 'off',
-            '@typescript-eslint/no-unused-vars': UNUSED_VARS_BACKEND,
-
-            // Em arquivos JS com @ts-check o parser já valida escopo — no-undef
-            // seria redundante e produz falsos positivos com globals dinâmicos.
-            'no-undef': 'off',
-
-            // Ajustes relevantes para projeto JS-first com JSDoc:
-            // @typescript-eslint/no-explicit-any em JS-first é muito ruidoso.
-            '@typescript-eslint/no-explicit-any': 'off',
-            // Require-await em JS com async callback patterns pode ser impreciso.
-            '@typescript-eslint/require-await': 'off',
-            // Permite uso de `!` non-null assertion em cases onde o dev sabe mais.
-            '@typescript-eslint/no-non-null-assertion': 'off',
+            'no-unused-vars': UNUSED_VARS_BACKEND,
         },
     },
 
-    // ======================================================
-    // 2. Type-checked (src/ geral) — projeto TypeScript explícito
-    //    Regras que requerem informação de tipo ficam aqui.
-    //    O ESLint constrói um programa único a partir de tsconfig.node.json.
-    //    NOTA: aumenta o tempo de lint; uso intencional apenas para src/.
-    // ======================================================
-    {
-        files: ['src/**/*.{js,mjs}'],
-        ignores: [
-            // browser context: usa globals.browser, não precisa de type-check do projeto Node
-            'src/driver/**',
-            'src/shared/page_stability/**',
-            'src/shared/biomechanics/**',
-            'src/shared/sadi/**',
-            'src/infra/browser_pool/**',
-        ],
-        extends: tseslint.configs.recommendedTypeChecked,
-        languageOptions: {
-            parserOptions: {
-                project: ['./tsconfig.node.json'],
-                tsconfigRootDir: import.meta.dirname,
-            },
-        },
-        rules: {
-            // Type-checked rules: habilitamos apenas os de alto valor e baixo ruído
-            // para uma base de código JS-first com JSDoc.
-
-            // ─── Segurança de Promise ────────────────────────────────────────
-            // Captura promises flutuantes (fire-and-forget não intencional).
-            '@typescript-eslint/no-floating-promises': 'error',
-            // Previne await em valores não-thenable.
-            '@typescript-eslint/await-thenable': 'error',
-            // Previne passar Promise onde callback é esperado.
-            '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
-
-            // ─── Regras ruidosas em JS-first → desabilitadas ─────────────────
-            // no-unsafe-* são muito verbosos em código JS com JSDoc parcial.
-            '@typescript-eslint/no-unsafe-assignment': 'off',
-            '@typescript-eslint/no-unsafe-call': 'off',
-            '@typescript-eslint/no-unsafe-member-access': 'off',
-            '@typescript-eslint/no-unsafe-argument': 'off',
-            '@typescript-eslint/no-unsafe-return': 'off',
-            // Em base logging-heavy, objetos entram diretamente em template literals.
-            '@typescript-eslint/no-base-to-string': 'off',
-            '@typescript-eslint/restrict-template-expressions': 'off',
-            // require-await: desabilitado — base JS-first tem muitas implementações de interface
-            // async sem await (padrão legítimo: métodos async para compatibilidade com protocolo/contrato).
-            '@typescript-eslint/require-await': 'off',
-            // unbound-method é caro (24% do tempo) e muito ruidoso em JS-first com this-binding dinâmico.
-            '@typescript-eslint/unbound-method': 'off',
-        },
-    },
-
-    // ======================================================
-    // Zone D. TypeScript Declaration Files (.d.ts)
-    //    Regras que geram falsos positivos em arquivos de declaração:
-    //    - triple-slash-reference: padrão legítimo em .d.ts bundled
-    //    - no-empty-object-type: interfaces de eventos vazias são válidas
-    //    - no-unsafe-declaration-merging: augmentation pattern esperado
-    // ======================================================
-    {
-        files: ['**/*.d.ts'],
-        rules: {
-            '@typescript-eslint/triple-slash-reference': 'off',
-            '@typescript-eslint/no-empty-object-type': 'off',
-            '@typescript-eslint/no-unsafe-declaration-merging': 'off',
-        },
-    },
+    // Type-aware Promise safety is enforced by the separate TS7 Oxlint/tsgolint lane.
 
     // ======================================================
     // 3. Core (estrito) — partes críticas do sistema
@@ -287,7 +200,7 @@ export default tseslint.config(
         files: ['src/{core,kernel,logic,nerv}/**/*.{js,mjs}'],
         rules: {
             // Core: apenas "_" é descartável
-            '@typescript-eslint/no-unused-vars': UNUSED_VARS_STRICT,
+            'no-unused-vars': UNUSED_VARS_STRICT,
         },
     },
 
@@ -298,7 +211,7 @@ export default tseslint.config(
         files: ['src/**/*.{js,mjs}', '*.{js,mjs}'],
         ignores: ['src/core/**', 'src/kernel/**', 'src/logic/**', 'src/nerv/**'],
         rules: {
-            '@typescript-eslint/no-unused-vars': UNUSED_VARS_BACKEND,
+            'no-unused-vars': UNUSED_VARS_BACKEND,
         },
     },
 
@@ -317,7 +230,6 @@ export default tseslint.config(
             'src/infra/browser_pool/**/*.{js,mjs}',
             'test-proxy-final.{js,mjs}',
         ],
-        extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
             globals: {
                 ...globals.node,
@@ -327,7 +239,7 @@ export default tseslint.config(
         rules: {
             // Reativa no-undef para esta zona (globals.browser cobre window/document)
             'no-undef': 'error',
-            '@typescript-eslint/no-unused-vars': UNUSED_VARS_STRICT,
+            'no-unused-vars': UNUSED_VARS_STRICT,
         },
     },
 
@@ -337,20 +249,13 @@ export default tseslint.config(
     // ======================================================
     {
         files: ['tests/**/*.{js,mjs}', '**/*.spec.{js,mjs}', '**/*.test.{js,mjs}'],
-        extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
-            parserOptions: {
-                projectService: false,
-                tsconfigRootDir: import.meta.dirname,
-            },
             globals: {
                 ...globals.node,
             },
         },
         rules: {
-            '@typescript-eslint/no-unused-vars': 'off',
-            '@typescript-eslint/no-explicit-any': 'off',
-            '@typescript-eslint/no-this-alias': 'off',
+            'no-unused-vars': 'off',
             'no-unused-expressions': 'off',
             'no-console': 'off',
             // Catches empty blocks legítimos em testes de integração (ex: timeouts esperados)
@@ -367,18 +272,13 @@ export default tseslint.config(
     // ======================================================
     {
         files: ['tests/legacy/**/*.{js,mjs}'],
-        extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
-            parserOptions: {
-                projectService: false,
-                tsconfigRootDir: import.meta.dirname,
-            },
             globals: {
                 ...globals.node,
             },
         },
         rules: {
-            '@typescript-eslint/no-unused-vars': 'off',
+            'no-unused-vars': 'off',
             'prefer-const': 'off',
             'prefer-rest-params': 'off',
             'no-empty': 'off',
@@ -392,7 +292,6 @@ export default tseslint.config(
     // ======================================================
     {
         files: ['scripts/**/*.{js,mjs}', '*.{config,conf}.{js,mjs}', 'ecosystem.config.{js,mjs}', '*.mjs'],
-        extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
             globals: {
                 ...globals.node,
@@ -409,7 +308,7 @@ export default tseslint.config(
             'no-useless-assignment': 'off',
 
             // warnings apenas — não bloquear tooling
-            '@typescript-eslint/no-unused-vars': [
+            'no-unused-vars': [
                 'warn',
                 {
                     vars: 'all',
@@ -428,8 +327,14 @@ export default tseslint.config(
     // 8. Configs CommonJS explícitos (ex.: pm2/ecosystem)
     // ======================================================
     {
-        files: ['**/*.cjs', 'ecosystem.config.cjs', 'test-*.js', 'test_*.js', 'check_syntax.js', 'benchmark.js'],
-        extends: [tseslint.configs.disableTypeChecked],
+        files: [
+            '**/*.cjs',
+            'ecosystem.config.cjs',
+            'test-proxy-final.js',
+            'test-proxy-simple.js',
+            'test-puppeteer.js',
+            'check_syntax.js',
+        ],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'commonjs',
@@ -438,8 +343,6 @@ export default tseslint.config(
             },
         },
         rules: {
-            // Arquivos CJS raiz usam require() legitimamente
-            '@typescript-eslint/no-require-imports': 'off',
         },
     },
 
@@ -450,7 +353,6 @@ export default tseslint.config(
     // ======================================================
     {
         files: ['tools/**/*.{js,mjs}'],
-        extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
             ecmaVersion: 'latest',
             globals: {
@@ -461,9 +363,7 @@ export default tseslint.config(
             'no-console': 'off',
             // Ferramentas de tooling frequentemente relançam erros sem cause (padrão aceitável)
             'preserve-caught-error': 'off',
-            // Arquivos CJS de tooling usam require() legitimamente
-            '@typescript-eslint/no-require-imports': 'off',
-            '@typescript-eslint/no-unused-vars': [
+            'no-unused-vars': [
                 'warn',
                 {
                     vars: 'all',

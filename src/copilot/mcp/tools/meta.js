@@ -21,10 +21,11 @@ import { buildMcpSessionProfile } from './session-profile.js';
 import { readMcpToolsStatus } from './tools-status.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 73;
+const CAPABILITIES_VERSION = 83;
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
+    'repo_inventory',
     'repo_root_redaction_status',
     'repo_read_file',
     'repo_bulk_inspect',
@@ -45,6 +46,8 @@ const INDEX_TOOLS = [
     'repo_index_build',
     'repo_index_search',
     'repo_find_imports',
+    'repo_graph',
+    'repo_change_impact',
     'repo_find_orphan_imports',
 ];
 
@@ -64,6 +67,7 @@ const GIT_TOOLS = [
     'git_status',
     'git_diff',
     'git_log',
+    'git_inspect',
     'git_branch_info',
     'git_publish_changes',
     'git_stage',
@@ -173,8 +177,8 @@ const IO_GUIDANCE = [
     'Use repo_read_file_chunks for large files instead of requesting entire content.',
     'Use repo_search_text as the completeness-oriented filesystem search; it prefers rg when available and avoids treating temporarily partial derived-index hits as complete. Use repo_index_search explicitly for FTS/discovery over the convergent SQLite index.',
     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
-    'Use repo_find_symbol_usages for impact analysis before refactors.',
-    'Use repo_index_search/repo_find_imports for explicit indexed navigation; repo_symbol_search already uses the shared symbol index as its fast path and falls back to filesystem search when needed.',
+    'Use repo_change_impact for module-level reverse dependency impact before refactors. repo_find_symbol_usages remains lexical/textual occurrence discovery and must not be interpreted as semantic binding references while semantic code intelligence is deferred.',
+    'Use repo_index_search/repo_find_imports for explicit indexed navigation. Use repo_graph for dependency/dependent closures, cycles, shortest dependency paths and unresolved local edges instead of reconstructing a graph with repeated searches or shell commands; graph facts reuse the shared index and canonical infra module resolver.',
     'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',

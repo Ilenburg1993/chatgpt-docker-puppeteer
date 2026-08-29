@@ -11,6 +11,7 @@ import {
     errorResult,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
+    requireMcpToolPrincipal,
     requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
@@ -236,7 +237,11 @@ export const jobTools = [
                     validator,
                     requireMcpToolWorkspace(operationContext),
                     requireMcpToolValidationConfig(operationContext),
-                    { timeoutMs, ...(operationContext?.signal ? { signal: operationContext.signal } : {}) },
+                    {
+                        timeoutMs,
+                        ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                        ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
+                    },
                 ),
             );
         },
@@ -310,6 +315,7 @@ export const jobTools = [
         ) => {
             const workspace = requireMcpToolWorkspace(operationContext);
             const validationConfig = requireMcpToolValidationConfig(operationContext);
+            const ownerPrincipalKey = requireMcpToolPrincipal(operationContext).key;
             if (batch !== undefined) {
                 if (
                     validator !== undefined ||
@@ -342,6 +348,7 @@ export const jobTools = [
                                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
                                     workspace,
                                     validationConfig,
+                                    ownerPrincipalKey,
                                     operationContext?.signal,
                                 ),
                             );
@@ -449,6 +456,7 @@ export const jobTools = [
                     /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
                     workspace,
                     validationConfig,
+                    ownerPrincipalKey,
                     operationContext?.signal,
                 ),
             );
@@ -505,6 +513,7 @@ export const jobTools = [
                         includeDetails,
                     },
                     requireMcpToolValidationConfig(operationContext),
+                    requireMcpToolPrincipal(operationContext).key,
                 ),
             ),
     }),
@@ -516,7 +525,10 @@ export const jobTools = [
             jobId: z.string().min(1)['describe']('Validator job id.'),
         },
 
-        handler: async ({ jobId }) => frameValidationJobOperation(await readValidationJobSummary(jobId)),
+        handler: async ({ jobId }, operationContext) =>
+            frameValidationJobOperation(
+                await readValidationJobSummary(jobId, requireMcpToolPrincipal(operationContext).key),
+            ),
     }),
     defineMcpRawTool({
         name: 'job_get_output',
@@ -527,8 +539,10 @@ export const jobTools = [
             tailBytes: z.number().int().min(1000).max(50000).optional()['describe']('Tail bytes. Default: 8000.'),
         },
 
-        handler: async ({ jobId, tailBytes }) =>
-            frameValidationJobOperation(await readValidationJobOutput(jobId, tailBytes)),
+        handler: async ({ jobId, tailBytes }, operationContext) =>
+            frameValidationJobOperation(
+                await readValidationJobOutput(jobId, requireMcpToolPrincipal(operationContext).key, tailBytes),
+            ),
     }),
     defineMcpRawTool({
         name: 'job_cancel',
@@ -538,6 +552,9 @@ export const jobTools = [
             jobId: z.string().min(1)['describe']('Validator job id.'),
         },
 
-        handler: async ({ jobId }) => frameValidationJobOperation(await cancelValidationJob(jobId)),
+        handler: async ({ jobId }, operationContext) =>
+            frameValidationJobOperation(
+                await cancelValidationJob(jobId, requireMcpToolPrincipal(operationContext).key),
+            ),
     }),
 ];

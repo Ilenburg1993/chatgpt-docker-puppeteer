@@ -11,6 +11,8 @@
 import { diffTextWithReader } from '#copilot/infra/internal/filesystem/patch';
 import {
     listDirectoryNamesFresh,
+    listRegularFilesFresh,
+    listWorkspaceTreeEntriesFresh,
     lstatPath,
     readBytes,
     readBytesFresh,
@@ -235,6 +237,30 @@ export function createWorkspaceReadIo(input, options = {}) {
         diffTextValidated: bindValidatedReadPairOperation(runtimeDiffText, authority, telemetryRuntime),
         listDirectoryNamesFresh: bindWorkspaceReadOperation(
             listDirectoryNamesFresh,
+            'scan',
+            authority,
+            telemetryRuntime,
+        ),
+        listRegularFilesFresh: bindWorkspaceReadOperation(
+            listRegularFilesFresh,
+            'scan',
+            authority,
+            telemetryRuntime,
+        ),
+        listRegularFilesFreshValidated: bindValidatedReadOperation(
+            listRegularFilesFresh,
+            'scan',
+            authority,
+            telemetryRuntime,
+        ),
+        listWorkspaceTreeEntriesFresh: bindWorkspaceReadOperation(
+            listWorkspaceTreeEntriesFresh,
+            'scan',
+            authority,
+            telemetryRuntime,
+        ),
+        listWorkspaceTreeEntriesFreshValidated: bindValidatedReadOperation(
+            listWorkspaceTreeEntriesFresh,
             'scan',
             authority,
             telemetryRuntime,

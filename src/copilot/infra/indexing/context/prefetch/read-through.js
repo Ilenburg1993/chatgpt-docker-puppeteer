@@ -2,11 +2,11 @@
 /** Read-through context warm-up with parser/index reuse and relative-import expansion. */
 
 import { makeBytesKey, makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache/keys';
-import { readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
+import { readTextFileSnapshot, statPathSnapshot } from '#copilot/infra/internal/filesystem/read';
+import { createLocalModuleResolver } from '#copilot/infra/internal/indexing/module-resolution';
 import { parseAndCacheSymbols } from '#copilot/infra/internal/indexing/parser/cache';
 import { toOwnedBuffer } from '#copilot/infra/internal/platform/buffer';
 import { sha256 } from '#copilot/infra/internal/platform/hash';
-import { stat as fsStat } from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import { primeIoL1Entry, resolvePrefetchL1Cache, warmCacheForPaths } from './cache-warm.js';
 
@@ -164,7 +164,8 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         }
 
         if (relatedImports) {
-            relatedPaths = await resolveRelativeImportTargets(filePath, symbols?.imports ?? []);
+            const moduleResolver = await createLocalModuleResolver({ workspaceRoot });
+            relatedPaths = await resolveRelatedImportTargets(moduleResolver, filePath, symbols?.imports ?? []);
             if (relatedPaths.length > 0) {
                 const warm = await warmCacheForPaths(relatedPaths, {
                     concurrency,
@@ -192,46 +193,38 @@ export async function warmReadThroughContext(filePath, opts = {}) {
     };
 }
 
-const IMPORT_EXTENSIONS = ['', '.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx', '.json'];
-
 /**
+ * Resolve repository-local imports through the canonical module resolver, then use the canonical filesystem read owner
+ * only to select the first existing regular-file candidate. The resolver itself remains IO-free after construction.
+ *
+ * @param {Awaited<ReturnType<typeof createLocalModuleResolver>>} resolver
  * @param {string} sourceFile
  * @param {import('#copilot/infra/internal/indexing/parser').ImportEntry[]} imports
  * @returns {Promise<string[]>}
  */
-async function resolveRelativeImportTargets(sourceFile, imports) {
-    const baseDir = nodePath.dirname(sourceFile);
+async function resolveRelatedImportTargets(resolver, sourceFile, imports) {
     /** @type {string[]} */
     const out = [];
     /** @type {Map<string, Promise<import('node:fs').Stats | null>>} */
     const statCache = new Map();
 
-    /**
-     * @param {string} candidate
-     * @returns {Promise<import('node:fs').Stats | null>}
-     */
+    /** @param {string} candidate */
     function statCandidate(candidate) {
         const cached = statCache.get(candidate);
         if (cached) return cached;
-        const pending = fsStat(candidate).catch(() => null);
+        const pending = statPathSnapshot(candidate).catch(() => null);
         statCache.set(candidate, pending);
         return pending;
     }
 
     for (const entry of imports) {
-        if (!entry.source.startsWith('.')) continue;
-        const raw = nodePath.resolve(baseDir, entry.source);
-        const candidates = [
-            ...new Set(
-                IMPORT_EXTENSIONS.flatMap((ext) => [`${raw}${ext}`, nodePath.join(raw, `index${ext || '.js'}`)]),
-            ),
-        ];
-        const stats = await Promise.all(candidates.map((candidate) => statCandidate(candidate)));
+        const resolution = resolver.resolve(sourceFile, entry.source);
+        if (!resolution.local || !resolution.resolved) continue;
+        const stats = await Promise.all(resolution.candidates.map((candidate) => statCandidate(candidate)));
         const foundIndex = stats.findIndex((stat) => stat?.isFile());
-        if (foundIndex >= 0) {
-            const foundCandidate = candidates[foundIndex];
-            if (foundCandidate) out.push(foundCandidate);
-        }
+        if (foundIndex < 0) continue;
+        const foundCandidate = resolution.candidates[foundIndex];
+        if (foundCandidate) out.push(foundCandidate);
     }
     return [...new Set(out)];
 }

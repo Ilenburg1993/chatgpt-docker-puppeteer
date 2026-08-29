@@ -208,8 +208,7 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
  */
 async function executePhase(phase, manifestPath, dbPath, concurrency) {
     const files = /** @type {WorkloadFile[]} */ (JSON.parse(await readFile(manifestPath, 'utf8')));
-    const [{ readBytes }, { createInfraRuntime }, database] = await Promise.all([
-        import('#copilot/infra/internal/filesystem/read'),
+    const [{ createInfraRuntime }, database] = await Promise.all([
         import('#copilot/infra/public/composition/runtime'),
         import('#copilot/infra/public/composition/database/sqlite'),
     ]);
@@ -219,6 +218,7 @@ async function executePhase(phase, manifestPath, dbPath, concurrency) {
         sqliteProvider: sqliteRuntime.getStructuralDatabase,
         env: process.env,
     });
+    const workspace = runtime.workspace(process.cwd());
     const l2Cache = runtime.coherence.l2.get();
     if (phase === 'seed') {
         assert.ok(l2Cache, 'seed phase requires the experimental L2 cache');
@@ -245,7 +245,7 @@ async function executePhase(phase, manifestPath, dbPath, concurrency) {
             if (!file) return;
             const readStartedAt = performance.now();
             try {
-                const result = await readBytes(file.path, { cacheRuntime: runtime.coherence });
+                const result = await workspace.io.readBytes(file.path);
                 bytes += result.bytesRead;
                 const cache = String(result.io.cache ?? 'none');
                 cacheCounts[cache] = (cacheCounts[cache] ?? 0) + 1;

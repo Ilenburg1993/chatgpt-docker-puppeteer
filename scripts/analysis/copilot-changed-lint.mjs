@@ -4,6 +4,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const COPILOT_LINT_ROOTS = Object.freeze(['src/copilot/', 'tests/unit/copilot/']);
+const COPILOT_TYPE_AWARE_ROOT = 'src/copilot/';
 const COPILOT_LINT_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx']);
 const GENERATED_COPILOT_PREFIXES = Object.freeze(['src/copilot/.ai/']);
 
@@ -25,6 +26,15 @@ export function selectChangedCopilotLintPaths(paths) {
         .filter((candidate) => !GENERATED_COPILOT_PREFIXES.some((prefix) => candidate.startsWith(prefix)))
         .filter((candidate) => COPILOT_LINT_EXTENSIONS.has(path.posix.extname(candidate)))
         .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Type-aware promise lint deliberately covers first-party Copilot source only. Tests keep the historical relaxed lane.
+ *
+ * @param {Iterable<string>} paths
+ */
+export function selectChangedCopilotTypeAwarePaths(paths) {
+    return selectChangedCopilotLintPaths(paths).filter((candidate) => candidate.startsWith(COPILOT_TYPE_AWARE_ROOT));
 }
 
 /** @param {string} stdout */
@@ -63,14 +73,35 @@ export function collectChangedCopilotLintPaths(cwd) {
     return selectChangedCopilotLintPaths(changed);
 }
 
+/**
+ * @param {string} label
+ * @param {string} executable
+ * @param {string[]} args
+ * @param {{cwd:string;env:NodeJS.ProcessEnv}} options
+ */
+function runLintProcess(label, executable, args, options) {
+    const result = spawnSync(executable, args, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: 'inherit',
+        windowsHide: true,
+    });
+    if (result.error) {
+        process.stderr.write(`[lint:copilot:changed] phase=${label} error=${result.error.message}\n`);
+        return 1;
+    }
+    return Number(result.status ?? (result.signal ? 1 : 0));
+}
+
 /** @param {{ cwd?: string; env?: NodeJS.ProcessEnv }} [options] */
 export function runChangedCopilotLint(options = {}) {
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const env = options.env ?? process.env;
     const files = collectChangedCopilotLintPaths(cwd);
+    const typeAwareFiles = selectChangedCopilotTypeAwarePaths(files);
     const startedAt = Date.now();
     if (files.length === 0) {
-        process.stdout.write('[lint:copilot:changed] files=0 skipped=true durationMs=0\n');
+        process.stdout.write('[lint:copilot:changed] files=0 typeAwareFiles=0 skipped=true durationMs=0\n');
         return 0;
     }
 
@@ -78,28 +109,36 @@ export function runChangedCopilotLint(options = {}) {
     const cacheLocation =
         env['COPILOT_ESLINT_CACHE_LOCATION'] ??
         path.join(env['HOME'] ?? '/home/node', '.cache', 'eslint', '.eslintcache');
-    const result = spawnSync(
+    const eslintExitCode = runLintProcess(
+        'eslint',
         process.execPath,
         ['--max-old-space-size=6144', eslintCli, ...files, '--cache', '--cache-location', cacheLocation],
-        {
-            cwd,
-            env,
-            stdio: 'inherit',
-            windowsHide: true,
-        },
+        { cwd, env },
     );
-    const durationMs = Date.now() - startedAt;
-    if (result.error) {
-        process.stderr.write(
-            `[lint:copilot:changed] files=${String(files.length)} durationMs=${String(durationMs)} error=${result.error.message}\n`,
+    if (eslintExitCode !== 0) {
+        const durationMs = Date.now() - startedAt;
+        process.stdout.write(
+            `[lint:copilot:changed] files=${String(files.length)} typeAwareFiles=${String(typeAwareFiles.length)} phase=eslint durationMs=${String(durationMs)} exitCode=${String(eslintExitCode)}\n`,
         );
-        return 1;
+        return eslintExitCode;
     }
-    const exitCode = Number(result.status ?? (result.signal ? 1 : 0));
+
+    let typeAwareExitCode = 0;
+    if (typeAwareFiles.length > 0) {
+        const oxlintCli = path.join(cwd, 'node_modules', 'oxlint', 'bin', 'oxlint');
+        typeAwareExitCode = runLintProcess(
+            'type-aware',
+            process.execPath,
+            [oxlintCli, '--type-aware', '--tsconfig=tsconfig.node.json', ...typeAwareFiles],
+            { cwd, env },
+        );
+    }
+
+    const durationMs = Date.now() - startedAt;
     process.stdout.write(
-        `[lint:copilot:changed] files=${String(files.length)} durationMs=${String(durationMs)} exitCode=${String(exitCode)}\n`,
+        `[lint:copilot:changed] files=${String(files.length)} typeAwareFiles=${String(typeAwareFiles.length)} durationMs=${String(durationMs)} eslintExitCode=${String(eslintExitCode)} typeAwareExitCode=${String(typeAwareExitCode)}\n`,
     );
-    return exitCode;
+    return typeAwareExitCode;
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : null;

@@ -14,9 +14,10 @@ import {
     estimateStructuredTextResultBytes,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
+    requireMcpToolGitConfig,
     requireMcpToolRepositoryReadCacheConfig,
     requireMcpToolWorkspace,
-    withResultExecutionHint,
+    withBoundedResultPage,
     withResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
 import {
@@ -26,12 +27,15 @@ import {
     readRepositoryFile,
     readRepositoryFileChunks,
     readRepositoryFileOutline,
+    readRepositoryInventory,
     readRepositoryFileStats,
     readRepositoryTree,
     searchRepositorySymbols,
     searchRepositoryText,
 } from '#copilot/mcp/public/workspace/repository/read';
+import { execWorkspaceGit as execGit } from '#copilot/mcp/public/workspace/git';
 import { z } from 'zod';
+import { compactRepoReadBatchExecution, frameRepoReadBatchExecution } from './repo-read-batch.js';
 import { repoStatusHandler, repoStatusOutputSchema } from './repo-status.js';
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} RepoReadWorkspaceCapability */
@@ -45,7 +49,41 @@ const {
     minBatchResultBudgetBytes: MIN_REPO_BATCH_RESULT_BUDGET_BYTES,
     maxBatchResultBudgetBytes: MAX_REPO_BATCH_RESULT_BUDGET_BYTES,
     maxSearchContextLines: MAX_REPO_SEARCH_CONTEXT_LINES,
+    defaultTreeMaxEntries: DEFAULT_REPO_TREE_MAX_ENTRIES,
+    maxTreeMaxEntries: MAX_REPO_TREE_MAX_ENTRIES,
+    defaultTreeContentBudgetBytes: DEFAULT_REPO_TREE_CONTENT_BUDGET_BYTES,
+    minTreeContentBudgetBytes: MIN_REPO_TREE_CONTENT_BUDGET_BYTES,
+    maxTreeContentBudgetBytes: MAX_REPO_TREE_CONTENT_BUDGET_BYTES,
+    maxTreeToolResultBytes: MAX_REPO_TREE_TOOL_RESULT_BYTES,
+    maxTreeEnumeratedEntries: MAX_REPO_TREE_ENUMERATED_ENTRIES,
+    defaultChunkLines: DEFAULT_REPO_CHUNK_LINES,
+    maxChunkLines: MAX_REPO_CHUNK_LINES,
+    defaultChunkMaxChunks: DEFAULT_REPO_CHUNK_MAX_CHUNKS,
+    maxChunkMaxChunks: MAX_REPO_CHUNK_MAX_CHUNKS,
+    defaultChunkContentBudgetBytes: DEFAULT_REPO_CHUNK_CONTENT_BUDGET_BYTES,
+    minChunkContentBudgetBytes: MIN_REPO_CHUNK_CONTENT_BUDGET_BYTES,
+    maxChunkContentBudgetBytes: MAX_REPO_CHUNK_CONTENT_BUDGET_BYTES,
+    maxChunkToolResultBytes: MAX_REPO_CHUNK_TOOL_RESULT_BYTES,
+    defaultInventoryMaxResults: DEFAULT_REPO_INVENTORY_MAX_RESULTS,
+    maxInventoryMaxResults: MAX_REPO_INVENTORY_MAX_RESULTS,
+    defaultInventoryContentBudgetBytes: DEFAULT_REPO_INVENTORY_CONTENT_BUDGET_BYTES,
+    minInventoryContentBudgetBytes: MIN_REPO_INVENTORY_CONTENT_BUDGET_BYTES,
+    maxInventoryContentBudgetBytes: MAX_REPO_INVENTORY_CONTENT_BUDGET_BYTES,
+    maxInventoryToolResultBytes: MAX_REPO_INVENTORY_TOOL_RESULT_BYTES,
+    defaultOutlineMaxItems: DEFAULT_REPO_OUTLINE_MAX_ITEMS,
+    maxOutlineMaxItems: MAX_REPO_OUTLINE_MAX_ITEMS,
+    defaultOutlineContentBudgetBytes: DEFAULT_REPO_OUTLINE_CONTENT_BUDGET_BYTES,
+    minOutlineContentBudgetBytes: MIN_REPO_OUTLINE_CONTENT_BUDGET_BYTES,
+    maxOutlineContentBudgetBytes: MAX_REPO_OUTLINE_CONTENT_BUDGET_BYTES,
+    maxOutlineToolResultBytes: MAX_REPO_OUTLINE_TOOL_RESULT_BYTES,
 } = MCP_TOOL_EXECUTION_LIMITS.repoRead;
+
+const REPO_READ_BATCH_LIMITS = Object.freeze({
+    defaultResultBudgetBytes: DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
+    minResultBudgetBytes: MIN_REPO_BATCH_RESULT_BUDGET_BYTES,
+    maxResultBudgetBytes: MAX_REPO_BATCH_RESULT_BUDGET_BYTES,
+    maxBatchItems: MAX_REPO_BATCH_REQUESTS,
+});
 
 const repoReadBatchItemSchema = z.object({
     path: z.string().min(1),
@@ -67,6 +105,22 @@ const repoSearchBatchItemSchema = z.object({
     cursor: z.string().optional(),
 });
 
+const repoOutlineBatchItemSchema = z.object({
+    path: z.string().min(1),
+    includeImports: z.boolean().optional(),
+    includeExports: z.boolean().optional(),
+    includeOutline: z.boolean().optional(),
+    includeTopComments: z.boolean().optional(),
+    maxItems: z.number().int().min(1).max(MAX_REPO_OUTLINE_MAX_ITEMS).optional(),
+    maxBytes: z
+        .number()
+        .int()
+        .min(MIN_REPO_OUTLINE_CONTENT_BUDGET_BYTES)
+        .max(MAX_REPO_OUTLINE_CONTENT_BUDGET_BYTES)
+        .optional(),
+    cursor: z.string().max(32 * 1024).optional(),
+});
+
 const repoStatBatchItemSchema = z.object({
     path: z.string().min(1),
     includeHash: z.boolean().optional(),
@@ -83,43 +137,6 @@ const repoBulkInspectItemSchema = z.object({
     args: z.record(z.string(), z.unknown()),
 });
 
-/**
- * Convert a normal MCP call result into one compact batch row. Heavy text remains only in structuredContent, so batch
- * mode does not duplicate each read/search payload in legacy content text.
- *
- * @param {number} index
- * @param {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult} result
- */
-function compactBatchCallResult(index, result) {
-    return {
-        index,
-        isError: result.isError === true,
-        ...(result.structuredContent ?? {}),
-    };
-}
-
-/** @param {Record<string, unknown>[]} results */
-function inspectRepoBulkContinuation(results) {
-    let availableOperations = 0;
-    let transportRequiredOperations = 0;
-    let recommendedOperations = 0;
-    for (const row of results) {
-        const nextCursor = typeof row['nextCursor'] === 'string' && row['nextCursor'].length > 0;
-        const hasMore = row['hasMore'] === true;
-        const transportRequired = row['payloadTruncated'] === true;
-        const recommended = transportRequired || hasMore || row['truncated'] === true;
-        const available = transportRequired || hasMore || nextCursor;
-        if (available) availableOperations += 1;
-        if (transportRequired) transportRequiredOperations += 1;
-        if (recommended) recommendedOperations += 1;
-    }
-    return {
-        availableOperations,
-        transportRequiredOperations,
-        recommendedOperations,
-    };
-}
-
 /** @param {unknown} value */
 function estimateRepoBatchItemBytes(value) {
     try {
@@ -130,147 +147,39 @@ function estimateRepoBatchItemBytes(value) {
 }
 
 /**
- * @param {Awaited<
- *     ReturnType<
- *         typeof runBoundedOperationBatch<
- *             Record<string, unknown>,
- *             import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult
- *         >
- *     >
- * >} execution
- */
-function compactRepoBulkExecution(execution) {
-    return execution.results.map((row) => {
-        if (row.status === 'skipped') {
-            return {
-                index: row.index,
-                status: row.status,
-                isError: true,
-                success: false,
-                skipped: true,
-                durationMs: row.durationMs,
-                code: 'ERR_BATCH_SKIPPED',
-                reason: row.reason,
-            };
-        }
-        if (row.status === 'succeeded') {
-            return {
-                ...compactBatchCallResult(row.index, row.value),
-                status: row.status,
-                durationMs: row.durationMs,
-            };
-        }
-        if ('value' in row && row.value) {
-            return {
-                ...compactBatchCallResult(row.index, row.value),
-                status: row.status,
-                durationMs: row.durationMs,
-            };
-        }
-        return {
-            index: row.index,
-            status: 'failed',
-            isError: true,
-            success: false,
-            durationMs: row.durationMs,
-            code: row.code ?? 'ERR_BATCH_ITEM_EXECUTION',
-            error: row.error ?? 'Batch item execution failed.',
-        };
-    });
-}
-
-/**
- * Keep a successful bulk execution below the registry result ceiling without dropping item-level status/metadata. Only
- * large textual payload fields are truncated; structural feedback remains available.
- *
- * @param {Record<string, unknown>[]} inputResults
- * @param {number} budgetBytes
- */
-function boundRepoBulkResultPayload(inputResults, budgetBytes) {
-    const effectiveBudget = Math.max(
-        MIN_REPO_BATCH_RESULT_BUDGET_BYTES,
-        Math.min(MAX_REPO_BATCH_RESULT_BUDGET_BYTES, Math.floor(budgetBytes)),
-    );
-    const originalResultBytes = Buffer.byteLength(JSON.stringify(inputResults), 'utf8');
-    if (originalResultBytes <= effectiveBudget) {
-        return {
-            results: inputResults,
-            resultBudgetBytes: effectiveBudget,
-            originalResultBytes,
-            resultBytes: originalResultBytes,
-            payloadTruncatedCount: 0,
-        };
-    }
-
-    const results = inputResults.map((row) => ({ ...row }));
-    /** @type {{
-    row: Record<string, unknown>;
-    key: 'content' | 'output';
-    original: string;
-    originalBytes: number;
-}[]} */
-    const heavy = [];
-    for (const row of results) {
-        for (const key of /** @type {const} */ (['content', 'output'])) {
-            const value = row[key];
-            if (typeof value !== 'string' || value.length === 0) continue;
-            heavy.push({ row, key, original: value, originalBytes: Buffer.byteLength(value, 'utf8') });
-            row[key] = '';
-        }
-    }
-
-    const skeletonBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
-    let remaining = Math.max(0, effectiveBudget - skeletonBytes - 4096);
-    let remainingFields = heavy.length;
-    let payloadTruncatedCount = 0;
-    for (const field of heavy) {
-        const share = remainingFields > 0 ? Math.max(0, Math.floor(remaining / remainingFields)) : 0;
-        const bounded = truncateUtf8String(field.original, share);
-        field.row[field.key] = bounded.text;
-        if (bounded.truncated) {
-            field.row['payloadTruncated'] = true;
-            field.row['originalPayloadBytes'] = field.originalBytes;
-            payloadTruncatedCount += 1;
-        }
-        remaining = Math.max(0, remaining - Buffer.byteLength(bounded.text, 'utf8'));
-        remainingFields -= 1;
-    }
-
-    let resultBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
-    if (resultBytes > effectiveBudget) {
-        payloadTruncatedCount = 0;
-        for (const field of heavy) {
-            field.row[field.key] = '';
-            field.row['payloadTruncated'] = true;
-            field.row['payloadOmittedForBatchBudget'] = true;
-            field.row['originalPayloadBytes'] = field.originalBytes;
-            payloadTruncatedCount += 1;
-        }
-        resultBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
-    }
-    return {
-        results,
-        resultBudgetBytes: effectiveBudget,
-        originalResultBytes,
-        resultBytes,
-        payloadTruncatedCount,
-    };
-}
-
-/**
  * Convert one protocol-neutral repository operation into an MCP result.
  *
  * @param {Awaited<ReturnType<typeof readRepositoryFile>>} operation
  * @param {string} [sizeHintSource]
- * @param {'read-file' | 'search-text' | 'tree'} [heavySummaryKind]
+ * @param {'read-file' | 'search-text' | 'tree' | 'chunks' | 'inventory' | 'outline'} [heavySummaryKind]
+ * @param {number | undefined} [boundedPageBudgetBytes]
  * @returns {import('#copilot/mcp/public/protocol/tools').StructuredCallToolResult}
  */
-function frameRepositoryReadOperation(operation, sizeHintSource, heavySummaryKind) {
+function frameRepositoryReadOperation(operation, sizeHintSource, heavySummaryKind, boundedPageBudgetBytes) {
     if (!operation.ok) return errorResult(operation.message, operation.details);
     const text = heavySummaryKind
         ? buildHeavyRepositoryResultSummary(heavySummaryKind, operation.structured)
         : operation.text;
     const result = okResult(operation.structured, text);
+    if (boundedPageBudgetBytes !== undefined) {
+        const cursor = operation.structured['cursor'];
+        const nextCursor = operation.structured['nextCursor'];
+        return withBoundedResultPage(result, {
+            ...(cursor === undefined ? {} : { cursor: /** @type {string | number | null} */ (cursor) }),
+            ...(nextCursor === undefined
+                ? {}
+                : { nextCursor: /** @type {string | number | null} */ (nextCursor) }),
+            truncated: operation.structured['truncated'] === true,
+            truncationReason:
+                typeof operation.structured['truncationReason'] === 'string'
+                    ? operation.structured['truncationReason']
+                    : null,
+            budgetBytes: boundedPageBudgetBytes,
+            contentBytes: Number(operation.structured['returnedContentBytes'] ?? 0),
+            contentBudgetBytes: Number(operation.structured['contentBudgetBytes'] ?? 0),
+            source: sizeHintSource ?? 'bounded-repository-result',
+        });
+    }
     if (!sizeHintSource) return result;
     return withResultSizeHint(result, {
         bytes: estimateStructuredTextResultBytes(operation.structured, text ?? ''),
@@ -286,7 +195,7 @@ const MAX_HEAVY_RESULT_SUMMARY_BYTES = 2048;
  * compatibility surface. This is intentionally tool-local instead of changing okResult globally: only result shapes
  * with proven structuredContent visibility and measured duplication use compact framing.
  *
- * @param {'read-file' | 'search-text' | 'tree'} kind
+ * @param {'read-file' | 'search-text' | 'tree' | 'chunks' | 'inventory' | 'outline'} kind
  * @param {Record<string, unknown>} structured
  */
 function buildHeavyRepositoryResultSummary(kind, structured) {
@@ -300,8 +209,16 @@ function buildHeavyRepositoryResultSummary(kind, structured) {
         text = `Read ${path}: bytes=${Number(structured['bytes'] ?? 0)}, lines=${Number(returned['start'] ?? 0)}-${Number(returned['end'] ?? 0)}/${Number(structured['totalLines'] ?? 0)}; full file text is in structuredContent.content.`;
     } else if (kind === 'search-text') {
         text = `Search ${JSON.stringify(String(structured['pattern'] ?? ''))} in ${path}: returnedMatches=${Number(structured['returnedMatchCount'] ?? structured['matchCount'] ?? 0)}/${Number(structured['totalMatchCount'] ?? structured['totalMatches'] ?? 0)}, returnedLines=${Number(structured['returnedLineCount'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; full matched output is in structuredContent.output.`;
+    } else if (kind === 'tree') {
+        text = `Tree ${path}: returned=${Number(structured['count'] ?? 0)}/${Number(structured['totalVisible'] ?? structured['totalScanned'] ?? 0)}, scanned=${Number(structured['totalScanned'] ?? 0)}, blocked=${Number(structured['blockedEntriesCount'] ?? 0)}, contentBytes=${Number(structured['returnedContentBytes'] ?? 0)}/${Number(structured['contentBudgetBytes'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; full tree entries are in structuredContent.entries.`;
+    } else if (kind === 'inventory') {
+        text = `Inventory ${path} via ${String(structured['source'] ?? 'unknown')}: returned=${Number(structured['returnedCount'] ?? 0)}/${Number(/** @type {Record<string, unknown>} */ (structured['aggregates'] ?? {})['visibleFiles'] ?? 0)}, contentBytes=${Number(structured['returnedContentBytes'] ?? 0)}/${Number(structured['contentBudgetBytes'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; paths are in structuredContent.paths.`;
+    } else if (kind === 'outline') {
+        const returned = /** @type {Record<string, unknown>} */ (structured['returnedCounts'] ?? {});
+        const total = /** @type {Record<string, unknown>} */ (structured['totalCounts'] ?? {});
+        text = `Outline ${path}: symbols=${Number(returned['symbols'] ?? 0)}/${Number(total['symbols'] ?? 0)}, imports=${Number(returned['imports'] ?? 0)}/${Number(total['imports'] ?? 0)}, exports=${Number(returned['exports'] ?? 0)}/${Number(total['exports'] ?? 0)}, contentBytes=${Number(structured['returnedContentBytes'] ?? 0)}/${Number(structured['contentBudgetBytes'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; structural collections are in structuredContent.`;
     } else {
-        text = `Tree ${path}: entries=${Number(structured['count'] ?? 0)}, scanned=${Number(structured['totalScanned'] ?? 0)}, blocked=${Number(structured['blockedEntriesCount'] ?? 0)}, truncated=${structured['truncated'] === true}; full tree entries are in structuredContent.entries.`;
+        text = `Chunk page ${path}: chunks=${Number(structured['returnedChunkCount'] ?? structured['chunkCount'] ?? 0)}, lines=${Number(structured['returnedLineCount'] ?? 0)}, contentBytes=${Number(structured['returnedContentBytes'] ?? 0)}/${Number(structured['contentBudgetBytes'] ?? 0)}, truncated=${structured['truncated'] === true}, nextCursor=${String(structured['nextCursor'] ?? 'none')}; chunk content is in structuredContent.chunks.`;
     }
     return truncateUtf8String(text, MAX_HEAVY_RESULT_SUMMARY_BYTES).text;
 }
@@ -324,6 +241,16 @@ async function runRepoSearchTextCall(workspace, input) {
     );
 }
 
+/** @param {RepoReadWorkspaceCapability} workspace @param {{path:string;includeImports?:boolean;includeExports?:boolean;includeOutline?:boolean;includeTopComments?:boolean;maxItems?:number;maxBytes?:number;cursor?:string}} input */
+async function runRepoFileOutlineCall(workspace, input) {
+    return frameRepositoryReadOperation(
+        await readRepositoryFileOutline(workspace, input),
+        'repo_file_outline',
+        'outline',
+        MAX_REPO_OUTLINE_TOOL_RESULT_BYTES,
+    );
+}
+
 /** @param {{pattern?: string | undefined; query?: string | undefined}} input */
 function hasDivergentSearchAliases(input) {
     return input.pattern !== undefined && input.query !== undefined && input.pattern !== input.query;
@@ -332,6 +259,58 @@ function hasDivergentSearchAliases(input) {
 /** @param {RepoReadWorkspaceCapability} workspace @param {{ path: string; includeHash?: boolean; maxHashBytes?: number }} input */
 async function runRepoFileStatsCall(workspace, input) {
     return frameRepositoryReadOperation(await readRepositoryFileStats(workspace, input));
+}
+
+/**
+ * @param {RepoReadWorkspaceCapability} workspace
+ * @param {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext | undefined} operationContext
+ */
+function createRepoInventoryGitPorts(workspace, operationContext) {
+    const config = requireMcpToolGitConfig(operationContext);
+    const signal = operationContext?.signal;
+    return Object.freeze({
+        ...(signal ? { signal } : {}),
+        /** @param {string} scopePath */
+        async gitListTrackedPaths(scopePath) {
+            const args = ['--literal-pathspecs', 'ls-files', '-z', '--'];
+            if (scopePath !== '.') args.push(scopePath);
+            const result = await execGit(args, {
+                cwd: workspace.workspaceRoot,
+                config,
+                timeoutMs: 30_000,
+                maxBufferBytes: 8 * 1024 * 1024,
+                ...(signal ? { signal } : {}),
+            });
+            if (!result.success) {
+                return {
+                    ok: /** @type {const} */ (false),
+                    message: 'Git tracked-file inventory failed.',
+                    details: {
+                        code: 'ERR_REPO_INVENTORY_GIT',
+                        failureClass: 'git-read',
+                        retryability: 'inspect-before-retry',
+                        recoveryRequired: false,
+                        exitCode: result.exitCode,
+                        timedOut: result.timedOut,
+                        cancelled: result.cancelled,
+                        outputLimitExceeded: result.outputLimitExceeded,
+                        error: result.error ?? 'git ls-files failed',
+                    },
+                };
+            }
+            const paths = Object.freeze(result.stdout.split('\0').filter(Boolean));
+            return {
+                ok: /** @type {const} */ (true),
+                paths,
+                metadata: {
+                    engine: 'git ls-files -z',
+                    trackedOnly: true,
+                    nulDelimited: true,
+                    candidateCount: paths.length,
+                },
+            };
+        },
+    });
 }
 
 /**
@@ -397,7 +376,8 @@ export const repoReadTools = [
     defineMcpRawTool({
         name: 'repo_tree',
         title: 'Repository tree',
-        description: 'List files and directories inside the workspace with depth and entry limits.',
+        description:
+            'List deterministic flat tree entries with bounded depth, keyset continuation, glob filters and byte budget. Paths are workspace-relative; absolutePath is never returned.',
         inputSchema: {
             path: z
                 .string()
@@ -405,24 +385,140 @@ export const repoReadTools = [
                 ['describe'](
                     'Workspace-relative directory path. Default: src/copilot. Empty string uses the default. Use "." for workspace root.',
                 ),
-            recursive: z.boolean().optional()['describe']('Whether to recurse into children. Default: false.'),
-            depth: z.number().int().min(1).max(8).optional()['describe']('Maximum recursion depth. Default: 2.'),
-            maxEntries: z.number().int().min(1).max(2000).optional()['describe']('Maximum entries returned.'),
-            showHidden: z.boolean().optional()['describe']('Include dotfiles. Default: false.'),
+            recursive: z.boolean().optional()['describe']('Whether to recurse into descendants. Default: false.'),
+            depth: z
+                .number()
+                .int()
+                .min(1)
+                .max(8)
+                .optional()
+                ['describe']('Maximum relative depth when recursive=true. Default: 2; ignored for non-recursive calls.'),
+            maxEntries: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_TREE_MAX_ENTRIES)
+                .optional()
+                ['describe'](`Maximum entries returned in one page. Default: ${String(DEFAULT_REPO_TREE_MAX_ENTRIES)}.`),
+            showHidden: z.boolean().optional()['describe']('Include allowed dotfiles/directories. Protected names remain redacted. Default: false.'),
+            includePattern: z
+                .string()
+                .min(1)
+                .max(4096)
+                .optional()
+                ['describe']('Optional native glob matched against paths relative to the tree scope (or basename for slashless patterns).'),
+            excludePattern: z
+                .string()
+                .min(1)
+                .max(4096)
+                .optional()
+                ['describe']('Optional native glob excluded after security filtering and before pagination.'),
+            maxOutputBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_TREE_CONTENT_BUDGET_BYTES)
+                .max(MAX_REPO_TREE_CONTENT_BUDGET_BYTES)
+                .optional()
+                ['describe'](
+                    `UTF-8 budget for structured tree entries. Default: ${String(DEFAULT_REPO_TREE_CONTENT_BUDGET_BYTES)}; complete result ceiling: ${String(MAX_REPO_TREE_TOOL_RESULT_BYTES)} bytes.`,
+                ),
+            cursor: z
+                .string()
+                .max(32 * 1024)
+                .optional()
+                ['describe']('Path-keyset nextCursor returned by the same repo_tree scope/filter configuration.'),
         },
+        maxResultBytes: MAX_REPO_TREE_TOOL_RESULT_BYTES,
 
-        handler: async ({ path, recursive, depth, maxEntries, showHidden }, operationContext) =>
+        handler: async (
+            { path, recursive, depth, maxEntries, showHidden, includePattern, excludePattern, maxOutputBytes, cursor },
+            operationContext,
+        ) =>
             frameRepositoryReadOperation(
                 await readRepositoryTree(requireMcpToolWorkspace(operationContext), {
                     ...(path === undefined ? {} : { path }),
                     ...(recursive === undefined ? {} : { recursive }),
                     ...(depth === undefined ? {} : { depth }),
-                    ...(maxEntries === undefined ? {} : { maxEntries }),
+                    maxEntries: maxEntries ?? DEFAULT_REPO_TREE_MAX_ENTRIES,
                     ...(showHidden === undefined ? {} : { showHidden }),
+                    ...(includePattern === undefined ? {} : { includePattern }),
+                    ...(excludePattern === undefined ? {} : { excludePattern }),
+                    maxOutputBytes: maxOutputBytes ?? DEFAULT_REPO_TREE_CONTENT_BUDGET_BYTES,
+                    ...(cursor === undefined ? {} : { cursor }),
+                    hardMaxEntries: MAX_REPO_TREE_ENUMERATED_ENTRIES,
+                    ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
-                undefined,
+                'repo_tree',
                 'tree',
+                MAX_REPO_TREE_TOOL_RESULT_BYTES,
             ),
+    }),
+    defineMcpRawTool({
+        name: 'repo_inventory',
+        title: 'Repository inventory',
+        description:
+            'Return a flat deterministic workspace-relative file inventory from Git, filesystem or the persistent index with keyset continuation and aggregate counts.',
+        inputSchema: {
+            source: z
+                .enum(['git', 'filesystem', 'index'])
+                .optional()
+                ['describe']('Inventory source. Default: git (tracked files only).'),
+            path: z
+                .string()
+                .optional()
+                ['describe'](
+                    'Workspace-relative file or directory scope. Default: src/copilot. Empty string uses the default; use "." for workspace root.',
+                ),
+            maxResults: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_INVENTORY_MAX_RESULTS)
+                .optional()
+                ['describe'](`Maximum paths returned in one page. Default: ${String(DEFAULT_REPO_INVENTORY_MAX_RESULTS)}.`),
+            maxOutputBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_INVENTORY_CONTENT_BUDGET_BYTES)
+                .max(MAX_REPO_INVENTORY_CONTENT_BUDGET_BYTES)
+                .optional()
+                ['describe'](
+                    `UTF-8 budget for returned paths. Default: ${String(DEFAULT_REPO_INVENTORY_CONTENT_BUDGET_BYTES)}; complete tool result ceiling: ${String(MAX_REPO_INVENTORY_TOOL_RESULT_BYTES)} bytes.`,
+                ),
+            cursor: z
+                .string()
+                .max(32 * 1024)
+                .optional()
+                ['describe']('Path-keyset nextCursor returned by the same repo_inventory path/source scope.'),
+        },
+        maxResultBytes: MAX_REPO_INVENTORY_TOOL_RESULT_BYTES,
+
+        handler: async ({ source, path, maxResults, maxOutputBytes, cursor }, operationContext) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            const effectiveSource = source ?? 'git';
+            const ports =
+                effectiveSource === 'git'
+                    ? createRepoInventoryGitPorts(workspace, operationContext)
+                    : operationContext?.signal
+                      ? { signal: operationContext.signal }
+                      : {};
+            return frameRepositoryReadOperation(
+                await readRepositoryInventory(
+                    workspace,
+                    {
+                        source: effectiveSource,
+                        ...(path === undefined ? {} : { path }),
+                        maxResults: maxResults ?? DEFAULT_REPO_INVENTORY_MAX_RESULTS,
+                        maxOutputBytes: maxOutputBytes ?? DEFAULT_REPO_INVENTORY_CONTENT_BUDGET_BYTES,
+                        ...(cursor === undefined ? {} : { cursor }),
+                    },
+                    ports,
+                ),
+                'repo_inventory',
+                'inventory',
+                MAX_REPO_INVENTORY_TOOL_RESULT_BYTES,
+            );
+        },
     }),
     defineMcpRawTool({
         name: 'repo_root_redaction_status',
@@ -512,52 +608,13 @@ export const repoReadTools = [
                         isFailure: (result) => result.isError === true,
                     },
                 );
-                const bounded = boundRepoBulkResultPayload(
-                    compactRepoBulkExecution(execution),
-                    batchResultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
-                );
-                const structured = {
-                    success: execution.failedCount === 0 && execution.skippedCount === 0,
-                    batch: true,
-                    executionId: execution.executionId,
-                    failureMode: execution.failureMode,
-                    requestCount: execution.requestCount,
-                    attemptedCount: execution.attemptedCount,
-                    succeededCount: execution.succeededCount,
-                    failedCount: execution.failedCount,
-                    skippedCount: execution.skippedCount,
-                    concurrency: execution.concurrency,
-                    maxInFlight: execution.maxInFlight,
-                    inputBytes: execution.inputBytes,
-                    durationMs: execution.durationMs,
-                    resultBudgetBytes: bounded.resultBudgetBytes,
-                    originalResultBytes: bounded.originalResultBytes,
-                    resultBytes: bounded.resultBytes,
-                    payloadTruncatedCount: bounded.payloadTruncatedCount,
-                    results: bounded.results,
-                };
-                const text = `Read batch completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped; payloads are in structuredContent.results.`;
-                const result = withResultSizeHint(okResult(structured, text), {
-                    bytes: estimateStructuredTextResultBytes(structured, text),
-                    strategy: 'conservative-estimate',
-                    source: 'repo_read_file.batch',
-                });
-                const continuation = inspectRepoBulkContinuation(bounded.results);
-                return withResultExecutionHint(result, {
-                    logicalOperations: execution.requestCount,
-                    failedOperations: execution.failedCount,
-                    skippedOperations: execution.skippedCount,
-                    mode: `read-batch:${execution.failureMode}`,
-                    batchSize: execution.requestCount,
-                    batchCapacity: MAX_REPO_BATCH_REQUESTS,
-                    resultBudgetBytes: bounded.resultBudgetBytes,
-                    truncatedOperations: bounded.payloadTruncatedCount,
-                    continuationAvailable: continuation.availableOperations > 0,
-                    continuationAvailableOperations: continuation.availableOperations,
-                    continuationTransportRequired: continuation.transportRequiredOperations > 0,
-                    continuationTransportRequiredOperations: continuation.transportRequiredOperations,
-                    continuationRecommended: continuation.recommendedOperations > 0,
-                    continuationRecommendedOperations: continuation.recommendedOperations,
+                return frameRepoReadBatchExecution(execution, {
+                    budgetBytes: batchResultBudgetBytes,
+                    limits: REPO_READ_BATCH_LIMITS,
+                    marker: 'batch',
+                    modePrefix: 'read-batch',
+                    sizeHintSource: 'repo_read_file.batch',
+                    summaryNoun: 'Read',
                 });
             }
             if (
@@ -640,58 +697,21 @@ export const repoReadTools = [
                     isFailure: (result) => result.isError === true,
                 },
             );
-            const bounded = boundRepoBulkResultPayload(
-                compactRepoBulkExecution(execution).map((row, index) => ({
-                    ...row,
-                    op:
-                        operations[index] && typeof operations[index] === 'object' && 'op' in operations[index]
-                            ? operations[index].op
-                            : null,
-                })),
-                resultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
-            );
-            const structured = {
-                success: execution.failedCount === 0 && execution.skippedCount === 0,
-                bulkInspect: true,
-                executionId: execution.executionId,
-                failureMode: execution.failureMode,
-                requestCount: execution.requestCount,
-                attemptedCount: execution.attemptedCount,
-                succeededCount: execution.succeededCount,
-                failedCount: execution.failedCount,
-                skippedCount: execution.skippedCount,
-                concurrency: execution.concurrency,
-                maxInFlight: execution.maxInFlight,
-                inputBytes: execution.inputBytes,
-                durationMs: execution.durationMs,
-                resultBudgetBytes: bounded.resultBudgetBytes,
-                originalResultBytes: bounded.originalResultBytes,
-                resultBytes: bounded.resultBytes,
-                payloadTruncatedCount: bounded.payloadTruncatedCount,
-                results: bounded.results,
-            };
-            const text = `Bulk inspect completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped.`;
-            const result = withResultSizeHint(okResult(structured, text), {
-                bytes: estimateStructuredTextResultBytes(structured, text),
-                strategy: 'conservative-estimate',
-                source: 'repo_bulk_inspect',
-            });
-            const continuation = inspectRepoBulkContinuation(bounded.results);
-            return withResultExecutionHint(result, {
-                logicalOperations: execution.requestCount,
-                failedOperations: execution.failedCount,
-                skippedOperations: execution.skippedCount,
-                mode: `bulk-inspect:${execution.failureMode}`,
-                batchSize: execution.requestCount,
-                batchCapacity: MAX_REPO_BATCH_REQUESTS,
-                resultBudgetBytes: bounded.resultBudgetBytes,
-                truncatedOperations: bounded.payloadTruncatedCount,
-                continuationAvailable: continuation.availableOperations > 0,
-                continuationAvailableOperations: continuation.availableOperations,
-                continuationTransportRequired: continuation.transportRequiredOperations > 0,
-                continuationTransportRequiredOperations: continuation.transportRequiredOperations,
-                continuationRecommended: continuation.recommendedOperations > 0,
-                continuationRecommendedOperations: continuation.recommendedOperations,
+            const rows = compactRepoReadBatchExecution(execution).map((row, index) => ({
+                ...row,
+                op:
+                    operations[index] && typeof operations[index] === 'object' && 'op' in operations[index]
+                        ? operations[index].op
+                        : null,
+            }));
+            return frameRepoReadBatchExecution(execution, {
+                rows,
+                budgetBytes: resultBudgetBytes,
+                limits: REPO_READ_BATCH_LIMITS,
+                marker: 'bulkInspect',
+                modePrefix: 'bulk-inspect',
+                sizeHintSource: 'repo_bulk_inspect',
+                summaryNoun: 'Bulk inspect',
             });
         },
     }),
@@ -704,7 +724,29 @@ export const repoReadTools = [
             path: z.string().min(1)['describe']('Workspace-relative file path.'),
             startLine: z.number().int().min(1).optional()['describe']('Optional 1-based first line.'),
             endLine: z.number().int().min(1).optional()['describe']('Optional 1-based last line.'),
-            chunkLines: z.number().int().min(1).max(1000).optional()['describe']('Lines per chunk. Default: 200.'),
+            chunkLines: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_CHUNK_LINES)
+                .optional()
+                ['describe'](`Lines per chunk. Default: ${String(DEFAULT_REPO_CHUNK_LINES)}.`),
+            maxChunks: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_CHUNK_MAX_CHUNKS)
+                .optional()
+                ['describe'](`Maximum chunks in one page. Default: ${String(DEFAULT_REPO_CHUNK_MAX_CHUNKS)}.`),
+            maxOutputBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_CHUNK_CONTENT_BUDGET_BYTES)
+                .max(MAX_REPO_CHUNK_CONTENT_BUDGET_BYTES)
+                .optional()
+                ['describe'](
+                    `UTF-8 budget for chunk content only. Default: ${String(DEFAULT_REPO_CHUNK_CONTENT_BUDGET_BYTES)}; the complete MCP result has a separate ${String(MAX_REPO_CHUNK_TOOL_RESULT_BYTES)}-byte ceiling.`,
+                ),
             cursor: z.string().optional()['describe']('Next-line cursor returned by a previous call.'),
             highWaterMark: z
                 .number()
@@ -714,8 +756,9 @@ export const repoReadTools = [
                 .optional()
                 ['describe']('Optional stream highWaterMark in bytes.'),
         },
+        maxResultBytes: MAX_REPO_CHUNK_TOOL_RESULT_BYTES,
 
-        handler: async ({ path, startLine, endLine, chunkLines, cursor, highWaterMark }, operationContext) =>
+        handler: async ({ path, startLine, endLine, chunkLines, maxChunks, maxOutputBytes, cursor, highWaterMark }, operationContext) =>
             frameRepositoryReadOperation(
                 await readRepositoryFileChunks(
                     requireMcpToolWorkspace(operationContext),
@@ -723,13 +766,17 @@ export const repoReadTools = [
                         path,
                         ...(startLine === undefined ? {} : { startLine }),
                         ...(endLine === undefined ? {} : { endLine }),
-                        ...(chunkLines === undefined ? {} : { chunkLines }),
+                        chunkLines: chunkLines ?? DEFAULT_REPO_CHUNK_LINES,
+                        maxChunks: maxChunks ?? DEFAULT_REPO_CHUNK_MAX_CHUNKS,
+                        maxOutputBytes: maxOutputBytes ?? DEFAULT_REPO_CHUNK_CONTENT_BUDGET_BYTES,
                         ...(cursor === undefined ? {} : { cursor }),
                         ...(highWaterMark === undefined ? {} : { highWaterMark }),
                     },
                     requireMcpToolRepositoryReadCacheConfig(operationContext),
                 ),
                 'repo_read_file_chunks',
+                'chunks',
+                MAX_REPO_CHUNK_TOOL_RESULT_BYTES,
             ),
     }),
     defineMcpRawTool({
@@ -877,52 +924,13 @@ export const repoReadTools = [
                         isFailure: (result) => result.isError === true,
                     },
                 );
-                const bounded = boundRepoBulkResultPayload(
-                    compactRepoBulkExecution(execution),
-                    batchResultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
-                );
-                const structured = {
-                    success: execution.failedCount === 0 && execution.skippedCount === 0,
-                    batch: true,
-                    executionId: execution.executionId,
-                    failureMode: execution.failureMode,
-                    requestCount: execution.requestCount,
-                    attemptedCount: execution.attemptedCount,
-                    succeededCount: execution.succeededCount,
-                    failedCount: execution.failedCount,
-                    skippedCount: execution.skippedCount,
-                    concurrency: execution.concurrency,
-                    maxInFlight: execution.maxInFlight,
-                    inputBytes: execution.inputBytes,
-                    durationMs: execution.durationMs,
-                    resultBudgetBytes: bounded.resultBudgetBytes,
-                    originalResultBytes: bounded.originalResultBytes,
-                    resultBytes: bounded.resultBytes,
-                    payloadTruncatedCount: bounded.payloadTruncatedCount,
-                    results: bounded.results,
-                };
-                const text = `Search batch completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped; outputs are in structuredContent.results.`;
-                const result = withResultSizeHint(okResult(structured, text), {
-                    bytes: estimateStructuredTextResultBytes(structured, text),
-                    strategy: 'conservative-estimate',
-                    source: 'repo_search_text.batch',
-                });
-                const continuation = inspectRepoBulkContinuation(bounded.results);
-                return withResultExecutionHint(result, {
-                    logicalOperations: execution.requestCount,
-                    failedOperations: execution.failedCount,
-                    skippedOperations: execution.skippedCount,
-                    mode: `search-batch:${execution.failureMode}`,
-                    batchSize: execution.requestCount,
-                    batchCapacity: MAX_REPO_BATCH_REQUESTS,
-                    resultBudgetBytes: bounded.resultBudgetBytes,
-                    truncatedOperations: bounded.payloadTruncatedCount,
-                    continuationAvailable: continuation.availableOperations > 0,
-                    continuationAvailableOperations: continuation.availableOperations,
-                    continuationTransportRequired: continuation.transportRequiredOperations > 0,
-                    continuationTransportRequiredOperations: continuation.transportRequiredOperations,
-                    continuationRecommended: continuation.recommendedOperations > 0,
-                    continuationRecommendedOperations: continuation.recommendedOperations,
+                return frameRepoReadBatchExecution(execution, {
+                    budgetBytes: batchResultBudgetBytes,
+                    limits: REPO_READ_BATCH_LIMITS,
+                    marker: 'batch',
+                    modePrefix: 'search-batch',
+                    sizeHintSource: 'repo_search_text.batch',
+                    summaryNoun: 'Search',
                 });
             }
             if (
@@ -1028,43 +1036,160 @@ export const repoReadTools = [
         name: 'repo_file_outline',
         title: 'Repository file outline',
         description:
-            'Parse a workspace file and return symbols, imports, exports, outline and optional top comments for navigation.',
+            'Parse one file or a bounded batch and return paginated symbols/imports/exports/outline/top comments with revision-bound continuation.',
         inputSchema: {
-            path: z.string().min(1)['describe']('Workspace-relative file path.'),
-            includeImports: z.boolean().optional()['describe']('Include imports. Default: true.'),
-            includeExports: z.boolean().optional()['describe']('Include exports. Default: true.'),
-            includeOutline: z.boolean().optional()['describe']('Include textual outline. Default: true.'),
-            includeTopComments: z.boolean().optional()['describe']('Include top comments. Default: false.'),
+            path: z.string().min(1).optional()['describe']('Single-mode workspace-relative file path.'),
+            includeImports: z.boolean().optional()['describe']('Single-mode: include imports. Default: true.'),
+            includeExports: z.boolean().optional()['describe']('Single-mode: include exports. Default: true.'),
+            includeOutline: z.boolean().optional()['describe']('Single-mode: include textual outline. Default: true.'),
+            includeTopComments: z.boolean().optional()['describe']('Single-mode: include top comments. Default: false.'),
             maxItems: z
                 .number()
                 .int()
                 .min(1)
-                .max(5_000)
+                .max(MAX_REPO_OUTLINE_MAX_ITEMS)
                 .optional()
-                ['describe']('Maximum items returned per collection.'),
+                ['describe'](`Single-mode maximum items returned per collection. Default: ${String(DEFAULT_REPO_OUTLINE_MAX_ITEMS)}.`),
             maxBytes: z
                 .number()
                 .int()
-                .min(1)
-                .max(4 * 1024 * 1024)
+                .min(MIN_REPO_OUTLINE_CONTENT_BUDGET_BYTES)
+                .max(MAX_REPO_OUTLINE_CONTENT_BUDGET_BYTES)
                 .optional()
-                ['describe']('Total UTF-8 budget for returned collections. Default: 524288.'),
+                ['describe'](
+                    `Single-mode UTF-8 budget for structural collections. Default: ${String(DEFAULT_REPO_OUTLINE_CONTENT_BUDGET_BYTES)}; complete result ceiling: ${String(MAX_REPO_OUTLINE_TOOL_RESULT_BYTES)} bytes.`,
+                ),
+            cursor: z
+                .string()
+                .max(32 * 1024)
+                .optional()
+                ['describe']('Single-mode revision/profile-bound nextCursor returned by a previous repo_file_outline page.'),
+            batch: z
+                .array(z.record(z.string(), z.unknown()))
+                .min(1)
+                .max(MAX_REPO_BATCH_REQUESTS)
+                .optional()
+                ['describe']('Batch up to 64 file-outline requests using the single-mode fields; do not mix with single mode.'),
+            batchFailureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                ['describe']('Batch failure policy. Default: best-effort.'),
+            batchConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_BATCH_CONCURRENCY)
+                .optional()
+                ['describe']('Maximum parallel outline operations. Default: 6, hard max: 8.'),
+            batchResultBudgetBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .optional()
+                ['describe']('Aggregate structured batch-result budget. Default 2 MiB; hard max 3 MiB.'),
         },
+        maxResultBytes: MAX_REPO_OUTLINE_TOOL_RESULT_BYTES,
 
         handler: async (
-            { path, includeImports, includeExports, includeOutline, includeTopComments, maxItems, maxBytes },
+            {
+                path,
+                includeImports,
+                includeExports,
+                includeOutline,
+                includeTopComments,
+                maxItems,
+                maxBytes,
+                cursor,
+                batch,
+                batchFailureMode,
+                batchConcurrency,
+                batchResultBudgetBytes,
+            },
             operationContext,
-        ) =>
-            frameRepositoryReadOperation(
-                await readRepositoryFileOutline(requireMcpToolWorkspace(operationContext), {
-                    path,
-                    ...(includeImports === undefined ? {} : { includeImports }),
-                    ...(includeExports === undefined ? {} : { includeExports }),
-                    ...(includeOutline === undefined ? {} : { includeOutline }),
-                    ...(includeTopComments === undefined ? {} : { includeTopComments }),
-                    ...(maxItems === undefined ? {} : { maxItems }),
-                    ...(maxBytes === undefined ? {} : { maxBytes }),
-                }),
-            ),
+        ) => {
+            const workspace = requireMcpToolWorkspace(operationContext);
+            if (batch !== undefined) {
+                if (
+                    path !== undefined ||
+                    includeImports !== undefined ||
+                    includeExports !== undefined ||
+                    includeOutline !== undefined ||
+                    includeTopComments !== undefined ||
+                    maxItems !== undefined ||
+                    maxBytes !== undefined ||
+                    cursor !== undefined
+                ) {
+                    return errorResult('Do not mix repo_file_outline batch and single-request fields.', {
+                        code: 'ERR_BATCH_CONFLICTING_MODE',
+                    });
+                }
+                const execution = await runBoundedOperationBatch(
+                    /** @type {Record<string, unknown>[]} */ (batch),
+                    async (item, index) => {
+                        const parsed = repoOutlineBatchItemSchema.safeParse(item);
+                        if (!parsed.success) {
+                            return errorResult(`Invalid repo_file_outline batch item at index ${index}.`, {
+                                code: 'ERR_BATCH_INVALID_ITEM',
+                                index,
+                            });
+                        }
+                        return runRepoFileOutlineCall(workspace, {
+                            path: parsed.data.path,
+                            ...(parsed.data.includeImports === undefined ? {} : { includeImports: parsed.data.includeImports }),
+                            ...(parsed.data.includeExports === undefined ? {} : { includeExports: parsed.data.includeExports }),
+                            ...(parsed.data.includeOutline === undefined ? {} : { includeOutline: parsed.data.includeOutline }),
+                            ...(parsed.data.includeTopComments === undefined
+                                ? {}
+                                : { includeTopComments: parsed.data.includeTopComments }),
+                            maxItems: parsed.data.maxItems ?? DEFAULT_REPO_OUTLINE_MAX_ITEMS,
+                            maxBytes: parsed.data.maxBytes ?? DEFAULT_REPO_OUTLINE_CONTENT_BUDGET_BYTES,
+                            ...(parsed.data.cursor === undefined ? {} : { cursor: parsed.data.cursor }),
+                        });
+                    },
+                    {
+                        concurrency: batchConcurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
+                        failureMode: batchFailureMode ?? 'best-effort',
+                        maxItems: MAX_REPO_BATCH_REQUESTS,
+                        maxInputBytes: MAX_REPO_BATCH_INPUT_BYTES,
+                        estimateItemBytes: estimateRepoBatchItemBytes,
+                        isFailure: (result) => result.isError === true,
+                    },
+                );
+                return frameRepoReadBatchExecution(execution, {
+                    budgetBytes: batchResultBudgetBytes,
+                    limits: REPO_READ_BATCH_LIMITS,
+                    marker: 'batch',
+                    modePrefix: 'outline-batch',
+                    sizeHintSource: 'repo_file_outline.batch',
+                    summaryNoun: 'Outline',
+                });
+            }
+            if (
+                batchFailureMode !== undefined ||
+                batchConcurrency !== undefined ||
+                batchResultBudgetBytes !== undefined
+            ) {
+                return errorResult('batchFailureMode/batchConcurrency/batchResultBudgetBytes require batch mode.', {
+                    code: 'ERR_BATCH_OPTIONS_WITHOUT_BATCH',
+                });
+            }
+            if (!path) {
+                return errorResult('repo_file_outline requires path in single mode.', {
+                    code: 'ERR_OUTLINE_PATH_REQUIRED',
+                    hint: 'Provide path or use batch.',
+                });
+            }
+            return runRepoFileOutlineCall(workspace, {
+                path,
+                ...(includeImports === undefined ? {} : { includeImports }),
+                ...(includeExports === undefined ? {} : { includeExports }),
+                ...(includeOutline === undefined ? {} : { includeOutline }),
+                ...(includeTopComments === undefined ? {} : { includeTopComments }),
+                maxItems: maxItems ?? DEFAULT_REPO_OUTLINE_MAX_ITEMS,
+                maxBytes: maxBytes ?? DEFAULT_REPO_OUTLINE_CONTENT_BUDGET_BYTES,
+                ...(cursor === undefined ? {} : { cursor }),
+            });
+        },
     }),
 ];

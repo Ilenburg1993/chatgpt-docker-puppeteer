@@ -10,6 +10,7 @@ import {
     collectChangedCopilotLintPaths,
     parseNulSeparatedPaths,
     selectChangedCopilotLintPaths,
+    selectChangedCopilotTypeAwarePaths,
 } from '../../../../scripts/analysis/copilot-changed-lint.mjs';
 
 /** @type {string[]} */
@@ -48,6 +49,18 @@ describe('Copilot changed lint preflight', () => {
                 'src/copilot/mcp/z.js',
             ]),
             ['src/copilot/mcp/a.ts', 'src/copilot/mcp/z.js', 'tests/unit/copilot/mcp/a.spec.js'],
+        );
+    });
+
+    it('keeps type-aware changed lint scoped to first-party Copilot source, not tests', () => {
+        assert.deepEqual(
+            selectChangedCopilotTypeAwarePaths([
+                'src/copilot/mcp/a.js',
+                'tests/unit/copilot/mcp/a.spec.js',
+                'src/copilot/.ai/generated.js',
+                'src/copilot/readme.md',
+            ]),
+            ['src/copilot/mcp/a.js'],
         );
     });
 

@@ -17,7 +17,7 @@ async function publishServerReady(nerv, payload = {}) {
     // Prefer NERV when available
     if (nerv) {
         try {
-            // eslint-disable-next-line @typescript-eslint/await-thenable
+            // oxlint-disable-next-line typescript/await-thenable
             return await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
         } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);

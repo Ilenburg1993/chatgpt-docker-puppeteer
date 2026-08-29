@@ -122,7 +122,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         // Evita enviar stack traces gigantescas pelo barramento Socket.io
         if (nervInstance) {
             try {
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendEvent(
                     nervInstance,
                     ActorRole.INFRA,

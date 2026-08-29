@@ -56,9 +56,8 @@ describe('Copilot SQLite lifecycle governance', () => {
     it('application host is the sole canonical path/bootstrap/dispose owner and revokes provider on teardown', () => {
         const source = readFileSync(APPLICATION_HOST, 'utf8');
         expect(source).toContain('const processEnv = options.env ?? process.env');
-        expect(source).toContain(
-            'const applicationDbPath = resolveApplicationDbPath(processEnv, defaultWorkspaceRoot)',
-        );
+        expect(source).toContain('const applicationDbPath = resolveApplicationSqlitePath(');
+        expect(source).toContain("defaultWorkspaceRoot ?? resolve(import.meta.dirname, '../../..')");
         expect(source).toContain("id: 'boot.application-infra.sqlite-directory'");
         expect(source).toContain("operations: ['mkdir']");
         expect(source).toContain('createApplicationSqliteRuntime({ dbPath })');

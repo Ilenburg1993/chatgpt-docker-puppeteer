@@ -640,6 +640,12 @@ export function createIoIndexRegistryRuntime(options) {
             queryCount += 1;
             return store.findImportsByPath(pathPrefix);
         },
+        listFiles() {
+            const store = ensureIndex();
+            if (!store) return [];
+            queryCount += 1;
+            return store.listIndexedFiles();
+        },
         /** @param {string} directory @param {Parameters<IoIndexStore['indexDirectory']>[1] & {adoptAutoRefreshDomain?:boolean}} [buildOptions] */
         async buildDirectory(directory, buildOptions = {}) {
             assertActive();

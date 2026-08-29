@@ -10,3 +10,4 @@ export {
     searchRepositoryIndex,
 } from '../runtime.js';
 export { auditRepositoryOrphanImports } from '../orphan-imports.js';
+export { readRepositoryChangeImpact, readRepositoryModuleGraph } from '../graph.js';

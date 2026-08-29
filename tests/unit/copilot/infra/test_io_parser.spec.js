@@ -786,6 +786,100 @@ describe('parseFileForContext', () => {
         assert.equal(result.maxItems, 1);
         assert.equal(result.maxBytes, 256);
         assert.equal(result.truncated, true);
+        assert.equal(result.hasMore, true);
+        assert.equal(result.cursorKind, 'file-context-collections-v1');
+        assert.equal(typeof result.nextCursor, 'string');
+    });
+
+    it('pagina FileContext por offsets versionados e rejeita cursor de revisão ou projeção divergente', async () => {
+        const parsed = await parseFileForContext(path.join(tmpDir, 'module.js'), JS_CONTENT);
+        const revision = 'revision-a';
+        const first = windowFileContext(parsed, {
+            maxItems: 1,
+            maxBytes: 64 * 1024,
+            includeImports: true,
+            includeExports: true,
+            includeOutline: true,
+            includeTopComments: true,
+            cursorRevision: revision,
+        });
+        assert.equal(first.truncated, true);
+        assert.equal(typeof first.nextCursor, 'string');
+
+        const second = windowFileContext(parsed, {
+            maxItems: 1,
+            maxBytes: 64 * 1024,
+            includeImports: true,
+            includeExports: true,
+            includeOutline: true,
+            includeTopComments: true,
+            cursorRevision: revision,
+            cursor: String(first.nextCursor),
+        });
+        assert.equal(second.cursor, first.nextCursor);
+        assert.notDeepEqual(second.symbols, first.symbols);
+        assert.ok(
+            Object.values(second.returnedCounts).some((count) => count > 0) || second.hasMore === false,
+        );
+
+        assert.throws(
+            () =>
+                windowFileContext(parsed, {
+                    maxItems: 1,
+                    maxBytes: 64 * 1024,
+                    includeImports: false,
+                    includeExports: true,
+                    includeOutline: true,
+                    includeTopComments: true,
+                    cursorRevision: revision,
+                    cursor: String(first.nextCursor),
+                }),
+            (error) =>
+                Boolean(
+                    error &&
+                        typeof error === 'object' &&
+                        'code' in error &&
+                        error.code === 'ERR_FILE_CONTEXT_WINDOW_CURSOR',
+                ),
+        );
+        assert.throws(
+            () =>
+                windowFileContext(parsed, {
+                    maxItems: 1,
+                    maxBytes: 64 * 1024,
+                    includeImports: true,
+                    includeExports: true,
+                    includeOutline: true,
+                    includeTopComments: true,
+                    cursorRevision: 'revision-b',
+                    cursor: String(first.nextCursor),
+                }),
+            (error) =>
+                Boolean(
+                    error &&
+                        typeof error === 'object' &&
+                        'code' in error &&
+                        error.code === 'ERR_FILE_CONTEXT_WINDOW_CURSOR',
+                ),
+        );
+    });
+
+    it('falha explicitamente quando o primeiro item estrutural não cabe no byte budget', () => {
+        const oversized = {
+            symbols: { symbols: [{ name: 'x'.repeat(1024), kind: 'variable' }], imports: [], exports: [], parseError: null },
+            outline: [],
+            topComments: [],
+        };
+        assert.throws(
+            () => windowFileContext(/** @type {any} */ (oversized), { maxBytes: 16, maxItems: 10 }),
+            (error) =>
+                Boolean(
+                    error &&
+                        typeof error === 'object' &&
+                        'code' in error &&
+                        error.code === 'ERR_FILE_CONTEXT_WINDOW_ITEM_TOO_LARGE',
+                ),
+        );
     });
 
     it('cacheia FileContext por path e conteúdo', async () => {

@@ -10,7 +10,7 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { projectMcpRuntimeSourcePromotionEnvironment } from '#copilot/mcp/public/runtime/source-generation';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';

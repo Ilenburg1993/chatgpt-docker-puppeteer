@@ -314,16 +314,20 @@ async function collectMcpSemanticContext(job, callToolOverride) {
         budgetUsed += 1;
     };
 
+    const lspDiagnosticsPromise = lspEnabled
+        ? (() => {
+              spend();
+              return call('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 });
+          })()
+        : Promise.resolve({
+              ok: true,
+              status: null,
+              json: null,
+              text: '',
+          });
     spend();
     const [lspDiagnostics, ragSearch] = await Promise.all([
-        lspEnabled
-            ? (spend(), call('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }))
-            : Promise.resolve({
-                  ok: true,
-                  status: null,
-                  json: null,
-                  text: '',
-              }),
+        lspDiagnosticsPromise,
         call('rag_search', { query, topK: 2, mode: 'auto', includeDiagnostics: true }, { timeoutMs: 8000, id: 202 }),
     ]);
 

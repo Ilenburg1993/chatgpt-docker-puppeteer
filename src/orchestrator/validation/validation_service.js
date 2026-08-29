@@ -234,7 +234,7 @@ class ValidationService {
         // Emite evento NERV
         if (this.nerv) {
             try {
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
                     passed,
                     overall_score,

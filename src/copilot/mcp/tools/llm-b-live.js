@@ -29,6 +29,7 @@ import {
     requireMcpToolAuditCapability,
     requireMcpToolModelGatewayLiveRunEnvironmentAuthority,
     requireMcpToolModelGatewaySqliteFingerprintCapability,
+    requireMcpToolPrincipal,
     requireMcpToolWorkspace,
     withResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
@@ -224,6 +225,7 @@ export const llmBLiveTools = [
                 }
                 const result = await readModelGatewayPersistedLiveRuns(workspace, limit ?? 20, {
                     environmentAuthority,
+                    ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 });
                 if (!result.success || !result.parsed) {
@@ -281,9 +283,10 @@ export const llmBLiveTools = [
 
         handler: async ({ runId }, operationContext) => {
             const workspace = requireMcpToolWorkspace(operationContext);
+            const ownerPrincipalKey = requireMcpToolPrincipal(operationContext).key;
             try {
                 const manifest = await readDetachedLiveRunManifestById(workspace, runId);
-                if (!manifest) {
+                if (!manifest || manifest.ownerPrincipalKey !== ownerPrincipalKey) {
                     return errorResult('Detached LLM-B live run manifest was not found or is invalid.', {
                         code: 'ERR_LLMB_LIVE_CANCEL_NOT_FOUND',
                         runId,
@@ -431,6 +434,7 @@ export const llmBLiveTools = [
                         plan,
                         timeoutMs: effectiveTimeoutMs,
                         environmentAuthority,
+                        ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
                         ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                     });
                     await requireMcpToolAuditCapability(operationContext).append({

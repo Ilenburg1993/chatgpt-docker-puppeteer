@@ -161,6 +161,22 @@ describe('io-index-registry status isolation', () => {
     });
 });
 
+describe('io-index-registry file inventory projection', () => {
+    it('projects indexed file rows through the registry without exposing the store handle', () => {
+        const rows = [
+            { filePath: '/tmp/ws/a.js', extension: '.js', metadataJson: null },
+            { filePath: '/tmp/ws/b.ts', extension: '.ts', metadataJson: null },
+        ];
+        mocks.listIndexedFiles.mockReturnValue(rows);
+
+        const listed = requireIndexRuntime().listFiles();
+
+        assert.deepEqual(listed, rows);
+        expect(mocks.listIndexedFiles).toHaveBeenCalledTimes(1);
+        assert.equal(requireIndexRuntime().snapshot().queries, 1);
+    });
+});
+
 describe('io-index-registry build coalescing', () => {
     it('coalesce builds concorrentes com mesma assinatura de diretório/opções', async () => {
         mocks.indexDirectory.mockImplementation(async () => {

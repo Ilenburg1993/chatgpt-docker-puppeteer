@@ -154,7 +154,7 @@
       "audiences": ["public", "testing"],
       "authorityClasses": ["process-launcher", "public-surface", "testing-surface"],
       "policyHooks": ["cost", "process", "surface"],
-      "allowedDependencies": ["mcp.cloudflare", "mcp.process", "mcp.workspace"]
+      "allowedDependencies": ["mcp.cloudflare", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.cloudflare.transport-benchmark",
@@ -166,7 +166,7 @@
       "audiences": ["public", "testing"],
       "authorityClasses": ["process-launcher", "public-surface", "testing-surface"],
       "policyHooks": ["cost", "process", "surface"],
-      "allowedDependencies": ["mcp.cloudflare", "mcp.cloudflare.observability", "mcp.process", "mcp.workspace"]
+      "allowedDependencies": ["mcp.cloudflare", "mcp.cloudflare.observability", "mcp.workspace"]
     },
     {
       "ownerId": "mcp.company-knowledge",
@@ -483,6 +483,7 @@
         "mcp.indexing.auto-build",
         "mcp.observability",
         "mcp.protocol",
+        "mcp.runtime.source-generation",
         "mcp.runtime.startup-maintenance",
         "mcp.transport",
         "mcp.workspace.repository.read-cache",
@@ -562,9 +563,9 @@
       "protectedBoundary": true,
       "role": "Repository indexing/query adapter",
       "audiences": ["public"],
-      "authorityClasses": ["mutable-state", "public-surface"],
-      "policyHooks": ["cost", "state", "surface"],
-      "allowedDependencies": ["mcp.indexing.auto-build"]
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
+      "allowedDependencies": ["mcp.indexing.auto-build", "mcp.workspace.git"]
     },
     {
       "ownerId": "mcp.integrations",
@@ -956,8 +957,8 @@
       "protectedBoundary": true,
       "role": "Workspace Git primitive",
       "audiences": ["public"],
-      "authorityClasses": ["process-launcher", "public-surface"],
-      "policyHooks": ["cost", "process", "surface"],
+      "authorityClasses": ["public-surface"],
+      "policyHooks": ["cost", "surface"],
       "allowedDependencies": ["mcp.process"]
     },
     {

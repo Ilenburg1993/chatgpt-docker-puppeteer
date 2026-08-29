@@ -41,6 +41,17 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     backgroundServices: false,
 });
 const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+const TEST_JOB_OWNER_KEY = 'test-validator-job-principal-a';
+const TEST_JOB_OTHER_OWNER_KEY = 'test-validator-job-principal-b';
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_JOB_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: TEST_JOB_OWNER_KEY,
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -51,7 +62,11 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
             envelope: { protocol: '2026' },
         },
     },
-    { workspace: TEST_WORKSPACE, config: TEST_PROCESS_HOST.processConfig.toolConfig },
+    {
+        workspace: TEST_WORKSPACE,
+        principal: TEST_JOB_PRINCIPAL,
+        config: TEST_PROCESS_HOST.processConfig.toolConfig,
+    },
 );
 
 /** @param {string} name */
@@ -287,12 +302,14 @@ describe('copilot MCP jobs', () => {
         assert.equal(config.childEnvironment['OPENAI_API_KEY'], undefined);
         assert.equal(Object.isFrozen(config), true);
         assert.equal(Object.isFrozen(config.childEnvironment), true);
-        const capacity = readCopilotValidatorCapacityState(config);
+        const capacity = readCopilotValidatorCapacityState(config, TEST_JOB_OWNER_KEY);
         assert.match(capacity.runtimeEpoch, /^[0-9a-f-]{36}$/iu);
         assert.ok(capacity.ownerPid > 0);
         assert.equal(capacity.maxActive, 1);
         assert.equal(capacity.vitestMaxWorkers, 1);
         assert.equal(capacity.activeCount, 0);
+        assert.equal(capacity.ownedActiveCount, 0);
+        assert.equal(capacity.busyByOtherPrincipal, false);
     });
 
     it('normalizes job timeouts inside supported bounds', () => {
@@ -402,7 +419,7 @@ describe('copilot MCP jobs', () => {
     });
 
     it('rejects non-UUID job ids before resolving artifact paths', async () => {
-        assert.deepEqual(await readJobOutput('../../package'), { job: null, output: '' });
+        assert.deepEqual(await readJobOutput('../../package', TEST_JOB_OWNER_KEY), { job: null, output: '' });
     });
 
     it('ignores persisted logFile paths and reads only the canonical bounded job log', async () => {
@@ -426,17 +443,24 @@ describe('copilot MCP jobs', () => {
                     args: [],
                     timeoutMs: 1000,
                     timedOut: false,
+                    ownerPrincipalKey: TEST_JOB_OWNER_KEY,
                     logFile: '/etc/hosts',
                     manifestFile: '/tmp/forged.json',
                 }),
             );
             await writeFile(logFile, 'prefix-safe-log-tail');
 
-            const result = await readJobOutput(id, 13);
+            const result = await readJobOutput(id, TEST_JOB_OWNER_KEY, 13);
 
             assert.equal(result.job?.logFile, logFile);
             assert.equal(result.job?.manifestFile, manifestFile);
+            assert.equal('ownerPrincipalKey' in (result.job ?? {}), false);
             assert.equal(result.output, 'safe-log-tail');
+
+            const foreign = await readJobOutput(id, TEST_JOB_OTHER_OWNER_KEY, 13);
+            assert.deepEqual(foreign, { job: null, output: '' });
+            const foreignCancel = await cancelJob(id, TEST_JOB_OTHER_OWNER_KEY);
+            assert.deepEqual(foreignCancel, { ok: false, job: null, message: 'Job not found.' });
         } finally {
             await rm(manifestFile, { force: true });
             await rm(logFile, { force: true });
@@ -465,19 +489,57 @@ describe('copilot MCP jobs', () => {
                     args: command.args,
                     timeoutMs: 60_000,
                     timedOut: false,
+                    ownerPrincipalKey: TEST_JOB_OWNER_KEY,
                 }),
             );
             await writeFile(logFile, 'persisted-running-job');
 
-            const observed = await readJobOutput(id);
+            const observed = await readJobOutput(id, TEST_JOB_OWNER_KEY);
             assert.equal(observed.job?.status, 'running');
             assert.equal(observed.job?.runtimeAttached, false);
 
-            const cancelled = await cancelJob(id);
+            const cancelled = await cancelJob(id, TEST_JOB_OWNER_KEY);
             assert.equal(cancelled.ok, false);
             assert.equal(cancelled.unattached, true);
             assert.equal(cancelled.job?.runtimeAttached, false);
             assert.match(cancelled.message, /not attached to the current MCP runtime/u);
+        } finally {
+            await rm(manifestFile, { force: true });
+            await rm(logFile, { force: true });
+        }
+    });
+
+    it('fails closed for legacy persisted manifests without a principal owner', async () => {
+        const id = randomUUID();
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        const manifestFile = join(jobsDir, `${id}.json`);
+        const logFile = join(jobsDir, `${id}.log`);
+        await mkdir(jobsDir, { recursive: true });
+        try {
+            await writeFile(
+                manifestFile,
+                JSON.stringify({
+                    id,
+                    validator: 'typecheck',
+                    status: 'completed',
+                    startedAt: 1,
+                    endedAt: 2,
+                    exitCode: 0,
+                    signal: null,
+                    command: 'npm',
+                    args: [],
+                    timeoutMs: 1000,
+                    timedOut: false,
+                }),
+            );
+            await writeFile(logFile, 'legacy-ownerless-log');
+
+            assert.deepEqual(await readJobOutput(id, TEST_JOB_OWNER_KEY), { job: null, output: '' });
+            assert.deepEqual(await cancelJob(id, TEST_JOB_OWNER_KEY), {
+                ok: false,
+                job: null,
+                message: 'Job not found.',
+            });
         } finally {
             await rm(manifestFile, { force: true });
             await rm(logFile, { force: true });
@@ -505,11 +567,12 @@ describe('copilot MCP jobs', () => {
                     args: [],
                     timeoutMs: 1000,
                     timedOut: false,
+                    ownerPrincipalKey: TEST_JOB_OWNER_KEY,
                 }),
             );
             await symlink(join(process.cwd(), 'package.json'), logFile);
 
-            const result = await readJobOutput(id);
+            const result = await readJobOutput(id, TEST_JOB_OWNER_KEY);
 
             assert.equal(result.job?.id, id);
             assert.equal(result.output, '');

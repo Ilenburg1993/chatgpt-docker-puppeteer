@@ -8,22 +8,17 @@
  * @module copilot/mcp/indexing/repository/orphan-imports
  */
 
+import {
+    createLocalModuleResolver,
+    isLocalModuleSource,
+    LOCAL_MODULE_FILE_EXTENSIONS,
+} from '#copilot/infra/public/indexing/module-resolution';
 import { normalizeSearchWindow, paginateSearchItems } from '#copilot/infra/public/indexing/search';
-import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
+import { extname, relative } from 'node:path';
 import { normalizeRepositoryIndexPath } from './runtime.js';
 
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_MAX_FILES = 500;
-const MODULE_FILE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.json'];
-const MODULE_INDEX_CANDIDATES = MODULE_FILE_EXTENSIONS.map((extension) => `index${extension}`);
-const LOCAL_IMPORT_ALIAS_PREFIXES = ['#copilot'];
-const PACKAGE_JSON_RELATIVE_PATH = 'package.json';
-const PACKAGE_IMPORTS_CACHE_TTL_MS = 30_000;
-
-/** @type {Promise<[string, unknown][]> | null} */
-let packageImportEntriesPromise = null;
-let packageImportEntriesExpiresAtMs = 0;
-let packageImportEntriesWorkspaceRoot = '';
 
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} RepositoryIndexWorkspace */
 /**
@@ -56,113 +51,7 @@ function relativeFileDepth(rootPath, filePath) {
 
 /** @param {string} filePath */
 function isAnalyzableModuleFile(filePath) {
-    return MODULE_FILE_EXTENSIONS.includes(extname(filePath).toLowerCase());
-}
-
-/** @param {string} source */
-function isLocalImportSource(source) {
-    return (
-        source.startsWith('.') ||
-        LOCAL_IMPORT_ALIAS_PREFIXES.some((prefix) => source === prefix || source.startsWith(`${prefix}/`))
-    );
-}
-
-/** @param {unknown} value @returns {string | null} */
-function selectPackageImportTarget(value) {
-    if (typeof value === 'string') return value;
-    if (Array.isArray(value)) {
-        for (const candidate of value) {
-            const target = selectPackageImportTarget(candidate);
-            if (target) return target;
-        }
-        return null;
-    }
-    if (!value || typeof value !== 'object') return null;
-    const record = /** @type {Record<string, unknown>} */ (value);
-    for (const condition of ['import', 'node', 'default']) {
-        const target = selectPackageImportTarget(record[condition]);
-        if (target) return target;
-    }
-    for (const candidate of Object.values(record)) {
-        const target = selectPackageImportTarget(candidate);
-        if (target) return target;
-    }
-    return null;
-}
-
-/** @param {RepositoryIndexWorkspace} workspace */
-async function readPackageImportEntries(workspace) {
-    const now = Date.now();
-    if (
-        !packageImportEntriesPromise ||
-        packageImportEntriesWorkspaceRoot !== workspace.workspaceRoot ||
-        now >= packageImportEntriesExpiresAtMs
-    ) {
-        packageImportEntriesWorkspaceRoot = workspace.workspaceRoot;
-        packageImportEntriesExpiresAtMs = now + PACKAGE_IMPORTS_CACHE_TTL_MS;
-        packageImportEntriesPromise = workspace.io
-            .readText(join(workspace.workspaceRoot, PACKAGE_JSON_RELATIVE_PATH))
-            .then((text) => {
-                const parsed = JSON.parse(text.content);
-                const imports = parsed && typeof parsed === 'object' ? parsed.imports : null;
-                return imports && typeof imports === 'object' ? Object.entries(imports) : [];
-            })
-            .catch(() => []);
-    }
-    return packageImportEntriesPromise ?? [];
-}
-
-/** @param {RepositoryIndexWorkspace} workspace @param {string} source @param {[string, unknown][]} entries */
-function resolvePackageImportBasePath(workspace, source, entries) {
-    const exact = entries.find(([key]) => key === source);
-    if (exact) {
-        const target = selectPackageImportTarget(exact[1]);
-        if (target?.startsWith('./'))
-            return { basePath: resolvePath(workspace.workspaceRoot, target), strategy: 'package-import-exact' };
-    }
-    const wildcardMatches = entries
-        .map(([key, value]) => ({ key, value, starIndex: key.indexOf('*') }))
-        .filter(({ starIndex }) => starIndex >= 0)
-        .sort((a, b) => b.key.length - a.key.length);
-    for (const { key, value, starIndex } of wildcardMatches) {
-        const prefix = key.slice(0, starIndex);
-        const suffix = key.slice(starIndex + 1);
-        if (!source.startsWith(prefix) || !source.endsWith(suffix)) continue;
-        const wildcardValue = source.slice(prefix.length, source.length - suffix.length);
-        const target = selectPackageImportTarget(value);
-        if (!target?.startsWith('./')) continue;
-        const substituted = target.includes('*') ? target.replaceAll('*', wildcardValue) : target;
-        return { basePath: resolvePath(workspace.workspaceRoot, substituted), strategy: 'package-import-wildcard' };
-    }
-    return null;
-}
-
-/** @param {RepositoryIndexWorkspace} workspace @param {string} source @param {string} importerPath */
-async function resolveImportBasePath(workspace, source, importerPath) {
-    if (source.startsWith('.')) return { basePath: resolvePath(dirname(importerPath), source), strategy: 'relative' };
-    if (source.startsWith('#')) {
-        const mapped = resolvePackageImportBasePath(workspace, source, await readPackageImportEntries(workspace));
-        if (mapped) return mapped;
-    }
-    if (source === '#copilot')
-        return { basePath: join(workspace.workspaceRoot, 'src/copilot'), strategy: 'legacy-copilot-alias' };
-    if (source.startsWith('#copilot/')) {
-        return {
-            basePath: join(workspace.workspaceRoot, 'src/copilot', source.slice('#copilot/'.length)),
-            strategy: 'legacy-copilot-alias',
-        };
-    }
-    return null;
-}
-
-/** @param {string} basePath */
-function buildModuleCandidatePaths(basePath) {
-    const candidates = new Set([basePath]);
-    if (extname(basePath) === '') {
-        for (const extension of MODULE_FILE_EXTENSIONS) candidates.add(`${basePath}${extension}`);
-        for (const fileName of MODULE_INDEX_CANDIDATES) candidates.add(join(basePath, fileName));
-    }
-    return [...candidates];
+    return LOCAL_MODULE_FILE_EXTENSIONS.includes(extname(filePath).toLowerCase());
 }
 
 /** @param {RepositoryIndexWorkspace} workspace @param {string} filePath */
@@ -227,6 +116,7 @@ export async function auditRepositoryOrphanImports(workspace, input) {
         normalizeRepositoryIndexPath(input.path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
     );
     if (!resolved.ok) return failure(resolved.reason, resolved);
+    const moduleResolver = await createLocalModuleResolver({ workspaceRoot: workspace.workspaceRoot });
     const stat = await workspace.io.statPathValidated(resolved.validatedReadPath);
     const fileLimit = normalizePositiveInteger(input.maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
     /** @type {{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[]; resolutionStrategy: string }[]} */
@@ -263,14 +153,17 @@ export async function auditRepositoryOrphanImports(workspace, input) {
                         skippedDynamicImports += 1;
                         continue;
                     }
-                    if (!isLocalImportSource(source)) {
+                    if (!isLocalModuleSource(source)) {
                         skippedExternalImports += 1;
                         continue;
                     }
-                    const resolution = await resolveImportBasePath(workspace, source, resolved.resolved);
-                    if (!resolution) continue;
+                    const resolution = moduleResolver.resolve(resolved.resolved, source);
+                    if (!resolution.resolved) {
+                        aliasResolutionGapCount += 1;
+                        continue;
+                    }
                     if (resolution.strategy === 'legacy-copilot-alias') aliasResolutionGapCount += 1;
-                    const candidates = buildModuleCandidatePaths(resolution.basePath);
+                    const candidates = resolution.candidates;
                     checkedImports += 1;
                     const targetState = await classifyCandidateTargets(workspace, targetExistsMemo, candidates);
                     if (targetState.status === 'exists') continue;
@@ -337,14 +230,17 @@ export async function auditRepositoryOrphanImports(workspace, input) {
                 skippedDynamicImports += 1;
                 continue;
             }
-            if (!isLocalImportSource(source)) {
+            if (!isLocalModuleSource(source)) {
                 skippedExternalImports += 1;
                 continue;
             }
-            const resolution = await resolveImportBasePath(workspace, source, String(row.filePath ?? ''));
-            if (!resolution) continue;
+            const resolution = moduleResolver.resolve(String(row.filePath ?? ''), source);
+            if (!resolution.resolved) {
+                aliasResolutionGapCount += 1;
+                continue;
+            }
             if (resolution.strategy === 'legacy-copilot-alias') aliasResolutionGapCount += 1;
-            const candidates = buildModuleCandidatePaths(resolution.basePath);
+            const candidates = resolution.candidates;
             checkedImports += 1;
             const targetState = await classifyCandidateTargets(workspace, targetExistsMemo, candidates);
             if (targetState.status === 'exists') continue;

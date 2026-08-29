@@ -11,7 +11,7 @@
 import { createWorkspaceMutationIo } from '#copilot/infra/public/composition/workspace/mutation-io';
 import { buildCloudflareConnectorSmokeEnvironment } from '#copilot/mcp/public/cloudflare/environment';
 import { readCloudflaredMetricsSnapshot } from '#copilot/mcp/public/cloudflare/observability';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';

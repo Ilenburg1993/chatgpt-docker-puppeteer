@@ -76,6 +76,27 @@ function requiresManualApproval(tool) {
     return tool.destructive || NEVER_REMEMBER_APPROVAL_TOOLS.includes(tool.name);
 }
 
+function buildStatusExecutionLimits() {
+    return {
+        toolsList: {
+            maxEnvelopeBytes: MCP_TOOL_EXECUTION_LIMITS.toolsList.maxEnvelopeBytes,
+        },
+        terminal: {
+            maxBatchCommands: MCP_TOOL_EXECUTION_LIMITS.terminal.maxBatchCommands,
+            maxBatchConcurrency: MCP_TOOL_EXECUTION_LIMITS.terminal.maxBatchConcurrency,
+            maxSessions: MCP_TOOL_EXECUTION_LIMITS.terminal.maxSessions,
+        },
+        repoPatch: {
+            maxBatchOperations: MCP_TOOL_EXECUTION_LIMITS.repoPatch.maxBatchOperations,
+            defaultApplyMode: MCP_TOOL_EXECUTION_LIMITS.repoPatch.defaultApplyMode,
+        },
+        validator: {
+            maxBatchConcurrency: MCP_TOOL_EXECUTION_LIMITS.validator.maxBatchConcurrency,
+            acceptedInputMaxConcurrency: MCP_TOOL_EXECUTION_LIMITS.validator.acceptedInputMaxConcurrency,
+        },
+    };
+}
+
 /**
  * @param {{ name: string; destructive: boolean; rememberApprovalCandidate: boolean }[]} summaries
  */
@@ -232,7 +253,8 @@ export async function readMcpToolsStatus(operationContext) {
                 'Use the direct bounded one-shot tool when intent is clear; prefer its dryRun/preview mode when available, and use a separate plan tool only when it provides distinct functionality.',
         },
         executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
-        executionLimits: MCP_TOOL_EXECUTION_LIMITS,
+        executionLimitsProjection: 'status-critical-v1',
+        executionLimits: buildStatusExecutionLimits(),
         descriptorObservation: readMcpDescriptorObservationState(),
         descriptorRevisionProfile,
         publicationWorkflow: {

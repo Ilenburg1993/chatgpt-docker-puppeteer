@@ -56,6 +56,14 @@ const TEST_TOOL_CAPABILITIES = Object.freeze({
     ...TEST_PROCESS_HOST.toolCapabilities,
     toolSurface: TEST_TOOL_SURFACE,
 });
+const TEST_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-mcp-tools-principal',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -68,6 +76,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_WORKSPACE,
+        principal: TEST_PRINCIPAL,
         config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_TOOL_CAPABILITIES,
     },
@@ -88,6 +97,7 @@ function createToolContextWithRepositoryReadCache(repositoryReadCache) {
         },
         {
             workspace: TEST_WORKSPACE,
+            principal: TEST_PRINCIPAL,
             config: { ...TEST_PROCESS_HOST.processConfig.toolConfig, repositoryReadCache },
             capabilities: TEST_TOOL_CAPABILITIES,
         },
@@ -626,6 +636,9 @@ describe('copilot MCP tools', () => {
         assert.match(treeText, /^Tree src\/copilot:/u);
         assert.ok(treeText.includes('structuredContent.entries'));
         assert.equal(treeText.includes('absolutePath'), false);
+        assert.equal(JSON.stringify(tree.structuredContent).includes('absolutePath'), false);
+        assert.equal(tree.structuredContent?.['projection'], 'flat-path-page-v2');
+        assert.equal(tree.structuredContent?.['cursorKind'], 'path-keyset-v1');
 
         const root = await treeTool.handler({ path: '.', maxEntries: 20 });
         assert.equal(root.isError, undefined);
@@ -635,6 +648,146 @@ describe('copilot MCP tools', () => {
         const rootText = String(root.content?.[0]?.text ?? '');
         assert.match(rootText, /^Tree \.:/u);
         assert.equal(rootText.includes('absolutePath'), false);
+        assert.equal(JSON.stringify(root.structuredContent).includes('absolutePath'), false);
+    });
+
+    it('repo_tree paginates recursive flat paths deterministically and applies native include/exclude filters', async () => {
+        const treeTool = findTool('repo_tree');
+        const first = await treeTool.handler({
+            path: 'src/copilot/mcp',
+            recursive: true,
+            depth: 3,
+            maxEntries: 5,
+            maxOutputBytes: 16 * 1024,
+            includePattern: '**/*.js',
+            excludePattern: '**/testing/**',
+        });
+        assert.equal(first.isError, undefined);
+        const firstStructured = /** @type {Record<string, unknown>} */ (first.structuredContent);
+        const firstEntries = /** @type {{path:string;type:string;depth:number;size?:number}[]} */ (firstStructured['entries']);
+        assert.equal(firstEntries.length, 5);
+        assert.deepEqual(firstEntries.map((entry) => entry.path), [...firstEntries.map((entry) => entry.path)].sort());
+        assert.ok(firstEntries.every((entry) => entry.path.endsWith('.js')));
+        assert.equal(firstEntries.some((entry) => entry.path.includes('/testing/')), false);
+        assert.ok(firstEntries.every((entry) => entry.depth >= 1 && entry.depth <= 3));
+        assert.ok(firstEntries.filter((entry) => entry.type === 'file').every((entry) => Number.isFinite(entry.size)));
+        assert.equal(firstStructured['truncationReason'], 'entry-limit');
+        assert.equal(firstStructured['nextCursor'], firstEntries.at(-1)?.path);
+        const firstPage = /** @type {Record<string, unknown>} */ (firstStructured['page']);
+        assert.equal(firstPage['nextCursor'], firstStructured['nextCursor']);
+        assert.equal(firstPage['budgetBytes'], 1536 * 1024);
+
+        const second = await treeTool.handler({
+            path: 'src/copilot/mcp',
+            recursive: true,
+            depth: 3,
+            maxEntries: 5,
+            maxOutputBytes: 16 * 1024,
+            includePattern: '**/*.js',
+            excludePattern: '**/testing/**',
+            cursor: String(firstStructured['nextCursor']),
+        });
+        assert.equal(second.isError, undefined);
+        const secondEntries = /** @type {{path:string}[]} */ (second.structuredContent?.['entries']);
+        const firstPaths = new Set(firstEntries.map((entry) => entry.path));
+        assert.ok(secondEntries.length > 0);
+        assert.equal(secondEntries.some((entry) => firstPaths.has(entry.path)), false);
+        assert.ok(secondEntries.every((entry) => entry.path > String(firstStructured['nextCursor'])));
+    });
+
+    it('repo_tree enforces entry byte budget with continuation instead of whole-result truncation', async () => {
+        const treeTool = findTool('repo_tree');
+        const result = await treeTool.handler({
+            path: 'src/copilot',
+            recursive: true,
+            depth: 4,
+            maxEntries: 5000,
+            maxOutputBytes: 16 * 1024,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['truncated'], true);
+        assert.equal(structured['truncationReason'], 'content-byte-budget');
+        assert.equal(typeof structured['nextCursor'], 'string');
+        assert.ok(Number(structured['returnedContentBytes'] ?? Infinity) <= 16 * 1024);
+        const page = /** @type {Record<string, unknown>} */ (structured['page']);
+        assert.equal(page['nextCursor'], structured['nextCursor']);
+        assert.equal(page['contentBudgetBytes'], 16 * 1024);
+        assert.equal(JSON.stringify(structured).includes('absolutePath'), false);
+    });
+
+    it('repo_inventory uses deterministic Git keyset pagination without duplicating path payload in TextContent', async () => {
+        const tool = findTool('repo_inventory');
+        const first = await tool.handler({
+            source: 'git',
+            path: 'src/copilot/mcp/tools',
+            maxResults: 3,
+            maxOutputBytes: 16 * 1024,
+        });
+        assert.equal(first.isError, undefined);
+        const firstStructured = /** @type {Record<string, unknown>} */ (first.structuredContent);
+        const firstPaths = /** @type {string[]} */ (firstStructured['paths']);
+        assert.equal(firstStructured['source'], 'git');
+        assert.equal(firstStructured['cursorKind'], 'path-keyset-v1');
+        assert.equal(firstPaths.length, 3);
+        assert.deepEqual(firstPaths, [...firstPaths].sort());
+        assert.equal(typeof firstStructured['nextCursor'], 'string');
+        assert.equal(firstStructured['nextCursor'], firstPaths.at(-1));
+        assert.equal(firstStructured['truncationReason'], 'entry-limit');
+        assert.equal(firstStructured['hashPolicy']?.['followUpOwner'], 'repo_bulk_inspect');
+        const page = /** @type {Record<string, unknown>} */ (firstStructured['page']);
+        assert.equal(page['nextCursor'], firstStructured['nextCursor']);
+        assert.equal(page['budgetBytes'], 1536 * 1024);
+        assert.equal(page['contentBytes'], firstStructured['returnedContentBytes']);
+        const firstText = String(first.content?.[0]?.text ?? '');
+        assert.match(firstText, /^Inventory src\/copilot\/mcp\/tools via git:/u);
+        assert.equal(firstText.includes(JSON.stringify(firstPaths)), false);
+
+        const second = await tool.handler({
+            source: 'git',
+            path: 'src/copilot/mcp/tools',
+            maxResults: 3,
+            maxOutputBytes: 16 * 1024,
+            cursor: String(firstStructured['nextCursor']),
+        });
+        assert.equal(second.isError, undefined);
+        const secondPaths = /** @type {string[]} */ (second.structuredContent?.['paths']);
+        assert.ok(secondPaths.length > 0);
+        assert.equal(secondPaths.some((candidate) => firstPaths.includes(candidate)), false);
+        assert.ok(secondPaths.every((candidate) => candidate > String(firstStructured['nextCursor'])));
+    });
+
+    it('repo_inventory filesystem source prunes protected branches and returns regular files only', async () => {
+        const tool = findTool('repo_inventory');
+        const tempDir = await mkdtemp(join(process.cwd(), 'tests/.tmp-mcp-inventory-'));
+        const relativeRoot = relative(process.cwd(), tempDir).replace(/\\/gu, '/');
+        await mkdir(join(tempDir, 'nested'), { recursive: true });
+        await mkdir(join(tempDir, 'node_modules'), { recursive: true });
+        await writeFile(join(tempDir, 'a.js'), 'export const a = 1;\n', 'utf8');
+        await writeFile(join(tempDir, 'nested', 'b.js'), 'export const b = 2;\n', 'utf8');
+        await writeFile(join(tempDir, '.env'), 'SECRET=hidden\n', 'utf8');
+        await writeFile(join(tempDir, 'node_modules', 'hidden.js'), 'export const hidden = true;\n', 'utf8');
+        try {
+            const result = await tool.handler({
+                source: 'filesystem',
+                path: relativeRoot,
+                maxResults: 100,
+                maxOutputBytes: 16 * 1024,
+            });
+            assert.equal(result.isError, undefined);
+            const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+            const paths = /** @type {string[]} */ (structured['paths']);
+            assert.deepEqual(paths, [`${relativeRoot}/a.js`, `${relativeRoot}/nested/b.js`]);
+            assert.equal(structured['truncated'], false);
+            assert.equal(structured['nextCursor'], null);
+            const sourceMetadata = /** @type {Record<string, unknown>} */ (structured['sourceMetadata']);
+            assert.equal(sourceMetadata['engine'], 'node:fs/promises.readdir');
+            assert.ok(Number(sourceMetadata['protectedBranchesPruned'] ?? 0) >= 1);
+            assert.equal(paths.some((candidate) => candidate.includes('node_modules') || candidate.endsWith('/.env')), false);
+            assert.equal(paths.some((candidate) => candidate.endsWith('/nested')), false);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('repo_tree path="." redacts protected hidden path metadata', async () => {
@@ -786,6 +939,94 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['chunkLines'], 20);
         assert.equal(structured['nextCursor'], '46');
         assert.equal(structured['cursor'], null);
+        assert.equal(structured['truncated'], true);
+        assert.equal(structured['truncationReason'], 'requested-line-window');
+        const page = /** @type {Record<string, unknown>} */ (structured['page']);
+        assert.equal(page['nextCursor'], '46');
+        assert.equal(page['hasMore'], true);
+        assert.equal(page['truncated'], true);
+        assert.ok(Number(page['resultBytes'] ?? 0) > 0);
+        assert.equal(page['budgetBytes'], 1536 * 1024);
+        assert.ok(Number(page['resultBytes'] ?? 0) < Number(page['budgetBytes'] ?? 0));
+        const legacyText = String(result.content?.[0]?.text ?? '');
+        assert.match(legacyText, /^Chunk page /u);
+        assert.equal(legacyText.includes('// @ts-check'), false);
+        assert.ok(Buffer.byteLength(legacyText, 'utf8') <= 2048);
+    });
+
+    it('repo_read_file_chunks applies an automatic line page when endLine is omitted', async () => {
+        const tool = findTool('repo_read_file_chunks');
+        const first = await tool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 20,
+            maxChunks: 2,
+        });
+        assert.equal(first.isError, undefined);
+        const firstPage = /** @type {Record<string, unknown>} */ (first.structuredContent);
+        assert.equal(firstPage['returnedChunkCount'], 2);
+        assert.equal(firstPage['returnedLineCount'], 40);
+        assert.equal(firstPage['nextCursor'], '41');
+        assert.equal(firstPage['effectiveEndLine'], 40);
+        assert.equal(firstPage['truncationReason'], 'line-page-limit');
+
+        const second = await tool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 20,
+            maxChunks: 2,
+            cursor: String(firstPage['nextCursor']),
+        });
+        assert.equal(second.isError, undefined);
+        assert.equal(second.structuredContent?.['cursor'], '41');
+        const secondChunks = /** @type {Record<string, unknown>[]} */ (second.structuredContent?.['chunks']);
+        assert.equal(secondChunks[0]?.['startLine'], 41);
+    });
+
+    it('repo_read_file_chunks stops on the content byte budget without losing continuation', async () => {
+        const tool = findTool('repo_read_file_chunks');
+        const result = await tool.handler({
+            path: 'tests/unit/copilot/mcp/test_mcp_tools.spec.js',
+            chunkLines: 100,
+            maxChunks: 4,
+            maxOutputBytes: 16 * 1024,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['stoppedAtOutputBudget'], true);
+        assert.equal(structured['truncationReason'], 'content-byte-budget');
+        assert.ok(Number(structured['returnedChunkCount'] ?? 0) >= 1);
+        assert.ok(Number(structured['returnedChunkCount'] ?? 0) < 4);
+        assert.ok(Number(structured['returnedContentBytes'] ?? 0) <= 16 * 1024);
+        assert.equal(typeof structured['nextCursor'], 'string');
+        const page = /** @type {Record<string, unknown>} */ (structured['page']);
+        assert.equal(page['contentBudgetBytes'], 16 * 1024);
+        assert.equal(page['contentBytes'], structured['returnedContentBytes']);
+        assert.equal(page['nextCursor'], structured['nextCursor']);
+        assert.ok(Number(page['resultBytes'] ?? 0) < Number(page['budgetBytes'] ?? 0));
+    });
+
+    it('repo_read_file_chunks fails explicitly when one line cannot fit the hard content budget', async () => {
+        const tool = findTool('repo_read_file_chunks');
+        const relativePath = `tests/mcp-chunk-oversize-${String(process.pid)}.txt`;
+        const absolutePath = join(process.cwd(), relativePath);
+        await writeFile(absolutePath, 'x'.repeat(20 * 1024), 'utf8');
+        try {
+            const result = await tool.handler({
+                path: relativePath,
+                chunkLines: 1,
+                maxChunks: 1,
+                maxOutputBytes: 16 * 1024,
+            });
+            assert.equal(result.isError, true);
+            assert.equal(result.structuredContent?.['code'], 'ERR_CHUNK_PAGE_ITEM_TOO_LARGE');
+            const details = /** @type {Record<string, unknown>} */ (result.structuredContent?.['details']);
+            assert.equal(details['failureClass'], 'bounded-output-item-too-large');
+            assert.equal(details['retryability'], 'manual-decision');
+            assert.equal(details['recoveryRequired'], false);
+            assert.ok(Number(details['requiredBytes'] ?? 0) > 16 * 1024);
+            assert.equal(details['maxOutputBytes'], 16 * 1024);
+        } finally {
+            await rm(absolutePath, { force: true });
+        }
     });
 
     it('repo_read_file_chunks returns identical results for repeated same-window chunk reads through the extracted cache module', async () => {
@@ -911,12 +1152,54 @@ describe('copilot MCP tools', () => {
         const boundedOutline = await outlineTool.handler({
             path: 'src/copilot/mcp/tools/repo-read.js',
             maxItems: 1,
-            maxBytes: 512,
+            maxBytes: 16 * 1024,
         });
+        assert.equal(boundedOutline.isError, undefined);
         assert.equal(boundedOutline.structuredContent?.['truncated'], true);
         assert.equal(boundedOutline.structuredContent?.['maxItems'], 1);
-        assert.ok(Number(boundedOutline.structuredContent?.['returnedContentBytes'] ?? Infinity) <= 512);
+        assert.equal(boundedOutline.structuredContent?.['cursorKind'], 'file-context-collections-v1');
+        assert.equal(typeof boundedOutline.structuredContent?.['nextCursor'], 'string');
+        assert.ok(Number(boundedOutline.structuredContent?.['returnedContentBytes'] ?? Infinity) <= 16 * 1024);
         assert.ok(/** @type {unknown[]} */ (boundedOutline.structuredContent?.['symbols'] ?? []).length <= 1);
+        assert.equal(String(boundedOutline.content?.[0]?.text ?? '').includes('structuredContent'), true);
+        assert.equal(String(boundedOutline.content?.[0]?.text ?? '').includes(JSON.stringify(boundedOutline.structuredContent?.['symbols'])), false);
+
+        const secondPage = await outlineTool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            maxItems: 1,
+            maxBytes: 16 * 1024,
+            cursor: String(boundedOutline.structuredContent?.['nextCursor']),
+        });
+        assert.equal(secondPage.isError, undefined);
+        assert.equal(secondPage.structuredContent?.['cursor'], boundedOutline.structuredContent?.['nextCursor']);
+        assert.notDeepEqual(secondPage.structuredContent?.['symbols'], boundedOutline.structuredContent?.['symbols']);
+
+        const profileMismatch = await outlineTool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            includeImports: false,
+            maxItems: 1,
+            maxBytes: 16 * 1024,
+            cursor: String(boundedOutline.structuredContent?.['nextCursor']),
+        });
+        assert.equal(profileMismatch.isError, true);
+        assert.equal(profileMismatch.structuredContent?.['code'], 'ERR_REPO_OUTLINE_CURSOR');
+
+        const batch = await outlineTool.handler({
+            batch: [
+                { path: 'src/copilot/mcp/tools/repo-read.js', maxItems: 2, maxBytes: 16 * 1024 },
+                { path: '', maxItems: 2, maxBytes: 16 * 1024 },
+                { path: 'src/copilot/mcp/tools/meta.js', maxItems: 2, maxBytes: 16 * 1024 },
+            ],
+            batchFailureMode: 'best-effort',
+        });
+        assert.equal(batch.isError, undefined);
+        assert.equal(batch.structuredContent?.['batch'], true);
+        assert.equal(batch.structuredContent?.['requestCount'], 3);
+        assert.equal(batch.structuredContent?.['succeededCount'], 2);
+        assert.equal(batch.structuredContent?.['failedCount'], 1);
+        const batchRows = /** @type {Record<string, unknown>[]} */ (batch.structuredContent?.['results']);
+        assert.equal(batchRows[1]?.['isError'], true);
+        assert.ok(Array.isArray(batchRows[0]?.['symbols']));
     });
 
     it('mcp_smoke_workspace runs read-only end-to-end checks', async () => {
@@ -944,6 +1227,19 @@ describe('copilot MCP tools', () => {
         assert.equal(status.structuredContent?.['success'], true);
         assert.equal(typeof status.structuredContent?.['stats'], 'object');
         assert.equal(typeof status.structuredContent?.['autoBuild'], 'object');
+
+        const inventoryTool = findTool('repo_inventory');
+        const inventory = await inventoryTool.handler({
+            source: 'index',
+            path: 'src/copilot/mcp/tools',
+            maxResults: 20,
+        });
+        assert.equal(inventory.isError, undefined);
+        assert.equal(inventory.structuredContent?.['success'], true);
+        assert.equal(inventory.structuredContent?.['source'], 'index');
+        const inventoryPaths = /** @type {string[]} */ (inventory.structuredContent?.['paths']);
+        assert.ok(inventoryPaths.some((candidate) => candidate.endsWith('/repo-read.js')));
+        assert.equal(inventory.structuredContent?.['sourceMetadata']?.['engine'], 'persistent-io-index');
 
         const searchTool = findTool('repo_index_search');
         const search = await searchTool.handler({ query: 'repoIndexTools', maxResults: 5 });
@@ -1156,10 +1452,26 @@ describe('copilot MCP tools', () => {
         assert.equal(authProfile['stepUpPreferred'], false);
         assert.equal(authProfile['broadInitialGrant'], true);
         assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
-        assert.equal(structured['executionLimitsVersion'], 2);
+        assert.equal(structured['executionLimitsVersion'], 6);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
         assert.equal(executionLimits['repoRead']?.['maxBatchRequests'], 64);
         assert.equal(executionLimits['repoRead']?.['maxSearchContextLines'], 48);
+        assert.equal(executionLimits['repoRead']?.['defaultTreeMaxEntries'], 2000);
+        assert.equal(executionLimits['repoRead']?.['maxTreeMaxEntries'], 5000);
+        assert.equal(executionLimits['repoRead']?.['defaultTreeContentBudgetBytes'], 512 * 1024);
+        assert.equal(executionLimits['repoRead']?.['maxTreeToolResultBytes'], 1536 * 1024);
+        assert.equal(executionLimits['repoRead']?.['maxTreeEnumeratedEntries'], 100_000);
+        assert.equal(executionLimits['repoRead']?.['defaultChunkLines'], 200);
+        assert.equal(executionLimits['repoRead']?.['defaultChunkMaxChunks'], 4);
+        assert.equal(executionLimits['repoRead']?.['defaultChunkContentBudgetBytes'], 512 * 1024);
+        assert.equal(executionLimits['repoRead']?.['maxChunkToolResultBytes'], 1536 * 1024);
+        assert.equal(executionLimits['repoRead']?.['defaultInventoryMaxResults'], 2000);
+        assert.equal(executionLimits['repoRead']?.['maxInventoryMaxResults'], 5000);
+        assert.equal(executionLimits['repoRead']?.['maxInventoryToolResultBytes'], 1536 * 1024);
+        assert.equal(executionLimits['repoRead']?.['defaultOutlineMaxItems'], 500);
+        assert.equal(executionLimits['repoRead']?.['maxOutlineMaxItems'], 5000);
+        assert.equal(executionLimits['repoRead']?.['defaultOutlineContentBudgetBytes'], 512 * 1024);
+        assert.equal(executionLimits['repoRead']?.['maxOutlineToolResultBytes'], 1536 * 1024);
         assert.equal(executionLimits['repoPatch']?.['maxBatchOperations'], 128);
         assert.equal(executionLimits['repoPatch']?.['maxBatchTargets'], 64);
         assert.equal(executionLimits['repoPatch']?.['maxBatchInputBytes'], 3 * 1024 * 1024);
@@ -1261,7 +1573,7 @@ describe('copilot MCP tools', () => {
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
         assert.equal(metadataCoverage['securityComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
-        assert.equal(structured['executionLimitsVersion'], 2);
+        assert.equal(structured['executionLimitsVersion'], 6);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
         assert.equal(executionLimits['repoPatch']?.['maxBatchOperations'], 128);
         assert.equal(executionLimits['repoPatch']?.['defaultApplyMode'], 'per-target-fast');
@@ -1368,6 +1680,14 @@ describe('copilot MCP tools', () => {
         assert.equal(applyConflict.isError, true);
         assert.equal(applyConflict.structuredContent?.['code'], 'ERR_CLOUDFLARE_APPLY_TARGET_FIELDS');
 
+        const missingConfirmation = await applyTool.handler({ target: 'edge-policy', dryRun: false });
+        assert.equal(missingConfirmation.isError, true);
+        assert.equal(missingConfirmation.structuredContent?.['code'], 'ERR_CLOUDFLARE_APPLY_CONFIRM_REQUIRED');
+        assert.equal(
+            /** @type {Record<string, unknown>} */ (missingConfirmation.structuredContent?.['details'] ?? {})['retryability'],
+            'manual-decision',
+        );
+
         const localTool = findTool('mcp_cloudflare_metrics_snapshot');
         const metricsConflict = await localTool.handler({ view: 'metrics', includeMetricsBaseline: true });
         assert.equal(metricsConflict.isError, true);
@@ -1472,6 +1792,7 @@ describe('copilot MCP tools', () => {
             },
             {
                 workspace: TEST_WORKSPACE,
+                principal: TEST_PRINCIPAL,
                 config: TEST_PROCESS_HOST.processConfig.toolConfig,
                 capabilities: {
                     ...TEST_TOOL_CAPABILITIES,
@@ -1512,9 +1833,13 @@ describe('copilot MCP tools', () => {
     it('dependency upgrade requires explicit confirmation without executing npm', async () => {
         const tool = findTool('mcp_dependency_upgrade');
         const result = await tool.handler({ confirmUpgrade: false });
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['code'], 'ERR_DEPENDENCY_UPGRADE_CONFIRM_REQUIRED');
+        const details = /** @type {Record<string, unknown>} */ (result.structuredContent?.['details']);
+        assert.equal(details['failureClass'], 'shape-config');
+        assert.equal(details['retryability'], 'manual-decision');
+        assert.equal(details['recoveryRequired'], false);
     });
 
     it('mcp maintenance composite exposes canonical plan metadata through dry-run and batches safe work', async () => {
@@ -1649,7 +1974,7 @@ describe('copilot MCP tools', () => {
         assert.equal(descriptorObservation['scope'], 'origin-mcp-descriptor-observation');
         const snapshot = /** @type {Record<string, unknown>} */ (descriptorObservation['chatgptActionSnapshot']);
         assert.equal(snapshot['observableFromOrigin'], false);
-        assert.equal(projection['executionLimitsVersion'], 2);
+        assert.equal(projection['executionLimitsVersion'], 6);
         const limits = /** @type {Record<string, Record<string, unknown>>} */ (projection['executionLimits']);
         assert.equal(limits['repoPatch']?.['maxBatchOperations'], 128);
         assert.equal(limits['validator']?.['maxBatchConcurrency'], 1);
@@ -1811,7 +2136,7 @@ describe('copilot MCP tools', () => {
                 confirmBatch: true,
                 applyMode: 'global-preflight',
             });
-            assert.equal(conservative.isError, undefined);
+            assert.equal(conservative.isError, true);
             assert.equal(conservative.structuredContent?.['success'], false);
             assert.equal(conservative.structuredContent?.['preflightBlockedApply'], true);
             assert.deepEqual(getResultExecutionHint(conservative), {
@@ -1834,7 +2159,7 @@ describe('copilot MCP tools', () => {
                 confirmBatch: true,
                 targetConcurrency: 2,
             });
-            assert.equal(fast.isError, undefined);
+            assert.equal(fast.isError, true);
             assert.equal(fast.structuredContent?.['success'], false);
             assert.equal(fast.structuredContent?.['partial'], true);
             assert.equal(fast.structuredContent?.['applyMode'], 'per-target-fast');
@@ -2161,7 +2486,7 @@ describe('copilot MCP tools', () => {
                 confirmBatch: true,
                 resultMode: 'detailed',
             });
-            assert.equal(result.isError, undefined);
+            assert.equal(result.isError, true);
             assert.equal(result.structuredContent?.['success'], false);
             assert.equal(result.structuredContent?.['partial'], false);
             const failures = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['failures']);

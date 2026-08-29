@@ -23,6 +23,7 @@ import { readMcpWorkspaceSmokeSummary } from '#copilot/mcp/public/diagnostics/wo
 import { readMcpIndexAutoBuildState } from '#copilot/mcp/public/indexing/auto-build';
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
 import { readMcpDescriptorObservationState } from '#copilot/mcp/public/protocol/catalog';
+import { buildMcpRuntimeGenerationCertificate } from '#copilot/mcp/public/runtime/source-generation';
 import { readMcpStartupMaintenanceState } from '#copilot/mcp/public/runtime/startup-maintenance';
 import { readMcpHttpStatefulRuntimePolicySnapshot } from '#copilot/mcp/public/transport/http/stateful/config';
 import { readRepoReadFileResultCacheStats } from '#copilot/mcp/public/workspace/repository/read-cache';
@@ -199,6 +200,41 @@ function summarizeRuntimeSourceGeneration(generation) {
     };
 }
 
+/** @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeGenerationCertificate} certificate */
+function summarizeRuntimeGenerationCertificate(certificate) {
+    return {
+        schemaVersion: certificate.schemaVersion,
+        certificateFingerprint: certificate.certificateFingerprint,
+    };
+}
+
+/**
+ * Mutable worktree observations are deliberately kept outside the immutable certificate.
+ * @param {import('#copilot/mcp/public/runtime/source-generation').McpRuntimeSourceGeneration} generation
+ * @param {{ dirty:boolean|null; branch:string|null; head:string|null; error:string|null }} workspace
+ * @param {Record<string, unknown>} drift
+ */
+function summarizeRuntimeGenerationRelation(generation, workspace, drift) {
+    const driftDetected = drift['driftDetected'] === true;
+    const missingCount = Number(drift['missingCount'] ?? 0);
+    return {
+        bootSourceProof:
+            generation.sourceBinding === 'controlled-promotion' ? 'source-barrier-bound' : 'manual-unbound',
+        currentSourceObservation: driftDetected
+            ? 'sampled-drift-detected'
+            : missingCount > 0
+              ? 'sample-incomplete-no-drift-detected'
+              : 'sampled-no-drift-detected',
+        loadedBehaviorMayBeStale: driftDetected,
+        exactCurrentWorktreeEqualityProven: false,
+        currentWorktree: {
+            head: workspace.head,
+            branch: workspace.branch,
+            dirty: workspace.dirty,
+        },
+    };
+}
+
 /**
  * @param {Record<string, Record<string, unknown>>} tools
  * @returns {{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }[]}
@@ -313,14 +349,9 @@ function recordOrEmpty(value) {
 /** @param {Record<string, unknown>} drift */
 function summarizeRuntimeSourceDrift(drift) {
     return {
-        version: drift['version'] ?? null,
         driftDetected: drift['driftDetected'] === true,
-        processStartedAt: drift['processStartedAt'] ?? null,
-        checkedAt: drift['checkedAt'] ?? null,
-        sampledFileCount: drift['sampledFileCount'] ?? 0,
         changedSinceProcessStartCount: drift['changedSinceProcessStartCount'] ?? 0,
         missingCount: drift['missingCount'] ?? 0,
-        newestSourceMtime: drift['newestSourceMtime'] ?? null,
         changedPaths: Array.isArray(drift['changedPaths']) ? drift['changedPaths'] : [],
     };
 }
@@ -696,7 +727,7 @@ function buildEvidenceAwareIoCachePlan(ioRuntime, benchmarkState) {
  * @param {Readonly<{ readState: () => Record<string, unknown> }> | undefined} httpSessionRuntimeCapability
  * @param {ReturnType<typeof import('#copilot/mcp/public/maintenance').createAiArtifactsRuntime>} aiArtifactsCapability
  * @param {import('#copilot/mcp/public/cloudflare/config').CloudflareTunnelConfig} tunnelConfig
- * @param {{ includeDetails?: boolean | undefined; signal?: AbortSignal }} [input]
+ * @param {{ includeDetails?: boolean | undefined; signal?: AbortSignal; toolSurface?: NonNullable<import('#copilot/mcp/public/protocol/tools').McpToolCapabilityProjection['toolSurface']> }} [input]
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function readMcpRuntimeHealth(
@@ -761,6 +792,30 @@ export async function readMcpRuntimeHealth(
         reason: 'http-session-runtime-not-owned-by-current-transport',
     };
     const descriptorObservation = readMcpDescriptorObservationState();
+    const operationToolSurface = input.toolSurface;
+    const runtimeGenerationCertificate = buildMcpRuntimeGenerationCertificate(
+        runtimeSourceGeneration,
+        operationToolSurface?.descriptorFingerprint
+            ? {
+                  evidence: 'operation-context-frozen',
+                  toolCount: operationToolSurface.names.length,
+                  descriptorFingerprint: operationToolSurface.descriptorFingerprint,
+                  descriptorFingerprintKind: operationToolSurface.descriptorFingerprintKind ?? null,
+              }
+            : typeof descriptorObservation['currentDescriptorFingerprint'] === 'string'
+              ? {
+                    evidence: 'descriptor-observation-fallback',
+                    toolCount: Number(descriptorObservation['currentToolCount'] ?? 0),
+                    descriptorFingerprint: descriptorObservation['currentDescriptorFingerprint'],
+                    descriptorFingerprintKind: 'mcp-tools-list-wire-descriptor-set-sha256',
+                }
+              : { evidence: 'unavailable' },
+    );
+    const runtimeGenerationRelation = summarizeRuntimeGenerationRelation(
+        runtimeSourceGeneration,
+        workspace,
+        runtimeSourceDrift,
+    );
     const roundTripAnalyticsMonitor = readMcpRoundTripAnalyticsMonitorState();
     const compileCache = ioProcess.compileCache;
     const warnings = [];
@@ -850,6 +905,7 @@ export async function readMcpRuntimeHealth(
                 indexAutoBuild: summarizeIndexAutoBuild(indexAutoBuild),
                 startupMaintenance,
                 runtimeSourceGeneration: summarizeRuntimeSourceGeneration(runtimeSourceGeneration),
+                runtimeGenerationCertificate: summarizeRuntimeGenerationCertificate(runtimeGenerationCertificate),
                 runtimeSourceDrift: summarizeRuntimeSourceDrift(runtimeSourceDrift),
                 tunnel: {
                     mode: tunnelConfig.mode,
@@ -932,6 +988,8 @@ export async function readMcpRuntimeHealth(
             startupMaintenance,
             lastWorkspaceSmoke,
             runtimeSourceGeneration,
+            runtimeGenerationCertificate,
+            runtimeGenerationRelation,
             runtimeSourceDrift,
             tunnel: {
                 mode: tunnelConfig.mode,

@@ -25,7 +25,7 @@
  * @property {boolean} allowEmpty
  */
 
-export const MCP_TOOL_SURFACE_POLICY_VERSION = '2.0.0';
+export const MCP_TOOL_SURFACE_POLICY_VERSION = '2.1.0';
 
 /** @type {readonly McpToolSurfaceMode[]} */
 export const MCP_TOOL_SURFACE_MODES = Object.freeze([
@@ -44,12 +44,15 @@ const DEFAULT_TOOL_SURFACE = 'full';
 const LATENCY_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_tree',
+    'repo_inventory',
     'repo_search_text',
     'repo_read_file',
     'repo_bulk_inspect',
     'repo_read_file_chunks',
     'repo_file_outline',
     'repo_symbol_search',
+    'repo_graph',
+    'repo_change_impact',
     'repo_find_orphan_imports',
     'search',
     'fetch',
@@ -71,6 +74,7 @@ const LATENCY_SURFACE_TOOL_NAMES = Object.freeze([
     'git_branch_info',
     'git_diff',
     'git_log',
+    'git_inspect',
     'git_publish_changes',
     'run_copilot_validator',
     'mcp_run_safe_validation_suite',
@@ -137,6 +141,7 @@ const CLOUDFLARE_SURFACE_TOOL_NAMES = Object.freeze([
 const RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_status',
     'repo_tree',
+    'repo_inventory',
     'repo_search_text',
     'repo_read_file',
     'repo_bulk_inspect',
@@ -146,6 +151,8 @@ const RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'repo_index_status',
     'repo_index_search',
     'repo_find_imports',
+    'repo_graph',
+    'repo_change_impact',
     'repo_find_orphan_imports',
     'search',
     'fetch',
@@ -153,6 +160,7 @@ const RESEARCH_SURFACE_TOOL_NAMES = Object.freeze([
     'git_branch_info',
     'git_diff',
     'git_log',
+    'git_inspect',
     'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_capabilities_summary',

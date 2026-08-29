@@ -11,11 +11,13 @@ import {
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     requireMcpToolAuditCapability,
+    requireMcpToolPrincipal,
     requireMcpToolRepositoryPatchConfig,
     requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
     withResultSizeHint,
+    withToolErrorResult,
 } from '#copilot/mcp/public/protocol/tools';
 import { canRunCopilotValidatorInline } from '#copilot/mcp/public/validation';
 import { compactRepositoryPatchFailureRows } from '#copilot/mcp/public/workspace/repository/patch';
@@ -487,17 +489,19 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
             strategy: 'conservative-estimate',
             source: 'repo_apply_patch_batch',
         });
-        return withResultExecutionHint(result, {
-            logicalOperations: operationCount,
-            failedOperations: workflow.failureSummary.causalFailureCount,
-            skippedOperations: workflow.failureSummary.abortedOperationCount,
-            mode: 'patch-apply:global-preflight-blocked',
-            executionPolicyClass: 'preflight-blocked',
-            executionFailurePolicyClass: 'best-effort',
-            executionConcurrencyClass: classifyBoundedConcurrency(workflow.preflight.execution.concurrency),
-            batchSize: operationCount,
-            batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
-        });
+        return withToolErrorResult(
+            withResultExecutionHint(result, {
+                logicalOperations: operationCount,
+                failedOperations: workflow.failureSummary.causalFailureCount,
+                skippedOperations: workflow.failureSummary.abortedOperationCount,
+                mode: 'patch-apply:global-preflight-blocked',
+                executionPolicyClass: 'preflight-blocked',
+                executionFailurePolicyClass: 'best-effort',
+                executionConcurrencyClass: classifyBoundedConcurrency(workflow.preflight.execution.concurrency),
+                batchSize: operationCount,
+                batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
+            }),
+        );
     }
 
     const exactSelfRepair = summarizeExactPatchSelfRepair(workflow.applied);
@@ -639,7 +643,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         strategy: 'conservative-estimate',
         source: 'repo_apply_patch_batch',
     });
-    return withResultExecutionHint(result, {
+    const framedResult = withResultExecutionHint(result, {
         logicalOperations: operationCount + (workflow.postValidation.ran ? workflow.postValidation.requestedCount : 0),
         failedOperations:
             workflow.failureSummary.causalFailureCount +
@@ -660,6 +664,7 @@ async function projectRepoPatchBatchWorkflow(runtime, workflow, presentation) {
         batchSize: operationCount,
         batchCapacity: MAX_PATCH_BATCH_OPERATIONS,
     });
+    return structured.success === false ? withToolErrorResult(framedResult) : framedResult;
 }
 
 /**
@@ -818,6 +823,7 @@ export function createRepoWriteTools(options = {}) {
             quarantineMetadataWriter,
             operationContext?.signal,
             {
+                ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
                 repositoryPatchConfig: requireMcpToolRepositoryPatchConfig(operationContext),
                 ...(options.quarantineDir ? { quarantineDir: options.quarantineDir } : {}),
             },

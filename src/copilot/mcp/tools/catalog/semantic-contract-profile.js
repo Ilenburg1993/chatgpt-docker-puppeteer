@@ -9,7 +9,7 @@
  * @module copilot/mcp/tools/catalog/semantic-contract-profile
  */
 
-export const MCP_TOOL_CONTRACTS_VERSION = '2.10.0';
+export const MCP_TOOL_CONTRACTS_VERSION = '2.19.0';
 
 /** @typedef {Readonly<{
  * effect: import('#copilot/mcp/public/protocol/catalog').McpToolContract['effects']['mutation'];
@@ -50,9 +50,27 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
                 cancellation: 'bounded-non-cancellable',
                 continuationBoundMs: 120000,
                 rationale:
-                    'Current implementation is locally/input bounded but does not yet prove end-to-end cooperative cancellation; bounded work may settle after the registry reports cancellation.',
+                    'Native glob enumeration and page-only stat enrichment receive cooperative abort checks, but the glob iterator itself has no explicit AbortSignal ownership contract.',
             },
             output: 'intentional-untyped',
+            maxResultBytes: 1572864,
+            network: 'local',
+            credentials: ['none'],
+            externalSideEffects: 'none',
+            retry: 'safe',
+        },
+        repo_inventory: {
+            effect: 'none',
+            idempotency: 'idempotent',
+            callerScope: 'read',
+            execution: {
+                cancellation: 'bounded-non-cancellable',
+                continuationBoundMs: 120000,
+                rationale:
+                    'Git source is cooperatively cancellable; native filesystem glob and synchronous index projection are bounded but do not prove immediate end-to-end cancellation.',
+            },
+            output: 'intentional-untyped',
+            maxResultBytes: 1572864,
             network: 'local',
             credentials: ['none'],
             externalSideEffects: 'none',
@@ -117,6 +135,7 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
                     'Current implementation is locally/input bounded but does not yet prove end-to-end cooperative cancellation; bounded work may settle after the registry reports cancellation.',
             },
             output: 'intentional-untyped',
+            maxResultBytes: 1572864,
             network: 'local',
             credentials: ['none'],
             externalSideEffects: 'none',
@@ -194,9 +213,10 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
                 cancellation: 'bounded-non-cancellable',
                 continuationBoundMs: 120000,
                 rationale:
-                    'Current implementation is locally/input bounded but does not yet prove end-to-end cooperative cancellation; bounded work may settle after the registry reports cancellation.',
+                    'Parser/window work is bounded by file and page budgets; cursor semantics are revision-bound, while parser worker cancellation is not yet proven end-to-end.',
             },
             output: 'intentional-untyped',
+            maxResultBytes: 1572864,
             network: 'local',
             credentials: ['none'],
             externalSideEffects: 'none',
@@ -242,6 +262,38 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
                 continuationBoundMs: 300000,
                 rationale:
                     'Current external/network path has explicit request/input bounds but does not yet prove cooperative cancellation across every remote primitive.',
+            },
+            output: 'intentional-untyped',
+            network: 'local',
+            credentials: ['none'],
+            externalSideEffects: 'none',
+            retry: 'safe',
+        },
+        repo_graph: {
+            effect: 'none',
+            idempotency: 'idempotent',
+            callerScope: 'read',
+            execution: {
+                cancellation: 'bounded-non-cancellable',
+                continuationBoundMs: 120000,
+                rationale:
+                    'Graph construction uses bounded local index reads plus pure in-process graph algorithms; no source reparse or external network work is required.',
+            },
+            output: 'intentional-untyped',
+            network: 'local',
+            credentials: ['none'],
+            externalSideEffects: 'none',
+            retry: 'safe',
+        },
+        repo_change_impact: {
+            effect: 'none',
+            idempotency: 'idempotent',
+            callerScope: 'read',
+            execution: {
+                cancellation: 'bounded-non-cancellable',
+                continuationBoundMs: 120000,
+                rationale:
+                    'Change impact reuses the bounded indexed module graph and computes a pure reverse closure over explicitly supplied paths.',
             },
             output: 'intentional-untyped',
             network: 'local',
@@ -356,6 +408,22 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
                     'OperationContext.signal reaches the owned cancellable/acceptance boundary; after abort the handler must settle only after owned call-scoped work is terminal.',
             },
             output: 'specific',
+            network: 'local',
+            credentials: ['none'],
+            externalSideEffects: 'none',
+            retry: 'safe',
+        },
+        git_inspect: {
+            effect: 'none',
+            idempotency: 'idempotent',
+            callerScope: 'read',
+            execution: {
+                cancellation: 'cancellable',
+                drainTimeoutMs: 15000,
+                rationale:
+                    'Structured Git forensic reads execute through the governed workspace Git adapter and infra buffered-process owner; cancellation terminates owned Git process groups and drains close before settlement.',
+            },
+            output: 'intentional-untyped',
             network: 'local',
             credentials: ['none'],
             externalSideEffects: 'none',
@@ -1212,12 +1280,12 @@ export const CONTRACT_PROFILE_BY_TOOL = /** @type {Readonly<Record<string, McpTo
         copilot_sessions: {
             effect: 'none',
             idempotency: 'idempotent',
-            callerScope: 'read',
+            callerScope: 'admin',
             execution: {
                 cancellation: 'bounded-non-cancellable',
                 continuationBoundMs: 120000,
                 rationale:
-                    'Current implementation is locally/input bounded but does not yet prove end-to-end cooperative cancellation; bounded work may settle after the registry reports cancellation.',
+                    'Administrative process-global SDK-session inspection is synchronous/local and bounded by the in-memory registry; sessions can originate outside MCP, so the surface intentionally does not infer caller ownership.',
             },
             output: 'intentional-untyped',
             network: 'local',

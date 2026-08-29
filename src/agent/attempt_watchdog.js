@@ -315,7 +315,7 @@ class AttemptWatchdog {
                 // Best-effort abort to stop runaway driver execution (if still alive).
                 try {
                     if (this.nerv) {
-                        // eslint-disable-next-line @typescript-eslint/await-thenable
+                        // oxlint-disable-next-line typescript/await-thenable
                         await sendCommand(
                             this.nerv,
                             ActorRole.KERNEL,

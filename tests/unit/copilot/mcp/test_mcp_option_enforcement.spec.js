@@ -16,18 +16,18 @@ describe('MCP option enforcement before side effects', () => {
             batch: [{ command: 'printf ok' }],
             cwd: '/must-not-be-used',
         });
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['code'], 'ERR_TERMINAL_EXEC_SHAPE');
-        assert.deepEqual(result.structuredContent?.['conflictingFields'], ['cwd']);
+        assert.deepEqual(result.structuredContent?.['details']?.['conflictingFields'], ['cwd']);
     });
 
     it('rejects terminal_exec batch-only tuning in single mode before execution', async () => {
         const result = await tool('terminal_exec').handler({ command: 'printf ok', batchConcurrency: 2 });
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['code'], 'ERR_TERMINAL_EXEC_SHAPE');
-        assert.deepEqual(result.structuredContent?.['conflictingFields'], ['batchConcurrency']);
+        assert.deepEqual(result.structuredContent?.['details']?.['conflictingFields'], ['batchConcurrency']);
     });
 
     it('rejects terminal session fields that do not apply to the selected action', async () => {
@@ -36,10 +36,10 @@ describe('MCP option enforcement before side effects', () => {
             sessionId: 'opaque-session-id',
             data: 'must-not-be-written',
         });
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['code'], 'ERR_TERMINAL_SESSION_ACTION_OPTIONS');
-        assert.deepEqual(result.structuredContent?.['invalidOptions'], ['data']);
+        assert.deepEqual(result.structuredContent?.['details']?.['invalidOptions'], ['data']);
     });
 
     it('rejects divergent repo_search_text aliases before acquiring workspace authority', async () => {
@@ -56,10 +56,10 @@ describe('MCP option enforcement before side effects', () => {
             afterSeq: 5,
             limit: 10,
         });
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['code'], 'ERR_TERMINAL_SESSION_READ_ACTION_OPTIONS');
-        assert.deepEqual(result.structuredContent?.['invalidOptions'], ['sessionId', 'afterSeq']);
+        assert.deepEqual(result.structuredContent?.['details']?.['invalidOptions'], ['sessionId', 'afterSeq']);
     });
 
     it('rejects replace_all plus occurrence_index even when expected_occurrences is also present', async () => {

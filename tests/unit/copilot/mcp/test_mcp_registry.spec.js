@@ -55,7 +55,7 @@ describe('copilot MCP registry', () => {
         const firstNames = first.map((tool) => tool.name);
         const secondNames = second.map((tool) => tool.name);
 
-        assert.equal(first.length, 84);
+        assert.equal(first.length, 88);
         assert.equal(new Set(firstNames).size, first.length);
         assert.deepEqual(secondNames, firstNames);
         assert.notStrictEqual(second, first);
@@ -83,6 +83,7 @@ describe('copilot MCP registry', () => {
             'git_branch_info',
             'git_commit',
             'git_diff',
+            'git_inspect',
             'git_log',
             'git_publish_changes',
             'git_push',
@@ -133,15 +134,18 @@ describe('copilot MCP registry', () => {
             'repo_apply_patch',
             'repo_apply_patch_batch',
             'repo_bulk_inspect',
+            'repo_change_impact',
             'repo_create_file',
             'repo_diff_files',
             'repo_file_outline',
             'repo_find_imports',
             'repo_find_orphan_imports',
             'repo_find_symbol_usages',
+            'repo_graph',
             'repo_index_build',
             'repo_index_search',
             'repo_index_status',
+            'repo_inventory',
             'repo_move_file',
             'repo_quarantine_file',
             'repo_quarantine_status',
@@ -286,7 +290,7 @@ describe('copilot MCP registry', () => {
             assert.equal(names.has(name), true, name);
         }
         assert.ok(latency.length < full.length);
-        assert.equal(latency.length, 51);
+        assert.equal(latency.length, 55);
     });
 
     it('warns before the configured tool-count limit is exhausted', () => {
@@ -420,15 +424,15 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
         const coverage = readMcpToolContractCoverage();
         assert.deepEqual(coverage, {
-            total: 84,
-            readOnly: 51,
+            total: 88,
+            readOnly: 55,
             boundedWrite: 25,
             destructive: 8,
             openWorld: 9,
-            idempotent: 50,
-            scopes: { read: 51, write: 19, validate: 2, admin: 12 },
-            cancellation: { cancellable: 23, boundedNonCancellable: 56, notApplicable: 5 },
-            output: { specific: 10, intentionalUntyped: 74 },
+            idempotent: 54,
+            scopes: { read: 54, write: 19, validate: 2, admin: 13 },
+            cancellation: { cancellable: 24, boundedNonCancellable: 59, notApplicable: 5 },
+            output: { specific: 10, intentionalUntyped: 78 },
         });
         assert.equal(tools.length, coverage.total);
         for (const tool of tools) {

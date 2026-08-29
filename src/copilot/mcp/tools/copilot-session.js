@@ -5,13 +5,6 @@
  * @module copilot/mcp/tools/copilot-session
  */
 
-// @ts-check
-/**
- * Read-only MCP tools for Copilot SDK/LLM-B session state.
- *
- * @module copilot/mcp/tools/copilot-session
- */
-
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import { errorResult, okResult } from '#copilot/mcp/public/protocol/tools';
 import { getActiveSdkSession, listActiveSdkSessions } from '#copilot/sdk/session';
@@ -37,7 +30,8 @@ export const copilotSessionTools = [
     defineMcpRawTool({
         name: 'copilot_sessions',
         title: 'Copilot sessions',
-        description: 'List active Copilot SDK/LLM-B sessions or return read-only metadata for one active session.',
+        description:
+            'Administrative process-global inspection of active Copilot SDK/LLM-B sessions. Sessions can originate outside MCP, so this surface intentionally does not claim caller ownership.',
         inputSchema: {
             action: z.enum(['list', 'get'])['describe']('Read projection: list or get.'),
             limit: z.number().int().min(1).max(100).optional()['describe']('action=list only: maximum sessions. Default: 50.'),

@@ -167,6 +167,8 @@ completa; os itens abaixo destacam as superfícies centrais, não um inventário
 - `repo_index_build`
 - `repo_index_search`
 - `repo_find_imports`
+- `repo_graph`
+- `repo_change_impact`
 - `repo_find_orphan_imports`
 - `git_status`
 - `git_diff`
@@ -344,9 +346,12 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
   necessario.
 - `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor
   runtime da LLM-B.
-- `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_find_imports`,
-  `repo_find_orphan_imports` espelha a família `workspace_index_*`/`workspace_find_imports` usando a
-  mesma engine FTS5/simbolica compartilhada.
+- `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_find_imports` e
+  `repo_find_orphan_imports` reutilizam a mesma engine FTS5/simbólica compartilhada.
+- `repo_graph` e `repo_change_impact` usam os mesmos file/import facts já persistidos nesse índice;
+  não reparseiam source nem fazem traversal adicional. A resolução relative/package-import é única em
+  `infra/indexing/module-resolution`, enquanto SCC, reachability, shortest path e reverse closure são
+  algoritmos puros em `infra/indexing/graph`.
 
 Erros recuperaveis usam contratos estaveis em `structuredContent`:
 

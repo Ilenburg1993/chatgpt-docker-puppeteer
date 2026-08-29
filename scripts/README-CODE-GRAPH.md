@@ -7,8 +7,7 @@ Esta implementação é deliberadamente independente da API do compilador TypeSc
 estrutural usa `@babel/parser` sob a policy compartilhada de
 `src/copilot/infra/code-analysis/babel-policy.js`; imports são resolvidos com a semântica de módulos
 do Node; componentes fortemente conexos são calculados com Tarjan. Dessa forma, análise arquitetural
-não cria uma dependência first-party da ilha TS6 mantida somente por compatibilidade de peers
-upstream.
+não cria uma dependência first-party do compilador ou de APIs semânticas TypeScript; essas responsabilidades permanecem separadas no TypeScript 7 canônico.
 
 ## Invariantes
 
@@ -143,17 +142,14 @@ prova independente contra regressões.
 
 ## TS7 e retirada de Madge
 
-A arquitetura atual separa três responsabilidades:
+A arquitetura atual separa quatro responsabilidades:
 
-1. `@typescript/native`/TS7 é o compilador e language service canônico;
+1. `typescript@7` é o único compilador e language-service engine canônico;
 2. Babel é o parser estrutural first-party para análise de código e grafo;
-3. TS6 permanece instalado somente enquanto peers upstream, em especial `typescript-eslint`, ainda o
-   exigirem.
+3. ESLint executa lint JavaScript/ESM e regras arquiteturais sem construir outro grafo TypeScript;
+4. Oxlint + `oxlint-tsgolint` executam o pequeno lane type-aware TS7 selecionado para promise safety.
 
-Código first-party não pode importar `typescript`, `@typescript/typescript6` nem o antigo
-`scripts/analysis/typescript-compat.mjs`. `scripts/ci/check-typescript-baseline.mjs` verifica essa
-propriedade em CI. O mesmo gate impede a reintrodução de Madge enquanto sua árvore trouxer
-TypeScript 5.
+Código first-party pode consumir os exports canônicos `typescript/unstable/*` quando precisa de semântica TS7, mas aliases aposentados `@typescript/native`, `@typescript/typescript6`, o antigo `scripts/analysis/typescript-compat.mjs` e qualquer compiler TypeScript abaixo de major 7 são proibidos. `scripts/ci/check-typescript-baseline.mjs` verifica essa propriedade em CI e também impede peer masking via `legacy-peer-deps=true`. O mesmo gate continua impedindo a reintrodução de Madge enquanto sua árvore puder reintroduzir uma geração TypeScript anterior.
 
 Documentos históricos podem mencionar Madge como evidência de auditorias passadas; isso não
 representa uma dependência ativa.

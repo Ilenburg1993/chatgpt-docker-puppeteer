@@ -282,8 +282,8 @@
   "eslint.enable": true,
   "eslint.format.enable": false,
   "eslint.lintTask.enable": true,
-  // O servidor ESLint do editor usa uma derivação sem projectService para não manter um segundo grafo TypeScript
-  // residente. CLI/CI continuam usando eslint.config.mjs canônico e todas as regras type-aware.
+  // O servidor ESLint do editor usa apenas análise sintática/arquitetural e não mantém grafo TypeScript próprio.
+  // CLI/CI combinam este ESLint com o lane type-aware TS7 de Oxlint/tsgolint.
   "eslint.options": {
     "overrideConfigFile": "eslint.editor.config.mjs"
   },
@@ -299,25 +299,15 @@
       "severity": "warn"
     },
     {
-      "rule": "@typescript-eslint/no-unused-vars",
-      "severity": "warn"
-    },
-    {
       "rule": "no-console",
       "severity": "off"
-    },
-    {
-      "rule": "@typescript-eslint/no-floating-promises",
-      "severity": "warn"
     }
   ],
   "eslint.run": "onType",
   "eslint.useESLintClass": true,
   "eslint.validate": [
     "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact"
+    "javascriptreact"
   ],
   "eslint.workingDirectories": [
     {
@@ -366,9 +356,8 @@
   // As preferências `js/ts.*` abaixo configuram recursos editoriais suportados pelo cliente nativo;
   // não constituem autorização para iniciar o daemon MCP local.
   //
-  // Não configure `js/ts.tsdk.path` para node_modules/typescript/lib: `typescript` neste repo é
-  // deliberadamente o pacote de compatibilidade TS6 exigido pelo typescript-eslint, enquanto o
-  // compiler principal TS7 está exposto como `tsc` por `@typescript/native`.
+  // `node_modules/typescript` é a única autoridade local TS7; não há alias TS6 nem parser TypeScript
+  // paralelo mantido pelo ESLint.
   //
   // Opções históricas `tsserver.*` permanecem apenas como preferências inertes/compatíveis do
   // VS Code; o serviço selecionado e suportado neste workspace é o TypeScript 7 nativo.

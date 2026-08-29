@@ -17,7 +17,7 @@ import { performance } from 'node:perf_hooks';
 import { parseArgs } from 'node:util';
 
 import { parse as babelParse } from '@babel/parser';
-import { API as TypeScriptNativeAPI } from '@typescript/native/unstable/sync';
+import { API as TypeScriptNativeAPI } from 'typescript/unstable/sync';
 import { globSync } from 'glob';
 
 import {
@@ -222,7 +222,7 @@ const report = {
     policyVersion: BABEL_PARSER_POLICY_VERSION,
     contract: {
         syntaxAuthority: '@babel/parser@8',
-        semanticAuthority: '@typescript/native@7',
+        semanticAuthority: 'typescript@7',
         transformationAuthority: 'none (Node 24 + TypeScript noEmit)',
         astSharingBoundary:
             'share content snapshots/hashes/projections; do not structured-clone full ASTs across workers',
@@ -230,8 +230,7 @@ const report = {
     runtime: {
         node: process.version,
         babel: directVersions,
-        typescriptNative: packageVersion('@typescript/native'),
-        typescriptCompat: packageVersion('typescript'),
+        typescript: packageVersion('typescript'),
     },
     dependencies: {
         directBabel,
@@ -257,7 +256,7 @@ if (values.json) {
     console.log(`direct transform/preset packages=${forbiddenDirect.length}`);
     if (ts7) {
         console.log(
-            `ts7=${report.runtime.typescriptNative} diagnostics=${ts7.diagnosticTotal} duration=${ts7.durationMs}ms`,
+            `ts7=${report.runtime.typescript} diagnostics=${ts7.diagnosticTotal} duration=${ts7.durationMs}ms`,
         );
         for (const project of ts7.projects) {
             console.log(

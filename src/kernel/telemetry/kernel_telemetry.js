@@ -99,7 +99,7 @@ class KernelTelemetry {
                 const discarded = this.buffer.shift();
                 // ONDA 2.5: Emitir via NERV (não mais EventEmitter interno)
                 try {
-                    // eslint-disable-next-line @typescript-eslint/await-thenable
+                    // oxlint-disable-next-line typescript/await-thenable
                     await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type,
@@ -112,7 +112,7 @@ class KernelTelemetry {
 
         // ONDA 2.5: Emissão via NERV (desacoplado)
         try {
-            // eslint-disable-next-line @typescript-eslint/await-thenable
+            // oxlint-disable-next-line typescript/await-thenable
             await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
         } catch (/** @type {any} */ _) {
             // Best-effort: avoid failing kernel telemetry on emission errors

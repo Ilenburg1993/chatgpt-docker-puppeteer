@@ -15,14 +15,14 @@
  */
 
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor, signalProcessTree } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-export const MCP_TERMINAL_CONTROL_VERSION = 4;
+export const MCP_TERMINAL_CONTROL_VERSION = 6;
 
 const require = createRequire(import.meta.url);
 const DEFAULT_EXEC_TIMEOUT_MS = 120_000;
@@ -38,6 +38,7 @@ const MAX_SESSION_READ_BYTES = 8 * 1024 * 1024;
 const DEFAULT_SESSION_WAIT_MS = 30_000;
 const MAX_SESSION_WAIT_MS = 120_000;
 const MAX_SESSION_WAITERS_PER_SESSION = 64;
+const CLOSED_SESSION_RETENTION_MS = 30 * 60 * 1000;
 const MAX_TERMINAL_SESSIONS = 128;
 const MAX_TERMINAL_BATCH = 32;
 const MAX_TERMINAL_BATCH_CONCURRENCY = 16;
@@ -46,6 +47,7 @@ const MAX_TERMINAL_BATCH_CONCURRENCY = 16;
 const sessions = new Map();
 /** @type {typeof import('node-pty') | null | undefined} */
 let nodePtyModule;
+let terminalProcessExitCleanupInstalled = false;
 
 /**
  * @typedef {{
@@ -66,6 +68,7 @@ let nodePtyModule;
  *     config: import('./config.js').McpTerminalProcessConfig;
  *     signal?: AbortSignal;
  *     cancellationSource?: () => 'caller' | 'deadline' | 'unknown' | null;
+ *     principalKey?: string;
  * }>} TerminalExecutionRuntime
  *
  * @typedef {{ seq: number; stream: 'stdout' | 'stderr' | 'pty' | 'system'; data: string; bytes: number; at: string }} TerminalEvent
@@ -73,6 +76,7 @@ let nodePtyModule;
  *
  * @typedef {{
  *     id: string;
+ *     ownerPrincipalKey: string;
  *     backend: 'pipe' | 'pty';
  *     command: string;
  *     args: string[];
@@ -360,13 +364,15 @@ async function awaitPersistentPipeSessionAcceptance(child, supervisor, runtime) 
 export async function openTerminalSession(input, runtime) {
     const executionRuntime = requireTerminalExecutionRuntime(runtime);
     throwIfTerminalRuntimeAborted(executionRuntime);
-    pruneTerminalSessions();
-    if (runningSessionCount() >= MAX_TERMINAL_SESSIONS) {
+    const ownerPrincipalKey = requireTerminalSessionPrincipalKey(executionRuntime);
+    ensureTerminalProcessExitCleanup();
+    pruneTerminalSessions(ownerPrincipalKey);
+    if (runningSessionCount(undefined) >= MAX_TERMINAL_SESSIONS) {
         return {
             success: false,
             code: 'ERR_TERMINAL_SESSION_LIMIT',
             maxSessions: MAX_TERMINAL_SESSIONS,
-            runningSessions: runningSessionCount(),
+            runningSessions: runningSessionCount(undefined),
         };
     }
     const requestedBackend = input.backend ?? 'auto';
@@ -386,6 +392,7 @@ export async function openTerminalSession(input, runtime) {
     /** @type {TerminalSessionRecord} */
     const record = {
         id,
+        ownerPrincipalKey,
         backend,
         command: invocation.executable,
         args: [...invocation.args],
@@ -484,9 +491,13 @@ export async function openTerminalSession(input, runtime) {
  *     processGroup?: boolean;
  *     graceMs?: number;
  * }} input
+ * @param {TerminalExecutionRuntime} runtime
  */
-export async function controlTerminalSession(input) {
-    const record = sessions.get(String(input.sessionId ?? ''));
+export async function controlTerminalSession(input, runtime) {
+    const executionRuntime = requireTerminalExecutionRuntime(runtime);
+    const ownerPrincipalKey = requireTerminalSessionPrincipalKey(executionRuntime);
+    pruneTerminalSessions(ownerPrincipalKey);
+    const record = getOwnedTerminalSession(input.sessionId, ownerPrincipalKey);
     if (!record) return { success: false, code: 'ERR_TERMINAL_SESSION_NOT_FOUND', sessionId: input.sessionId };
     const action = input.action;
     if (action === 'forget') {
@@ -571,24 +582,26 @@ export async function controlTerminalSession(input) {
  */
 export function readTerminalSession(input, runtime) {
     const executionRuntime = requireTerminalExecutionRuntime(runtime);
-    pruneTerminalSessions();
+    const ownerPrincipalKey = requireTerminalSessionPrincipalKey(executionRuntime);
+    pruneTerminalSessions(ownerPrincipalKey);
     const action = input.action ?? 'read';
     if (action === 'capabilities') {
         return { success: true, capabilities: getTerminalCapabilities(executionRuntime.config) };
     }
     if (action === 'list') {
         const limit = clampInteger(input.limit, 1, MAX_TERMINAL_SESSIONS, 50);
+        const ownedSessions = [...sessions.values()].filter((record) => record.ownerPrincipalKey === ownerPrincipalKey);
         return {
             success: true,
-            total: sessions.size,
-            running: runningSessionCount(),
-            sessions: [...sessions.values()]
+            total: ownedSessions.length,
+            running: runningSessionCount(ownerPrincipalKey),
+            sessions: ownedSessions
                 .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
                 .slice(0, limit)
                 .map(summarizeTerminalSession),
         };
     }
-    const record = sessions.get(String(input.sessionId ?? ''));
+    const record = getOwnedTerminalSession(input.sessionId, ownerPrincipalKey);
     if (!record) return { success: false, code: 'ERR_TERMINAL_SESSION_NOT_FOUND', sessionId: input.sessionId ?? null };
     if (action === 'status') return { success: true, session: summarizeTerminalSession(record) };
     const afterSeq = Math.max(0, Math.trunc(Number(input.afterSeq ?? 0)));
@@ -639,7 +652,8 @@ export async function readTerminalSessionWithWait(input, runtime) {
     if ((input.action ?? 'read') !== 'read' || input.waitFor !== 'output-or-exit') return immediate;
     if (immediate['success'] !== true) return immediate;
 
-    const record = sessions.get(String(input.sessionId ?? ''));
+    const ownerPrincipalKey = requireTerminalSessionPrincipalKey(executionRuntime);
+    const record = getOwnedTerminalSession(input.sessionId, ownerPrincipalKey);
     if (!record) return immediate;
     const waitMs = clampInteger(input.waitMs, 1, MAX_SESSION_WAIT_MS, DEFAULT_SESSION_WAIT_MS);
     const afterSeq = Math.max(0, Math.trunc(Number(input.afterSeq ?? 0)));
@@ -658,7 +672,7 @@ export async function readTerminalSessionWithWait(input, runtime) {
     const signalOutcome = await waitForTerminalSessionReadChange(record, afterSeq, waitMs, executionRuntime);
     const refreshed = readTerminalSession(input, executionRuntime);
     const waitedMs = Math.max(0, Math.round(performance.now() - startedAt));
-    const refreshedRecord = sessions.get(String(input.sessionId ?? ''));
+    const refreshedRecord = getOwnedTerminalSession(input.sessionId, ownerPrincipalKey);
     const refreshedEvents = Array.isArray(refreshed['events']) ? refreshed['events'] : [];
     const waitOutcome =
         refreshedRecord?.status !== 'running'
@@ -702,6 +716,12 @@ export function getTerminalCapabilities(config) {
         maxSessionBufferBytes: MAX_SESSION_BUFFER_BYTES,
         maxSessionWaitMs: MAX_SESSION_WAIT_MS,
         maxSessionWaitersPerSession: MAX_SESSION_WAITERS_PER_SESSION,
+        sessionLifecycle: {
+            runningLifetime: 'until-process-exit-or-explicit-close',
+            closedRetentionMs: CLOSED_SESSION_RETENTION_MS,
+            processExitCleanup: 'force-kill-running-session-process-trees',
+            retentionCleanup: 'opportunistic-on-session-operations',
+        },
         osBoundary: 'same-identity-namespace-mounts-and-privileges-as-mcp-process',
     };
 }
@@ -908,6 +928,10 @@ function summarizeTerminalSession(record) {
         bufferedBytes: record.bufferedBytes,
         droppedBytes: record.droppedBytes,
         nextSeq: record.nextSeq,
+        retentionExpiresAt:
+            record.endedAt === null
+                ? null
+                : new Date(Date.parse(record.endedAt) + CLOSED_SESSION_RETENTION_MS).toISOString(),
     };
 }
 
@@ -1024,20 +1048,67 @@ function terminalSessionWaitCancellationError(runtime) {
     );
 }
 
-function runningSessionCount() {
+/** @param {string | undefined} ownerPrincipalKey */
+function runningSessionCount(ownerPrincipalKey) {
     let count = 0;
-    for (const record of sessions.values()) if (record.status === 'running') count += 1;
+    for (const record of sessions.values()) {
+        if (record.status !== 'running') continue;
+        if (ownerPrincipalKey !== undefined && record.ownerPrincipalKey !== ownerPrincipalKey) continue;
+        count += 1;
+    }
     return count;
 }
 
-function pruneTerminalSessions() {
+/** @param {string | undefined} sessionId @param {string} ownerPrincipalKey */
+function getOwnedTerminalSession(sessionId, ownerPrincipalKey) {
+    const record = sessions.get(String(sessionId ?? ''));
+    return record?.ownerPrincipalKey === ownerPrincipalKey ? record : null;
+}
+
+/** @param {TerminalExecutionRuntime} runtime */
+function requireTerminalSessionPrincipalKey(runtime) {
+    const principalKey = String(runtime.principalKey ?? '').trim();
+    if (!principalKey) throw new TypeError('Persistent terminal session access requires an authorization-derived principal key.');
+    return principalKey;
+}
+
+/** @param {TerminalSessionRecord} record @param {number} nowMs */
+function terminalClosedRetentionExpired(record, nowMs) {
+    if (record.status === 'running' || record.endedAt === null) return false;
+    const endedAtMs = Date.parse(record.endedAt);
+    return Number.isFinite(endedAtMs) && nowMs - endedAtMs >= CLOSED_SESSION_RETENTION_MS;
+}
+
+/** @param {string} ownerPrincipalKey @param {number} [nowMs] */
+function pruneTerminalSessions(ownerPrincipalKey, nowMs = Date.now()) {
+    for (const [sessionId, record] of sessions) {
+        if (terminalClosedRetentionExpired(record, nowMs)) sessions.delete(sessionId);
+    }
     if (sessions.size <= MAX_TERMINAL_SESSIONS) return;
-    const closed = [...sessions.values()]
-        .filter((record) => record.status !== 'running')
+    const ownedClosed = [...sessions.values()]
+        .filter((record) => record.ownerPrincipalKey === ownerPrincipalKey && record.status !== 'running')
         .sort((left, right) => left.startedAt.localeCompare(right.startedAt));
-    for (const record of closed) {
+    for (const record of ownedClosed) {
         if (sessions.size <= MAX_TERMINAL_SESSIONS) break;
         sessions.delete(record.id);
+    }
+}
+
+function ensureTerminalProcessExitCleanup() {
+    if (terminalProcessExitCleanupInstalled) return;
+    terminalProcessExitCleanupInstalled = true;
+    process.once('exit', terminateRunningTerminalSessionsAtProcessExit);
+}
+
+function terminateRunningTerminalSessionsAtProcessExit() {
+    for (const record of sessions.values()) {
+        if (record.status !== 'running') continue;
+        try {
+            if (record.backend === 'pty' && record.pty) record.pty.kill('SIGKILL');
+            else if (record.pid) signalProcessTree(record.pid, 'SIGKILL', { processGroup: true });
+        } catch {
+            // Process exit cleanup is best-effort and must never block MCP shutdown.
+        }
     }
 }
 

@@ -95,7 +95,6 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         // Wait for process to be ready (heuristic wait)
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- resolve is a function, not a string; no-implied-eval is a false positive here
         await new Promise((/** @type {any} */ resolve) => setTimeout(resolve, 1000));
 
         // Send initialize handshake

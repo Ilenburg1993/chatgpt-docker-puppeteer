@@ -11,7 +11,7 @@
 
 import path from 'node:path';
 
-const STRICT_UUID_JOB_ARTIFACT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|log)$/u;
+const STRICT_UUID_JOB_ARTIFACT_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(json|log)$/u;
 const ROLLBACK_SIDECAR_RE = /^(\d+)-([a-f0-9]{64})-([0-9a-f-]{36})\.rollback$/u;
 const ROLLBACK_PENDING_RE = /^\.pending-(\d+)-(\d+)-([0-9a-f-]{36})$/u;
 const DEFAULT_RETAIN_NEWEST = 240;
@@ -28,7 +28,13 @@ const MAX_ARTIFACT_STAT_CONCURRENCY = 32;
  * @property {string} name
  * @property {number} bytes
  * @property {number} mtimeMs
- * @property {boolean} strictUuidName
+ * @property {boolean} [strictUuidName]
+ *
+ * @typedef {object} JobArtifactGroup
+ * @property {string} jobId
+ * @property {JobArtifactSummary[]} artifacts
+ * @property {number} bytes
+ * @property {number} mtimeMs
  */
 
 /** @typedef {{ name: string; stats: import('node:fs').Stats }} AiArtifactDirEntry */
@@ -73,6 +79,39 @@ async function statSafe(context, filePath) {
     } catch {
         return null;
     }
+}
+
+/** @param {JobArtifactSummary[]} artifacts @returns {JobArtifactGroup[]} */
+function groupJobArtifacts(artifacts) {
+    /** @type {Map<string, JobArtifactSummary[]>} */
+    const byJob = new Map();
+    for (const artifact of artifacts) {
+        const match = STRICT_UUID_JOB_ARTIFACT_RE.exec(artifact.name);
+        const jobId = match?.[1];
+        if (!jobId) continue;
+        const group = byJob.get(jobId) ?? [];
+        group.push(artifact);
+        byJob.set(jobId, group);
+    }
+    return [...byJob.entries()].map(([jobId, group]) => ({
+        jobId,
+        artifacts: group.sort((left, right) => left.name.localeCompare(right.name)),
+        bytes: group.reduce((sum, artifact) => sum + artifact.bytes, 0),
+        mtimeMs: Math.max(...group.map((artifact) => artifact.mtimeMs)),
+    }));
+}
+
+/** @param {JobArtifactGroup[]} candidateGroups @param {number} maxDeleteCount */
+function selectWholeJobArtifactGroups(candidateGroups, maxDeleteCount) {
+    const selectedGroups = [];
+    let selectedFileCount = 0;
+    for (const group of candidateGroups) {
+        if (selectedFileCount + group.artifacts.length > maxDeleteCount) continue;
+        selectedGroups.push(group);
+        selectedFileCount += group.artifacts.length;
+        if (selectedFileCount >= maxDeleteCount) break;
+    }
+    return selectedGroups;
 }
 
 /**
@@ -130,14 +169,18 @@ async function readAiArtifactsPressureForRuntime(context, options = {}) {
         .listDirectoryNamesFresh(context.jobsDir)
         .then((result) => result.entries)
         .catch(() => []);
-    const strictArtifactCount = names.reduce(
-        (count, name) => count + (STRICT_UUID_JOB_ARTIFACT_RE.test(name) ? 1 : 0),
-        0,
-    );
+    const strictNames = names.filter((name) => STRICT_UUID_JOB_ARTIFACT_RE.test(name));
+    const strictArtifactCount = strictNames.length;
+    const strictJobCount = new Set(
+        strictNames.map((name) => STRICT_UUID_JOB_ARTIFACT_RE.exec(name)?.[1]).filter(Boolean),
+    ).size;
     return {
         jobs: {
             artifactCount: strictArtifactCount,
-            cleanupCandidateCount: Math.max(0, strictArtifactCount - retainNewest),
+            jobCount: strictJobCount,
+            retentionUnit: 'job',
+            cleanupCandidateCount: Math.max(0, strictJobCount - retainNewest),
+            cleanupCandidateUnit: 'job-group-estimate',
             cleanupCandidateBytes: null,
             estimatedFromNames: true,
         },
@@ -185,10 +228,14 @@ async function buildAiArtifactsReportForRuntime(context, state, options = {}) {
         });
     }
     jobArtifacts.sort((left, right) => right.mtimeMs - left.mtimeMs || left.name.localeCompare(right.name));
-    const cleanupCandidates = jobArtifacts.slice(retainNewest);
-    const cleanupCandidateSamples = cleanupCandidates
+    const jobGroups = groupJobArtifacts(jobArtifacts).sort(
+        (left, right) => right.mtimeMs - left.mtimeMs || left.jobId.localeCompare(right.jobId),
+    );
+    const cleanupCandidateGroups = jobGroups.slice(retainNewest);
+    const cleanupCandidates = cleanupCandidateGroups.flatMap((group) => group.artifacts);
+    const cleanupCandidateSamples = cleanupCandidateGroups
         .slice(0, 12)
-        .map((artifact) => ({ name: artifact.name, bytes: artifact.bytes }));
+        .map((group) => ({ jobId: group.jobId, files: group.artifacts.length, bytes: group.bytes }));
 
     const oversizedCloudflareLogs = [];
     for (const name of ['cloudflared.log', 'mcp-http.log']) {
@@ -243,15 +290,18 @@ async function buildAiArtifactsReportForRuntime(context, state, options = {}) {
         aiPath: path.relative(workspaceRoot, aiDir),
         jobs: {
             artifactCount: jobArtifacts.length,
+            jobCount: jobGroups.length,
             artifactBytes: jobArtifacts.reduce((sum, artifact) => sum + artifact.bytes, 0),
             ignoredJobFileCount,
             retainNewest,
-            overRetainCount: Math.max(0, jobArtifacts.length - retainNewest),
+            retentionUnit: 'job',
+            overRetainCount: Math.max(0, jobGroups.length - retainNewest),
+            cleanupCandidateJobCount: cleanupCandidateGroups.length,
             cleanupCandidateCount: cleanupCandidates.length,
             cleanupCandidateBytes: cleanupCandidates.reduce((sum, artifact) => sum + artifact.bytes, 0),
             cleanupCandidateSamples,
-            oldestRetainedCandidate: jobArtifacts[retainNewest - 1]?.name ?? null,
-            newestCleanupCandidate: cleanupCandidates[0]?.name ?? null,
+            oldestRetainedJobId: jobGroups[retainNewest - 1]?.jobId ?? null,
+            newestCleanupCandidateJobId: cleanupCandidateGroups[0]?.jobId ?? null,
         },
         cloudflare: {
             oversizedLogThresholdBytes: cloudflareLogThresholdBytes,
@@ -300,12 +350,12 @@ async function buildAiArtifactsReportForRuntime(context, state, options = {}) {
             defaultDryRun: true,
             maxDeleteCountPerCall: 500,
             deletionDomain:
-                'strict UUID-named .json/.log files under src/copilot/.ai/jobs; rollback sidecars only when explicitly requested while automatic rollback is disabled',
+                'whole UUID job groups (.json + .log when both exist) under src/copilot/.ai/jobs; rollback sidecars only when explicitly requested while automatic rollback is disabled',
         },
         safety: {
             defaultAction: 'dry-run',
             cleanupPolicy:
-                'delete only allowlisted validator artifacts beyond retention; rollback purge is explicit and schema-restricted; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
+                'select validator cleanup by whole UUID job group so normal retention never intentionally splits manifest/log pairs; rollback purge is explicit and schema-restricted; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
         },
     };
     state.cachedReport = { key: cacheKey, expiresAt: Date.now() + REPORT_CACHE_TTL_MS, report };
@@ -340,10 +390,21 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
         artifacts.push({ name: entry.name, bytes: entry.stats.size, mtimeMs: entry.stats.mtimeMs });
     }
     artifacts.sort((left, right) => right.mtimeMs - left.mtimeMs || left.name.localeCompare(right.name));
-    const candidates = artifacts
+    const jobGroups = groupJobArtifacts(artifacts).sort(
+        (left, right) => right.mtimeMs - left.mtimeMs || left.jobId.localeCompare(right.jobId),
+    );
+    const candidateGroups = jobGroups
         .slice(retainNewest)
-        .sort((left, right) => left.mtimeMs - right.mtimeMs || left.name.localeCompare(right.name));
-    const selected = candidates.slice(0, maxDeleteCount);
+        .sort((left, right) => left.mtimeMs - right.mtimeMs || left.jobId.localeCompare(right.jobId));
+    const candidates = candidateGroups.flatMap((group) => group.artifacts);
+    const selectedGroups = selectWholeJobArtifactGroups(candidateGroups, maxDeleteCount);
+    const selected = selectedGroups.flatMap((group) =>
+        [...group.artifacts].sort((left, right) => {
+            const leftManifest = left.name.endsWith('.json');
+            const rightManifest = right.name.endsWith('.json');
+            return Number(leftManifest) - Number(rightManifest) || left.name.localeCompare(right.name);
+        }),
+    );
     const deleted = [];
     const failures = [];
     const rollbackCandidates = [];
@@ -405,7 +466,9 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
         dryRun,
         retainNewest,
         maxDeleteCount,
+        candidateJobCount: candidateGroups.length,
         candidateCount: candidates.length,
+        selectedJobCount: selectedGroups.length,
         selectedCount: selected.length,
         selectedBytes: selected.reduce((sum, artifact) => sum + artifact.bytes, 0),
         selected: selected.map((artifact) => artifact.name),
@@ -440,6 +503,7 @@ async function cleanupAiArtifactsForRuntime(context, state, options = {}) {
             /** @type {Record<string, unknown>} */ (after['jobs'] ?? {})['cleanupCandidateCount'] ?? null,
         protectedByDesign: [
             'non-UUID job filenames',
+            'newest retained UUID job groups',
             'OAuth stores',
             'tunnel tokens and state',
             'pid files',

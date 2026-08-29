@@ -44,6 +44,9 @@ export const mcpRuntimeHealthTool = defineMcpRawTool({
                 requireMcpToolCloudflareConfig(operationContext),
                 {
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                    ...(operationContext?.capabilities.toolSurface
+                        ? { toolSurface: operationContext.capabilities.toolSurface }
+                        : {}),
                     includeDetails: /** @type {{ includeDetails?: boolean }} */ (input).includeDetails,
                 },
             ),

@@ -241,7 +241,7 @@
     {
       "alias": "#copilot/mcp/public/indexing/auto-build",
       "target": "./src/copilot/mcp/indexing/auto-build/public/index.js",
-      "costTier": "micro",
+      "costTier": "standard",
       "coldImport": false
     },
     {
@@ -295,12 +295,6 @@
     {
       "alias": "#copilot/mcp/public/process/host",
       "target": "./src/copilot/mcp/process/host/public/index.js",
-      "costTier": "micro",
-      "coldImport": false
-    },
-    {
-      "alias": "#copilot/mcp/public/process/supervision",
-      "target": "./src/copilot/mcp/process/supervision/public/index.js",
       "costTier": "micro",
       "coldImport": false
     },

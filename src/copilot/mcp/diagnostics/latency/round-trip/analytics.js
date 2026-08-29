@@ -596,14 +596,19 @@ export function createMcpRoundTripAnalytics(options) {
         };
     }
 
-    /** @param {{ windowMs?: number; top?: number; includeSynthetic?: boolean; sync?: boolean; runtimeSourceBinding?: string }} [summaryOptions] */
+    /** @param {{ windowMs?: number; top?: number; includeSynthetic?: boolean; sync?: boolean; runtimeSourceBinding?: string; runtimeEpochId?: string }} [summaryOptions] */
     async function summarize(summaryOptions = {}) {
         const ingestion = summaryOptions.sync === false ? null : await sync();
         const windowMs = boundedInteger(summaryOptions.windowMs, DEFAULT_WINDOW_MS, 60_000, 14 * 24 * 60 * 60 * 1000);
         const top = boundedInteger(summaryOptions.top, 20, 1, MAX_INTERNAL_SUMMARY_TOP);
         const includeSynthetic = summaryOptions.includeSynthetic === true;
         const runtimeSourceBinding = normalizeRuntimeSourceBindingFilter(summaryOptions.runtimeSourceBinding);
-        const queryScope = { includeSynthetic, runtimeSourceBinding };
+        const runtimeEpochId = normalizeRuntimeEpochIdFilter(summaryOptions.runtimeEpochId);
+        const queryScope = {
+            includeSynthetic,
+            runtimeSourceBinding,
+            ...(runtimeEpochId ? { runtimeEpochId } : {}),
+        };
         const sourceIntegrity = buildSourceIntegrity(readCursor(db));
         if (ingestion?.sourcePresent === false || sourceIntegrity.status !== 'materialized') {
             return {
@@ -620,7 +625,14 @@ export function createMcpRoundTripAnalytics(options) {
             };
         }
         const cutoff = now() - windowMs;
-        const window = readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxSummaryRows, runtimeSourceBinding);
+        const window = readBoundedSummaryWindow(
+            db,
+            cutoff,
+            includeSynthetic,
+            maxSummaryRows,
+            runtimeSourceBinding,
+            runtimeEpochId,
+        );
         return {
             ingestion,
             sourceIntegrity,
@@ -674,10 +686,10 @@ export function createMcpRoundTripAnalyticsCapability(readDatabase, audit) {
     return Object.freeze({
         sync: (/** @type {{ maxChunks?: number }} */ options = {}) => requireAnalytics().sync(options),
         summarize: (
-            /** @type {{ windowMs?: number; top?: number; includeSynthetic?: boolean; sync?: boolean; runtimeSourceBinding?: string }} */ options = {},
+            /** @type {{ windowMs?: number; top?: number; includeSynthetic?: boolean; sync?: boolean; runtimeSourceBinding?: string; runtimeEpochId?: string }} */ options = {},
         ) => requireAnalytics().summarize(options),
         readSnapshot: (
-            /** @type {{ windowMs?: number; top?: number; includeSynthetic?: boolean; now?: () => number; runtimeSourceBinding?: string }} */ options = {},
+            /** @type {{ windowMs?: number; top?: number; includeSynthetic?: boolean; now?: () => number; runtimeSourceBinding?: string; runtimeEpochId?: string }} */ options = {},
         ) => {
             const database = readDatabase();
             return readMcpRoundTripAnalyticsSnapshot({
@@ -698,6 +710,7 @@ export function createMcpRoundTripAnalyticsCapability(readDatabase, audit) {
  *     top?: number;
  *     includeSynthetic?: boolean;
  *     runtimeSourceBinding?: string;
+ *     runtimeEpochId?: string;
  *     maxSummaryRows?: number;
  *     now?: () => number;
  * }} [options]
@@ -708,7 +721,12 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
     const top = boundedInteger(options.top, 20, 1, 100);
     const includeSynthetic = options.includeSynthetic === true;
     const runtimeSourceBinding = normalizeRuntimeSourceBindingFilter(options.runtimeSourceBinding);
-    const queryScope = { includeSynthetic, runtimeSourceBinding };
+    const runtimeEpochId = normalizeRuntimeEpochIdFilter(options.runtimeEpochId);
+    const queryScope = {
+        includeSynthetic,
+        runtimeSourceBinding,
+        ...(runtimeEpochId ? { runtimeEpochId } : {}),
+    };
     const maxSummaryRows = boundedInteger(options.maxSummaryRows, MAX_SUMMARY_ROWS, 1, MAX_SUMMARY_ROWS);
     if (!db) {
         return {
@@ -762,7 +780,7 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
         };
     }
     const cutoff = (options.now ?? Date.now)() - windowMs;
-    const window = readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxSummaryRows, runtimeSourceBinding);
+    const window = readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxSummaryRows, runtimeSourceBinding, runtimeEpochId);
     return {
         available: true,
         queryScope,
@@ -785,8 +803,9 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
  * @param {boolean} includeSynthetic
  * @param {number} maxRows
  * @param {string | null} [runtimeSourceBinding]
+ * @param {string | null} [runtimeEpochId]
  */
-function readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxRows, runtimeSourceBinding = null) {
+function readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxRows, runtimeSourceBinding = null, runtimeEpochId = null) {
     const predicates = ['ts_ms >= ?'];
     /** @type {(number|string)[]} */
     const parameters = [cutoff];
@@ -794,6 +813,10 @@ function readBoundedSummaryWindow(db, cutoff, includeSynthetic, maxRows, runtime
     if (runtimeSourceBinding) {
         predicates.push('runtime_source_binding = ?');
         parameters.push(runtimeSourceBinding);
+    }
+    if (runtimeEpochId) {
+        predicates.push('runtime_epoch_id = ?');
+        parameters.push(runtimeEpochId);
     }
     const whereClause = predicates.join(' AND ');
     const countRow = /** @type {Record<string, unknown> | undefined} */ (
@@ -1250,6 +1273,16 @@ function normalizeRuntimeSourceBindingFilter(value) {
     const text = String(value).trim();
     if (!/^[a-z0-9][a-z0-9-]{0,63}$/u.test(text)) {
         throw new TypeError('runtimeSourceBinding filter must be a bounded machine-like source binding.');
+    }
+    return text;
+}
+
+/** @param {unknown} value @returns {string | null} */
+function normalizeRuntimeEpochIdFilter(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const text = String(value).trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(text)) {
+        throw new TypeError('runtimeEpochId filter must be a bounded opaque runtime identity.');
     }
     return text;
 }

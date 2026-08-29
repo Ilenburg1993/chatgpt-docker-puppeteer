@@ -225,6 +225,7 @@ export async function readRepoFileWithValidatedResultCache(
  * @param {number} chunkLines
  * @param {number | undefined} highWaterMark
  * @param {string | undefined} cursor
+ * @param {number} maxOutputBytes
  * @param {import('./config.js').McpRepoReadCacheConfig} config
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
@@ -236,6 +237,7 @@ export async function readRepoFileChunksWithValidatedResultCache(
     chunkLines,
     highWaterMark,
     cursor,
+    maxOutputBytes,
     config,
 ) {
     if (!config) throw new TypeError('Repository read-cache operation requires an explicit cache config generation.');
@@ -259,7 +261,7 @@ export async function readRepoFileChunksWithValidatedResultCache(
         },
         config,
     );
-    if (cached) return shapeChunkResultForCaller(cached, cursor);
+    if (cached) return shapeChunkResultForCaller(cached, cursor, maxOutputBytes);
 
     const canonical = await runRepoReadSingleflight(
         repoReadFileChunkInflight,
@@ -333,21 +335,75 @@ export async function readRepoFileChunksWithValidatedResultCache(
             return { structured, text };
         },
     );
-    return shapeChunkResultForCaller(canonical, cursor);
+    return shapeChunkResultForCaller(canonical, cursor, maxOutputBytes);
 }
 
 /**
- * Apply caller-specific presentation metadata after cache/singleflight resolution. The canonical cached payload is
- * intentionally cursor-neutral because startLine and cursor can resolve to the same effective page key.
+ * Apply caller-specific page presentation after cache/singleflight resolution. The canonical cache keeps the complete
+ * line-bounded page so callers with different byte budgets can share one physical read safely.
  *
  * @param {RepoReadCacheResult} result
  * @param {string | undefined} cursor
+ * @param {number} maxOutputBytes
  * @returns {RepoReadCacheResult}
  */
-function shapeChunkResultForCaller(result, cursor) {
+function shapeChunkResultForCaller(result, cursor, maxOutputBytes) {
     const structured = cloneStructuredReadFileResult(result.structured);
+    const chunks = Array.isArray(structured['chunks'])
+        ? /** @type {Record<string, unknown>[]} */ (structured['chunks'])
+        : [];
+    /** @type {Record<string, unknown>[]} */
+    const selected = [];
+    let contentBytes = 0;
+    let stoppedAtOutputBudget = false;
+    for (const chunk of chunks) {
+        const chunkBytes = Number.isFinite(chunk['bytes'])
+            ? Math.max(0, Number(chunk['bytes']))
+            : Buffer.byteLength(String(chunk['content'] ?? ''), 'utf8');
+        const contribution = chunkBytes + (selected.length > 0 ? 1 : 0);
+        if (contentBytes + contribution > maxOutputBytes) {
+            if (selected.length === 0) {
+                const error = Object.assign(
+                    new Error(
+                        `First chunk requires ${String(contribution)} UTF-8 bytes but maxOutputBytes is ${String(maxOutputBytes)}.`,
+                    ),
+                    {
+                        code: 'ERR_CHUNK_PAGE_ITEM_TOO_LARGE',
+                        requiredBytes: contribution,
+                        maxOutputBytes,
+                        startLine: Number(chunk['startLine'] ?? 0),
+                        endLine: Number(chunk['endLine'] ?? 0),
+                    },
+                );
+                throw error;
+            }
+            stoppedAtOutputBudget = true;
+            break;
+        }
+        selected.push(chunk);
+        contentBytes += contribution;
+    }
+    const returnedLineCount = selected.reduce(
+        (sum, chunk) => sum + Math.max(0, Number(chunk['endLine'] ?? 0) - Number(chunk['startLine'] ?? 0) + 1),
+        0,
+    );
+    const lastSelected = selected[selected.length - 1];
+    if (stoppedAtOutputBudget && lastSelected) {
+        structured['nextCursor'] = String(Number(lastSelected['endLine'] ?? 0) + 1);
+    }
+    const nextCursor = typeof structured['nextCursor'] === 'string' ? structured['nextCursor'] : null;
+    structured['chunks'] = selected;
+    structured['chunkCount'] = selected.length;
+    structured['returnedChunkCount'] = selected.length;
+    structured['returnedLineCount'] = returnedLineCount;
+    structured['returnedContentBytes'] = contentBytes;
+    structured['contentBudgetBytes'] = maxOutputBytes;
+    structured['stoppedAtOutputBudget'] = stoppedAtOutputBudget;
     structured['cursor'] = cursor ?? null;
-    return { structured, text: result.text };
+    structured['truncated'] = nextCursor !== null;
+    structured['hasMore'] = nextCursor !== null;
+    const text = selected.map((chunk) => String(chunk['content'] ?? '')).join('\n');
+    return { structured, text };
 }
 
 /**

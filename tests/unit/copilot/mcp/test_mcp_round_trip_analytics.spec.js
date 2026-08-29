@@ -1299,6 +1299,7 @@ describe('MCP incremental round-trip analytics v11', () => {
                 event: 'tool_call_started',
                 tool: 'promoted_tool',
                 callId: 'promoted-a',
+                runtimeEpochId: 'epoch-promoted',
                 runtimeSourceBinding: 'controlled-promotion',
                 runtimeSourceFingerprint: 'a'.repeat(64),
             }),
@@ -1307,6 +1308,7 @@ describe('MCP incremental round-trip analytics v11', () => {
                 event: 'tool_call_completed',
                 tool: 'promoted_tool',
                 callId: 'promoted-a',
+                runtimeEpochId: 'epoch-promoted',
                 runtimeSourceBinding: 'controlled-promotion',
                 runtimeSourceFingerprint: 'a'.repeat(64),
             }),
@@ -1315,6 +1317,7 @@ describe('MCP incremental round-trip analytics v11', () => {
                 event: 'tool_call_started',
                 tool: 'manual_tool',
                 callId: 'manual-a',
+                runtimeEpochId: 'epoch-manual',
                 runtimeSourceBinding: 'manual-unbound',
             }),
             entry(300, {
@@ -1322,6 +1325,7 @@ describe('MCP incremental round-trip analytics v11', () => {
                 event: 'tool_call_completed',
                 tool: 'manual_tool',
                 callId: 'manual-a',
+                runtimeEpochId: 'epoch-manual',
                 runtimeSourceBinding: 'manual-unbound',
             }),
         ];
@@ -1361,9 +1365,26 @@ describe('MCP incremental round-trip analytics v11', () => {
         assert.equal(promoted.callPairing.startedCallCount, 1);
         assert.equal(promoted.callPairing.pairedCallCount, 1);
 
+        const currentEpoch = await analytics.summarize({
+            windowMs: 20_000,
+            sync: false,
+            runtimeEpochId: 'epoch-manual',
+        });
+        assert.deepEqual(currentEpoch.queryScope, {
+            includeSynthetic: false,
+            runtimeSourceBinding: null,
+            runtimeEpochId: 'epoch-manual',
+        });
+        assert.equal(currentEpoch.completeness.rowsEligible, 2);
+        assert.deepEqual(currentEpoch.toolStarts, [{ tool: 'manual_tool', count: 1 }]);
+
         await assert.rejects(
             () => analytics.summarize({ windowMs: 20_000, sync: false, runtimeSourceBinding: 'bad binding' }),
             /bounded machine-like source binding/u,
+        );
+        await assert.rejects(
+            () => analytics.summarize({ windowMs: 20_000, sync: false, runtimeEpochId: 'bad epoch' }),
+            /bounded opaque runtime identity/u,
         );
     });
 

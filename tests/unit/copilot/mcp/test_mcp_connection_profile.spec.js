@@ -207,6 +207,9 @@ describe('copilot MCP ChatGPT connection profile', () => {
         );
         assert.equal(decision.allowed, true);
         assert.equal(decision.required, false);
+        assert.equal(decision.principal?.verified, false);
+        assert.equal(decision.principal?.mode, 'none-dev');
+        assert.equal(decision.principal?.key.length, 64);
     });
 
     it('does not bypass auth for public OAuth diagnostics outside oauth mode', async () => {

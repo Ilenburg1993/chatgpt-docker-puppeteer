@@ -291,10 +291,11 @@ export function summarizeValidationProductivity(jobs) {
  * }} request
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {import('../config.js').McpValidationProcessConfig} config
+ * @param {string} ownerPrincipalKey
  * @param {AbortSignal} [signal]
  * @returns {Promise<ValidationJobOperationResult>}
  */
-export async function executeValidatorRequest(request, workspace, config, signal) {
+export async function executeValidatorRequest(request, workspace, config, ownerPrincipalKey, signal) {
     const { validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes } = request;
     if (!isCopilotValidatorName(validator)) {
         return failure('Unsupported validator.', {
@@ -324,6 +325,7 @@ export async function executeValidatorRequest(request, workspace, config, signal
             ...(timeoutMs === undefined ? {} : { timeoutMs }),
             ...(focused && testFile !== undefined ? { testFiles: [testFile] } : {}),
             ...(signal ? { signal } : {}),
+            ownerPrincipalKey,
         });
         const shouldWait =
             waitForCompletion !== false &&
@@ -335,7 +337,7 @@ export async function executeValidatorRequest(request, workspace, config, signal
             );
         }
         const effectiveWaitMs = waitMs ?? 30_000;
-        const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs, signal);
+        const waitedJob = await waitForJobCompletion(job.id, ownerPrincipalKey, effectiveWaitMs, signal);
         if (!waitedJob) {
             return failure('Validator job disappeared while waiting for completion.', {
                 code: 'ERR_VALIDATOR_JOB_WAIT_LOST',
@@ -346,9 +348,13 @@ export async function executeValidatorRequest(request, workspace, config, signal
         const completedWithinWait = waitedJob.status !== 'running';
         const failed = waitedJob.status === 'failed';
         const compatibilityMaintenance = COMPATIBILITY_MAINTENANCE_VALIDATORS.includes(validator);
-        const failureOutput = failed ? await readJobOutput(job.id, failureTailBytes ?? 4000) : { output: '' };
+        const failureOutput = failed
+            ? await readJobOutput(job.id, ownerPrincipalKey, failureTailBytes ?? 4000)
+            : { output: '' };
         const maintenanceOutput =
-            compatibilityMaintenance && completedWithinWait ? await readJobOutput(job.id, 50_000) : { output: '' };
+            compatibilityMaintenance && completedWithinWait
+                ? await readJobOutput(job.id, ownerPrincipalKey, 50_000)
+                : { output: '' };
         return success(
             {
                 success: waitedJob.status === 'completed',
@@ -396,16 +402,17 @@ export async function executeValidatorRequest(request, workspace, config, signal
  * @param {import('./runtime.js').CopilotValidatorName} validator
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
  * @param {import('../config.js').McpValidationProcessConfig} config
- * @param {{ timeoutMs?: number | undefined; signal?: AbortSignal }} [options]
+ * @param {{ timeoutMs?: number | undefined; signal?: AbortSignal; ownerPrincipalKey: string }} options
  * @returns {Promise<ValidationJobOperationResult>}
  */
-export async function startValidatorJobOperation(validator, workspace, config, options = {}) {
+export async function startValidatorJobOperation(validator, workspace, config, options) {
     try {
         const job = await spawnValidatorJob(validator, {
             workspace,
             config,
             ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
             ...(options.signal ? { signal: options.signal } : {}),
+            ownerPrincipalKey: options.ownerPrincipalKey,
         });
         return success({ success: true, job }, `Started job ${job.id} (${validator}).`);
     } catch (error) {
@@ -416,8 +423,8 @@ export async function startValidatorJobOperation(validator, workspace, config, o
     }
 }
 
-/** @param {{ status?: 'running'|'completed'|'failed'|'cancelled'|undefined; validator?: string|undefined; limit?: number|undefined; includeCompleted?: boolean|undefined }} input */
-export async function listValidationJobs(input) {
+/** @param {{ status?: 'running'|'completed'|'failed'|'cancelled'|undefined; validator?: string|undefined; limit?: number|undefined; includeCompleted?: boolean|undefined }} input @param {string} ownerPrincipalKey */
+export async function listValidationJobs(input, ownerPrincipalKey) {
     if (input.validator !== undefined && !isCopilotValidatorName(input.validator)) {
         return failure('Unsupported validator filter.', {
             code: 'ERR_UNSUPPORTED_VALIDATOR',
@@ -430,12 +437,13 @@ export async function listValidationJobs(input) {
         ...(input.validator === undefined ? {} : { validator: input.validator }),
         ...(input.limit === undefined ? {} : { limit: input.limit }),
         ...(input.includeCompleted === undefined ? {} : { includeCompleted: input.includeCompleted }),
+        ownerPrincipalKey,
     });
     return success({ success: true, count: jobs.length, jobs });
 }
 
-/** @param {{ validator?: string|undefined; includeOutputTail?: boolean|undefined; tailBytes?: number|undefined }} input */
-export async function readLastValidationSummary(input) {
+/** @param {{ validator?: string|undefined; includeOutputTail?: boolean|undefined; tailBytes?: number|undefined }} input @param {string} ownerPrincipalKey */
+export async function readLastValidationSummary(input, ownerPrincipalKey) {
     if (input.validator !== undefined && !isCopilotValidatorName(input.validator)) {
         return failure('Unsupported validator filter.', {
             code: 'ERR_UNSUPPORTED_VALIDATOR',
@@ -447,6 +455,7 @@ export async function readLastValidationSummary(input) {
         ...(input.validator === undefined ? {} : { validator: input.validator }),
         includeCompleted: true,
         limit: 200,
+        ownerPrincipalKey,
     });
     const latestByValidator = latestJobsByValidator(jobs);
     const selected = input.validator
@@ -456,7 +465,7 @@ export async function readLastValidationSummary(input) {
     for (const job of selected) {
         const summary = summarizeValidationJob(job);
         if (input.includeOutputTail === true) {
-            const output = await readJobOutput(job.id, input.tailBytes ?? 8000);
+            const output = await readJobOutput(job.id, ownerPrincipalKey, input.tailBytes ?? 8000);
             summary['outputTail'] = output.output;
         }
         summaries.push(summary);
@@ -496,8 +505,8 @@ export async function readLastValidationSummary(input) {
  * includeRunning?: boolean|undefined;
  * includeLatest?: boolean|undefined;
  * includeDetails?: boolean|undefined;
- * }} input @param {import('../config.js').McpValidationProcessConfig} config */
-export async function readValidationDashboard(input, config) {
+ * }} input @param {import('../config.js').McpValidationProcessConfig} config @param {string} ownerPrincipalKey */
+export async function readValidationDashboard(input, config, ownerPrincipalKey) {
     const view = input.view ?? 'dashboard';
     if (view === 'list') {
         if (
@@ -517,7 +526,7 @@ export async function readValidationDashboard(input, config) {
             validator: input.validator,
             limit: input.limit,
             includeCompleted: input.includeCompleted,
-        });
+        }, ownerPrincipalKey);
     }
     if (view === 'latest') {
         if (
@@ -537,7 +546,7 @@ export async function readValidationDashboard(input, config) {
             validator: input.validator,
             includeOutputTail: input.includeOutputTail,
             tailBytes: input.tailBytes,
-        });
+        }, ownerPrincipalKey);
     }
     if (
         input.status !== undefined ||
@@ -552,7 +561,7 @@ export async function readValidationDashboard(input, config) {
         });
     }
     const includeDetails = input.includeDetails === true;
-    const jobs = await listJobs({ includeCompleted: true, limit: input.limit ?? 80 });
+    const jobs = await listJobs({ includeCompleted: true, limit: input.limit ?? 80, ownerPrincipalKey });
     const running = jobs
         .filter((job) => job.status === 'running' && job.runtimeAttached !== false)
         .map(summarizeValidationJob);
@@ -565,7 +574,7 @@ export async function readValidationDashboard(input, config) {
     const effectiveChecks = buildEffectiveValidationChecks(jobs);
     const base = {
         success: true,
-        validatorCapacity: readCopilotValidatorCapacityState(config),
+        validatorCapacity: readCopilotValidatorCapacityState(config, ownerPrincipalKey),
         runningCount: running.length,
         orphanedCount: orphaned.length,
         latestCount: latest.length,
@@ -606,9 +615,9 @@ export async function readValidationDashboard(input, config) {
     );
 }
 
-/** @param {string} jobId */
-export async function readValidationJobSummary(jobId) {
-    const result = await readJobOutput(jobId, 1000);
+/** @param {string} jobId @param {string} ownerPrincipalKey */
+export async function readValidationJobSummary(jobId, ownerPrincipalKey) {
+    const result = await readJobOutput(jobId, ownerPrincipalKey, 1000);
     if (!result.job) {
         return failure('Job not found.', {
             code: 'ERR_JOB_NOT_FOUND',
@@ -630,9 +639,9 @@ export async function readValidationJobSummary(jobId) {
     });
 }
 
-/** @param {string} jobId @param {number | undefined} tailBytes */
-export async function readValidationJobOutput(jobId, tailBytes) {
-    const result = await readJobOutput(jobId, tailBytes ?? 8000);
+/** @param {string} jobId @param {string} ownerPrincipalKey @param {number | undefined} tailBytes */
+export async function readValidationJobOutput(jobId, ownerPrincipalKey, tailBytes) {
+    const result = await readJobOutput(jobId, ownerPrincipalKey, tailBytes ?? 8000);
     if (!result.job) {
         return failure('Job not found.', {
             code: 'ERR_JOB_NOT_FOUND',
@@ -643,9 +652,9 @@ export async function readValidationJobOutput(jobId, tailBytes) {
     return success({ success: true, ...result }, result.output);
 }
 
-/** @param {string} jobId */
-export async function cancelValidationJob(jobId) {
-    const result = await cancelJob(jobId);
+/** @param {string} jobId @param {string} ownerPrincipalKey */
+export async function cancelValidationJob(jobId, ownerPrincipalKey) {
+    const result = await cancelJob(jobId, ownerPrincipalKey);
     if (!result.ok) {
         const code = result.unattached
             ? 'ERR_JOB_UNATTACHED'

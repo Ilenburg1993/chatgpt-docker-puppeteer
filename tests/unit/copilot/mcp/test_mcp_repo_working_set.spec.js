@@ -117,26 +117,44 @@ const TEST_WORKSPACE = Object.freeze({
         context: Object.freeze({ ...BASE_TEST_WORKSPACE.indexing.context, ...mocks }),
     }),
 });
-const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
-    {
-        mcpReq: {
-            id: 'mcp-working-set-unit',
-            method: 'tools/call',
-            signal: new AbortController().signal,
-            _meta: { caller: 'test_mcp_repo_working_set' },
-            envelope: { protocol: '2026' },
-        },
-    },
-    { workspace: TEST_WORKSPACE },
-);
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL_A = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-working-set-principal-a',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL_B = Object.freeze({ ...TEST_PRINCIPAL_A, key: 'test-working-set-principal-b' });
 
-/** @param {Record<string, unknown>} input */
-function callRepoWorkingSet(input) {
-    return repoWorkingSetTool.handler(input, TOOL_OPERATION_CONTEXT);
+/** @param {import('#copilot/mcp/public/auth').McpPrincipalIdentity} principal */
+function createToolOperationContext(principal) {
+    return createMcpToolOperationContext(
+        {
+            mcpReq: {
+                id: `mcp-working-set-unit:${principal.key}`,
+                method: 'tools/call',
+                signal: new AbortController().signal,
+                _meta: { caller: 'test_mcp_repo_working_set' },
+                envelope: { protocol: '2026' },
+            },
+        },
+        { workspace: TEST_WORKSPACE, principal },
+    );
+}
+const TOOL_OPERATION_CONTEXT = createToolOperationContext(TEST_PRINCIPAL_A);
+const OTHER_TOOL_OPERATION_CONTEXT = createToolOperationContext(TEST_PRINCIPAL_B);
+
+/** @param {Record<string, unknown>} input @param {typeof TOOL_OPERATION_CONTEXT} [operationContext] */
+function callRepoWorkingSet(input, operationContext = TOOL_OPERATION_CONTEXT) {
+    return repoWorkingSetTool.handler(input, operationContext);
 }
 
 afterEach(() => {
     resetMcpWorkingSetsForTest();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
 });
 
@@ -226,6 +244,91 @@ describe('mcp/repo_working_set', () => {
         expect(mocks.findSymbol).not.toHaveBeenCalled();
         expect(mocks.refreshScope).not.toHaveBeenCalled();
         expect(mocks.closeScope).not.toHaveBeenCalled();
+    });
+
+    it('isola handles e contagem entre principals sem criar existence oracle', async () => {
+        const openedA = structured(await callRepoWorkingSet({ action: 'open', path: 'src/copilot', contextMode: 'omit' }));
+        const idA = String(openedA['workingSetId']);
+        const openedB = structured(
+            await callRepoWorkingSet(
+                { action: 'open', path: 'src/copilot', contextMode: 'omit' },
+                OTHER_TOOL_OPERATION_CONTEXT,
+            ),
+        );
+        const idB = String(openedB['workingSetId']);
+        assert.equal(openedA['activeOwnedWorkingSets'], 1);
+        assert.equal(openedB['activeOwnedWorkingSets'], 1);
+
+        const foreignA = await callRepoWorkingSet(
+            { action: 'status', workingSetId: idA },
+            OTHER_TOOL_OPERATION_CONTEXT,
+        );
+        assert.equal(foreignA.isError, true);
+        assert.equal(structured(foreignA)['code'], 'ERR_WORKING_SET_NOT_FOUND');
+        const foreignB = await callRepoWorkingSet({ action: 'status', workingSetId: idB });
+        assert.equal(foreignB.isError, true);
+        assert.equal(structured(foreignB)['code'], 'ERR_WORKING_SET_NOT_FOUND');
+
+        assert.equal((await callRepoWorkingSet({ action: 'status', workingSetId: idA })).isError, undefined);
+        assert.equal(
+            (
+                await callRepoWorkingSet(
+                    { action: 'status', workingSetId: idB },
+                    OTHER_TOOL_OPERATION_CONTEXT,
+                )
+            ).isError,
+            undefined,
+        );
+    });
+
+    it('expira working set após uma hora sem acesso e fecha a scope antes de remover o handle', async () => {
+        const startedAtMs = Date.parse('2026-08-28T12:00:00.000Z');
+        const now = vi.spyOn(Date, 'now').mockReturnValue(startedAtMs);
+        const opened = structured(
+            await callRepoWorkingSet({ action: 'open', path: 'src/copilot', contextMode: 'omit' }),
+        );
+        const id = String(opened['workingSetId']);
+        assert.deepEqual(opened['lifecycle'], {
+            policyVersion: 1,
+            idleTtlMs: 60 * 60 * 1000,
+            createdAtMs: startedAtMs,
+            lastAccessAtMs: startedAtMs,
+            idleExpiresAtMs: startedAtMs + 60 * 60 * 1000,
+            cleanup: 'close-scope-then-remove-handle',
+        });
+
+        now.mockReturnValue(startedAtMs + 60 * 60 * 1000 + 1);
+        const expired = await callRepoWorkingSet({ action: 'status', workingSetId: id });
+        assert.equal(expired.isError, true);
+        assert.equal(structured(expired)['code'], 'ERR_WORKING_SET_NOT_FOUND');
+        expect(mocks.closeScope).toHaveBeenCalledTimes(1);
+        expect(mocks.closeScope).toHaveBeenCalledWith(id);
+    });
+
+    it('não expulsa working sets de outro principal ao aplicar quota local', async () => {
+        const ownedA = [];
+        for (let index = 0; index < 8; index += 1) {
+            ownedA.push(
+                String(
+                    structured(
+                        await callRepoWorkingSet({ action: 'open', path: 'src/copilot', contextMode: 'omit' }),
+                    )['workingSetId'],
+                ),
+            );
+        }
+        expect(mocks.closeScope).not.toHaveBeenCalled();
+        const openedB = structured(
+            await callRepoWorkingSet(
+                { action: 'open', path: 'src/copilot', contextMode: 'omit' },
+                OTHER_TOOL_OPERATION_CONTEXT,
+            ),
+        );
+        assert.equal(openedB['activeOwnedWorkingSets'], 1);
+        expect(mocks.closeScope).not.toHaveBeenCalled();
+
+        await callRepoWorkingSet({ action: 'open', path: 'src/copilot', contextMode: 'omit' });
+        expect(mocks.closeScope).toHaveBeenCalledTimes(1);
+        expect(mocks.closeScope).toHaveBeenCalledWith(ownedA[0]);
     });
 
     it('refresh auto/include/omit materializa contexto somente quando a política exige', async () => {

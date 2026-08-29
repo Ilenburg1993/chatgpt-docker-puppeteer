@@ -71,4 +71,32 @@ describe('MCP continuation semantics', () => {
         assert.equal(hint?.continuationRecommended, true);
         assert.ok(Number(hint?.continuationRecommendedOperations ?? 0) > 0);
     });
+
+    it('omits structural outline arrays atomically and preserves same-page recovery when the batch budget is exhausted', async () => {
+        const batch = Array.from({ length: 24 }, () => ({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            maxItems: 500,
+            maxBytes: 64 * 1024,
+        }));
+        const result = await tool('repo_file_outline').handler({
+            batch,
+            batchConcurrency: 8,
+            batchResultBudgetBytes: 64 * 1024,
+        });
+        assert.equal(result.isError, undefined);
+        assert.ok(Number(result.structuredContent?.['payloadTruncatedCount'] ?? 0) > 0);
+        assert.ok(Number(result.structuredContent?.['resultBytes'] ?? Infinity) <= 64 * 1024);
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        const omitted = rows.find((row) => row['payloadOmittedForBatchBudget'] === true);
+        assert.ok(omitted);
+        assert.deepEqual(omitted['symbols'], []);
+        assert.equal('payloadRecoveryCursor' in omitted, true);
+        assert.equal(
+            omitted['payloadRecoveryStrategy'],
+            'repeat-same-page-with-larger-batch-budget-or-single-call',
+        );
+        const hint = getResultExecutionHint(result);
+        assert.equal(hint?.continuationTransportRequired, true);
+        assert.ok(Number(hint?.continuationTransportRequiredOperations ?? 0) > 0);
+    });
 });

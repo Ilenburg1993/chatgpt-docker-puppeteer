@@ -15,6 +15,7 @@ import path from 'node:path';
  * @param {AbortSignal | undefined} signal
  * @param {{
  *     quarantineDir?: string;
+ *     ownerPrincipalKey: string;
  *     repositoryPatchConfig: import('#copilot/mcp/public/workspace/repository/patch/config').McpRepositoryPatchConfig;
  * }} options
  * @returns {RepoWriteRuntime}
@@ -23,6 +24,8 @@ export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWrite
     if (!options?.repositoryPatchConfig) {
         throw new TypeError('Repo write runtime requires a repository patch config projection.');
     }
+    const ownerPrincipalKey = String(options.ownerPrincipalKey ?? '').trim();
+    if (!ownerPrincipalKey) throw new TypeError('Repo write runtime requires an authorization-derived principal key.');
     const quarantineDir = resolveRepoWriteQuarantineDir(workspace.workspaceRoot, options.quarantineDir);
     return Object.freeze({
         workspace,
@@ -31,6 +34,7 @@ export function createRepoWriteRuntime(workspace, audit, quarantineMetadataWrite
         quarantineDir,
         quarantineMetadataWriter,
         audit,
+        ownerPrincipalKey,
         repositoryPatchConfig: options.repositoryPatchConfig,
         ...(signal ? { signal } : {}),
     });

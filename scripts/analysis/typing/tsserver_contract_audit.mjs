@@ -13,8 +13,8 @@ const { values } = parseArgs({
 const schemaPath = path.resolve('schemas/typing/tsserver-tool-contract.schema.json');
 const daemonPath = path.resolve('src/integration/lsp/tsgo-lsp-daemon.mjs');
 const skillPath = path.resolve('.github/skills/lsp-ops/SKILL.md');
-const nativePackagePath = path.resolve('node_modules/@typescript/native/package.json');
-const nativeLspEntrypoint = path.resolve('node_modules/@typescript/native/lib/tsc.js');
+const nativePackagePath = path.resolve('node_modules/typescript/package.json');
+const nativeLspEntrypoint = path.resolve('node_modules/typescript/lib/tsc.js');
 
 /**
  * @param {string[]} valuesToSort

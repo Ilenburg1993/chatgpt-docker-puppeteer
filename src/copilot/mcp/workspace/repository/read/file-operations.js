@@ -109,7 +109,7 @@ export async function readRepositoryFileStats(workspace, input) {
 
 /**
  * @param {RepositoryReadWorkspace} workspace
- * @param {{ path: string; startLine?: number; endLine?: number; chunkLines?: number; cursor?: string; highWaterMark?: number }} input
+ * @param {{ path: string; startLine?: number; endLine?: number; chunkLines: number; maxChunks: number; maxOutputBytes: number; cursor?: string; highWaterMark?: number }} input
  * @param {import('#copilot/mcp/public/workspace/repository/read-cache').McpRepoReadCacheConfig} cacheConfig
  * @returns {Promise<RepositoryReadOperationResult>}
  */
@@ -124,23 +124,70 @@ export async function readRepositoryFileChunks(workspace, input, cacheConfig) {
         });
     }
     const effectiveStartLine = parsedCursorLine ?? input.startLine ?? 1;
+    if (!Number.isInteger(input.chunkLines) || input.chunkLines < 1) {
+        return failure('chunkLines must be a positive integer.', { code: 'ERR_INVALID_CHUNK_LINES' });
+    }
+    if (!Number.isInteger(input.maxChunks) || input.maxChunks < 1) {
+        return failure('maxChunks must be a positive integer.', { code: 'ERR_INVALID_MAX_CHUNKS' });
+    }
+    if (!Number.isInteger(input.maxOutputBytes) || input.maxOutputBytes < 1) {
+        return failure('maxOutputBytes must be a positive integer.', { code: 'ERR_INVALID_OUTPUT_BUDGET' });
+    }
     if (input.endLine !== undefined && input.endLine < effectiveStartLine) {
         return failure('endLine must be greater than or equal to the effective start line.', {
             code: 'ERR_INVALID_LINE_RANGE',
             hint: 'Use endLine greater than or equal to cursor/startLine, or omit endLine.',
         });
     }
-    const { structured, text } = await readRepoFileChunksWithValidatedResultCache(
-        workspace.io,
-        resolved,
-        effectiveStartLine,
-        input.endLine,
-        input.chunkLines ?? 200,
-        input.highWaterMark,
-        input.cursor,
-        cacheConfig,
-    );
-    return success(structured, text);
+    const pageEndLine = effectiveStartLine + input.chunkLines * input.maxChunks - 1;
+    const effectiveEndLine = input.endLine === undefined ? pageEndLine : Math.min(input.endLine, pageEndLine);
+    try {
+        const { structured, text } = await readRepoFileChunksWithValidatedResultCache(
+            workspace.io,
+            resolved,
+            effectiveStartLine,
+            effectiveEndLine,
+            input.chunkLines,
+            input.highWaterMark,
+            input.cursor,
+            input.maxOutputBytes,
+            cacheConfig,
+        );
+        const stoppedAtOutputBudget = structured['stoppedAtOutputBudget'] === true;
+        const nextCursor = typeof structured['nextCursor'] === 'string' ? structured['nextCursor'] : null;
+        const pageLimited = input.endLine === undefined || input.endLine > pageEndLine;
+        return success(
+            {
+                ...structured,
+                requestedEndLine: input.endLine ?? null,
+                effectiveEndLine,
+                maxChunks: input.maxChunks,
+                maxOutputBytes: input.maxOutputBytes,
+                truncationReason: stoppedAtOutputBudget
+                    ? 'content-byte-budget'
+                    : nextCursor !== null
+                      ? pageLimited
+                          ? 'line-page-limit'
+                          : 'requested-line-window'
+                      : null,
+            },
+            text,
+        );
+    } catch (error) {
+        const candidate = /** @type {Error & { code?: string; requiredBytes?: number; maxOutputBytes?: number; startLine?: number; endLine?: number }} */ (error);
+        if (candidate.code !== 'ERR_CHUNK_PAGE_ITEM_TOO_LARGE') throw error;
+        return failure(candidate.message, {
+            code: candidate.code,
+            failureClass: 'bounded-output-item-too-large',
+            retryability: 'manual-decision',
+            recoveryRequired: false,
+            requiredBytes: candidate.requiredBytes ?? null,
+            maxOutputBytes: candidate.maxOutputBytes ?? input.maxOutputBytes,
+            startLine: candidate.startLine ?? effectiveStartLine,
+            endLine: candidate.endLine ?? effectiveStartLine,
+            hint: 'Retry with a smaller chunkLines value. If chunkLines=1 still exceeds the hard content budget, use exceptional byte-oriented inspection instead of requesting an unbounded MCP result.',
+        });
+    }
 }
 
 /**

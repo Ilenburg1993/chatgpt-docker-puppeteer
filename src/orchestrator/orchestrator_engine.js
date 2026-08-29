@@ -805,7 +805,7 @@ class OrchestratorEngine {
         if (typeof this.nerv.emitEvent === 'function') {
             try {
                 const code = /** @type {any} */ (ActionCode)[actionCode] || actionCode;
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload); // ✅ P1-4: Added await
             } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);

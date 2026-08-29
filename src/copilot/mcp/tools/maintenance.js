@@ -10,6 +10,7 @@ import { inspectRootDependencyUpdates, upgradeRootDependenciesToLatest } from '#
 import { readMcpMetricsSnapshot } from '#copilot/mcp/public/observability';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
+    errorResult,
     okResult,
     requireMcpToolAiArtifactsCapability,
     requireMcpToolCloudflareConfig,
@@ -29,6 +30,38 @@ const maintenanceFixSchema = z.enum([
 ]);
 
 const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-report', 'run-mcp-smoke'];
+
+/**
+ * Convert command/action failure into MCP tool-error semantics while preserving the bounded domain evidence needed to
+ * decide whether a retry is safe. Diagnostic success remains a normal result.
+ *
+ * @param {Record<string, unknown>} result
+ * @param {'outdated' | 'upgrade'} operation
+ */
+function frameDependencyMaintenanceResult(result, operation) {
+    if (result['success'] !== false) return okResult(result);
+    const cancelled = result['cancelled'] === true;
+    const rollbackPerformed = result['rollbackPerformed'] === true;
+    const rollbackTreeReconciled = result['rollbackTreeReconciled'];
+    const recoveryRequired = rollbackPerformed && rollbackTreeReconciled === false;
+    const message =
+        typeof result['error'] === 'string' && result['error'].trim()
+            ? result['error']
+            : operation === 'outdated'
+              ? 'Dependency update audit did not complete successfully.'
+              : 'Dependency upgrade did not complete successfully.';
+    return errorResult(message, {
+        code: operation === 'outdated' ? 'ERR_DEPENDENCY_OUTDATED_FAILED' : 'ERR_DEPENDENCY_UPGRADE_FAILED',
+        failureClass: cancelled ? 'cancelled' : 'dependency-maintenance',
+        retryability: 'inspect-before-retry',
+        recoveryRequired,
+        operation,
+        result,
+        hint: recoveryRequired
+            ? 'Inspect package.json, package-lock.json and node_modules before any retry because rollback reconciliation was incomplete.'
+            : 'Inspect the returned command/step evidence before retrying the fixed maintenance workflow.',
+    });
+}
 
 /**
  * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability['indexRegistry']} indexRegistry
@@ -117,12 +150,13 @@ export const maintenanceTools = [
         },
 
         handler: async ({ timeoutMs }, operationContext) =>
-            okResult(
+            frameDependencyMaintenanceResult(
                 await inspectRootDependencyUpdates({
                     workspace: requireMcpToolWorkspace(operationContext),
                     ...(timeoutMs === undefined ? {} : { timeoutMs }),
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
+                'outdated',
             ),
     }),
     defineMcpRawTool({
@@ -147,19 +181,22 @@ export const maintenanceTools = [
 
         handler: async ({ confirmUpgrade, install, timeoutMs }, operationContext) => {
             if (confirmUpgrade !== true) {
-                return okResult({
-                    success: false,
+                return errorResult('Dependency upgrade requires explicit confirmation.', {
                     code: 'ERR_DEPENDENCY_UPGRADE_CONFIRM_REQUIRED',
+                    failureClass: 'shape-config',
+                    retryability: 'manual-decision',
+                    recoveryRequired: false,
                     hint: 'Pass confirmUpgrade=true only after reviewing mcp_dependency_outdated.',
                 });
             }
-            return okResult(
+            return frameDependencyMaintenanceResult(
                 await upgradeRootDependenciesToLatest({
                     workspace: requireMcpToolWorkspace(operationContext),
                     ...(install === undefined ? {} : { install }),
                     ...(timeoutMs === undefined ? {} : { timeoutMs }),
                     ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
                 }),
+                'upgrade',
             );
         },
     }),
@@ -167,7 +204,7 @@ export const maintenanceTools = [
         name: 'mcp_cleanup_ai_artifacts',
         title: 'Cleanup MCP AI artifacts',
         description:
-            'Delete a bounded set of strict UUID-named validator artifacts beyond retention. Rollback sidecars can be purged only by explicit request while automatic rollback is disabled; OAuth, tunnel, pid and quarantine state stay unreachable.',
+            'Delete a bounded set of whole UUID validator-job artifact groups beyond retention, keeping manifest/log pairs together during normal selection. Rollback sidecars can be purged only by explicit request while automatic rollback is disabled; OAuth, tunnel, pid and quarantine state stay unreachable.',
         inputSchema: {
             dryRun: z.boolean().optional()['describe']('Preview without deleting. Default: true.'),
             retainNewest: z
@@ -176,14 +213,14 @@ export const maintenanceTools = [
                 .min(20)
                 .max(10_000)
                 .optional()
-                ['describe']('Number of newest artifacts to retain. Default: 240.'),
+                ['describe']('Number of newest validator jobs (UUID groups) to retain. Default: 240.'),
             maxDeleteCount: z
                 .number()
                 .int()
                 .min(1)
                 .max(500)
                 .optional()
-                ['describe']('Maximum files deleted in one cleanup domain per call. Default: 100.'),
+                ['describe']('Maximum files deleted in one cleanup domain per call. Whole job groups are never intentionally split to fill the budget. Default: 100.'),
             purgeDisabledRollback: z
                 .boolean()
                 .optional()

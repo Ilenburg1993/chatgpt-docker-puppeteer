@@ -100,6 +100,49 @@ describe('MCP AI artifact cleanup', () => {
         expect(applied['remainingCandidateCount']).toBe(1);
     });
 
+    it('treats validator manifest/log retention as one logical job and never splits a pair to fill the file budget', async () => {
+        const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'mcp-ai-job-groups-'));
+        roots.push(workspaceRoot);
+        const jobsDir = path.join(workspaceRoot, 'src/copilot/.ai/jobs');
+        await mkdir(jobsDir, { recursive: true });
+        const jobIds = Array.from(
+            { length: 21 },
+            (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        );
+        for (const [index, jobId] of jobIds.entries()) {
+            const time = new Date(Date.parse('2026-08-28T12:00:00.000Z') + index * 1000);
+            for (const extension of ['json', 'log']) {
+                const filePath = path.join(jobsDir, `${jobId}.${extension}`);
+                await writeFile(filePath, `${jobId}.${extension}\n`);
+                await utimes(filePath, time, time);
+            }
+        }
+
+        const runtime = createTestAiArtifactsRuntime(workspaceRoot);
+        const report = await runtime.buildReport({ retainNewest: 20 });
+        const jobs = /** @type {Record<string, unknown>} */ (report['jobs']);
+        expect(jobs['retentionUnit']).toBe('job');
+        expect(jobs['jobCount']).toBe(21);
+        expect(jobs['cleanupCandidateJobCount']).toBe(1);
+        expect(jobs['cleanupCandidateCount']).toBe(2);
+
+        const cannotSplit = await runtime.cleanup({ dryRun: true, retainNewest: 20, maxDeleteCount: 1 });
+        expect(cannotSplit['candidateJobCount']).toBe(1);
+        expect(cannotSplit['candidateCount']).toBe(2);
+        expect(cannotSplit['selectedJobCount']).toBe(0);
+        expect(cannotSplit['selectedCount']).toBe(0);
+
+        const applied = await runtime.cleanup({ dryRun: false, retainNewest: 20, maxDeleteCount: 2 });
+        expect(applied['selectedJobCount']).toBe(1);
+        expect(applied['selectedCount']).toBe(2);
+        expect(applied['deletedCount']).toBe(2);
+        const remaining = await readdir(jobsDir);
+        expect(remaining).not.toContain(`${jobIds[0]}.json`);
+        expect(remaining).not.toContain(`${jobIds[0]}.log`);
+        expect(remaining).toContain(`${jobIds[1]}.json`);
+        expect(remaining).toContain(`${jobIds[1]}.log`);
+    });
+
     it('reports rollback sidecars read-only and never makes them cleanup targets', async () => {
         const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'mcp-ai-rollback-report-'));
         roots.push(workspaceRoot);

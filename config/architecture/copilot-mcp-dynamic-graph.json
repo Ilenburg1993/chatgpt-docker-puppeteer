@@ -168,8 +168,7 @@
     "src/copilot/mcp/transport/http/stateful/bootstrap/runtime.js",
     "src/copilot/mcp/validation/devcontainer-shell/runtime.js",
     "src/copilot/mcp/validation/jobs/runtime.js",
-    "src/copilot/mcp/validation/suites/runtime.js",
-    "src/copilot/mcp/workspace/git/runtime.js"
+    "src/copilot/mcp/validation/suites/runtime.js"
   ],
   "workerThreadImportOwners": [],
   "childProcessAuthorities": [
@@ -546,25 +545,6 @@
           "environmentAuthority": "explicit-projection",
           "processGroup": "yes",
           "bound": "caller abort terminates current suite step and awaits close"
-        }
-      ]
-    },
-    {
-      "path": "src/copilot/mcp/workspace/git/runtime.js",
-      "ownerId": "mcp.workspace.git",
-      "launchers": [
-        {
-          "id": "workspace-git",
-          "executableAuthority": "fixed-binary",
-          "credentialAuthority": "projected-only",
-          "signalPolicy": "attached-supervisor",
-          "terminality": "attached",
-          "completionModel": "attached-close",
-          "callerCancellation": "drain",
-          "cwdAuthority": "caller-bounded-workspace",
-          "environmentAuthority": "explicit-projection",
-          "processGroup": "yes",
-          "bound": "caller abort/timeout terminates Git process group and awaits close"
         }
       ]
     }

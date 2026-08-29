@@ -263,6 +263,9 @@ function buildIndependentPatchAttemptOptions(operation, index, dryRun, relativeP
         ...(optionalInteger(operation['occurrence_index']) !== undefined
             ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
             : {}),
+        ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
+            ? { expectedHash: operation['expectedHash'] }
+            : {}),
         dryRun,
         ...(!dryRun ? { captureRollback: false } : {}),
         allowNoop: operation['allowNoop'] === true,

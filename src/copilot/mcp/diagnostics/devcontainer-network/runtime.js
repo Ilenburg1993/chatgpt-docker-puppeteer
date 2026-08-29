@@ -9,7 +9,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { MCP_DEVCONTAINER_NETWORK_CANONICAL_SCRIPT, MCP_DEVCONTAINER_NETWORK_REPO_ROOT } from './config.js';

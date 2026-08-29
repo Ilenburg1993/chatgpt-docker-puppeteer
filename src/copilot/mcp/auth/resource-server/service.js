@@ -73,11 +73,21 @@ import {
  * @property {string} [method]
  * @property {string} [url]
  *
+ * @typedef {Readonly<{
+ *     version: 'mcp-principal-v1';
+ *     key: string;
+ *     mode: string;
+ *     verified: boolean;
+ *     resource: string;
+ *     audience: string;
+ * }>} McpPrincipalIdentity
+ *
  * @typedef {object} McpAuthorizationDecision
  * @property {boolean} allowed
  * @property {boolean} required
  * @property {McpAuthEnforcementMode} enforcement
  * @property {McpAuthScope[]} requiredScopes
+ * @property {McpPrincipalIdentity} [principal]
  * @property {string} [method]
  * @property {string} [code]
  * @property {string} [message]
@@ -104,7 +114,7 @@ export const MCP_AUTH_SCOPES = /** @type {const} */ ({
     admin: 'repo:admin',
 });
 
-export const MCP_AUTH_IMPLEMENTATION_VERSION = '1.3.0';
+export const MCP_AUTH_IMPLEMENTATION_VERSION = '1.4.0';
 export const MCP_AUTH_IMPLEMENTATION_NAME = 'copilot-mcp-auth';
 
 /**
@@ -836,6 +846,64 @@ export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, option
 }
 
 /**
+ * Derive the stable, non-secret principal identity used to own MCP state handles. Scope grants are deliberately excluded
+ * from the identity key: authorization is re-evaluated per call, while ownership should survive token refresh or scope
+ * narrowing for the same issuer/subject/client/resource identity.
+ *
+ * @param {McpSessionAuthBinding} binding
+ * @param {boolean} verified
+ * @returns {McpPrincipalIdentity}
+ */
+export function buildMcpPrincipalIdentity(binding, verified) {
+    const key = createHash('sha256')
+        .update(
+            JSON.stringify([
+                'mcp-principal-v1',
+                binding.mode,
+                binding.issuerHash,
+                binding.subjectHash,
+                binding.clientIdHash,
+                binding.resource,
+                binding.audience,
+            ]),
+        )
+        .digest('hex');
+    return Object.freeze({
+        version: 'mcp-principal-v1',
+        key,
+        mode: binding.mode,
+        verified,
+        resource: binding.resource,
+        audience: binding.audience,
+    });
+}
+
+/**
+ * Build a principal for non-JWT authorization paths. These paths deliberately keep one principal per configured trust
+ * domain rather than deriving identity from request headers that have not been cryptographically verified.
+ *
+ * @param {McpAuthConfig} config
+ * @param {string} mode
+ * @param {string} [subjectHash]
+ * @param {boolean} [verified]
+ * @returns {McpPrincipalIdentity}
+ */
+function buildNonOauthPrincipal(config, mode, subjectHash = '', verified = false) {
+    return buildMcpPrincipalIdentity(
+        {
+            mode,
+            issuerHash: hashSessionAuthComponent(config.expectedIssuer || config.resource),
+            subjectHash,
+            clientIdHash: '',
+            resource: config.resource,
+            audience: config.expectedAudience || config.resource,
+            scopes: [],
+        },
+        verified,
+    );
+}
+
+/**
  * Resolve a per-request MCP HTTP session binding. OAuth/JWT bearer tokens are verified before claims become part of the
  * binding; static bearer fallback is represented only as a token hash and should remain an operational fallback, not
  * the preferred production path.
@@ -1511,6 +1579,12 @@ async function verifyBearerToken(
             required: true,
             enforcement: config.enforcement,
             requiredScopes,
+            principal: buildNonOauthPrincipal(
+                config,
+                'secure-mcp-tunnel',
+                hashSessionAuthComponent(token),
+                true,
+            ),
             method: 'static-bearer',
         };
     }
@@ -1603,11 +1677,17 @@ async function verifyBearerToken(
                 }),
             };
         }
+        const principalBinding = buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, {
+            config,
+            tokenResource,
+            resourceUrl: config.resource,
+        });
         const decision = {
             allowed: true,
             required: true,
             enforcement: config.enforcement,
             requiredScopes,
+            principal: buildMcpPrincipalIdentity(principalBinding, true),
             method: 'oauth-jwks',
         };
         rememberMcpAuthorizationDecision(
@@ -1713,6 +1793,7 @@ export async function authorizeMcpToolCall(
             required: false,
             enforcement: config.enforcement,
             requiredScopes,
+            principal: buildNonOauthPrincipal(config, config.mode === 'oauth' ? 'oauth-unenforced' : 'none-dev'),
             method: 'not-required',
         };
     }
@@ -1722,6 +1803,7 @@ export async function authorizeMcpToolCall(
             required: false,
             enforcement: config.enforcement,
             requiredScopes,
+            principal: buildNonOauthPrincipal(config, 'oauth-public'),
             method: 'public-diagnostic',
         };
     }

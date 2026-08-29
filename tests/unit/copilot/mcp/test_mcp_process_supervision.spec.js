@@ -1,6 +1,6 @@
 // @ts-check
 
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import process from 'node:process';

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-import { API as TypeScriptNativeAPI } from '@typescript/native/unstable/sync';
+import { API as TypeScriptNativeAPI } from 'typescript/unstable/sync';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';

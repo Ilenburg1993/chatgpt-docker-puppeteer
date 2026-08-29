@@ -21,6 +21,7 @@ export {
     assertValidIoFilePath,
     attachSuppressedMutationError,
     capabilityForCreate,
+    evaluateWorkspacePathPolicy,
     hasNullByte,
     isMutationAppliedError,
     isPathInsideWorkspace,

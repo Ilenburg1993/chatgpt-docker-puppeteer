@@ -16,7 +16,17 @@ import {
 } from '#copilot/mcp/public/process/terminal';
 
 const TERMINAL_TEST_CONFIG = readMcpTerminalProcessConfig(process.env);
-const TERMINAL_TEST_RUNTIME = Object.freeze({ workspaceRoot: process.cwd(), config: TERMINAL_TEST_CONFIG });
+const TERMINAL_TEST_PRINCIPAL_KEY = 'test-terminal-principal-a';
+const TERMINAL_TEST_RUNTIME = Object.freeze({
+    workspaceRoot: process.cwd(),
+    config: TERMINAL_TEST_CONFIG,
+    principalKey: TERMINAL_TEST_PRINCIPAL_KEY,
+});
+const TERMINAL_OTHER_RUNTIME = Object.freeze({
+    workspaceRoot: process.cwd(),
+    config: TERMINAL_TEST_CONFIG,
+    principalKey: 'test-terminal-principal-b',
+});
 
 /** @param {Parameters<typeof executeTerminalCommand>[0]} input */
 const executeTerminalCommandForTest = (input) => executeTerminalCommand(input, TERMINAL_TEST_RUNTIME);
@@ -49,9 +59,9 @@ async function closeAllSessions() {
         const session = asRecord(sessionValue);
         const sessionId = String(session['id']);
         if (session['status'] === 'running') {
-            await controlTerminalSession({ action: 'close', sessionId, graceMs: 100 });
+            await controlTerminalSession({ action: 'close', sessionId, graceMs: 100 }, TERMINAL_TEST_RUNTIME);
         }
-        await controlTerminalSession({ action: 'forget', sessionId });
+        await controlTerminalSession({ action: 'forget', sessionId }, TERMINAL_TEST_RUNTIME);
     }
 }
 
@@ -80,6 +90,7 @@ async function waitForSessionText(sessionId, expected, timeoutMs = 2_000) {
 }
 
 afterEach(async () => {
+    vi.useRealTimers();
     await closeAllSessions();
     vi.unstubAllEnvs();
 });
@@ -173,6 +184,7 @@ describe('MCP terminal control plane', () => {
             signal: controller.signal,
             cancellationSource: () => /** @type {const} */ ('caller'),
             config: TERMINAL_TEST_CONFIG,
+            principalKey: TERMINAL_TEST_PRINCIPAL_KEY,
         };
         const startedAt = Date.now();
         const execution = executeTerminalCommand(
@@ -268,6 +280,7 @@ describe('MCP terminal control plane', () => {
             signal: controller.signal,
             cancellationSource: () => /** @type {const} */ ('caller'),
             config: TERMINAL_TEST_CONFIG,
+            principalKey: TERMINAL_TEST_PRINCIPAL_KEY,
         };
         const pending = openTerminalSession(
             {
@@ -296,6 +309,7 @@ describe('MCP terminal control plane', () => {
             signal: controller.signal,
             cancellationSource: () => /** @type {const} */ ('caller'),
             config: TERMINAL_TEST_CONFIG,
+            principalKey: TERMINAL_TEST_PRINCIPAL_KEY,
         };
         const opened = asRecord(
             await openTerminalSession(
@@ -320,7 +334,9 @@ describe('MCP terminal control plane', () => {
         assert.equal(status['success'], true);
         assert.equal(asRecord(status['session'])['status'], 'running');
 
-        const closed = asRecord(await controlTerminalSession({ action: 'close', sessionId, graceMs: 250 }));
+        const closed = asRecord(
+            await controlTerminalSession({ action: 'close', sessionId, graceMs: 250 }, TERMINAL_TEST_RUNTIME),
+        );
         assert.equal(closed['success'], true);
         assert.notEqual(asRecord(closed['session'])['status'], 'running');
     });
@@ -340,16 +356,86 @@ describe('MCP terminal control plane', () => {
         assert.equal(openedSession['backend'], 'pipe');
 
         const wrote = asRecord(
-            await controlTerminalSession({ action: 'write', sessionId, data: 'persistent-ok', appendNewline: true }),
+            await controlTerminalSession(
+                { action: 'write', sessionId, data: 'persistent-ok', appendNewline: true },
+                TERMINAL_TEST_RUNTIME,
+            ),
         );
         assert.equal(wrote['success'], true);
 
         const output = await waitForSessionText(sessionId, 'persistent-ok');
         assert.ok(output.includes('persistent-ok'));
 
-        const closed = asRecord(await controlTerminalSession({ action: 'close', sessionId, graceMs: 100 }));
+        const closed = asRecord(
+            await controlTerminalSession({ action: 'close', sessionId, graceMs: 100 }, TERMINAL_TEST_RUNTIME),
+        );
         assert.equal(closed['success'], true);
         assert.notEqual(asRecord(closed['session'])['status'], 'running');
+    });
+
+    it('retains closed session status/output for 30 minutes and then expires the handle', async () => {
+        const capabilities = asRecord(getTerminalCapabilities(TERMINAL_TEST_CONFIG));
+        const lifecycle = asRecord(capabilities['sessionLifecycle']);
+        assert.equal(lifecycle['runningLifetime'], 'until-process-exit-or-explicit-close');
+        assert.equal(lifecycle['closedRetentionMs'], 30 * 60 * 1000);
+        assert.equal(lifecycle['processExitCleanup'], 'force-kill-running-session-process-trees');
+
+        const opened = asRecord(
+            await openTerminalSessionForTest({
+                command: process.execPath,
+                args: ['-e', "process.stdout.write('retained-output')"],
+                shell: false,
+                backend: 'pipe',
+            }),
+        );
+        const sessionId = String(asRecord(opened['session'])['id']);
+        await readTerminalSessionWithWait(
+            { action: 'read', sessionId, afterSeq: 0, waitFor: 'output-or-exit', waitMs: 2_000 },
+            TERMINAL_TEST_RUNTIME,
+        );
+        let status = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        for (let attempt = 0; attempt < 20 && asRecord(status['session'])['status'] === 'running'; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            status = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        }
+        const closedSession = asRecord(status['session']);
+        assert.notEqual(closedSession['status'], 'running');
+        const endedAtMs = Date.parse(String(closedSession['endedAt']));
+        const retentionExpiresAtMs = Date.parse(String(closedSession['retentionExpiresAt']));
+        assert.equal(retentionExpiresAtMs - endedAtMs, 30 * 60 * 1000);
+
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(retentionExpiresAtMs + 1));
+        const expired = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        assert.equal(expired['success'], false);
+        assert.equal(expired['code'], 'ERR_TERMINAL_SESSION_NOT_FOUND');
+    });
+
+    it('hides persistent sessions from other principals across list/read/control', async () => {
+        const opened = asRecord(
+            await openTerminalSessionForTest({
+                command: process.execPath,
+                args: ['-e', 'setInterval(() => {}, 1000)'],
+                shell: false,
+                backend: 'pipe',
+            }),
+        );
+        const sessionId = String(asRecord(opened['session'])['id']);
+
+        const otherList = asRecord(readTerminalSession({ action: 'list', limit: 128 }, TERMINAL_OTHER_RUNTIME));
+        assert.equal(otherList['total'], 0);
+        assert.deepEqual(otherList['sessions'], []);
+        const otherStatus = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_OTHER_RUNTIME));
+        assert.equal(otherStatus['success'], false);
+        assert.equal(otherStatus['code'], 'ERR_TERMINAL_SESSION_NOT_FOUND');
+        const otherClose = asRecord(
+            await controlTerminalSession({ action: 'close', sessionId, graceMs: 50 }, TERMINAL_OTHER_RUNTIME),
+        );
+        assert.equal(otherClose['success'], false);
+        assert.equal(otherClose['code'], 'ERR_TERMINAL_SESSION_NOT_FOUND');
+
+        const ownerStatus = asRecord(readTerminalSession({ action: 'status', sessionId }, TERMINAL_TEST_RUNTIME));
+        assert.equal(ownerStatus['success'], true);
     });
 
     it('waits event-driven for persistent session output without polling', async () => {
@@ -421,6 +507,7 @@ describe('MCP terminal control plane', () => {
         const runtime = {
             workspaceRoot: process.cwd(),
             config: TERMINAL_TEST_CONFIG,
+            principalKey: TERMINAL_TEST_PRINCIPAL_KEY,
             signal: controller.signal,
             cancellationSource: () => /** @type {const} */ ('caller'),
         };

@@ -262,7 +262,7 @@ class KernelNERVBridge {
 
         try {
             const envelope = /** @type {any} */ (
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendCommand(
                     this.nerv,
                     ActorRole.KERNEL,
@@ -311,7 +311,7 @@ class KernelNERVBridge {
 
         try {
             const envelope = /** @type {any} */ (
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendEvent(
                     this.nerv,
                     ActorRole.KERNEL,

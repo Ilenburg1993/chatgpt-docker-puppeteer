@@ -9,7 +9,7 @@
  * @module copilot/mcp/indexing/auto-build/checkpoint
  */
 
-import { execWorkspaceGit } from '#copilot/mcp/public/workspace/git';
+import { execWorkspaceGit, parseGitNameStatusZ } from '#copilot/mcp/public/workspace/git';
 import { isAbsolute, normalize, relative } from 'node:path';
 const TABLE = 'copilot_mcp_index_startup_checkpoint';
 const GIT_TIMEOUT_MS = 5_000;
@@ -347,20 +347,7 @@ export function parseGitStatusZ(output) {
     return { changes, uncertain };
 }
 
-/** @param {string} output */
-export function parseGitNameStatusZ(output) {
-    const parts = output.split('\0').filter(Boolean);
-    /** @type {IndexGitPathChange[]} */
-    const changes = [];
-    let uncertain = parts.length % 2 !== 0;
-    for (let index = 0; index + 1 < parts.length; index += 2) {
-        const status = parts[index] ?? '';
-        const filePath = parts[index + 1] ?? '';
-        if (!status || !filePath || status.startsWith('U')) uncertain = true;
-        changes.push({ status, path: filePath, deleted: status.startsWith('D') });
-    }
-    return { changes, uncertain };
-}
+export { parseGitNameStatusZ } from '#copilot/mcp/public/workspace/git';
 
 /** @param {unknown} value @param {number} fallback */
 function normalizeJournalSequence(value, fallback) {

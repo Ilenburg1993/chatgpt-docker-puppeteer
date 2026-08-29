@@ -1,6 +1,6 @@
 // @ts-check
 
-import { adaptBetterSqliteDatabase } from '#copilot/infra/internal/database/sqlite/better-sqlite3';
+import { adaptBetterSqliteDatabase } from '#copilot/infra/public/testing/database/sqlite';
 import { readModelGatewaySqliteFingerprint } from '#copilot/mcp/public/integrations/model-gateway/sqlite-fingerprint';
 import { SqliteModelGatewayCatalogStore } from '#copilot/model-gateway';
 import Database from 'better-sqlite3';

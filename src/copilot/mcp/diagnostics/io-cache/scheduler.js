@@ -9,7 +9,7 @@
  * @module copilot/mcp/diagnostics/io-cache/scheduler
  */
 
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';

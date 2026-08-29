@@ -122,13 +122,26 @@ describe('MCP round-trip analytics wire projection', () => {
                 status: 'materialized',
                 cursor: { generationSequence: 1, lastTransition: 'append' },
             },
+            queryScope: {
+                includeSynthetic: false,
+                runtimeSourceBinding: null,
+                runtimeEpochId: 'epoch-current',
+            },
             ingestion: { ok: true },
         };
+        /** @type {Record<string, unknown> | null} */
+        let summarizeOptions = null;
         const operationContext = /** @type {import('#copilot/mcp/public/protocol/tools').McpToolOperationContext} */ (
             /** @type {unknown} */ ({
+                config: {
+                    runtimeSourceGeneration: { runtimeEpochId: 'epoch-current' },
+                },
                 capabilities: {
                     roundTripAnalytics: {
-                        summarize: async () => report,
+                        summarize: async (options) => {
+                            summarizeOptions = options;
+                            return report;
+                        },
                     },
                 },
             })
@@ -145,5 +158,13 @@ describe('MCP round-trip analytics wire projection', () => {
         assert.deepEqual(result.structuredContent?.['analytics']?.optionPolicies, optionPolicies);
         assert.deepEqual(result.structuredContent?.['analytics']?.executionPolicies, executionPolicies);
         assert.deepEqual(result.structuredContent?.['analytics']?.retryTax, {});
+        assert.equal(result.structuredContent?.['analytics']?.generation, 'current');
+        assert.deepEqual(result.structuredContent?.['analytics']?.queryScope, report.queryScope);
+        assert.equal(summarizeOptions?.['runtimeEpochId'], 'epoch-current');
+
+        summarizeOptions = null;
+        const historical = await roundTripAnalyticsTool().handler({ generation: 'all' }, operationContext);
+        assert.equal(historical.structuredContent?.['analytics']?.generation, 'all');
+        assert.equal(summarizeOptions?.['runtimeEpochId'], undefined);
     });
 });

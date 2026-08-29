@@ -12,13 +12,16 @@ import {
     auditRepositoryOrphanImports,
     buildRepositoryIndex,
     findRepositoryImports,
+    readRepositoryChangeImpact,
     readRepositoryIndexStatus,
+    readRepositoryModuleGraph,
     searchRepositoryIndex,
 } from '#copilot/mcp/public/indexing/repository';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
     errorResult,
     okResult,
+    requireMcpToolGitConfig,
     requireMcpToolIndexAutoBuildConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
@@ -207,6 +210,118 @@ export const repoIndexTools = [
                     cursor,
                     exactSource,
                 }),
+            ),
+    }),
+    defineMcpRawTool({
+        name: 'repo_graph',
+        title: 'Inspect repository module graph',
+        description:
+            'Inspect the indexed repository module graph without reparsing source. Supports summary, dependencies, dependents, cycles, shortest dependency path and unresolved local imports.',
+        inputSchema: {
+            view: z
+                .enum(['summary', 'dependencies', 'dependents', 'cycles', 'path', 'unresolved'])
+                .optional()
+                ['describe']('Graph projection. Default: summary.'),
+            path: z
+                .string()
+                .optional()
+                ['describe']('Workspace-relative graph scope. Default: src/copilot.'),
+            node: z
+                .string()
+                .optional()
+                ['describe']('Node for dependencies/dependents views; must be inside graph scope.'),
+            from: z.string().optional()['describe']('Start node for view=path.'),
+            to: z.string().optional()['describe']('Destination node for view=path.'),
+            includeDynamic: z.boolean().optional()['describe']('Include dynamic import() edges. Default: true.'),
+            maxDepth: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .optional()
+                ['describe']('Traversal/path depth bound. Dependencies/dependents default 1; path default 50.'),
+            maxResults: z
+                .number()
+                .int()
+                .min(1)
+                .max(500)
+                .optional()
+                ['describe']('Maximum rows/components returned for pageable views. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous pageable repo_graph call.'),
+        },
+
+        handler: async ({ view, path, node, from, to, includeDynamic, maxDepth, maxResults, cursor }, operationContext) =>
+            frameRepositoryIndexOperation(
+                await readRepositoryModuleGraph(requireMcpToolWorkspace(operationContext), {
+                    ...(view === undefined ? {} : { view }),
+                    ...(path === undefined ? {} : { path }),
+                    ...(node === undefined ? {} : { node }),
+                    ...(from === undefined ? {} : { from }),
+                    ...(to === undefined ? {} : { to }),
+                    ...(includeDynamic === undefined ? {} : { includeDynamic }),
+                    ...(maxDepth === undefined ? {} : { maxDepth }),
+                    ...(maxResults === undefined ? {} : { maxResults }),
+                    ...(cursor === undefined ? {} : { cursor }),
+                }),
+            ),
+    }),
+    defineMcpRawTool({
+        name: 'repo_change_impact',
+        title: 'Compute repository change impact',
+        description:
+            'Compute reverse dependency impact from explicit changed paths or a validated Git base/head range using the indexed module graph; no source reparse or shell graph reconstruction.',
+        inputSchema: {
+            paths: z
+                .array(z.string().min(1))
+                .min(1)
+                .max(64)
+                .optional()
+                ['describe']('Explicit changed workspace-relative files. Mutually exclusive with gitBase/gitHead; hard max 64.'),
+            gitBase: z.string().min(1).max(256).optional()['describe']('Validated Git range base; must be paired with gitHead and cannot be combined with paths.'),
+            gitHead: z.string().min(1).max(256).optional()['describe']('Validated Git range head; must be paired with gitBase and cannot be combined with paths.'),
+            path: z
+                .string()
+                .optional()
+                ['describe']('Workspace-relative graph scope. Default: src/copilot.'),
+            includeDynamic: z.boolean().optional()['describe']('Include dynamic import() edges. Default: true.'),
+            maxDepth: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .optional()
+                ['describe']('Maximum reverse dependency depth. Default: 1000.'),
+            includeSeeds: z.boolean().optional()['describe']('Include changed seed paths in returned impact rows. Default: false.'),
+            maxResults: z
+                .number()
+                .int()
+                .min(1)
+                .max(500)
+                .optional()
+                ['describe']('Maximum impacted rows returned. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_change_impact call.'),
+        },
+
+        handler: async ({ paths, gitBase, gitHead, path, includeDynamic, maxDepth, includeSeeds, maxResults, cursor }, operationContext) =>
+            frameRepositoryIndexOperation(
+                await readRepositoryChangeImpact(
+                    requireMcpToolWorkspace(operationContext),
+                    {
+                        ...(paths === undefined ? {} : { paths }),
+                        ...(gitBase === undefined ? {} : { gitBase }),
+                        ...(gitHead === undefined ? {} : { gitHead }),
+                        ...(path === undefined ? {} : { path }),
+                        ...(includeDynamic === undefined ? {} : { includeDynamic }),
+                        ...(maxDepth === undefined ? {} : { maxDepth }),
+                        ...(includeSeeds === undefined ? {} : { includeSeeds }),
+                        ...(maxResults === undefined ? {} : { maxResults }),
+                        ...(cursor === undefined ? {} : { cursor }),
+                    },
+                    {
+                        gitConfig: requireMcpToolGitConfig(operationContext),
+                        ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                    },
+                ),
             ),
     }),
     defineMcpRawTool({

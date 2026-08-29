@@ -1,76 +1,70 @@
 # TypeScript 7 e serviço de linguagem — arquitetura canônica
 
-**Estado:** atualizado em 20 de agosto de 2026.  
-**Regra central:** TypeScript 7 GA é o único compilador, autoridade semântica e servidor de
-linguagem canônico do workspace.
+**Estado:** atualizado em 28 de agosto de 2026.
+**Regra central:** TypeScript 7 GA é o único compilador, autoridade semântica e servidor de linguagem canônico do workspace. Não existe compatibility island TS6.
 
 ## Fluxo normal
 
-- `typescript@7.0.2` é uma versão GA; não usamos um compilador preview.
-- O workspace instala o pacote oficial por meio do alias `@typescript/native -> typescript@7.0.2` e
-  todos os gates chamam `scripts/ci/run-typescript-7.mjs`.
-- O DevContainer instala TypeScript 7 globalmente para CLI operacional; um `tsserver` global legado
-  após rebuild continua sendo resíduo indesejado.
-- O servidor de linguagem é o mesmo engine nativo TypeScript 7 executado como `tsc --lsp --stdio`.
-- `typescript-language-server` não é instalado e não existe um daemon Node intermediário no fluxo
-  normal.
+- `typescript@7.0.2` é instalado diretamente na raiz e é a **única identidade TypeScript local**.
+- Todos os gates de compilação chamam `scripts/ci/run-typescript-7.mjs`, que resolve explicitamente `typescript/package.json`; PATH/global installs não selecionam o compiler.
+- O DevContainer instala TypeScript 7 globalmente apenas para CLI operacional; um `tsserver` global de geração anterior após rebuild é resíduo e deve ser tratado como falha de baseline.
+- APIs first-party que necessitam da API nativa usam `typescript/unstable/sync` ou outro export `typescript/unstable/*` da mesma instalação TS7.
+- O servidor de linguagem suportado continua sendo o engine TypeScript 7 executado como `tsc --lsp --stdio`.
+- `typescript-language-server` não é instalado e não existe daemon Node intermediário no fluxo normal.
+
+## Lint: separação explícita de responsabilidades
+
+O workspace não instala mais `typescript-eslint` nem mantém um compiler TS6 para satisfazer peer ranges antigos.
+
+A governança atual é:
+
+1. **ESLint 10** — parsing JavaScript/ESM, estilo e regras arquiteturais/restricted-imports; não constrói Project Service TypeScript;
+2. **Oxlint + oxlint-tsgolint 7** — lane type-aware TS7, executando somente os checks semânticos selecionados em `.oxlintrc.json`;
+3. **TypeScript 7** — typecheck/compilação e autoridade semântica do projeto.
+
+O lane type-aware preserva a policy histórica de promise safety:
+
+- `typescript/no-floating-promises`;
+- `typescript/await-thenable`;
+- `typescript/no-misused-promises` com `checksVoidReturn: false`.
+
+`lint:copilot:changed` também executa esse lane sobre arquivos alterados de `src/copilot`, enquanto testes continuam no perfil ESLint relaxado.
+
+## Dependency graph e rebuild
+
+- `.npmrc` mantém `legacy-peer-deps=false`; conflitos de peer devem aparecer no install/CI em vez de serem mascarados.
+- `npm ci --dry-run --ignore-scripts` deve fechar sem incompatibilidades.
+- `scripts/ci/check-typescript-baseline.mjs` falha se qualquer compiler TypeScript abaixo de major 7, alias `@typescript/native`, alias `@typescript/typescript6`, `typescript-eslint`, `tsc6` ou `legacy-peer-deps=true` reaparecer.
+- Madge permanece aposentado; o grafo canônico first-party continua Babel/Node + Tarjan.
 
 ## Por que ainda existe `TypeScriptTeam.native-preview`
 
 O nome é um **ID histórico do cliente de VS Code**, não o status do compilador.
 
-No VS Code 1.134.0 usado atualmente pelo workspace, o builtin `vscode.typescript-language-features`
-ainda implementa o protocolo legado `tsserver.js`. Quando `js/ts.experimental.useTsgo=true`, esse
-builtin cede as features JS/TS para o cliente LSP externo. A extensão oficial
-`TypeScriptTeam.native-preview` instalada no DevContainer:
+No VS Code adotado pelo workspace, o builtin pode continuar oferecendo o protocolo legado `tsserver.js`. Quando `js/ts.experimental.useTsgo=true`, as features JS/TS são entregues ao cliente LSP que executa `tsc --lsp --stdio` sobre o TypeScript 7 do ambiente.
 
-1. fornece o cliente LSP que o VS Code ainda não incorporou ao builtin;
-2. executa `tsc --lsp --stdio`;
-3. atualmente carrega TypeScript **7.0.2**, exatamente a versão canônica do workspace.
+Essa extensão externa é uma ponte de integração e deve sair do baseline quando o VS Code incorporá-la de forma equivalente. Isso não altera a decisão arquitetural TS7-only.
 
-Portanto, a extensão externa é uma **ponte de integração temporária**. Ela deve ser removida do
-perfil `foundation` assim que a versão de VS Code adotada pelo workspace trouxer o mesmo cliente
-nativamente. A remoção futura do cliente externo não altera a decisão arquitetural de usar
-TypeScript 7.
+## Wrapper local preservado, mas adiado
 
-O auditor `npm run analyze:typescript:lsp:verify` não depende mais do ID histórico: identifica
-qualquer `tsc/tsgo --lsp`, compara a versão efetivamente executada com
-`node_modules/@typescript/native` e verifica projeto, `GOMEMLIMIT`, watchers e o typecheck CLI
-equivalente.
-
-## Compatibilidade TS6
-
-O pacote raiz `typescript` permanece temporariamente como alias para `@typescript/typescript6@6.0.2`
-**somente** porque o `typescript-eslint@8.67.0` corrente ainda declara peer
-`typescript >=4.8.4 <6.1.0`.
-
-Essa ilha não seleciona compilador, CI, editor ou language server. Ferramentas internas próprias não
-importam mais `scripts/analysis/typescript-compat.mjs`; esse adaptador foi retirado. Análise
-sintática leve usa Babel 8 e análise semântica/projetual usa as APIs nativas do TypeScript 7.
-
-O gate `npm run check:typescript-baseline` deve continuar detectando quando o peer upstream passar a
-aceitar TS7, momento em que o alias TS6 deixa de ter justificativa e deve ser removido.
-
-## Wrapper MCP local preservado
-
-O wrapper histórico não participa do fluxo normal:
+O wrapper histórico permanece desligado e **não foi reaberto por esta migração**:
 
 - implementação: `src/integration/lsp/tsgo-lsp-daemon.mjs`;
-- transporte: JSON-RPC para o LSP nativo TS7;
+- transporte: JSON-RPC para o LSP TS7;
 - isolamento: worker descartável e TTL curto;
-- aliases `Tsserver*`: compatibilidade temporária de API;
 - defaults obrigatórios: `LSP_ENABLED=false` e `LSP_MUTATIONS_ENABLED=false`;
-- PM2, DevContainer, health checks e Audit Agent respeitam o estado desligado;
-- apenas `LSP_ENABLED=true` explícito no processo isolado permite inicialização.
+- somente ativação explícita em processo isolado permite inicialização.
 
-Quando desligado, `npm run lsp:health -- --json` retorna `disabled-by-policy` com sucesso, sem
-iniciar subprocessos.
+A mudança de `@typescript/native` para `typescript` nesse código apenas consolida a identidade do package; não transforma LSP em dependência da campanha MCP corrente.
 
 ## Gates de manutenção
 
 ```bash
 npm run -s tsc7 -- --version
 npm run check:typescript-baseline
+npm run lint:type-aware
+npm run lint:copilot:changed
+npm ci --dry-run --ignore-scripts
 npm run analyze:typescript:lsp:verify
 npm run analyze:tsserver-contract
 npm run check:ts7-strict-coverage
@@ -79,6 +73,4 @@ npm run vscode:sync:check
 npm run vscode:check
 ```
 
-Qualquer mudança futura deve preservar três fatos separadamente: **TS7 GA é o engine**, **TS6 é
-apenas compatibilidade upstream**, e **o cliente externo de ID histórico só existe enquanto o VS
-Code builtin não falar com o LSP nativo diretamente**.
+Qualquer mudança futura deve preservar simultaneamente: **TS7 como única autoridade**, **zero compiler TS<7**, **zero peer masking**, e **separação entre lint estrutural ESLint e análise type-aware Oxlint/tsgolint**.

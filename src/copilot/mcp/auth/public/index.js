@@ -16,6 +16,7 @@
 /** @typedef {import('../resource-server/service.js').McpAuthorizationDecision} McpAuthorizationDecision */
 /** @typedef {import('../resource-server/service.js').McpSessionAuthBinding} McpSessionAuthBinding */
 /** @typedef {import('../resource-server/service.js').McpSessionAuthBindingResolution} McpSessionAuthBindingResolution */
+/** @typedef {import('../resource-server/service.js').McpPrincipalIdentity} McpPrincipalIdentity */
 
 export {
     MCP_AUTH_IMPLEMENTATION_NAME,
@@ -24,6 +25,7 @@ export {
     authorizeMcpToolCall,
     createMcpAuthResourceServerRuntime,
     buildMcpSessionAuthBindingFromVerifiedJwtPayload,
+    buildMcpPrincipalIdentity,
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
     isPublicOauthDiagnosticTool,

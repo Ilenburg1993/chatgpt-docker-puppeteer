@@ -9,19 +9,13 @@
  * @module copilot/mcp/tools/repo-working-set
  */
 
-// @ts-check
-/**
- * Compact MCP working-set surface over the shared LLM-B/session-scope engine.
- *
- * One tool deliberately composes open/context/find/refresh/status/close so a reusable working set does not add seven
- * permanent MCP descriptors. IDs are server-generated and must be present in this MCP-local ownership registry before
- * they can reach the shared scope engine.
- *
- * @module copilot/mcp/tools/repo-working-set
- */
-
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
-import { errorResult, okResult, requireMcpToolWorkspace } from '#copilot/mcp/public/protocol/tools';
+import {
+    errorResult,
+    okResult,
+    requireMcpToolPrincipal,
+    requireMcpToolWorkspace,
+} from '#copilot/mcp/public/protocol/tools';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod';
@@ -31,40 +25,68 @@ const DEFAULT_MAX_FILES = 80;
 const DEFAULT_CONTEXT_FILES = 40;
 const DEFAULT_CONTEXT_BYTES = 16 * 1024;
 const DEFAULT_CONCURRENCY = 4;
-const MAX_MCP_WORKING_SETS = 8;
+const MAX_MCP_WORKING_SETS_PER_PRINCIPAL = 8;
+const MAX_MCP_WORKING_SETS_GLOBAL = 32;
+const MCP_WORKING_SET_IDLE_TTL_MS = 60 * 60 * 1000;
 /** @typedef {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} McpWorkspaceCapability */
 /** @typedef {ReturnType<McpWorkspaceCapability['indexing']['context']['declareScope']>} McpScopeHandle */
 /** @typedef {McpWorkspaceCapability['indexing']['context']} McpScopeContext */
-/** @type {Map<string, { handle: McpScopeHandle; context: McpScopeContext; workspaceRoot: string; createdAtMs: number; lastAccessAtMs: number }>} */
+/** @type {Map<string, { handle: McpScopeHandle; context: McpScopeContext; workspaceRoot: string; ownerPrincipalKey: string; createdAtMs: number; lastAccessAtMs: number }>} */
 const mcpWorkingSets = new Map();
 
-function pruneStaleOwnedWorkingSets() {
+function pruneStaleOwnedWorkingSets(nowMs = Date.now()) {
     for (const [workingSetId, entry] of mcpWorkingSets) {
-        if (entry.handle.snapshot()) continue;
+        const snapshot = entry.handle.snapshot();
+        const idleExpired = nowMs - entry.lastAccessAtMs >= MCP_WORKING_SET_IDLE_TTL_MS;
+        if (snapshot && !idleExpired) continue;
+        if (snapshot && idleExpired) entry.handle.close();
         mcpWorkingSets.delete(workingSetId);
     }
 }
 
-function evictOldestOwnedWorkingSetIfNeeded() {
+/** @param {string} ownerPrincipalKey */
+function countOwnedWorkingSets(ownerPrincipalKey) {
+    let count = 0;
+    for (const entry of mcpWorkingSets.values()) if (entry.ownerPrincipalKey === ownerPrincipalKey) count += 1;
+    return count;
+}
+
+/** @param {string} ownerPrincipalKey */
+function evictOldestOwnedWorkingSetIfNeeded(ownerPrincipalKey) {
     pruneStaleOwnedWorkingSets();
-    if (mcpWorkingSets.size < MAX_MCP_WORKING_SETS) return;
-    const oldest = [...mcpWorkingSets.entries()].sort((a, b) => a[1].lastAccessAtMs - b[1].lastAccessAtMs)[0];
+    if (countOwnedWorkingSets(ownerPrincipalKey) < MAX_MCP_WORKING_SETS_PER_PRINCIPAL) return;
+    const oldest = [...mcpWorkingSets.entries()]
+        .filter(([, entry]) => entry.ownerPrincipalKey === ownerPrincipalKey)
+        .sort((a, b) => a[1].lastAccessAtMs - b[1].lastAccessAtMs)[0];
     if (!oldest) return;
     oldest[1].handle.close();
     mcpWorkingSets.delete(oldest[0]);
 }
 
-/** @param {string | undefined} workingSetId */
-function getOwnedWorkingSet(workingSetId) {
+/** @param {string | undefined} workingSetId @param {string} ownerPrincipalKey */
+function getOwnedWorkingSet(workingSetId, ownerPrincipalKey) {
     if (!workingSetId) return null;
+    pruneStaleOwnedWorkingSets();
     const entry = mcpWorkingSets.get(workingSetId);
-    if (!entry) return null;
+    if (!entry || entry.ownerPrincipalKey !== ownerPrincipalKey) return null;
     if (!entry.handle.snapshot()) {
         mcpWorkingSets.delete(workingSetId);
         return null;
     }
     entry.lastAccessAtMs = Date.now();
     return entry;
+}
+
+/** @param {{ createdAtMs:number; lastAccessAtMs:number }} entry */
+function workingSetLifecycle(entry) {
+    return {
+        policyVersion: 1,
+        idleTtlMs: MCP_WORKING_SET_IDLE_TTL_MS,
+        createdAtMs: entry.createdAtMs,
+        lastAccessAtMs: entry.lastAccessAtMs,
+        idleExpiresAtMs: entry.lastAccessAtMs + MCP_WORKING_SET_IDLE_TTL_MS,
+        cleanup: 'close-scope-then-remove-handle',
+    };
 }
 
 /** @param {string} workspaceRoot @param {string} absolutePath */
@@ -178,6 +200,7 @@ export const repoWorkingSetTool = defineMcpRawTool({
         operationContext,
     ) => {
         const workspace = requireMcpToolWorkspace(operationContext);
+        const ownerPrincipalKey = requireMcpToolPrincipal(operationContext).key;
         if (action === 'open') {
             const resolved = await workspace.resolveReadPath((path ?? '').trim() || DEFAULT_PATH);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
@@ -200,7 +223,14 @@ export const repoWorkingSetTool = defineMcpRawTool({
                 }
                 preferredPaths.push(seed.resolved);
             }
-            evictOldestOwnedWorkingSetIfNeeded();
+            evictOldestOwnedWorkingSetIfNeeded(ownerPrincipalKey);
+            if (mcpWorkingSets.size >= MAX_MCP_WORKING_SETS_GLOBAL) {
+                return errorResult('MCP working-set capacity is busy across active principals.', {
+                    code: 'ERR_WORKING_SET_GLOBAL_CAPACITY',
+                    maxGlobalWorkingSets: MAX_MCP_WORKING_SETS_GLOBAL,
+                    hint: 'Close an owned working set and retry; this principal cannot evict another principal\'s handle.',
+                });
+            }
             const id = `mcp-ws-${randomUUID()}`;
             const now = Date.now();
             const scopeContext = workspace.indexing.context;
@@ -220,13 +250,15 @@ export const repoWorkingSetTool = defineMcpRawTool({
                 recursive: true,
                 silent: true,
             });
-            mcpWorkingSets.set(id, {
+            const ownedEntry = {
                 handle,
                 context: scopeContext,
                 workspaceRoot: workspace.workspaceRoot,
+                ownerPrincipalKey,
                 createdAtMs: now,
                 lastAccessAtMs: now,
-            });
+            };
+            mcpWorkingSets.set(id, ownedEntry);
             const stats = await handle.awaitReady();
             if (!handle.snapshot()) {
                 mcpWorkingSets.delete(id);
@@ -251,8 +283,9 @@ export const repoWorkingSetTool = defineMcpRawTool({
                 contextIncluded,
                 contextAvailable: true,
                 ...(context ? { context } : {}),
-                activeOwnedWorkingSets: mcpWorkingSets.size,
-                maxOwnedWorkingSets: MAX_MCP_WORKING_SETS,
+                lifecycle: workingSetLifecycle(ownedEntry),
+                activeOwnedWorkingSets: countOwnedWorkingSets(ownerPrincipalKey),
+                maxOwnedWorkingSets: MAX_MCP_WORKING_SETS_PER_PRINCIPAL,
             };
             return okResult(
                 structured,
@@ -260,7 +293,7 @@ export const repoWorkingSetTool = defineMcpRawTool({
             );
         }
 
-        const owned = getOwnedWorkingSet(workingSetId);
+        const owned = getOwnedWorkingSet(workingSetId, ownerPrincipalKey);
         if (!owned) {
             return errorResult('Unknown or expired MCP workingSetId.', {
                 code: 'ERR_WORKING_SET_NOT_FOUND',
@@ -288,7 +321,7 @@ export const repoWorkingSetTool = defineMcpRawTool({
         if (action === 'status') {
             const stats = owned.handle.snapshot();
             return okResult(
-                { workingSetId, stats },
+                { workingSetId, stats, lifecycle: workingSetLifecycle(owned) },
                 `Working set ${workingSetId}: status=${stats?.status ?? 'unknown'}, selected=${stats?.selectedFiles ?? 0}, parsed=${stats?.parsed ?? 0}, invalidated=${stats?.invalidated ?? 0}.`,
             );
         }
@@ -349,10 +382,15 @@ export const repoWorkingSetTool = defineMcpRawTool({
 
         const stats = owned.handle.close();
         mcpWorkingSets.delete(workingSetId ?? '');
-        const structured = { workingSetId, closed: true, stats, activeOwnedWorkingSets: mcpWorkingSets.size };
+        const structured = {
+            workingSetId,
+            closed: true,
+            stats,
+            activeOwnedWorkingSets: countOwnedWorkingSets(ownerPrincipalKey),
+        };
         return okResult(
             structured,
-            `Closed working set ${workingSetId}; activeOwnedWorkingSets=${mcpWorkingSets.size}.`,
+            `Closed working set ${workingSetId}; activeOwnedWorkingSets=${countOwnedWorkingSets(ownerPrincipalKey)}.`,
         );
     },
 });

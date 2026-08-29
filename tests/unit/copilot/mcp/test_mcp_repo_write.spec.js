@@ -24,6 +24,15 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     backgroundServices: false,
 });
 const TEST_WORKSPACE = TEST_PROCESS_HOST.workspace;
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-repo-write-principal',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TEST_QUARANTINE_DIR = path.join(MCP_WORKSPACE_ROOT, 'src/copilot/.ai/quarantine/test-runs', randomUUID());
 
 /** @param {NonNullable<Parameters<typeof createRepoWriteTools>[0]>} [options] */
@@ -44,6 +53,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_WORKSPACE,
+        principal: TEST_PRINCIPAL,
         config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_PROCESS_HOST.toolCapabilities,
     },
@@ -63,6 +73,7 @@ function createRepoWriteOperationContext(signal) {
         },
         {
             workspace: TEST_WORKSPACE,
+            principal: TEST_PRINCIPAL,
             config: TEST_PROCESS_HOST.processConfig.toolConfig,
             capabilities: TEST_PROCESS_HOST.toolCapabilities,
         },

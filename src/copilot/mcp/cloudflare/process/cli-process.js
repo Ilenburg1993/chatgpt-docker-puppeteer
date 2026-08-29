@@ -9,7 +9,7 @@
  */
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
-import { signalProcessTreeDetailed } from '#copilot/mcp/public/process/supervision';
+import { signalProcessTreeDetailed } from '#copilot/infra/public/process/supervision';
 import { resolveMcpWorkspaceIdentityPath } from '#copilot/mcp/public/workspace';
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';

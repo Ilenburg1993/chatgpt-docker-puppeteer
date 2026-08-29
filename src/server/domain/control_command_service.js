@@ -1645,7 +1645,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
     });
 
     try {
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         const result = /** @type {any} */ (await _dispatch(normalized, payload, actorNormalized));
         const finalEntityId = entity.entityId || result?.after?.meta?.id || result?.after?.id || 'task:new';
 

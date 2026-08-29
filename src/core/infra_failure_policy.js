@@ -97,7 +97,7 @@ class InfraFailurePolicy {
         // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
         if (nervInstance) {
             try {
-                // eslint-disable-next-line @typescript-eslint/await-thenable
+                // oxlint-disable-next-line typescript/await-thenable
                 await HighLevelNERV.sendEvent(
                     nervInstance,
                     ActorRole.INFRA,

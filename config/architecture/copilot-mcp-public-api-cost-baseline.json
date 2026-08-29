@@ -14,10 +14,10 @@
     },
     {
       "alias": "#copilot/mcp/public/adapters/http1",
-      "moduleCount": 955,
-      "maxModuleCount": 1433,
-      "sourceBytes": 7277117,
-      "maxSourceBytes": 10915676,
+      "moduleCount": 965,
+      "maxModuleCount": 1448,
+      "sourceBytes": 7507567,
+      "maxSourceBytes": 11261351,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -35,10 +35,10 @@
     },
     {
       "alias": "#copilot/mcp/public/adapters/http2",
-      "moduleCount": 955,
-      "maxModuleCount": 1433,
-      "sourceBytes": 7289569,
-      "maxSourceBytes": 10934354,
+      "moduleCount": 965,
+      "maxModuleCount": 1448,
+      "sourceBytes": 7520019,
+      "maxSourceBytes": 11280029,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -56,10 +56,10 @@
     },
     {
       "alias": "#copilot/mcp/public/adapters/stdio",
-      "moduleCount": 933,
-      "maxModuleCount": 1400,
-      "sourceBytes": 7116500,
-      "maxSourceBytes": 10674750,
+      "moduleCount": 943,
+      "maxModuleCount": 1415,
+      "sourceBytes": 7346950,
+      "maxSourceBytes": 11020425,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -78,8 +78,8 @@
       "alias": "#copilot/mcp/public/auth",
       "moduleCount": 43,
       "maxModuleCount": 65,
-      "sourceBytes": 494576,
-      "maxSourceBytes": 741864,
+      "sourceBytes": 509629,
+      "maxSourceBytes": 764444,
       "externalPackages": [
         "jose"
       ]
@@ -88,8 +88,8 @@
       "alias": "#copilot/mcp/public/auth/config",
       "moduleCount": 10,
       "maxModuleCount": 15,
-      "sourceBytes": 91783,
-      "maxSourceBytes": 137675,
+      "sourceBytes": 94670,
+      "maxSourceBytes": 142005,
       "externalPackages": [
         "jose"
       ]
@@ -106,8 +106,8 @@
       "alias": "#copilot/mcp/public/cloudflare/edge",
       "moduleCount": 36,
       "maxModuleCount": 54,
-      "sourceBytes": 255878,
-      "maxSourceBytes": 383817,
+      "sourceBytes": 258209,
+      "maxSourceBytes": 387314,
       "externalPackages": [
         "cloudflare"
       ]
@@ -130,10 +130,10 @@
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/observability",
-      "moduleCount": 79,
-      "maxModuleCount": 119,
-      "sourceBytes": 730308,
-      "maxSourceBytes": 1095462,
+      "moduleCount": 80,
+      "maxModuleCount": 120,
+      "sourceBytes": 745496,
+      "maxSourceBytes": 1118244,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -141,10 +141,10 @@
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/posture",
-      "moduleCount": 94,
-      "maxModuleCount": 141,
-      "sourceBytes": 890760,
-      "maxSourceBytes": 1336140,
+      "moduleCount": 96,
+      "maxModuleCount": 144,
+      "sourceBytes": 915465,
+      "maxSourceBytes": 1373198,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -152,28 +152,28 @@
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/process",
-      "moduleCount": 20,
-      "maxModuleCount": 30,
-      "sourceBytes": 112486,
-      "maxSourceBytes": 168729,
+      "moduleCount": 21,
+      "maxModuleCount": 32,
+      "sourceBytes": 112621,
+      "maxSourceBytes": 168932,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/remote",
-      "moduleCount": 27,
-      "maxModuleCount": 41,
-      "sourceBytes": 175563,
-      "maxSourceBytes": 263345,
+      "moduleCount": 28,
+      "maxModuleCount": 42,
+      "sourceBytes": 180525,
+      "maxSourceBytes": 270788,
       "externalPackages": [
         "cloudflare"
       ]
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/transport-benchmark",
-      "moduleCount": 224,
-      "maxModuleCount": 336,
-      "sourceBytes": 1310365,
-      "maxSourceBytes": 1965548,
+      "moduleCount": 228,
+      "maxModuleCount": 342,
+      "sourceBytes": 1336138,
+      "maxSourceBytes": 2004207,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -181,10 +181,10 @@
     },
     {
       "alias": "#copilot/mcp/public/cloudflare/tunnel",
-      "moduleCount": 43,
-      "maxModuleCount": 65,
-      "sourceBytes": 256511,
-      "maxSourceBytes": 384767,
+      "moduleCount": 44,
+      "maxModuleCount": 66,
+      "sourceBytes": 256646,
+      "maxSourceBytes": 384969,
       "externalPackages": [
         "cloudflare"
       ]
@@ -199,10 +199,10 @@
     },
     {
       "alias": "#copilot/mcp/public/composition/cloudflare-cli",
-      "moduleCount": 934,
-      "maxModuleCount": 1401,
-      "sourceBytes": 7108411,
-      "maxSourceBytes": 10662617,
+      "moduleCount": 944,
+      "maxModuleCount": 1416,
+      "sourceBytes": 7338863,
+      "maxSourceBytes": 11008295,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -219,10 +219,10 @@
     },
     {
       "alias": "#copilot/mcp/public/composition/process-config",
-      "moduleCount": 963,
-      "maxModuleCount": 1445,
-      "sourceBytes": 7332191,
-      "maxSourceBytes": 10998287,
+      "moduleCount": 973,
+      "maxModuleCount": 1460,
+      "sourceBytes": 7562641,
+      "maxSourceBytes": 11343962,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -240,10 +240,10 @@
     },
     {
       "alias": "#copilot/mcp/public/composition/process-host",
-      "moduleCount": 979,
-      "maxModuleCount": 1469,
-      "sourceBytes": 7381537,
-      "maxSourceBytes": 11072306,
+      "moduleCount": 989,
+      "maxModuleCount": 1484,
+      "sourceBytes": 7611987,
+      "maxSourceBytes": 11417981,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -261,10 +261,10 @@
     },
     {
       "alias": "#copilot/mcp/public/connection",
-      "moduleCount": 97,
-      "maxModuleCount": 146,
-      "sourceBytes": 900089,
-      "maxSourceBytes": 1350134,
+      "moduleCount": 98,
+      "maxModuleCount": 147,
+      "sourceBytes": 920935,
+      "maxSourceBytes": 1381403,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -280,18 +280,18 @@
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/devcontainer-network",
-      "moduleCount": 18,
-      "maxModuleCount": 27,
-      "sourceBytes": 107353,
-      "maxSourceBytes": 161030,
+      "moduleCount": 19,
+      "maxModuleCount": 29,
+      "sourceBytes": 107488,
+      "maxSourceBytes": 161232,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/http-smoke",
-      "moduleCount": 932,
-      "maxModuleCount": 1398,
-      "sourceBytes": 7083133,
-      "maxSourceBytes": 10624700,
+      "moduleCount": 942,
+      "maxModuleCount": 1413,
+      "sourceBytes": 7313583,
+      "maxSourceBytes": 10970375,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -316,10 +316,10 @@
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/io-cache",
-      "moduleCount": 348,
-      "maxModuleCount": 522,
-      "sourceBytes": 1356511,
-      "maxSourceBytes": 2034767,
+      "moduleCount": 358,
+      "maxModuleCount": 537,
+      "sourceBytes": 1381365,
+      "maxSourceBytes": 2072048,
       "externalPackages": [
         "ignore",
         "lru-cache",
@@ -331,16 +331,16 @@
       "alias": "#copilot/mcp/public/diagnostics/latency",
       "moduleCount": 42,
       "maxModuleCount": 63,
-      "sourceBytes": 265735,
-      "maxSourceBytes": 398603,
+      "sourceBytes": 277770,
+      "maxSourceBytes": 416655,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/latency/attribution",
-      "moduleCount": 101,
-      "maxModuleCount": 152,
-      "sourceBytes": 894526,
-      "maxSourceBytes": 1341789,
+      "moduleCount": 102,
+      "maxModuleCount": 153,
+      "sourceBytes": 909714,
+      "maxSourceBytes": 1364571,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -348,10 +348,10 @@
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/latency/benchmark",
-      "moduleCount": 99,
-      "maxModuleCount": 149,
-      "sourceBytes": 918859,
-      "maxSourceBytes": 1378289,
+      "moduleCount": 100,
+      "maxModuleCount": 150,
+      "sourceBytes": 939705,
+      "maxSourceBytes": 1409558,
       "externalPackages": [
         "cloudflare",
         "jose"
@@ -361,24 +361,24 @@
       "alias": "#copilot/mcp/public/diagnostics/latency/dashboard",
       "moduleCount": 49,
       "maxModuleCount": 74,
-      "sourceBytes": 421471,
-      "maxSourceBytes": 632207,
+      "sourceBytes": 463016,
+      "maxSourceBytes": 694524,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/latency/round-trip",
       "moduleCount": 31,
       "maxModuleCount": 47,
-      "sourceBytes": 337178,
-      "maxSourceBytes": 505767,
+      "sourceBytes": 378202,
+      "maxSourceBytes": 567303,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/oauth-smoke",
       "moduleCount": 22,
       "maxModuleCount": 33,
-      "sourceBytes": 220095,
-      "maxSourceBytes": 330143,
+      "sourceBytes": 222982,
+      "maxSourceBytes": 334473,
       "externalPackages": [
         "@modelcontextprotocol/client",
         "jose"
@@ -386,18 +386,18 @@
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/project-doctor",
-      "moduleCount": 9,
-      "maxModuleCount": 14,
-      "sourceBytes": 24589,
-      "maxSourceBytes": 36884,
+      "moduleCount": 31,
+      "maxModuleCount": 47,
+      "sourceBytes": 104951,
+      "maxSourceBytes": 157427,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/runtime-health",
-      "moduleCount": 740,
-      "maxModuleCount": 1110,
-      "sourceBytes": 5185079,
-      "maxSourceBytes": 7777619,
+      "moduleCount": 755,
+      "maxModuleCount": 1133,
+      "sourceBytes": 5314588,
+      "maxSourceBytes": 7971882,
       "externalPackages": [
         "@github/copilot-sdk",
         "cloudflare",
@@ -421,8 +421,8 @@
       "alias": "#copilot/mcp/public/diagnostics/tool-payload",
       "moduleCount": 8,
       "maxModuleCount": 12,
-      "sourceBytes": 67528,
-      "maxSourceBytes": 101292,
+      "sourceBytes": 76990,
+      "maxSourceBytes": 115485,
       "externalPackages": [
         "@modelcontextprotocol/client",
         "@modelcontextprotocol/server"
@@ -430,28 +430,28 @@
     },
     {
       "alias": "#copilot/mcp/public/diagnostics/workspace-smoke",
-      "moduleCount": 61,
-      "maxModuleCount": 92,
-      "sourceBytes": 381186,
-      "maxSourceBytes": 571779,
+      "moduleCount": 81,
+      "maxModuleCount": 122,
+      "sourceBytes": 465104,
+      "maxSourceBytes": 697656,
       "externalPackages": [
         "cloudflare"
       ]
     },
     {
       "alias": "#copilot/mcp/public/indexing/auto-build",
-      "moduleCount": 22,
-      "maxModuleCount": 33,
-      "sourceBytes": 94134,
-      "maxSourceBytes": 141201,
+      "moduleCount": 44,
+      "maxModuleCount": 66,
+      "sourceBytes": 173992,
+      "maxSourceBytes": 260988,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/indexing/repository",
-      "moduleCount": 42,
-      "maxModuleCount": 63,
-      "sourceBytes": 165986,
-      "maxSourceBytes": 248979,
+      "moduleCount": 111,
+      "maxModuleCount": 167,
+      "sourceBytes": 444866,
+      "maxSourceBytes": 667299,
       "externalPackages": [
         "minimatch"
       ]
@@ -466,10 +466,10 @@
     },
     {
       "alias": "#copilot/mcp/public/integrations/model-gateway/live-runs",
-      "moduleCount": 642,
-      "maxModuleCount": 963,
-      "sourceBytes": 4228653,
-      "maxSourceBytes": 6342980,
+      "moduleCount": 652,
+      "maxModuleCount": 978,
+      "sourceBytes": 4262815,
+      "maxSourceBytes": 6394223,
       "externalPackages": [
         "@github/copilot-sdk",
         "ignore",
@@ -489,26 +489,26 @@
     },
     {
       "alias": "#copilot/mcp/public/maintenance",
-      "moduleCount": 7,
-      "maxModuleCount": 11,
-      "sourceBytes": 67004,
-      "maxSourceBytes": 100506,
+      "moduleCount": 8,
+      "maxModuleCount": 12,
+      "sourceBytes": 70186,
+      "maxSourceBytes": 105279,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/maintenance/dependencies/native-smoke",
-      "moduleCount": 80,
-      "maxModuleCount": 120,
-      "sourceBytes": 298449,
-      "maxSourceBytes": 447674,
+      "moduleCount": 83,
+      "maxModuleCount": 125,
+      "sourceBytes": 309856,
+      "maxSourceBytes": 464784,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/observability",
       "moduleCount": 22,
       "maxModuleCount": 33,
-      "sourceBytes": 178867,
-      "maxSourceBytes": 268301,
+      "sourceBytes": 190902,
+      "maxSourceBytes": 286353,
       "externalPackages": []
     },
     {
@@ -528,19 +528,11 @@
       "externalPackages": []
     },
     {
-      "alias": "#copilot/mcp/public/process/supervision",
-      "moduleCount": 2,
-      "maxModuleCount": 3,
-      "sourceBytes": 7553,
-      "maxSourceBytes": 11330,
-      "externalPackages": []
-    },
-    {
       "alias": "#copilot/mcp/public/process/terminal",
-      "moduleCount": 7,
-      "maxModuleCount": 11,
-      "sourceBytes": 59526,
-      "maxSourceBytes": 89289,
+      "moduleCount": 8,
+      "maxModuleCount": 12,
+      "sourceBytes": 63323,
+      "maxSourceBytes": 94985,
       "externalPackages": []
     },
     {
@@ -555,8 +547,8 @@
       "alias": "#copilot/mcp/public/protocol/catalog",
       "moduleCount": 49,
       "maxModuleCount": 74,
-      "sourceBytes": 527225,
-      "maxSourceBytes": 790838,
+      "sourceBytes": 542232,
+      "maxSourceBytes": 813348,
       "externalPackages": [
         "jose"
       ]
@@ -573,8 +565,8 @@
       "alias": "#copilot/mcp/public/protocol/tools",
       "moduleCount": 5,
       "maxModuleCount": 8,
-      "sourceBytes": 46659,
-      "maxSourceBytes": 69989,
+      "sourceBytes": 54670,
+      "maxSourceBytes": 82005,
       "externalPackages": []
     },
     {
@@ -595,10 +587,10 @@
     },
     {
       "alias": "#copilot/mcp/public/registry",
-      "moduleCount": 929,
-      "maxModuleCount": 1394,
-      "sourceBytes": 7073743,
-      "maxSourceBytes": 10610615,
+      "moduleCount": 939,
+      "maxModuleCount": 1409,
+      "sourceBytes": 7304193,
+      "maxSourceBytes": 10956290,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -615,26 +607,26 @@
     },
     {
       "alias": "#copilot/mcp/public/runtime/reload",
-      "moduleCount": 27,
-      "maxModuleCount": 41,
-      "sourceBytes": 153867,
-      "maxSourceBytes": 230801,
+      "moduleCount": 28,
+      "maxModuleCount": 42,
+      "sourceBytes": 159272,
+      "maxSourceBytes": 238908,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/runtime/source-generation",
       "moduleCount": 2,
       "maxModuleCount": 3,
-      "sourceBytes": 8914,
-      "maxSourceBytes": 13371,
+      "sourceBytes": 14184,
+      "maxSourceBytes": 21276,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/runtime/startup-maintenance",
-      "moduleCount": 686,
-      "maxModuleCount": 1029,
-      "sourceBytes": 4525126,
-      "maxSourceBytes": 6787689,
+      "moduleCount": 699,
+      "maxModuleCount": 1049,
+      "sourceBytes": 4601264,
+      "maxSourceBytes": 6901896,
       "externalPackages": [
         "@github/copilot-sdk",
         "cloudflare",
@@ -647,10 +639,10 @@
     },
     {
       "alias": "#copilot/mcp/public/server",
-      "moduleCount": 931,
-      "maxModuleCount": 1397,
-      "sourceBytes": 7112607,
-      "maxSourceBytes": 10668911,
+      "moduleCount": 941,
+      "maxModuleCount": 1412,
+      "sourceBytes": 7343057,
+      "maxSourceBytes": 11014586,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -667,10 +659,10 @@
     },
     {
       "alias": "#copilot/mcp/public/tools/catalog",
-      "moduleCount": 924,
-      "maxModuleCount": 1386,
-      "sourceBytes": 6967362,
-      "maxSourceBytes": 10451043,
+      "moduleCount": 934,
+      "maxModuleCount": 1401,
+      "sourceBytes": 7193451,
+      "maxSourceBytes": 10790177,
       "externalPackages": [
         "@github/copilot-sdk",
         "@modelcontextprotocol/client",
@@ -689,24 +681,24 @@
       "alias": "#copilot/mcp/public/tools/catalog/option-contracts",
       "moduleCount": 9,
       "maxModuleCount": 14,
-      "sourceBytes": 82025,
-      "maxSourceBytes": 123038,
+      "sourceBytes": 92764,
+      "maxSourceBytes": 139146,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/tools/catalog/semantic-contracts",
       "moduleCount": 2,
       "maxModuleCount": 3,
-      "sourceBytes": 81874,
-      "maxSourceBytes": 122811,
+      "sourceBytes": 62864,
+      "maxSourceBytes": 94296,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/transport/http/compat/stateless",
       "moduleCount": 24,
       "maxModuleCount": 36,
-      "sourceBytes": 181803,
-      "maxSourceBytes": 272705,
+      "sourceBytes": 193838,
+      "maxSourceBytes": 290757,
       "externalPackages": [
         "@modelcontextprotocol/node"
       ]
@@ -723,10 +715,10 @@
     },
     {
       "alias": "#copilot/mcp/public/transport/http/stateful/bootstrap",
-      "moduleCount": 22,
-      "maxModuleCount": 33,
-      "sourceBytes": 116679,
-      "maxSourceBytes": 175019,
+      "moduleCount": 23,
+      "maxModuleCount": 35,
+      "sourceBytes": 122084,
+      "maxSourceBytes": 183126,
       "externalPackages": []
     },
     {
@@ -751,8 +743,8 @@
       "alias": "#copilot/mcp/public/transport/http/stateful/router",
       "moduleCount": 57,
       "maxModuleCount": 86,
-      "sourceBytes": 608791,
-      "maxSourceBytes": 913187,
+      "sourceBytes": 623798,
+      "maxSourceBytes": 935697,
       "externalPackages": [
         "@modelcontextprotocol/node",
         "@modelcontextprotocol/server",
@@ -777,34 +769,34 @@
     },
     {
       "alias": "#copilot/mcp/public/validation",
-      "moduleCount": 28,
-      "maxModuleCount": 42,
-      "sourceBytes": 172868,
-      "maxSourceBytes": 259302,
+      "moduleCount": 29,
+      "maxModuleCount": 44,
+      "sourceBytes": 179064,
+      "maxSourceBytes": 268596,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/validation/devcontainer-shell",
-      "moduleCount": 7,
-      "maxModuleCount": 11,
-      "sourceBytes": 27688,
-      "maxSourceBytes": 41532,
+      "moduleCount": 8,
+      "maxModuleCount": 12,
+      "sourceBytes": 27823,
+      "maxSourceBytes": 41735,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/validation/suites",
-      "moduleCount": 12,
-      "maxModuleCount": 18,
-      "sourceBytes": 43371,
-      "maxSourceBytes": 65057,
+      "moduleCount": 13,
+      "maxModuleCount": 20,
+      "sourceBytes": 43506,
+      "maxSourceBytes": 65259,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/workflow-policy",
       "moduleCount": 7,
       "maxModuleCount": 11,
-      "sourceBytes": 55639,
-      "maxSourceBytes": 83459,
+      "sourceBytes": 63771,
+      "maxSourceBytes": 95657,
       "externalPackages": []
     },
     {
@@ -817,10 +809,10 @@
     },
     {
       "alias": "#copilot/mcp/public/workspace/git",
-      "moduleCount": 7,
-      "maxModuleCount": 11,
-      "sourceBytes": 21826,
-      "maxSourceBytes": 32739,
+      "moduleCount": 29,
+      "maxModuleCount": 44,
+      "sourceBytes": 102188,
+      "maxSourceBytes": 153282,
       "externalPackages": []
     },
     {
@@ -835,8 +827,8 @@
       "alias": "#copilot/mcp/public/workspace/repository/patch",
       "moduleCount": 12,
       "maxModuleCount": 18,
-      "sourceBytes": 100202,
-      "maxSourceBytes": 150303,
+      "sourceBytes": 102993,
+      "maxSourceBytes": 154490,
       "externalPackages": [
         "jsonc-parser"
       ]
@@ -851,34 +843,34 @@
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/read",
-      "moduleCount": 22,
-      "maxModuleCount": 33,
-      "sourceBytes": 93684,
-      "maxSourceBytes": 140526,
+      "moduleCount": 23,
+      "maxModuleCount": 35,
+      "sourceBytes": 129507,
+      "maxSourceBytes": 194261,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/read-cache",
       "moduleCount": 3,
       "maxModuleCount": 5,
-      "sourceBytes": 27154,
-      "maxSourceBytes": 40731,
+      "sourceBytes": 29745,
+      "maxSourceBytes": 44618,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/status",
-      "moduleCount": 12,
-      "maxModuleCount": 18,
-      "sourceBytes": 35064,
-      "maxSourceBytes": 52596,
+      "moduleCount": 34,
+      "maxModuleCount": 51,
+      "sourceBytes": 115426,
+      "maxSourceBytes": 173139,
       "externalPackages": []
     },
     {
       "alias": "#copilot/mcp/public/workspace/repository/write",
-      "moduleCount": 51,
-      "maxModuleCount": 77,
-      "sourceBytes": 393850,
-      "maxSourceBytes": 590775,
+      "moduleCount": 52,
+      "maxModuleCount": 78,
+      "sourceBytes": 403172,
+      "maxSourceBytes": 604758,
       "externalPackages": [
         "jsonc-parser",
         "zod"

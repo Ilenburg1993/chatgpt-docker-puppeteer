@@ -376,7 +376,7 @@ class ServerNERVAdapter {
 
     async _emitCommand(/** @type {any} */ actionCode, /** @type {any} */ payload, /** @type {any} */ correlationId) {
         try {
-            // eslint-disable-next-line @typescript-eslint/await-thenable
+            // oxlint-disable-next-line typescript/await-thenable
             await HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
             return true;
         } catch (/** @type {any} */ err) {

@@ -117,7 +117,6 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
         // Use Node 24's built-in sqlite module via dynamic require-like import
         // This avoids adding better-sqlite3 as a test dependency
         // Use the same module used in production (better-sqlite3 is already a dep)
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const Database = /** @type {typeof import('better-sqlite3')} */ (require('better-sqlite3'));
         const db = new Database(':memory:');
         // Apply the migration for convergence trace events

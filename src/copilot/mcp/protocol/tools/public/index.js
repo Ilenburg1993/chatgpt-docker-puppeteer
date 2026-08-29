@@ -14,13 +14,17 @@ export {
     getResultSizeHint,
     okResult,
     stringifyForModel,
+    withBoundedResultPage,
     withResultExecutionHint,
     withResultSizeHint,
+    withToolErrorResult,
 } from '../contracts/result.js';
 export { MCP_RECOVERY_RECIPE_VERSION, createMcpRecoveryRecipe } from '../contracts/recovery.js';
 export {
     MCP_TOOL_OPERATION_CONTEXT_VERSION,
     createMcpToolOperationContext,
+    withMcpToolPrincipal,
+    requireMcpToolPrincipal,
     requireMcpToolAuthConfig,
     requireMcpToolAiArtifactsCapability,
     requireMcpToolAuditCapability,

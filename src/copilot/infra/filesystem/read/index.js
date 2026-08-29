@@ -5,6 +5,9 @@
 
 export { readBytes, readLines, readText } from './cache/index.js';
 export { readTextChunks, readTextChunksStream, readTextLineChunks, readTextLineChunksStream } from './chunks/index.js';
+export { listRegularFilesFresh } from './inventory.js';
+export { listWorkspaceTreeEntriesFresh } from './tree.js';
+export { walkWorkspaceEntriesFresh } from './walk.js';
 export {
     listDirectoryNamesFresh,
     lstatPath,

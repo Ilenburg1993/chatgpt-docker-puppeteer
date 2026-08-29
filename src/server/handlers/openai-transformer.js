@@ -149,7 +149,6 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
     const promptWords = originalReq.messages.reduce((sum, msg) => {
         const content = /** @type {any} */ (msg).content || '';
         const words = content.split(/\s+/).filter((/** @type {any} */ w) => w.length > 0).length;
-        // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
         return sum + words;
     }, 0);
 

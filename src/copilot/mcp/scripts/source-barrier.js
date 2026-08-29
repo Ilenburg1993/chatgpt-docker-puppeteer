@@ -11,8 +11,6 @@ import {
     verifyRepositorySourceBarrier,
 } from '#copilot/mcp/public/workspace/repository/integrity';
 import { spawn, spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -139,29 +137,14 @@ export function collectSourceBarrierWorktreePaths(workspaceRoot) {
     );
 }
 
-/** @param {string} target @param {string} content */
-async function writeAtomicText(target, content) {
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    const temp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${randomUUID()}.tmp`);
-    const handle = await fs.open(temp, 'wx', 0o600);
-    try {
-        await handle.writeFile(content, 'utf8');
-        await handle.sync();
-    } finally {
-        await handle.close();
-    }
-    try {
-        await fs.rename(temp, target);
-        const dir = await fs.open(path.dirname(target), 'r');
-        try {
-            await dir.sync();
-        } finally {
-            await dir.close();
-        }
-    } catch (error) {
-        await fs.rm(temp, { force: true }).catch(() => {});
-        throw error;
-    }
+/**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {string} target
+ * @param {string} content
+ */
+async function writeAtomicText(workspace, target, content) {
+    await workspace.io.mkdirPathLocked(path.dirname(target), { recursive: true });
+    await workspace.io.writeFileAtomic(target, content, { mode: 0o600 });
 }
 
 /** @param {unknown} error */
@@ -175,9 +158,14 @@ function projectError(error) {
     };
 }
 
-/** @param {string} manifestPath @param {string} expectedFingerprint */
-async function readExpectedBarrier(manifestPath, expectedFingerprint) {
-    const barrier = parseRepositorySourceBarrierJson(await fs.readFile(manifestPath, 'utf8'));
+/**
+ * @param {import('#copilot/mcp/public/workspace').McpWorkspaceCapability} workspace
+ * @param {string} manifestPath
+ * @param {string} expectedFingerprint
+ */
+async function readExpectedBarrier(workspace, manifestPath, expectedFingerprint) {
+    const snapshot = await workspace.io.readText(manifestPath);
+    const barrier = parseRepositorySourceBarrierJson(snapshot.content);
     if (barrier.fingerprint !== expectedFingerprint) {
         const error = /** @type {Error & { code?: string; details?: Record<string, unknown> }} */ (
             new Error(
@@ -202,7 +190,7 @@ async function readExpectedBarrier(manifestPath, expectedFingerprint) {
  * @param {string} expectedFingerprint
  */
 async function verifyExpectedBarrier(host, manifestPath, expectedFingerprint) {
-    const barrier = await readExpectedBarrier(manifestPath, expectedFingerprint);
+    const barrier = await readExpectedBarrier(host.workspace, manifestPath, expectedFingerprint);
     const result = await verifyRepositorySourceBarrier(host.workspace, barrier, {
         ...(host.toolCapabilities.audit ? { audit: host.toolCapabilities.audit } : {}),
     });
@@ -269,7 +257,7 @@ async function main() {
             throw error;
         }
         const barrier = await captureRepositorySourceBarrier(host.workspace, sourcePaths);
-        await writeAtomicText(input.manifest, `${JSON.stringify(barrier, null, 2)}\n`);
+        await writeAtomicText(host.workspace, input.manifest, `${JSON.stringify(barrier, null, 2)}\n`);
         const absentEntryCount =
             barrier.version === 2 ? barrier.entries.filter((entry) => entry.kind === 'absent').length : 0;
         process.stdout.write(

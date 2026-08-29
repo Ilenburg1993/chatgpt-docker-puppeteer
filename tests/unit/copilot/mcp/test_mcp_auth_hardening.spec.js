@@ -125,10 +125,13 @@ describe('MCP auth hardening', () => {
     it('keeps destructive and Cloudflare apply tools admin-scoped', () => {
         const removeTool = getCanonicalMcpTools().find((tool) => tool.name === 'repo_remove_file');
         const edgeApplyTool = getCanonicalMcpTools().find((tool) => tool.name === 'mcp_cloudflare_edge_policy_apply');
+        const copilotSessionsTool = getCanonicalMcpTools().find((tool) => tool.name === 'copilot_sessions');
         assert.ok(removeTool);
         assert.ok(edgeApplyTool);
+        assert.ok(copilotSessionsTool);
         assert.deepEqual(scopesForMcpTool(removeTool), [MCP_AUTH_SCOPES.admin]);
         assert.deepEqual(scopesForMcpTool(edgeApplyTool), [MCP_AUTH_SCOPES.admin]);
+        assert.deepEqual(scopesForMcpTool(copilotSessionsTool), [MCP_AUTH_SCOPES.admin]);
     });
 
     it('allows static bearer without a JWKS round-trip when configured', async () => {
@@ -146,6 +149,9 @@ describe('MCP auth hardening', () => {
 
         assert.equal(decision.allowed, true);
         assert.equal(decision.method, 'static-bearer');
+        assert.equal(decision.principal?.verified, true);
+        assert.equal(decision.principal?.mode, 'secure-mcp-tunnel');
+        assert.equal(decision.principal?.key.length, 64);
     });
 
     it('builds protected resource metadata from stable supported scopes', () => {

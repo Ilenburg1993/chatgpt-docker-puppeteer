@@ -12,8 +12,8 @@ import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const NATIVE_PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.resolve('@typescript/native/package.json')));
-const NATIVE_TSC_ENTRYPOINT = path.join(NATIVE_PACKAGE_ROOT, 'lib', 'tsc.js');
+const TYPESCRIPT_PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.resolve('typescript/package.json')));
+const NATIVE_TSC_ENTRYPOINT = path.join(TYPESCRIPT_PACKAGE_ROOT, 'lib', 'tsc.js');
 const DEFAULT_TIMEOUT_MS = Number(process.env['LSP_TOOL_TIMEOUT_MS'] || 15_000);
 const DEFAULT_MAX_RESULTS = Number(process.env['LSP_MAX_RESULTS'] || 200);
 const DEFAULT_IDLE_TTL_MS = 30_000;

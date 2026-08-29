@@ -1,16 +1,14 @@
 // @ts-check
 /**
- * Governed Git execution primitive for the MCP workspace.
+ * Governed Git execution adapter for the MCP workspace.
  *
- * The primitive owns physical subprocess completion: caller cancellation, local timeout and output-budget exhaustion
- * terminate the Git process tree and resolve only after Node observes child `close`. This prevents a cancelled MCP
- * response from leaving `git commit`, hooks, SSH or `git push` descendants executing in the background.
+ * Physical subprocess IO is owned by infra/process/execution. This adapter owns only Git-specific bounded defaults,
+ * explicit workspace/config authority and Git-oriented failure text. No tool/schema policy belongs here.
  *
  * @module copilot/mcp/workspace/git/runtime
  */
 
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
-import { spawn } from 'node:child_process';
+import { executeBufferedProcess } from '#copilot/infra/public/process/execution';
 
 const DEFAULT_GIT_TIMEOUT_MS = 15_000;
 const DEFAULT_GIT_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
@@ -45,8 +43,9 @@ const TERMINATION_GRACE_MS = 1_500;
  */
 export async function execWorkspaceGit(args, opts) {
     if (!opts?.config) throw new TypeError('Workspace Git execution requires an explicit Git process config.');
-    if (typeof opts.cwd !== 'string' || opts.cwd.length === 0)
+    if (typeof opts.cwd !== 'string' || opts.cwd.length === 0) {
         throw new TypeError('Workspace Git execution requires an explicit cwd authority.');
+    }
     if (!Array.isArray(args)) throw new TypeError('Workspace Git execution requires an argument array.');
     const timeoutMs = normalizeBoundedInteger(opts.timeoutMs, DEFAULT_GIT_TIMEOUT_MS, 1, MAX_GIT_TIMEOUT_MS);
     const maxBufferBytes = normalizeBoundedInteger(
@@ -55,121 +54,52 @@ export async function execWorkspaceGit(args, opts) {
         1024,
         MAX_GIT_BUFFER_BYTES,
     );
-    if (opts.signal?.aborted) {
+
+    const result = await executeBufferedProcess('git', args, {
+        cwd: opts.cwd,
+        env: opts.config.childEnvironment,
+        timeoutMs,
+        maxBufferBytes,
+        processGroup: true,
+        terminationGraceMs: TERMINATION_GRACE_MS,
+        ...(opts.signal ? { signal: opts.signal } : {}),
+    });
+    if (result.success) {
         return Object.freeze({
-            success: false,
-            stdout: '',
-            stderr: '',
-            error: abortMessage(opts.signal, 'Git execution cancelled before spawn.'),
-            exitCode: null,
-            signal: null,
-            cancelled: true,
+            success: true,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+            signal: result.signal,
+            cancelled: false,
             timedOut: false,
             outputLimitExceeded: false,
         });
     }
 
-    /** @type {Buffer[]} */
-    const stdoutChunks = [];
-    /** @type {Buffer[]} */
-    const stderrChunks = [];
-    let stdoutBytes = 0;
-    let stderrBytes = 0;
-    let spawnError = null;
-    let cancelled = false;
-    let timedOut = false;
-    let outputLimitExceeded = false;
-
-    const child = spawn('git', args, {
-        cwd: opts.cwd,
-        env: opts.config.childEnvironment,
-        detached: process.platform !== 'win32',
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+    const error = result.spawnError
+        ? result.spawnError
+        : result.cancelled
+          ? abortMessage(opts.signal, 'Git execution cancelled.')
+          : result.timedOut
+            ? `Git execution timed out after ${String(timeoutMs)}ms.`
+            : result.outputLimitExceeded
+              ? `Git output exceeded ${String(maxBufferBytes)} bytes.`
+              : result.stderr.trim() ||
+                (result.signal
+                    ? `Git process terminated by ${result.signal}.`
+                    : `Git process exited with code ${String(result.exitCode)}.`);
+    return Object.freeze({
+        success: false,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        error,
+        exitCode: result.exitCode,
+        signal: result.signal,
+        cancelled: result.cancelled,
+        timedOut: result.timedOut,
+        outputLimitExceeded: result.outputLimitExceeded,
     });
-    const supervisor = createAttachedChildProcessSupervisor(child, { processGroup: true });
-
-    const terminate = () =>
-        supervisor.requestTermination({
-            graceMs: TERMINATION_GRACE_MS,
-            initialSignal: 'SIGTERM',
-            forceSignal: 'SIGKILL',
-        });
-
-    /** @param {Buffer[]} chunks @param {number} currentBytes @param {Buffer | string} chunk */
-    const appendBounded = (chunks, currentBytes, chunk) => {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
-        const remaining = Math.max(0, maxBufferBytes - currentBytes);
-        if (remaining > 0) chunks.push(buffer.subarray(0, remaining));
-        const observed = currentBytes + buffer.length;
-        if (observed > maxBufferBytes && !outputLimitExceeded) {
-            outputLimitExceeded = true;
-            terminate();
-        }
-        return observed;
-    };
-
-    child.stdout?.on('data', (chunk) => {
-        stdoutBytes = appendBounded(stdoutChunks, stdoutBytes, chunk);
-    });
-    child.stderr?.on('data', (chunk) => {
-        stderrBytes = appendBounded(stderrChunks, stderrBytes, chunk);
-    });
-    child.once('error', (error) => {
-        spawnError = error instanceof Error ? error.message : String(error);
-    });
-
-    const onAbort = () => {
-        cancelled = true;
-        terminate();
-    };
-    opts.signal?.addEventListener('abort', onAbort, { once: true });
-    const timeout = setTimeout(() => {
-        timedOut = true;
-        terminate();
-    }, timeoutMs);
-    timeout.unref();
-
-    try {
-        const closed = await supervisor.closed;
-        const stdout = Buffer.concat(stdoutChunks).toString('utf8');
-        const stderr = Buffer.concat(stderrChunks).toString('utf8');
-        const success =
-            closed.exitCode === 0 &&
-            closed.signal === null &&
-            spawnError === null &&
-            !cancelled &&
-            !timedOut &&
-            !outputLimitExceeded;
-        const error = success
-            ? undefined
-            : (spawnError ??
-              (cancelled
-                  ? abortMessage(opts.signal, 'Git execution cancelled.')
-                  : timedOut
-                    ? `Git execution timed out after ${timeoutMs}ms.`
-                    : outputLimitExceeded
-                      ? `Git output exceeded ${maxBufferBytes} bytes.`
-                      : stderr.trim() ||
-                        (closed.signal
-                            ? `Git process terminated by ${closed.signal}.`
-                            : `Git process exited with code ${String(closed.exitCode)}.`)));
-        return Object.freeze({
-            success,
-            stdout,
-            stderr,
-            ...(error ? { error } : {}),
-            exitCode: closed.exitCode,
-            signal: closed.signal,
-            cancelled,
-            timedOut,
-            outputLimitExceeded,
-        });
-    } finally {
-        clearTimeout(timeout);
-        opts.signal?.removeEventListener('abort', onAbort);
-        supervisor.cancelEscalation();
-    }
 }
 
 /** @param {AbortSignal | undefined} signal @param {string} fallback */

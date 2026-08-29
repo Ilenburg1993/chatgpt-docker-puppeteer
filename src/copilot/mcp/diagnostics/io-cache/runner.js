@@ -7,7 +7,7 @@
 
 import { createWorkspaceIo } from '#copilot/infra/public/composition/workspace/io';
 import { buildMcpChildEnvironment } from '#copilot/mcp/public/process/environment';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';

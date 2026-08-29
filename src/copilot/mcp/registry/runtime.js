@@ -39,6 +39,7 @@ import {
 import {
     createMcpToolOperationContext,
     errorResult,
+    withMcpToolPrincipal,
     getResultExecutionHint,
     getResultSizeHint,
 } from '#copilot/mcp/public/protocol/tools';
@@ -585,8 +586,17 @@ async function guardedToolHandler(tool, args, options, registryPolicy, serverCon
             );
         }
 
+        if (!authorization.principal) {
+            const durationMs = elapsedMs(startedAt);
+            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
+            return errorResult('MCP authorization completed without a principal identity.', {
+                code: 'MCP_AUTH_PRINCIPAL_MISSING',
+                callId,
+            });
+        }
+        const authorizedOperationContext = withMcpToolPrincipal(operationContext, authorization.principal);
         const handlerStartedAt = startPhase('handler');
-        const result = await runToolHandlerWithCancellation(tool, args, operationContext);
+        const result = await runToolHandlerWithCancellation(tool, args, authorizedOperationContext);
         finishPhase('handler', handlerStartedAt);
         const executionMetric = getResultExecutionHint(result) ?? undefined;
         const resultSizeStartedAt = startPhase('resultSize');

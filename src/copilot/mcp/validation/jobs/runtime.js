@@ -7,7 +7,7 @@
 
 import { createConfiguredFsGrant, createConfiguredFsIo } from '#copilot/infra/public/composition/filesystem/configured';
 import { readProcessResourceSnapshot } from '#copilot/infra/public/platform/process/introspection';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -106,6 +106,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  * @property {number | null} terminationRequestedAt
  * @property {string} logFile
  * @property {string} manifestFile
+ * @property {string} [ownerPrincipalKey]
  * @property {string} [ownerRuntimeEpoch]
  * @property {number} [ownerPid]
  * @property {number | null} [childPid]
@@ -115,7 +116,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  * @property {ReturnType<typeof createAttachedChildProcessSupervisor> | null} supervisor
  * @property {Promise<void> | null} completion
  *
- * @typedef {Omit<JobRecord, 'process' | 'supervisor' | 'completion'> & {
+ * @typedef {Omit<JobRecord, 'process' | 'supervisor' | 'completion' | 'ownerPrincipalKey'> & {
  *     runtimeAttached: boolean | null;
  *     runtimeSameEpoch: boolean | null;
  * }} PublicJobRecord
@@ -358,12 +359,14 @@ export function resolveJobTimeoutMs(timeoutMs) {
  *     timeoutMs?: number;
  *     testFiles?: string[];
  *     signal?: AbortSignal;
+ *     ownerPrincipalKey: string;
  * }} options
  * @returns {Promise<PublicJobRecord>}
  */
 export async function spawnValidatorJob(validator, options) {
     if (!options?.workspace) throw new TypeError('Validator execution requires a workspace capability.');
     if (!options.config) throw new TypeError('Validator execution requires a validation process config generation.');
+    const ownerPrincipalKey = requireValidatorJobOwnerPrincipalKey(options.ownerPrincipalKey);
     if (options.signal?.aborted) {
         throw (
             options.signal.reason ??
@@ -392,16 +395,20 @@ export async function spawnValidatorJob(validator, options) {
     const activeJob =
         [...JOBS.values()].find((record) => record.status === 'running' && record.process !== null) ?? null;
     if (validatorSpawnReserved || activeJob) {
+        const activeJobOwned = activeJob ? isJobOwnedBy(activeJob, ownerPrincipalKey) : false;
         throw Object.assign(
             new Error(
-                activeJob
+                activeJobOwned && activeJob
                     ? `Validator capacity is busy with ${activeJob.validator} (${activeJob.id}).`
-                    : 'Validator capacity is reserved by another spawn in progress.',
+                    : activeJob
+                      ? 'Validator capacity is busy with another principal.'
+                      : 'Validator capacity is reserved by another spawn in progress.',
             ),
             {
                 code: 'ERR_VALIDATOR_CAPACITY_BUSY',
-                activeJobId: activeJob?.id ?? null,
-                activeValidator: activeJob?.validator ?? null,
+                activeJobId: activeJobOwned ? (activeJob?.id ?? null) : null,
+                activeValidator: activeJobOwned ? (activeJob?.validator ?? null) : null,
+                busyByOtherPrincipal: Boolean(activeJob && !activeJobOwned),
                 maxActive: MAX_ACTIVE_VALIDATOR_PROCESSES,
             },
         );
@@ -467,6 +474,7 @@ export async function spawnValidatorJob(validator, options) {
                 terminationRequestedAt: null,
                 logFile,
                 manifestFile,
+                ownerPrincipalKey,
                 ownerRuntimeEpoch: VALIDATOR_RUNTIME_EPOCH,
                 ownerPid: process.pid,
                 childPid: child.pid ?? null,
@@ -568,17 +576,20 @@ function waitForValidatorChildSpawn(child) {
  * Wait only against an attached in-memory job record for a bounded window. Persisted/unattached jobs are read once.
  *
  * @param {string} id
+ * @param {string} ownerPrincipalKey
  * @param {number} [waitMs]
  * @param {AbortSignal} [signal]
  * @returns {Promise<PublicJobRecord | null>}
  */
-export async function waitForJobCompletion(id, waitMs = 30_000, signal) {
+export async function waitForJobCompletion(id, ownerPrincipalKey, waitMs = 30_000, signal) {
+    const ownerKey = requireValidatorJobOwnerPrincipalKey(ownerPrincipalKey);
     const boundedWaitMs = Math.max(0, Math.min(120_000, Math.floor(Number(waitMs) || 0)));
     const attached = JOBS.get(id);
     if (!attached) {
         const persisted = await readJobManifest(id);
-        return persisted ? publicJobRecord(persisted) : null;
+        return persisted && isJobOwnedBy(persisted, ownerKey) ? publicJobRecord(persisted) : null;
     }
+    if (!isJobOwnedBy(attached, ownerKey)) return null;
     if (attached.status !== 'running' || boundedWaitMs === 0) return publicJobRecord(attached);
 
     if (!attached.completion) return publicJobRecord(attached);
@@ -628,13 +639,15 @@ async function cancelJobAndDrain(record) {
 
 /**
  * @param {string} id
+ * @param {string} ownerPrincipalKey
  * @param {number} [tailBytes]
  * @returns {Promise<{ job: PublicJobRecord | null; output: string }>}
  */
-export async function readJobOutput(id, tailBytes = 24_000) {
+export async function readJobOutput(id, ownerPrincipalKey, tailBytes = 24_000) {
+    const ownerKey = requireValidatorJobOwnerPrincipalKey(ownerPrincipalKey);
     if (!resolveJobArtifactPaths(id)) return { job: null, output: '' };
     const record = JOBS.get(id) ?? (await readJobManifest(id));
-    if (!record) return { job: null, output: '' };
+    if (!record || !isJobOwnedBy(record, ownerKey)) return { job: null, output: '' };
     const output = await readJobLogTail(id, tailBytes);
     return { job: publicJobRecord(record), output };
 }
@@ -669,11 +682,13 @@ export async function readValidatorResourceSnapshot() {
     };
 }
 
-/** @param {import('../config.js').McpValidationProcessConfig} config */
-export function readCopilotValidatorCapacityState(config) {
+/** @param {import('../config.js').McpValidationProcessConfig} config @param {string} ownerPrincipalKey */
+export function readCopilotValidatorCapacityState(config, ownerPrincipalKey) {
     if (!config) throw new TypeError('Validator capacity state requires a validation process config generation.');
-    const active = [...JOBS.values()]
-        .filter((record) => record.status === 'running' && record.process !== null)
+    const ownerKey = requireValidatorJobOwnerPrincipalKey(ownerPrincipalKey);
+    const activeRecords = [...JOBS.values()].filter((record) => record.status === 'running' && record.process !== null);
+    const active = activeRecords
+        .filter((record) => isJobOwnedBy(record, ownerKey))
         .map((record) => ({ id: record.id, validator: record.validator, startedAt: record.startedAt }));
     return {
         runtimeEpoch: VALIDATOR_RUNTIME_EPOCH,
@@ -681,7 +696,9 @@ export function readCopilotValidatorCapacityState(config) {
         maxActive: MAX_ACTIVE_VALIDATOR_PROCESSES,
         vitestMaxWorkers: config.vitestMaxWorkers,
         spawnReserved: validatorSpawnReserved,
-        activeCount: active.length,
+        activeCount: activeRecords.length,
+        ownedActiveCount: active.length,
+        busyByOtherPrincipal: activeRecords.length > active.length,
         active,
     };
 }
@@ -699,12 +716,14 @@ export function readCopilotValidatorCapacityState(config) {
  *     failureTailBytes?: number;
  *     testFiles?: string[];
  *     signal?: AbortSignal;
+ *     ownerPrincipalKey: string;
  * }} options
  */
 export async function runCopilotValidatorInline(validator, options) {
     if (!options?.workspace) throw new TypeError('Inline validator execution requires a workspace capability.');
     if (!options.config)
         throw new TypeError('Inline validator execution requires a validation process config generation.');
+    const ownerPrincipalKey = requireValidatorJobOwnerPrincipalKey(options.ownerPrincipalKey);
     if (!canRunCopilotValidatorInline(options.config)) {
         throw new Error(
             'Inline validator fan-out is disabled inside test runners to prevent recursive Node/Vitest process trees.',
@@ -720,15 +739,20 @@ export async function runCopilotValidatorInline(validator, options) {
         ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
         ...(focused ? { testFiles: options.testFiles } : {}),
         ...(options.signal ? { signal: options.signal } : {}),
+        ownerPrincipalKey,
     });
     const waitMs = Math.max(0, Math.min(120_000, Math.floor(Number(options.waitMs ?? 30_000))));
-    const waited = await waitForJobCompletion(job.id, waitMs, options.signal);
+    const waited = await waitForJobCompletion(job.id, ownerPrincipalKey, waitMs, options.signal);
     if (!waited) throw new Error(`Validator job ${job.id} disappeared while waiting.`);
     const completedWithinWait = waited.status !== 'running';
     const passed = waited.status === 'completed' && waited.exitCode === 0;
     const shouldReadFailureTail = completedWithinWait && !passed && waited.status === 'failed';
     const failureOutput = shouldReadFailureTail
-        ? await readJobOutput(job.id, Math.max(1_000, Math.min(12_000, Number(options.failureTailBytes ?? 4_000))))
+        ? await readJobOutput(
+              job.id,
+              ownerPrincipalKey,
+              Math.max(1_000, Math.min(12_000, Number(options.failureTailBytes ?? 4_000))),
+          )
         : { output: '' };
     return {
         validator,
@@ -742,14 +766,16 @@ export async function runCopilotValidatorInline(validator, options) {
 
 /**
  * @param {string} id
+ * @param {string} ownerPrincipalKey
  * @returns {Promise<{ ok: boolean; job: PublicJobRecord | null; message: string; unattached?: boolean }>}
  */
-export async function cancelJob(id) {
+export async function cancelJob(id, ownerPrincipalKey) {
+    const ownerKey = requireValidatorJobOwnerPrincipalKey(ownerPrincipalKey);
     if (!resolveJobArtifactPaths(id)) return { ok: false, job: null, message: 'Job not found.' };
     const record = JOBS.get(id);
     if (!record) {
         const persisted = await readJobManifest(id);
-        if (!persisted) return { ok: false, job: null, message: 'Job not found.' };
+        if (!persisted || !isJobOwnedBy(persisted, ownerKey)) return { ok: false, job: null, message: 'Job not found.' };
         const job = publicJobRecord(persisted);
         if (persisted.status === 'running') {
             return {
@@ -761,6 +787,7 @@ export async function cancelJob(id) {
         }
         return { ok: false, job, message: `Job is ${persisted.status}.` };
     }
+    if (!isJobOwnedBy(record, ownerKey)) return { ok: false, job: null, message: 'Job not found.' };
     if (!record.process || record.status !== 'running') {
         return { ok: false, job: publicJobRecord(record), message: `Job is ${record.status}.` };
     }
@@ -787,13 +814,15 @@ export async function cancelJob(id) {
  *     validator?: CopilotValidatorName;
  *     limit?: number;
  *     includeCompleted?: boolean;
- * }} [options]
+ *     ownerPrincipalKey: string;
+ * }} options
  * @returns {Promise<PublicJobRecord[]>}
  */
-export async function listJobs(options = {}) {
+export async function listJobs(options) {
+    const ownerKey = requireValidatorJobOwnerPrincipalKey(options?.ownerPrincipalKey);
     const records = new Map();
     for (const record of JOBS.values()) {
-        records.set(record.id, publicJobRecord(record));
+        if (isJobOwnedBy(record, ownerKey)) records.set(record.id, publicJobRecord(record));
     }
     const entries = await JOB_ARTIFACT_IO.listDirectoryNamesFresh(MCP_JOBS_DIR)
         .then((result) => result.entries)
@@ -806,7 +835,7 @@ export async function listJobs(options = {}) {
         const batch = persistedIds.slice(offset, offset + MAX_PERSISTED_JOB_READ_CONCURRENCY);
         const manifests = await Promise.all(batch.map((id) => readJobManifest(id)));
         for (const manifest of manifests) {
-            if (manifest) records.set(manifest.id, publicJobRecord(manifest));
+            if (manifest && isJobOwnedBy(manifest, ownerKey)) records.set(manifest.id, publicJobRecord(manifest));
         }
     }
     const includeCompleted = options.includeCompleted !== false;
@@ -824,7 +853,13 @@ export async function listJobs(options = {}) {
  * @returns {PublicJobRecord}
  */
 function publicJobRecord(record) {
-    const { process: _process, supervisor: _supervisor, completion: _completion, ...publicRecord } = record;
+    const {
+        process: _process,
+        supervisor: _supervisor,
+        completion: _completion,
+        ownerPrincipalKey: _ownerPrincipalKey,
+        ...publicRecord
+    } = record;
     return {
         ...publicRecord,
         runtimeAttached: record.status === 'running' ? record.process !== null : null,
@@ -841,7 +876,7 @@ async function persistJobRecord(record) {
     await JOB_ARTIFACT_IO.mkdirPath(MCP_JOBS_DIR, { recursive: true });
     await JOB_ARTIFACT_IO.writeFileAtomic(
         record.manifestFile,
-        `${JSON.stringify(publicJobRecord(record), null, 2)}\n`,
+        `${JSON.stringify(persistedJobRecord(record), null, 2)}\n`,
         {
             mode: 0o600,
         },
@@ -852,6 +887,29 @@ async function persistJobRecord(record) {
  * @param {string} id
  * @returns {Promise<JobRecord | null>}
  */
+/** @param {JobRecord} record */
+function persistedJobRecord(record) {
+    const { process: _process, supervisor: _supervisor, completion: _completion, ...persistedRecord } = record;
+    return persistedRecord;
+}
+
+/** @param {string | undefined} ownerPrincipalKey */
+function requireValidatorJobOwnerPrincipalKey(ownerPrincipalKey) {
+    const normalized = String(ownerPrincipalKey ?? '').trim();
+    if (!normalized) {
+        throw Object.assign(new TypeError('Validator job access requires an authorization-derived principal key.'), {
+            code: 'ERR_VALIDATOR_JOB_OWNER_REQUIRED',
+        });
+    }
+    return normalized;
+}
+
+/** @param {JobRecord} record @param {string} ownerPrincipalKey */
+function isJobOwnedBy(record, ownerPrincipalKey) {
+    return typeof record.ownerPrincipalKey === 'string' && record.ownerPrincipalKey === ownerPrincipalKey;
+}
+
+/** @param {string} id @returns {Promise<JobRecord | null>} */
 async function readJobManifest(id) {
     const artifacts = resolveJobArtifactPaths(id);
     if (!artifacts) return null;

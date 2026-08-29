@@ -54,7 +54,7 @@ describe('MCP startup maintenance', () => {
             smokeRunner: async () => ({ success: true, status: 'ok' }),
             cleanupRunner: async () => ({ removed: true }),
             rollbackCleanupRunner: async () => ({ removed: 0, expiredRemoved: 0, budgetRemoved: 0 }),
-            detachedLiveReaper: async () => ({ reapedCount: 2, failureCount: 0 }),
+            detachedLiveReaper: async () => ({ reapedCount: 2, timedOutCount: 1, deletedCount: 3, failureCount: 0 }),
         });
 
         assert.equal(scheduled, true);
@@ -69,6 +69,8 @@ describe('MCP startup maintenance', () => {
         assert.equal(state.success, true);
         assert.equal(state.staleQuickTunnelStateRemoved, true);
         assert.equal(state.detachedLiveRunsReaped, 2);
+        assert.equal(state.detachedLiveRunsTimedOut, 1);
+        assert.equal(state.detachedLiveRunStatesDeleted, 3);
         assert.equal(state.detachedLiveRunReaperFailures, 0);
     });
 

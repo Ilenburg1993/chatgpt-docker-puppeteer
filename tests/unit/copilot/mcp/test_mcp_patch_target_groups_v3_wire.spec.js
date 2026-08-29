@@ -16,6 +16,15 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'mcp-patch-target-groups-v3-wire-unit-process-host',
     backgroundServices: false,
 });
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-patch-target-groups-v3-wire-principal',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -28,6 +37,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_PROCESS_HOST.workspace,
+        principal: TEST_PRINCIPAL,
         config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_PROCESS_HOST.toolCapabilities,
     },
@@ -100,6 +110,22 @@ describe('Patch Target Groups V3 wire', () => {
         assert.equal(await readFile(absolutePath, 'utf8'), 'ALPHA BETA GAMMA');
     });
 
+    it('fails closed when a single-operation target baseline is stale', async () => {
+        const initial = 'alpha';
+        const { absolutePath, repoPath } = await createRepoFile('single-stale-baseline.txt', initial);
+        const result = await findTool('repo_apply_patch').handler({
+            path: repoPath,
+            old_string: 'alpha',
+            new_string: 'ALPHA',
+            expectedHash: sha256('different-baseline'),
+        });
+
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent?.['code'], 'EEXPECTEDHASH');
+        assert.equal(result.structuredContent?.['details']?.['mutationState'], 'none');
+        assert.equal(await readFile(absolutePath, 'utf8'), initial);
+    });
+
     it('preserves independent target progress with target-native input', async () => {
         const first = await createRepoFile('first.txt', 'alpha');
         const second = await createRepoFile('second.txt', 'beta');
@@ -112,7 +138,7 @@ describe('Patch Target Groups V3 wire', () => {
             confirmBatch: true,
         });
 
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['partial'], true);
         assert.equal(result.structuredContent?.['appliedCount'], 1);

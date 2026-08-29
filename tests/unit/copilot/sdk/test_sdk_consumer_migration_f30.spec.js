@@ -206,7 +206,6 @@ describe('F152 — zero-bypass: submodules críticos não importados fora de sdk
         const mod = `#copilot/sdk/${suffix}`;
         it(`nenhum consumer usa alias SDK removido "${mod}"`, () => {
             const { execSync } = /** @type {typeof import('node:child_process')} */ (
-                // eslint-disable-next-line @typescript-eslint/no-require-imports
                 require('node:child_process')
             );
             let count = 0;

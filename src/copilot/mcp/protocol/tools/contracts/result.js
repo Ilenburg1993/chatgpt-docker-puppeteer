@@ -21,6 +21,17 @@
  * }} ResultSizeHint
  *
  * @typedef {{
+ *     cursor?: string | number | null;
+ *     nextCursor?: string | number | null;
+ *     truncated?: boolean;
+ *     truncationReason?: string | null;
+ *     budgetBytes: number;
+ *     contentBytes?: number;
+ *     contentBudgetBytes?: number;
+ *     source: string;
+ * }} BoundedResultPageHint
+ *
+ * @typedef {{
  *     logicalOperations: number;
  *     failedOperations?: number;
  *     skippedOperations?: number;
@@ -78,6 +89,20 @@ export function okResult(structuredContent, text, meta) {
 }
 
 /**
+ * Mark an already-framed rich MCP result as a tool execution error without rebuilding its structured payload.
+ * Mutation is intentional: result size/execution hints are non-enumerable symbol properties and must survive intact.
+ * Use only when the requested tool operation itself could not complete; negative domain outcomes remain normal results.
+ *
+ * @template {StructuredCallToolResult} T
+ * @param {T} result
+ * @returns {T}
+ */
+export function withToolErrorResult(result) {
+    result.isError = true;
+    return result;
+}
+
+/**
  * Attach an internal result-size hint used by the registry to avoid expensive full JSON stringification when a tool can
  * already account for its own result size. The symbol property is non-enumerable and is not part of the MCP payload.
  *
@@ -98,6 +123,58 @@ export function withResultSizeHint(result, hint) {
         configurable: true,
     });
     return result;
+}
+
+/**
+ * Attach the common bounded-page contract to a framed result and account for the full structured + TextContent payload.
+ * `budgetBytes` is the complete tool-result ceiling; optional content byte fields describe an inner heavy-content
+ * budget and are intentionally not conflated with the outer result limit.
+ *
+ * @template {StructuredCallToolResult} T
+ * @param {T} result
+ * @param {BoundedResultPageHint} hint
+ * @returns {T}
+ */
+export function withBoundedResultPage(result, hint) {
+    const budgetBytes = Math.floor(Number(hint.budgetBytes));
+    if (!Number.isFinite(budgetBytes) || budgetBytes <= 0) {
+        throw new TypeError('Bounded MCP result page requires a positive complete-result byte budget.');
+    }
+    const normalizeCursor = (/** @type {string | number | null | undefined} */ value) =>
+        value === undefined || value === null || value === '' ? null : String(value);
+    const cursor = normalizeCursor(hint.cursor);
+    const nextCursor = normalizeCursor(hint.nextCursor);
+    const truncated = hint.truncated === true || nextCursor !== null;
+    const page = {
+        cursor,
+        nextCursor,
+        hasMore: nextCursor !== null,
+        truncated,
+        truncationReason:
+            truncated && typeof hint.truncationReason === 'string' && hint.truncationReason.trim()
+                ? hint.truncationReason.trim().slice(0, 80)
+                : truncated
+                  ? 'bounded-window'
+                  : null,
+        resultBytes: 0,
+        budgetBytes,
+        ...(Number.isFinite(hint.contentBytes) && Number(hint.contentBytes) >= 0
+            ? { contentBytes: Math.ceil(Number(hint.contentBytes)) }
+            : {}),
+        ...(Number.isFinite(hint.contentBudgetBytes) && Number(hint.contentBudgetBytes) > 0
+            ? { contentBudgetBytes: Math.floor(Number(hint.contentBudgetBytes)) }
+            : {}),
+    };
+    result.structuredContent = { ...result.structuredContent, page };
+    let bytes = estimateStructuredTextResultBytes(result.structuredContent, result.content[0]?.text ?? '');
+    page.resultBytes = bytes;
+    bytes = estimateStructuredTextResultBytes(result.structuredContent, result.content[0]?.text ?? '');
+    page.resultBytes = bytes;
+    return withResultSizeHint(result, {
+        bytes,
+        strategy: 'conservative-estimate',
+        source: hint.source,
+    });
 }
 
 /**

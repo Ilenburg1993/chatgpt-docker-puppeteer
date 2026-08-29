@@ -9,7 +9,7 @@
  */
 
 import { enableCopilotNodeCompileCache } from '#copilot/infra/public/platform/node';
-import { createAttachedChildProcessSupervisor } from '#copilot/mcp/public/process/supervision';
+import { createAttachedChildProcessSupervisor } from '#copilot/infra/public/process/supervision';
 import { MCP_WORKSPACE_ROOT } from '#copilot/mcp/public/workspace';
 import { spawn } from 'node:child_process';
 import process from 'node:process';

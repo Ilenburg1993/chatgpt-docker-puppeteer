@@ -10,12 +10,15 @@
  * @module copilot/mcp/runtime/source-generation/runtime
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, posix } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 export const MCP_RUNTIME_SOURCE_GENERATION_SCHEMA_VERSION = 1;
 export const MCP_RUNTIME_SOURCE_GENERATION_KIND = 'copilot-mcp-runtime-source-generation';
+export const MCP_RUNTIME_GENERATION_CERTIFICATE_SCHEMA_VERSION = 1;
+export const MCP_RUNTIME_GENERATION_CERTIFICATE_KIND = 'copilot-mcp-runtime-generation-certificate';
+export const MCP_RUNTIME_GENERATION_CERTIFICATE_FINGERPRINT_KIND = 'sha256-stable-projection-v1';
 
 export const MCP_RUNTIME_SOURCE_PROMOTION_ENV = Object.freeze({
     requestId: 'COPILOT_MCP_PROMOTION_REQUEST_ID',
@@ -54,6 +57,36 @@ const PROCESS_IDENTITY = Object.freeze({
  *     sourceBarrierFingerprint: string | null;
  *     sourceBarrierManifestPath: string | null;
  * }>} McpRuntimeSourceGeneration
+ *
+ * @typedef {Readonly<{
+ *     schemaVersion: 1;
+ *     kind: 'copilot-mcp-runtime-generation-certificate';
+ *     runtime: Readonly<{
+ *         runtimeEpochId: string;
+ *         processStartedAtMs: number;
+ *         processStartedAt: string;
+ *         pid: number;
+ *         nodeVersion: string;
+ *         platform: NodeJS.Platform;
+ *         arch: string;
+ *     }>;
+ *     source: Readonly<{
+ *         binding: 'controlled-promotion' | 'manual-unbound';
+ *         proof: 'source-barrier-bound' | 'manual-unbound';
+ *         promotionRequestId: string | null;
+ *         sourceBarrierFingerprint: string | null;
+ *         sourceBarrierManifestPath: string | null;
+ *     }>;
+ *     toolSurface: Readonly<{
+ *         evidence: 'operation-context-frozen' | 'descriptor-observation-fallback' | 'unavailable';
+ *         available: boolean;
+ *         toolCount: number | null;
+ *         descriptorFingerprint: string | null;
+ *         descriptorFingerprintKind: string | null;
+ *     }>;
+ *     certificateFingerprintKind: 'sha256-stable-projection-v1';
+ *     certificateFingerprint: string;
+ * }>} McpRuntimeGenerationCertificate
  */
 
 /**
@@ -79,6 +112,70 @@ export function createMcpRuntimeSourceGeneration(env) {
         promotionRequestId: promotion?.requestId ?? null,
         sourceBarrierFingerprint: promotion?.sourceBarrierFingerprint ?? null,
         sourceBarrierManifestPath: promotion?.sourceBarrierManifestPath ?? null,
+    });
+}
+
+/**
+ * Project one immutable, non-secret certificate for the process generation plus the exact registered tool-surface
+ * evidence available to the caller. Repository/worktree state is intentionally excluded: it is mutable observation,
+ * not boot identity. The tiny projection hash is safe to recompute and never hashes repository files.
+ *
+ * @param {McpRuntimeSourceGeneration} generation
+ * @param {{
+ *     evidence?: 'operation-context-frozen' | 'descriptor-observation-fallback' | 'unavailable';
+ *     toolCount?: number | null;
+ *     descriptorFingerprint?: string | null;
+ *     descriptorFingerprintKind?: string | null;
+ * }} [surface]
+ * @returns {McpRuntimeGenerationCertificate}
+ */
+export function buildMcpRuntimeGenerationCertificate(generation, surface = {}) {
+    if (!generation || generation.kind !== MCP_RUNTIME_SOURCE_GENERATION_KIND) {
+        throw new TypeError('MCP runtime generation certificate requires a valid source generation.');
+    }
+    const descriptorFingerprint = normalizeCertificateToken(surface.descriptorFingerprint, 512);
+    const descriptorFingerprintKind = normalizeCertificateToken(surface.descriptorFingerprintKind, 256);
+    const toolCount =
+        Number.isInteger(surface.toolCount) && Number(surface.toolCount) >= 0 ? Number(surface.toolCount) : null;
+    const evidence =
+        surface.evidence === 'operation-context-frozen' || surface.evidence === 'descriptor-observation-fallback'
+            ? surface.evidence
+            : /** @type {const} */ ('unavailable');
+    const payload = {
+        schemaVersion: /** @type {1} */ (1),
+        kind: /** @type {'copilot-mcp-runtime-generation-certificate'} */ ('copilot-mcp-runtime-generation-certificate'),
+        runtime: Object.freeze({
+            runtimeEpochId: generation.runtimeEpochId,
+            processStartedAtMs: generation.processStartedAtMs,
+            processStartedAt: generation.processStartedAt,
+            pid: generation.pid,
+            nodeVersion: process.version,
+            platform: process.platform,
+            arch: process.arch,
+        }),
+        source: Object.freeze({
+            binding: generation.sourceBinding,
+            proof:
+                generation.sourceBinding === 'controlled-promotion'
+                    ? /** @type {const} */ ('source-barrier-bound')
+                    : /** @type {const} */ ('manual-unbound'),
+            promotionRequestId: generation.promotionRequestId,
+            sourceBarrierFingerprint: generation.sourceBarrierFingerprint,
+            sourceBarrierManifestPath: generation.sourceBarrierManifestPath,
+        }),
+        toolSurface: Object.freeze({
+            evidence,
+            available: descriptorFingerprint !== null,
+            toolCount,
+            descriptorFingerprint,
+            descriptorFingerprintKind,
+        }),
+    };
+    const certificateFingerprint = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    return Object.freeze({
+        ...payload,
+        certificateFingerprintKind: MCP_RUNTIME_GENERATION_CERTIFICATE_FINGERPRINT_KIND,
+        certificateFingerprint,
     });
 }
 
@@ -173,6 +270,17 @@ function assertCanonicalManifestPath(manifestPath) {
     if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
         throw new TypeError('MCP runtime source promotion manifest path contains an invalid segment.');
     }
+}
+
+/** @param {unknown} value @param {number} maxLength */
+function normalizeCertificateToken(value, maxLength) {
+    if (value === undefined || value === null) return null;
+    const normalized = String(value).trim();
+    if (!normalized) return null;
+    if (normalized.length > maxLength) {
+        throw new TypeError('MCP runtime generation certificate evidence token is too long.');
+    }
+    return normalized;
 }
 
 /** @param {string | undefined} value */

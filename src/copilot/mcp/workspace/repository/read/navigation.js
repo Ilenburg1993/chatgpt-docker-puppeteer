@@ -8,7 +8,8 @@
  */
 
 import { windowFileContext } from '#copilot/infra/public/indexing/file-context';
-import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/infra/public/policy';
+import { DEFAULT_BLOCKED_PATH_SEGMENTS, evaluateWorkspacePathPolicy } from '#copilot/infra/public/policy';
+import { isAbsolute } from 'node:path';
 
 const DEFAULT_REPOSITORY_READ_PATH = 'src/copilot';
 
@@ -79,14 +80,128 @@ function countEntryTypes(entries) {
     return counts;
 }
 
-/** @param {{ io?: { advisoryLimits?: Record<string, unknown> } }} scan */
-function scanHardLimitReached(scan) {
-    return scan.io?.advisoryLimits?.['hardLimitReached'] === true;
+/** @param {string} candidate @param {string} scopePath */
+function isTreePathWithinScope(candidate, scopePath) {
+    return scopePath === '.' || candidate.startsWith(`${scopePath}/`);
+}
+
+/**
+ * @param {string} workspaceRoot
+ * @param {string} scopePath
+ * @param {string | undefined} cursor
+ * @returns {{ok:true;cursor:string|null}|{ok:false;message:string;details:Record<string,unknown>}}
+ */
+function normalizeTreeCursor(workspaceRoot, scopePath, cursor) {
+    if (cursor === undefined || cursor === '') return { ok: true, cursor: null };
+    const normalized = String(cursor).trim().replace(/\\/gu, '/').replace(/^\.\//u, '').replace(/\/+$/u, '');
+    const policy =
+        normalized && !isAbsolute(normalized) && normalized !== '..' && !normalized.startsWith('../')
+            ? evaluateWorkspacePathPolicy(normalized, { workspaceRoot, mode: 'read' })
+            : { ok: false };
+    if (!normalized || !policy.ok || !isTreePathWithinScope(normalized, scopePath)) {
+        return {
+            ok: false,
+            message: 'Tree cursor is outside the visible tree scope.',
+            details: {
+                code: 'ERR_REPO_TREE_CURSOR',
+                failureClass: 'invalid-input',
+                retryability: 'fix-input',
+                recoveryRequired: false,
+                hint: 'Use nextCursor returned by the same repo_tree scope/filter configuration, or omit cursor.',
+            },
+        };
+    }
+    return { ok: true, cursor: normalized };
+}
+
+/**
+ * @param {{name:string;type:string;path:string;depth:number}} entry
+ */
+function conservativeTreeEntryBytes(entry) {
+    const projection = entry.type === 'file' ? { ...entry, size: Number.MAX_SAFE_INTEGER } : entry;
+    return Buffer.byteLength(JSON.stringify(projection), 'utf8');
+}
+
+/**
+ * @param {{name:string;type:string;path:string;depth:number}[]} entries
+ * @param {number} maxEntries
+ * @param {number} maxOutputBytes
+ * @returns {{ok:true;entries:{name:string;type:string;path:string;depth:number}[];nextCursor:string|null;truncated:boolean;truncationReason:string|null}|{ok:false;message:string;details:Record<string,unknown>}}
+ */
+function pageTreeEntries(entries, maxEntries, maxOutputBytes) {
+    /** @type {{name:string;type:string;path:string;depth:number}[]} */
+    const selected = [];
+    let budgetBytes = 2;
+    let stoppedAtOutputBudget = false;
+    for (const entry of entries) {
+        if (selected.length >= maxEntries) break;
+        const contribution = conservativeTreeEntryBytes(entry) + (selected.length > 0 ? 1 : 0);
+        if (budgetBytes + contribution > maxOutputBytes) {
+            if (selected.length === 0) {
+                return {
+                    ok: false,
+                    message: `First tree entry requires at least ${String(budgetBytes + contribution)} UTF-8 bytes but maxOutputBytes is ${String(maxOutputBytes)}.`,
+                    details: {
+                        code: 'ERR_REPO_TREE_PAGE_ITEM_TOO_LARGE',
+                        failureClass: 'bounded-output-item-too-large',
+                        retryability: 'manual-decision',
+                        recoveryRequired: false,
+                        requiredBytes: budgetBytes + contribution,
+                        maxOutputBytes,
+                    },
+                };
+            }
+            stoppedAtOutputBudget = true;
+            break;
+        }
+        selected.push(entry);
+        budgetBytes += contribution;
+    }
+    const truncated = selected.length < entries.length;
+    return {
+        ok: true,
+        entries: selected,
+        nextCursor: truncated ? selected[selected.length - 1]?.path ?? null : null,
+        truncated,
+        truncationReason: truncated ? (stoppedAtOutputBudget ? 'content-byte-budget' : 'entry-limit') : null,
+    };
+}
+
+/**
+ * Preserve the historical file-size convenience without paying stat cost for the complete candidate universe.
+ * Metadata enrichment is bounded to the already-selected page and tolerates a file disappearing between enumeration
+ * and stat by leaving size absent for that entry.
+ *
+ * @param {RepositoryReadWorkspace} workspace
+ * @param {{name:string;type:string;path:string;depth:number}[]} entries
+ * @param {AbortSignal | undefined} signal
+ */
+async function enrichTreePageFileSizes(workspace, entries, signal) {
+    /** @type {{name:string;type:string;path:string;depth:number;size?:number}[]} */
+    const enriched = [];
+    const batchSize = 32;
+    for (let offset = 0; offset < entries.length; offset += batchSize) {
+        signal?.throwIfAborted();
+        const batch = entries.slice(offset, offset + batchSize);
+        const rows = await Promise.all(
+            batch.map(async (entry) => {
+                if (entry.type !== 'file') return entry;
+                try {
+                    const snapshot = await workspace.io.statPath(entry.path);
+                    return { ...entry, size: snapshot.stats.size };
+                } catch {
+                    return entry;
+                }
+            }),
+        );
+        enriched.push(...rows);
+    }
+    return enriched;
 }
 
 /**
  * @param {RepositoryReadWorkspace} workspace
- * @param {{ path?: string; recursive?: boolean; depth?: number; maxEntries?: number; showHidden?: boolean }} [input]
+ * @param {{ path?: string; recursive?: boolean; depth?: number; maxEntries?: number; showHidden?: boolean; includePattern?:string; excludePattern?:string; maxOutputBytes?:number; cursor?:string; hardMaxEntries?:number; signal?:AbortSignal }} [input]
  * @returns {Promise<RepositoryReadOperationResult>}
  */
 export async function readRepositoryTree(workspace, input = {}) {
@@ -94,29 +209,97 @@ export async function readRepositoryTree(workspace, input = {}) {
         normalizeOptionalRepositoryPath(input.path, DEFAULT_REPOSITORY_READ_PATH),
     );
     if (!resolved.ok) return failure(resolved.reason, resolved);
+    const target = await workspace.io.statPathValidated(resolved.validatedReadPath);
+    if (!target.stats.isDirectory()) {
+        return failure('repo_tree requires a directory scope.', {
+            code: 'ERR_REPO_TREE_NOT_DIRECTORY',
+            failureClass: 'invalid-input',
+            retryability: 'fix-input',
+            recoveryRequired: false,
+            path: resolved.relative,
+        });
+    }
     const effectiveMaxEntries = input.maxEntries ?? 2000;
-    const scan = await workspace.indexing.scanDirectoryValidated(resolved.validatedReadPath, {
-        workspaceRoot: workspace.workspaceRoot,
-        recursive: input.recursive === true,
-        depth: input.depth ?? 2,
-        showHidden: input.showHidden === true,
-        maxEntries: effectiveMaxEntries,
-        fingerprint: false,
-        respectGitignore: input.recursive === true,
-    });
-    const entries = scan.entries.slice(0, effectiveMaxEntries);
+    const effectiveMaxOutputBytes = input.maxOutputBytes ?? 512 * 1024;
+    const effectiveDepth = input.recursive === true ? input.depth ?? 2 : 1;
+    const scopePath = resolved.relative === '' ? '.' : resolved.relative.replace(/\\/gu, '/');
+    const cursorResult = normalizeTreeCursor(workspace.workspaceRoot, scopePath, input.cursor);
+    if (!cursorResult.ok) return failure(cursorResult.message, cursorResult.details);
+
+    let structural;
+    try {
+        structural = await workspace.io.listWorkspaceTreeEntriesFreshValidated(resolved.validatedReadPath, {
+            workspaceRoot: workspace.workspaceRoot,
+            recursive: input.recursive === true,
+            depth: effectiveDepth,
+            showHidden: input.showHidden === true,
+            includeSymlinks: true,
+            ...(input.includePattern === undefined ? {} : { includePattern: input.includePattern }),
+            ...(input.excludePattern === undefined ? {} : { excludePattern: input.excludePattern }),
+            hardMaxEntries: input.hardMaxEntries ?? 100_000,
+            ...(input.signal ? { signal: input.signal } : {}),
+        });
+    } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_WORKSPACE_WALK_LIMIT') {
+            return failure(error instanceof Error ? error.message : 'Tree enumeration limit exceeded.', {
+                code: 'ERR_REPO_TREE_ENUMERATION_LIMIT',
+                failureClass: 'bounded-input-too-large',
+                retryability: 'fix-input',
+                recoveryRequired: false,
+                hardMaxEntries: input.hardMaxEntries ?? 100_000,
+                hint: 'Narrow path/depth or add include/exclude filters before retrying.',
+            });
+        }
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_WORKSPACE_WALK_GLOB_PATTERN') {
+            return failure(error instanceof Error ? error.message : 'Tree include/exclude glob is invalid.', {
+                code: 'ERR_REPO_TREE_GLOB_PATTERN',
+                failureClass: 'invalid-input',
+                retryability: 'fix-input',
+                recoveryRequired: false,
+            });
+        }
+        throw error;
+    }
+
+    const visible = structural.entries.map((entry) => ({ ...entry }));
+    const cursor = cursorResult.cursor;
+    const candidates = cursor ? visible.filter((entry) => entry.path > cursor) : visible;
+    const page = pageTreeEntries(candidates, effectiveMaxEntries, effectiveMaxOutputBytes);
+    if (!page.ok) return failure(page.message, page.details);
+    const entries = await enrichTreePageFileSizes(workspace, page.entries, input.signal);
+    const returnedContentBytes = Buffer.byteLength(JSON.stringify(entries), 'utf8');
+
     return success({
         success: true,
-        workspaceRoot: workspace.workspaceRoot,
-        path: resolved.relative,
+        path: scopePath,
+        projection: 'flat-path-page-v2',
+        cursorKind: 'path-keyset-v1',
+        cursor,
+        nextCursor: page.nextCursor,
         count: entries.length,
-        totalScanned: scan.scannedEntries,
-        blockedEntriesCount: scan.blockedEntries,
-        truncated: entries.length < scan.entries.length || scanHardLimitReached(scan),
+        totalVisible: visible.length,
+        totalScanned: structural.visitedEntries,
+        blockedEntriesCount: structural.protectedEntriesPruned,
+        hiddenEntriesPruned: structural.hiddenEntriesPruned,
+        symlinksObserved: structural.symlinksObserved,
+        userExcludedEntries: structural.userExcludedEntries,
+        truncated: page.truncated,
+        truncationReason: page.truncationReason,
+        returnedContentBytes,
+        contentBudgetBytes: effectiveMaxOutputBytes,
+        recursive: input.recursive === true,
+        depth: effectiveDepth,
+        engine: structural.engine,
+        filters: {
+            includePattern: input.includePattern ?? null,
+            excludePattern: input.excludePattern ?? null,
+        },
         securityPolicy: {
             readProtectedPaths: 'blocked',
             listProtectedPaths: 'redacted',
             writeProtectedPaths: 'blocked',
+            pathProjection: 'workspace-relative-only',
+            symlinkTraversal: 'disabled',
         },
         entries,
     });
@@ -320,7 +503,7 @@ export async function searchRepositorySymbols(workspace, input) {
 
 /**
  * @param {RepositoryReadWorkspace} workspace
- * @param {{ path: string; includeImports?: boolean; includeExports?: boolean; includeOutline?: boolean; includeTopComments?: boolean; maxItems?: number; maxBytes?: number }} input
+ * @param {{ path: string; includeImports?: boolean; includeExports?: boolean; includeOutline?: boolean; includeTopComments?: boolean; maxItems?: number; maxBytes?: number; cursor?: string }} input
  * @returns {Promise<RepositoryReadOperationResult>}
  */
 export async function readRepositoryFileOutline(workspace, input) {
@@ -330,23 +513,63 @@ export async function readRepositoryFileOutline(workspace, input) {
     const parsed = await workspace.indexing.parseFileForContext(resolved.resolved, snapshot.content, {
         ...(typeof snapshot.contentHash === 'string' ? { contentHash: snapshot.contentHash } : {}),
     });
-    const windowed = windowFileContext(parsed, {
-        ...(input.maxItems === undefined ? {} : { maxItems: input.maxItems }),
-        ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes }),
-        includeImports: input.includeImports !== false,
-        includeExports: input.includeExports !== false,
-        includeOutline: input.includeOutline !== false,
-        includeTopComments: input.includeTopComments === true,
-    });
+    let windowed;
+    try {
+        windowed = windowFileContext(parsed, {
+            ...(input.maxItems === undefined ? {} : { maxItems: input.maxItems }),
+            ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes }),
+            includeImports: input.includeImports !== false,
+            includeExports: input.includeExports !== false,
+            includeOutline: input.includeOutline !== false,
+            includeTopComments: input.includeTopComments === true,
+            ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+            ...(typeof snapshot.contentHash === 'string' ? { cursorRevision: snapshot.contentHash } : {}),
+        });
+    } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_FILE_CONTEXT_WINDOW_CURSOR') {
+            return failure(error instanceof Error ? error.message : 'Repository outline cursor is invalid.', {
+                code: 'ERR_REPO_OUTLINE_CURSOR',
+                failureClass: 'invalid-input',
+                retryability: 'fix-input',
+                recoveryRequired: false,
+                hint: 'Use nextCursor from the same file revision and include* projection, or omit cursor.',
+            });
+        }
+        if (
+            error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            error.code === 'ERR_FILE_CONTEXT_WINDOW_ITEM_TOO_LARGE'
+        ) {
+            const row = /** @type {Record<string, unknown>} */ (error);
+            return failure(error instanceof Error ? error.message : 'Repository outline item exceeds the page budget.', {
+                code: 'ERR_REPO_OUTLINE_PAGE_ITEM_TOO_LARGE',
+                failureClass: 'bounded-output-item-too-large',
+                retryability: 'manual-decision',
+                recoveryRequired: false,
+                collection: row['collection'],
+                index: row['index'],
+                requiredBytes: row['requiredBytes'],
+                maxBytes: row['maxBytes'],
+            });
+        }
+        throw error;
+    }
     const structured = {
         success: true,
         path: resolved.relative,
         sha256: snapshot.contentHash,
         symbols: windowed.symbols,
         parseError: parsed.symbols.parseError ?? null,
+        cursorKind: windowed.cursorKind,
+        cursor: windowed.cursor,
+        nextCursor: windowed.nextCursor,
+        hasMore: windowed.hasMore,
         truncated: windowed.truncated,
+        truncationReason: windowed.truncationReason,
         maxItems: windowed.maxItems,
         maxBytes: windowed.maxBytes,
+        contentBudgetBytes: windowed.maxBytes,
         returnedContentBytes: windowed.returnedContentBytes,
         totalCounts: windowed.totalCounts,
         returnedCounts: windowed.returnedCounts,

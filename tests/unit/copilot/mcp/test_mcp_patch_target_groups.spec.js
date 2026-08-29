@@ -16,6 +16,15 @@ const TEST_PROCESS_HOST = createComposedMcpProcessHost({
     hostId: 'mcp-patch-target-groups-unit-process-host',
     backgroundServices: false,
 });
+/** @type {import('#copilot/mcp/public/auth').McpPrincipalIdentity} */
+const TEST_PRINCIPAL = Object.freeze({
+    version: 'mcp-principal-v1',
+    key: 'test-patch-target-groups-principal',
+    mode: 'test',
+    verified: true,
+    resource: 'workspace:test',
+    audience: 'workspace:test',
+});
 const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     {
         mcpReq: {
@@ -28,6 +37,7 @@ const TOOL_OPERATION_CONTEXT = createMcpToolOperationContext(
     },
     {
         workspace: TEST_PROCESS_HOST.workspace,
+        principal: TEST_PRINCIPAL,
         config: TEST_PROCESS_HOST.processConfig.toolConfig,
         capabilities: TEST_PROCESS_HOST.toolCapabilities,
     },
@@ -205,7 +215,7 @@ describe('repo_apply_patch_batch target groups', () => {
             confirmBatch: true,
         });
 
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['resultMode'], 'compact');
         assert.equal(result.structuredContent?.['preflightElided'], true);
@@ -289,7 +299,7 @@ describe('repo_apply_patch_batch target groups', () => {
             confirmBatch: true,
         });
 
-        assert.equal(result.isError, undefined);
+        assert.equal(result.isError, true);
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['partial'], true);
         assert.equal(result.structuredContent?.['applyMode'], 'per-target-fast');

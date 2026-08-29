@@ -1,15 +1,15 @@
 // @ts-check
 /**
- * Neutral supervision primitives for child processes owned by the MCP runtime.
+ * Neutral attached-child supervision and process-tree signalling.
  *
- * This owner is deliberately below terminal, validators, Cloudflare and integrations. It owns only attached child
- * lifecycle observation and process-tree signalling. It does not decide which commands may run, how credentials are
- * projected, or what application status a child exit means.
+ * This is physical process IO infrastructure. It does not know MCP, tools, validators, terminal policy, credentials or
+ * application-level exit semantics. Callers own spawn authority and decide what a child process means; this owner only
+ * observes close and delivers bounded termination/escalation signals.
  *
- * @module copilot/mcp/process/supervision/runtime
+ * @module copilot/infra/process/supervision/runtime
  */
 
-export const MCP_PROCESS_SUPERVISION_VERSION = '1.0.0';
+export const INFRA_PROCESS_SUPERVISION_VERSION = '1.0.0';
 export const DEFAULT_PROCESS_TERMINATION_GRACE_MS = 1_500;
 
 /**
@@ -33,8 +33,8 @@ export const DEFAULT_PROCESS_TERMINATION_GRACE_MS = 1_500;
  */
 
 /**
- * Supervise one already-spawned child. The `closed` promise resolves only from Node's child `close` event, therefore a
- * caller can distinguish "termination requested" from "process and stdio actually observed closed".
+ * Supervise one already-spawned child. `closed` resolves only from Node's child `close` event, so callers can
+ * distinguish a termination request from observed process+stdio closure.
  *
  * @param {import('node:child_process').ChildProcess} child
  * @param {{ processGroup?: boolean }} [options]
@@ -84,11 +84,7 @@ export function createAttachedChildProcessSupervisor(child, options = {}) {
     const signal = (signal) => signalProcessTree(pid, signal, { child, processGroup });
 
     /**
-     * @param {{
-     *     graceMs?: number;
-     *     initialSignal?: NodeJS.Signals;
-     *     forceSignal?: NodeJS.Signals;
-     * }} [termination]
+     * @param {{graceMs?:number;initialSignal?:NodeJS.Signals;forceSignal?:NodeJS.Signals}} [termination]
      */
     const requestTermination = (termination = {}) => {
         if (state === 'closed') {
@@ -127,7 +123,7 @@ export function createAttachedChildProcessSupervisor(child, options = {}) {
     /** @returns {AttachedChildProcessSnapshot} */
     const snapshot = () =>
         Object.freeze({
-            version: MCP_PROCESS_SUPERVISION_VERSION,
+            version: INFRA_PROCESS_SUPERVISION_VERSION,
             pid,
             state,
             terminationRequested,
@@ -146,12 +142,11 @@ export function createAttachedChildProcessSupervisor(child, options = {}) {
 }
 
 /**
- * Signal a process tree and report the concrete authority path that accepted the signal.
+ * Signal a process tree and report which concrete target accepted the signal.
  *
  * @param {number | null | undefined} pid
  * @param {NodeJS.Signals} signal
  * @param {{ child?: import('node:child_process').ChildProcess | null; processGroup?: boolean }} [options]
- * @returns {Readonly<{ delivered: boolean; target: 'process-group' | 'pid' | 'child' | 'none' }>}
  */
 export function signalProcessTreeDetailed(pid, signal, options = {}) {
     const normalizedPid = typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null;
@@ -188,7 +183,6 @@ export function signalProcessTreeDetailed(pid, signal, options = {}) {
  * @param {number | null | undefined} pid
  * @param {NodeJS.Signals} signal
  * @param {{ child?: import('node:child_process').ChildProcess | null; processGroup?: boolean }} [options]
- * @returns {boolean}
  */
 export function signalProcessTree(pid, signal, options = {}) {
     return signalProcessTreeDetailed(pid, signal, options).delivered;

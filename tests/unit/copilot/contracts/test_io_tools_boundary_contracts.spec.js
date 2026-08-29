@@ -11,8 +11,8 @@ const TOOLS_ROOT = join(COPILOT_ROOT, 'tools');
 const COPILOT_INFRA_ROOT = join(COPILOT_ROOT, 'infra');
 const PACKAGE_JSON = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
 const ALLOWED_INFRA_CHILD_PROCESS_FILES = new Set([
-    'indexing/search/subprocess/exec.js',
     'indexing/search/subprocess/stream.js',
+    'process/execution/buffered.js',
 ]);
 const ALLOWED_INFRA_CAPABILITY_IMPORTS = new Set(
     Object.keys(PACKAGE_JSON.imports ?? {}).filter((key) => key.startsWith('#copilot/infra/public/')),
@@ -76,7 +76,7 @@ describe('IO/tools boundary contracts', () => {
         expect(aliases).toEqual([]);
     });
 
-    it('infra concentra child_process nos dois adapters de search com ambiente explícito', () => {
+    it('infra concentra child_process nos owners especializados com ambiente explícito', () => {
         const owners = [];
         const violations = [];
         for (const filePath of listJsFiles(COPILOT_INFRA_ROOT)) {

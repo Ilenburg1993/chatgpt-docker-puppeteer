@@ -11,6 +11,31 @@ import {
 } from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
+/**
+ * Dry-run is a diagnostic/plan result even when preflight says the desired mutation is currently blocked. A caller
+ * that explicitly requested a real mutation, however, receives a tool error when the guarded action did not complete.
+ *
+ * @param {Record<string, unknown> & { ok?: boolean }} outcome
+ * @param {'edge-policy' | 'passthrough'} target
+ * @param {boolean | undefined} requestedDryRun
+ */
+function frameCloudflareApplyOutcome(outcome, target, requestedDryRun) {
+    if (requestedDryRun !== false || outcome.ok === true) return okResult(outcome);
+    const blockedReason =
+        typeof outcome['blockedReason'] === 'string' && outcome['blockedReason'].trim()
+            ? outcome['blockedReason']
+            : `Cloudflare ${target} apply did not complete.`;
+    return errorResult(blockedReason, {
+        code: 'ERR_CLOUDFLARE_APPLY_BLOCKED',
+        failureClass: 'guarded-mutation-blocked',
+        retryability: 'inspect-before-retry',
+        recoveryRequired: false,
+        target,
+        outcome,
+        hint: 'Inspect preflight and mandatory-backup evidence before retrying the real apply.',
+    });
+}
+
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
 export const mcpCloudflareEdgePolicyApplyTool = defineMcpRawTool({
     name: 'mcp_cloudflare_edge_policy_apply',
@@ -41,20 +66,35 @@ export const mcpCloudflareEdgePolicyApplyTool = defineMcpRawTool({
         if (selectedTarget === 'passthrough' && (phases !== undefined || ruleRefs !== undefined)) {
             return errorResult('phases/ruleRefs are valid only with target=edge-policy.', {
                 code: 'ERR_CLOUDFLARE_APPLY_TARGET_FIELDS',
+                failureClass: 'shape-config',
+                retryability: 'manual-decision',
+                recoveryRequired: false,
                 target: selectedTarget,
+            });
+        }
+        if (dryRun === false && confirmApply !== true) {
+            return errorResult('Real Cloudflare apply requires explicit confirmation.', {
+                code: 'ERR_CLOUDFLARE_APPLY_CONFIRM_REQUIRED',
+                failureClass: 'shape-config',
+                retryability: 'manual-decision',
+                recoveryRequired: false,
+                target: selectedTarget,
+                hint: 'Use the default dry-run first; pass dryRun=false and confirmApply=true only for the reviewed plan.',
             });
         }
         const authority = requireMcpToolCloudflareEnvironmentAuthority(operationContext);
         if (selectedTarget === 'passthrough') {
-            return okResult(
+            return frameCloudflareApplyOutcome(
                 await applyCloudflareMcpPassthroughPlan({
                     authority,
                     ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
                     ...(typeof confirmApply === 'boolean' ? { confirmApply } : {}),
                 }),
+                selectedTarget,
+                dryRun,
             );
         }
-        return okResult(
+        return frameCloudflareApplyOutcome(
             await applyCloudflareEdgePolicy({
                 authority,
                 ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
@@ -62,6 +102,8 @@ export const mcpCloudflareEdgePolicyApplyTool = defineMcpRawTool({
                 ...(Array.isArray(phases) ? { phases } : {}),
                 ...(Array.isArray(ruleRefs) ? { ruleRefs } : {}),
             }),
+            selectedTarget,
+            dryRun,
         );
     },
 });

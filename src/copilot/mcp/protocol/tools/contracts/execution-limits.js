@@ -6,7 +6,7 @@
  * @module copilot/mcp/protocol/tools/contracts/execution-limits
  */
 
-export const MCP_TOOL_EXECUTION_LIMITS_VERSION = 2;
+export const MCP_TOOL_EXECUTION_LIMITS_VERSION = 6;
 
 export const MCP_TOOL_EXECUTION_LIMITS = Object.freeze({
     toolsList: Object.freeze({
@@ -29,6 +29,33 @@ export const MCP_TOOL_EXECUTION_LIMITS = Object.freeze({
         minBatchResultBudgetBytes: 64 * 1024,
         maxBatchResultBudgetBytes: 3 * 1024 * 1024,
         maxSearchContextLines: 48,
+        defaultTreeMaxEntries: 2000,
+        maxTreeMaxEntries: 5000,
+        defaultTreeContentBudgetBytes: 512 * 1024,
+        minTreeContentBudgetBytes: 16 * 1024,
+        maxTreeContentBudgetBytes: 1024 * 1024,
+        maxTreeToolResultBytes: 1536 * 1024,
+        maxTreeEnumeratedEntries: 100_000,
+        defaultChunkLines: 200,
+        maxChunkLines: 1000,
+        defaultChunkMaxChunks: 4,
+        maxChunkMaxChunks: 64,
+        defaultChunkContentBudgetBytes: 512 * 1024,
+        minChunkContentBudgetBytes: 16 * 1024,
+        maxChunkContentBudgetBytes: 1024 * 1024,
+        maxChunkToolResultBytes: 1536 * 1024,
+        defaultInventoryMaxResults: 2000,
+        maxInventoryMaxResults: 5000,
+        defaultInventoryContentBudgetBytes: 512 * 1024,
+        minInventoryContentBudgetBytes: 16 * 1024,
+        maxInventoryContentBudgetBytes: 1024 * 1024,
+        maxInventoryToolResultBytes: 1536 * 1024,
+        defaultOutlineMaxItems: 500,
+        maxOutlineMaxItems: 5000,
+        defaultOutlineContentBudgetBytes: 512 * 1024,
+        minOutlineContentBudgetBytes: 16 * 1024,
+        maxOutlineContentBudgetBytes: 1024 * 1024,
+        maxOutlineToolResultBytes: 1536 * 1024,
     }),
     repoPatch: Object.freeze({
         maxBatchOperations: 128,

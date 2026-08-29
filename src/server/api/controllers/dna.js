@@ -52,7 +52,7 @@ router.put('/', denyIfDelegated, async (req, res) => {
         }
 
         // Auditoria administrativa da mutação vinculada ao Request ID
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('UPDATE_CONFIG', {
             user: 'GUI',
             request_id: req.id,
@@ -113,7 +113,7 @@ router.get('/dna', async (req, res) => {
  */
 router.put('/dna', denyIfDelegated, async (req, res) => {
     try {
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('UPDATE_DNA', {
             user: 'GUI',
             request_id: req.id,
@@ -186,7 +186,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
             });
         }
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('DNA_ROLLBACK', {
             user: 'GUI',
             request_id: req.id,
@@ -264,7 +264,7 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
             });
         }
 
-        // eslint-disable-next-line @typescript-eslint/await-thenable
+        // oxlint-disable-next-line typescript/await-thenable
         await audit('DNA_MANUAL_EVOLUTION', {
             user: 'GUI',
             request_id: req.id,

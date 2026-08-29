@@ -7,7 +7,7 @@
  * abre um snapshot real do compilador canônico TS7 e coleta diagnósticos do mesmo programa usado pelos gates modernos.
  */
 
-import { DiagnosticCategory, API as TypeScriptNativeAPI } from '@typescript/native/unstable/sync';
+import { DiagnosticCategory, API as TypeScriptNativeAPI } from 'typescript/unstable/sync';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -25,7 +25,7 @@ const REPORT_PATH = path.resolve(
     reportIndex >= 0 ? (args[reportIndex + 1] ?? 'typescript-diagnostics.json') : 'typescript-diagnostics.json',
 );
 
-/** @typedef {import('@typescript/native/unstable/sync').Diagnostic} NativeDiagnostic */
+/** @typedef {import('typescript/unstable/sync').Diagnostic} NativeDiagnostic */
 
 /** @param {NativeDiagnostic} diagnostic @returns {string} */
 function flattenDiagnosticText(diagnostic) {
@@ -160,10 +160,8 @@ try {
 
     const report = {
         schema_version: 2,
-        engine: '@typescript/native/unstable/sync',
-        typescript_version: JSON.parse(
-            fs.readFileSync(path.join(ROOT, 'node_modules/@typescript/native/package.json'), 'utf8'),
-        ).version,
+        engine: 'typescript/unstable/sync',
+        typescript_version: JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules/typescript/package.json'), 'utf8')).version,
         timestamp: new Date().toISOString(),
         root: ROOT,
         config: path.relative(ROOT, CONFIG_PATH).replace(/\\/gu, '/'),

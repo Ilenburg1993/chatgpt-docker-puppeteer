@@ -16,6 +16,7 @@
  *     | 'governance'
  *     | 'composition'
  *     | 'platform-foundation'
+ *     | 'process-foundation'
  *     | 'filesystem-capability'
  *     | 'database-foundation'
  *     | 'persistence'
@@ -90,6 +91,15 @@ export const INFRA_ARCHITECTURE_MANIFEST = /** @type {readonly InfraModuleDescri
                 risk: 'stable',
                 public: false,
                 summary: 'Node/process/buffer/text primitives independent from higher-level capabilities.',
+            },
+            {
+                path: 'process/',
+                kind: 'directory',
+                role: 'process-foundation',
+                tier: 'primary',
+                risk: 'watch',
+                public: false,
+                summary: 'Generic subprocess execution and attached-child supervision with bounded lifecycle ownership.',
             },
             {
                 path: 'concurrency/',

@@ -101,7 +101,15 @@ describe('copilot MCP runtime metrics', () => {
             {
                 workspace: processHost.workspace,
                 config: processHost.processConfig.toolConfig,
-                capabilities: processHost.toolCapabilities,
+                capabilities: {
+                    ...processHost.toolCapabilities,
+                    toolSurface: {
+                        tools: [],
+                        names: ['repo_status', 'mcp_runtime_health'],
+                        descriptorFingerprint: 'b'.repeat(64),
+                        descriptorFingerprintKind: 'test-wire-descriptor-set-sha256',
+                    },
+                },
             },
         );
         try {
@@ -112,6 +120,10 @@ describe('copilot MCP runtime metrics', () => {
                 promotionRequestId: promotion.requestId,
                 sourceBarrierFingerprint: promotion.sourceBarrierFingerprint,
             });
+            const compactCertificate = compact.structuredContent['operationalSignals']?.runtimeGenerationCertificate;
+            assert.equal(compactCertificate?.schemaVersion, 1);
+            assert.match(String(compactCertificate?.certificateFingerprint ?? ''), /^[a-f0-9]{64}$/u);
+            assert.equal(Object.keys(compactCertificate ?? {}).length, 2);
 
             const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true }, operationContext);
             assert.deepEqual(
@@ -120,6 +132,14 @@ describe('copilot MCP runtime metrics', () => {
             );
             assert.equal(
                 detailed.structuredContent['operationalSignals']?.runtimeSourceGeneration?.sourceBarrierManifestPath,
+                promotion.sourceBarrierManifestPath,
+            );
+            assert.equal(
+                detailed.structuredContent['operationalSignals']?.runtimeGenerationCertificate?.toolSurface?.descriptorFingerprint,
+                'b'.repeat(64),
+            );
+            assert.equal(
+                detailed.structuredContent['operationalSignals']?.runtimeGenerationCertificate?.source?.sourceBarrierManifestPath,
                 promotion.sourceBarrierManifestPath,
             );
         } finally {
@@ -204,6 +224,15 @@ describe('copilot MCP runtime metrics', () => {
                 runtimeEpochId: processHost.processConfig.runtime.sourceGeneration.runtimeEpochId,
                 sourceBinding: processHost.processConfig.runtime.sourceGeneration.sourceBinding,
             });
+            assert.match(
+                String(result.structuredContent['operationalSignals'].runtimeGenerationCertificate?.certificateFingerprint ?? ''),
+                /^[a-f0-9]{64}$/u,
+            );
+            assert.equal(
+                result.structuredContent['operationalSignals'].runtimeGenerationCertificate?.runtimeEpochId,
+                undefined,
+            );
+            assert.equal(result.structuredContent['operationalSignals'].runtimeGenerationRelation, undefined);
             assert.equal(typeof result.structuredContent['operationalSignals'].nodeRuntime?.nodeVersion, 'string');
             assert.equal(
                 typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.enabled,
@@ -224,6 +253,8 @@ describe('copilot MCP runtime metrics', () => {
                 error: null,
                 staleQuickTunnelStateRemoved: false,
                 detachedLiveRunsReaped: 0,
+                detachedLiveRunsTimedOut: 0,
+                detachedLiveRunStatesDeleted: 0,
                 detachedLiveRunReaperFailures: 0,
             });
             assert.ok(result.structuredContent['indexStats']);

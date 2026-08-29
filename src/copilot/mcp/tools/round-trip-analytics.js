@@ -6,7 +6,11 @@
  */
 
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
-import { okResult, requireMcpToolRoundTripAnalyticsCapability } from '#copilot/mcp/public/protocol/tools';
+import {
+    okResult,
+    requireMcpToolRoundTripAnalyticsCapability,
+    requireMcpToolRuntimeSourceGeneration,
+} from '#copilot/mcp/public/protocol/tools';
 import { z } from 'zod';
 
 /** @type {import('#copilot/mcp/public/protocol/catalog').McpRawToolDefinition} */
@@ -38,6 +42,10 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
             .boolean()
             .optional()
             ['describe']('Refresh the derived SQLite index from new audit bytes before summarizing. Default: true.'),
+        generation: z
+            .enum(['current', 'all'])
+            .optional()
+            ['describe']('Runtime-generation scope. Default: current; use all only for explicit historical analysis.'),
     },
 
     handler: async (input = {}, operationContext) => {
@@ -46,11 +54,14 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
         const top = boundedInteger(options['top'], 20, 1, 100);
         const includeSynthetic = options['includeSynthetic'] === true;
         const sync = options['sync'] !== false;
+        const generation = options['generation'] === 'all' ? 'all' : 'current';
+        const runtimeSourceGeneration = requireMcpToolRuntimeSourceGeneration(operationContext);
         const report = await requireMcpToolRoundTripAnalyticsCapability(operationContext).summarize({
             windowMs: windowHours * 60 * 60 * 1000,
             top,
             includeSynthetic,
             sync,
+            ...(generation === 'current' ? { runtimeEpochId: runtimeSourceGeneration.runtimeEpochId } : {}),
         });
         const ingestion = report.ingestion;
         return okResult({
@@ -65,6 +76,8 @@ export const mcpRoundTripAnalyticsTool = defineMcpRawTool({
                 schemaVersion: report.schemaVersion,
                 normalizerVersion: report.normalizerVersion,
                 authority: report.authority,
+                generation,
+                queryScope: report.queryScope,
                 windowMs: report.windowMs,
                 includeSynthetic: report.includeSynthetic,
                 indexedRows: report.indexedRows,

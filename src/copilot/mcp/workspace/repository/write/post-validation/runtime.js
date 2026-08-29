@@ -55,6 +55,7 @@ export async function runPostPatchValidations(requests, runtime, validationConfi
             const result = await runCopilotValidatorInline(request.validator, {
                 workspace: runtime.workspace,
                 config: validationConfig,
+                ownerPrincipalKey: runtime.ownerPrincipalKey,
                 ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
                 ...(request.waitMs === undefined ? {} : { waitMs: request.waitMs }),
                 ...(request.failureTailBytes === undefined ? {} : { failureTailBytes: request.failureTailBytes }),

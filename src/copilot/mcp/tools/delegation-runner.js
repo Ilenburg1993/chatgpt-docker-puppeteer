@@ -21,6 +21,7 @@ import {
     requireMcpToolCloudflareEnvironmentAuthority,
     requireMcpToolGitConfig,
     requireMcpToolIoCacheConfig,
+    requireMcpToolPrincipal,
     requireMcpToolValidationConfig,
     requireMcpToolWorkspace,
 } from '#copilot/mcp/public/protocol/tools';
@@ -213,6 +214,7 @@ export const delegateToRepoAutonomyRunnerTool = defineMcpRawTool({
                 testFiles: [focusedTestFile],
                 ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
             });
             return okResult({
                 success: true,
@@ -297,6 +299,7 @@ export const delegateToRepoAutonomyRunnerTool = defineMcpRawTool({
                 config: requireMcpToolValidationConfig(operationContext),
                 ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
                 ...(operationContext?.signal ? { signal: operationContext.signal } : {}),
+                ownerPrincipalKey: requireMcpToolPrincipal(operationContext).key,
             });
             return okResult({
                 success: true,

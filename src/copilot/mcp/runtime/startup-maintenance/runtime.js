@@ -26,6 +26,8 @@ let startupState = {
     error: /** @type {string | null} */ (null),
     staleQuickTunnelStateRemoved: false,
     detachedLiveRunsReaped: 0,
+    detachedLiveRunsTimedOut: 0,
+    detachedLiveRunStatesDeleted: 0,
     detachedLiveRunReaperFailures: 0,
 };
 
@@ -42,7 +44,7 @@ let startupState = {
  *     smokeRunner?: () => Promise<Record<string, unknown>>;
  *     cleanupRunner?: () => Promise<{ removed: boolean }>;
  *     rollbackCleanupRunner?: () => Promise<Record<string, unknown> | null>;
- *     detachedLiveReaper?: () => Promise<{ reapedCount?: number; failureCount?: number } | null>;
+ *     detachedLiveReaper?: () => Promise<{ reapedCount?: number; timedOutCount?: number; deletedCount?: number; failureCount?: number } | null>;
  * }} [options]
  * @returns {boolean}
  */
@@ -141,6 +143,8 @@ export function resetMcpStartupMaintenanceForTests() {
         error: null,
         staleQuickTunnelStateRemoved: false,
         detachedLiveRunsReaped: 0,
+        detachedLiveRunsTimedOut: 0,
+        detachedLiveRunStatesDeleted: 0,
         detachedLiveRunReaperFailures: 0,
     };
 }
@@ -149,7 +153,7 @@ export function resetMcpStartupMaintenanceForTests() {
  * @param {() => Promise<Record<string, unknown>>} smokeRunner
  * @param {() => Promise<{ removed: boolean }>} cleanupRunner
  * @param {() => Promise<Record<string, unknown> | null>} rollbackCleanupRunner
- * @param {() => Promise<{ reapedCount?: number; failureCount?: number } | null>} detachedLiveReaper
+ * @param {() => Promise<{ reapedCount?: number; timedOutCount?: number; deletedCount?: number; failureCount?: number } | null>} detachedLiveReaper
  * @param {number} generation
  */
 async function runStartupMaintenance(
@@ -200,6 +204,8 @@ async function runStartupMaintenance(
             error: success ? null : 'workspace-smoke-reported-failure',
             staleQuickTunnelStateRemoved: cleanup.removed === true,
             detachedLiveRunsReaped: Number(detachedLiveReap?.reapedCount ?? 0),
+            detachedLiveRunsTimedOut: Number(detachedLiveReap?.timedOutCount ?? 0),
+            detachedLiveRunStatesDeleted: Number(detachedLiveReap?.deletedCount ?? 0),
             detachedLiveRunReaperFailures: Number(detachedLiveReap?.failureCount ?? 0),
         };
         logMcp(success ? 'INFO' : 'WARN', 'MCP startup workspace smoke completed.', {

@@ -21,10 +21,13 @@ import {
 } from '#copilot/mcp/public/process/terminal';
 import { defineMcpRawTool } from '#copilot/mcp/public/protocol/catalog';
 import {
+    errorResult,
     okResult,
+    requireMcpToolPrincipal,
     requireMcpToolTerminalConfig,
     requireMcpToolWorkspace,
     withResultExecutionHint,
+    withToolErrorResult,
 } from '#copilot/mcp/public/protocol/tools';
 
 const envSchema = z.record(z.string(), z.union([z.string(), z.null()]));
@@ -117,6 +120,12 @@ const terminalCapabilitiesSchema = z.object({
     maxSessionBufferBytes: z.number().int().min(1),
     maxSessionWaitMs: z.number().int().min(1),
     maxSessionWaitersPerSession: z.number().int().min(1),
+    sessionLifecycle: z.object({
+        runningLifetime: z.literal('until-process-exit-or-explicit-close'),
+        closedRetentionMs: z.number().int().min(1),
+        processExitCleanup: z.literal('force-kill-running-session-process-trees'),
+        retentionCleanup: z.literal('opportunistic-on-session-operations'),
+    }),
     osBoundary: z.string(),
 });
 
@@ -137,6 +146,7 @@ const terminalSessionSchema = z.object({
     bufferedBytes: z.number().int().min(0),
     droppedBytes: z.number().int().min(0),
     nextSeq: z.number().int().min(1),
+    retentionExpiresAt: z.string().nullable(),
 });
 
 const terminalEventSchema = z.object({
@@ -318,6 +328,20 @@ const TERMINAL_SESSION_READ_FIELDS = Object.freeze({
 });
 const TERMINAL_EXEC_RESULT_LIMIT_BYTES = 40 * 1024 * 1024;
 const TERMINAL_SESSION_READ_RESULT_LIMIT_BYTES = 12 * 1024 * 1024;
+const TERMINAL_CONTROL_PLANE_TOOL_ERROR_CODES = Object.freeze(
+    new Set([
+        'ERR_TERMINAL_SESSION_LIMIT',
+        'ERR_TERMINAL_PTY_UNAVAILABLE',
+        'ERR_TERMINAL_SESSION_NOT_FOUND',
+        'ERR_TERMINAL_SESSION_RUNNING',
+        'ERR_TERMINAL_RESIZE_REQUIRES_PTY',
+        'ERR_TERMINAL_SESSION_ACTION',
+        'ERR_TERMINAL_SESSION_NOT_RUNNING',
+        'ERR_TERMINAL_SESSION_OPEN',
+        'MCP_TOOL_CANCELLED',
+        'MCP_TOOL_TIMEOUT',
+    ]),
+);
 
 /**
  * Reduce the wire OperationContext to the authority actually required by the process owner.
@@ -330,6 +354,7 @@ function terminalExecutionRuntime(operationContext) {
     return Object.freeze({
         workspaceRoot: workspace.workspaceRoot,
         config: requireMcpToolTerminalConfig(operationContext),
+        principalKey: requireMcpToolPrincipal(operationContext).key,
         signal: operationContext.signal,
         cancellationSource: operationContext.cancellationSource,
     });
@@ -375,7 +400,12 @@ function terminalResult(payload) {
         detail: 'Full bounded terminal data is available in structuredContent.',
     };
     const result = okResult(payload, JSON.stringify(compact, null, 2));
-    if (payload['batch'] !== true || !Number.isSafeInteger(Number(payload['requestCount']))) return result;
+    const code = typeof payload['code'] === 'string' ? payload['code'] : '';
+    const framedResult =
+        payload['success'] === false && TERMINAL_CONTROL_PLANE_TOOL_ERROR_CODES.has(code)
+            ? withToolErrorResult(result)
+            : result;
+    if (payload['batch'] !== true || !Number.isSafeInteger(Number(payload['requestCount']))) return framedResult;
     const requestCount = Math.max(1, Math.floor(Number(payload['requestCount'])));
     const rows = Array.isArray(payload['results']) ? payload['results'] : [];
     const skippedOperations = rows.filter((row) => isRecord(row) && row['skipped'] === true).length;
@@ -385,7 +415,7 @@ function terminalResult(payload) {
     const truncatedOperations = rows.filter(
         (row) => isRecord(row) && (row['stdoutTruncated'] === true || row['stderrTruncated'] === true),
     ).length;
-    return withResultExecutionHint(result, {
+    return withResultExecutionHint(framedResult, {
         logicalOperations: requestCount,
         failedOperations,
         skippedOperations,
@@ -487,8 +517,7 @@ export const terminalTools = [
             if (Array.isArray(value['batch'])) {
                 const conflictingFields = presentTerminalFields(value, TERMINAL_EXEC_SINGLE_FIELDS);
                 if (conflictingFields.length > 0) {
-                    return okResult({
-                        success: false,
+                    return errorResult('terminal_exec batch mode received single-command fields.', {
                         code: 'ERR_TERMINAL_EXEC_SHAPE',
                         conflictingFields,
                         hint: 'Batch mode accepts batch plus batchConcurrency/batchFailureMode/batchResultBudgetBytes only.',
@@ -511,16 +540,14 @@ export const terminalTools = [
             }
             const batchOnlyFields = presentTerminalFields(value, TERMINAL_EXEC_BATCH_ONLY_FIELDS);
             if (batchOnlyFields.length > 0) {
-                return okResult({
-                    success: false,
+                return errorResult('terminal_exec single mode received batch-only fields.', {
                     code: 'ERR_TERMINAL_EXEC_SHAPE',
                     conflictingFields: batchOnlyFields,
                     hint: 'batchConcurrency/batchFailureMode/batchResultBudgetBytes require batch mode.',
                 });
             }
             if (typeof value['command'] !== 'string' || value['command'].length === 0) {
-                return okResult({
-                    success: false,
+                return errorResult('terminal_exec requires command outside batch mode.', {
                     code: 'ERR_TERMINAL_COMMAND_REQUIRED',
                     hint: 'command is required outside batch mode.',
                 });
@@ -633,8 +660,7 @@ export const terminalTools = [
             const value = input;
             const invalidOptions = invalidTerminalSessionActionFields(/** @type {Record<string, unknown>} */ (value));
             if (invalidOptions.length > 0) {
-                return okResult({
-                    success: false,
+                return errorResult(`terminal_session_control received fields that do not apply to action=${value.action}.`, {
                     code: 'ERR_TERMINAL_SESSION_ACTION_OPTIONS',
                     action: value.action,
                     invalidOptions,
@@ -651,14 +677,16 @@ export const terminalTools = [
                 );
             }
             if (!value.sessionId) {
-                return okResult({
-                    success: false,
+                return errorResult(`terminal_session_control action=${value.action} requires sessionId.`, {
                     code: 'ERR_TERMINAL_SESSION_ID_REQUIRED',
                     action: value.action,
                 });
             }
             return terminalResult(
-                await controlTerminalSession(/** @type {Parameters<typeof controlTerminalSession>[0]} */ (value)),
+                await controlTerminalSession(
+                    /** @type {Parameters<typeof controlTerminalSession>[0]} */ (value),
+                    terminalExecutionRuntime(operationContext),
+                ),
             );
         },
     }),
@@ -712,8 +740,7 @@ export const terminalTools = [
             const action = String(value['action'] ?? 'read');
             const invalidOptions = invalidTerminalSessionReadFields(value);
             if (invalidOptions.length > 0) {
-                return okResult({
-                    success: false,
+                return errorResult(`terminal_session_read received fields that do not apply to action=${action}.`, {
                     code: 'ERR_TERMINAL_SESSION_READ_ACTION_OPTIONS',
                     action,
                     invalidOptions,
@@ -721,15 +748,13 @@ export const terminalTools = [
                 });
             }
             if (value['waitMs'] !== undefined && value['waitFor'] !== 'output-or-exit') {
-                return okResult({
-                    success: false,
+                return errorResult('terminal_session_read waitMs requires waitFor="output-or-exit".', {
                     code: 'ERR_TERMINAL_SESSION_WAIT_REQUIRES_WAIT_FOR',
                     hint: 'Set waitFor="output-or-exit" when supplying waitMs.',
                 });
             }
             if (value['waitFor'] !== undefined && (value['action'] ?? 'read') !== 'read') {
-                return okResult({
-                    success: false,
+                return errorResult('terminal_session_read waitFor is supported only for action=read.', {
                     code: 'ERR_TERMINAL_SESSION_WAIT_REQUIRES_READ',
                     hint: 'waitFor is supported only for action=read.',
                 });

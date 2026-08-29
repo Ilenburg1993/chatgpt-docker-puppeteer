@@ -14,7 +14,7 @@
 
 import { readMcpWorkflowPolicy } from '#copilot/mcp/public/workflow-policy';
 
-export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.8.0';
+export const MCP_TOOL_OPTION_CONTRACTS_VERSION = '1.12.0';
 
 const OPTION_CATEGORIES = Object.freeze(['semantic', 'tuning', 'result', 'safety', 'recovery']);
 const INACTIVE_POLICIES = Object.freeze(['reject']);
@@ -131,6 +131,23 @@ const OPTION_CONTRACTS = Object.freeze({
             batchResultBudgetBytes: option('tuning', ['batch'], 'reject', 'literal'),
         }),
     }),
+    repo_file_outline: Object.freeze({
+        mode: Object.freeze({ kind: 'presence', option: 'batch', presentMode: 'batch', absentMode: 'single' }),
+        options: Object.freeze({
+            path: option('semantic', ['single'], 'reject'),
+            includeImports: option('result', ['single'], 'reject', 'literal'),
+            includeExports: option('result', ['single'], 'reject', 'literal'),
+            includeOutline: option('result', ['single'], 'reject', 'literal'),
+            includeTopComments: option('result', ['single'], 'reject', 'literal'),
+            maxItems: option('result', ['single'], 'reject', 'literal'),
+            maxBytes: option('result', ['single'], 'reject', 'literal'),
+            cursor: option('semantic', ['single'], 'reject'),
+            batch: option('semantic', ['batch'], 'reject'),
+            batchFailureMode: option('semantic', ['batch'], 'reject', 'literal'),
+            batchConcurrency: option('tuning', ['batch'], 'reject', 'literal'),
+            batchResultBudgetBytes: option('tuning', ['batch'], 'reject', 'literal'),
+        }),
+    }),
     repo_search_text: Object.freeze({
         mode: Object.freeze({ kind: 'presence', option: 'batch', presentMode: 'batch', absentMode: 'single' }),
         options: Object.freeze({
@@ -232,6 +249,30 @@ const OPTION_CONTRACTS = Object.freeze({
             resultBudgetBytes: option('tuning', ['batch'], 'reject', 'literal'),
         }),
     }),
+    repo_tree: Object.freeze({
+        mode: Object.freeze({ kind: 'constant', mode: 'read' }),
+        options: Object.freeze({
+            path: option('semantic', undefined, undefined, 'runtime'),
+            recursive: option('semantic', undefined, undefined, 'literal'),
+            depth: option('semantic', undefined, undefined, 'literal'),
+            maxEntries: option('result', undefined, undefined, 'literal'),
+            showHidden: option('semantic', undefined, undefined, 'literal'),
+            includePattern: option('semantic'),
+            excludePattern: option('semantic'),
+            maxOutputBytes: option('result', undefined, undefined, 'literal'),
+            cursor: option('semantic'),
+        }),
+    }),
+    repo_inventory: Object.freeze({
+        mode: Object.freeze({ kind: 'constant', mode: 'read' }),
+        options: Object.freeze({
+            source: option('semantic', undefined, undefined, 'literal'),
+            path: option('semantic', undefined, undefined, 'runtime'),
+            maxResults: option('result', undefined, undefined, 'literal'),
+            maxOutputBytes: option('result', undefined, undefined, 'literal'),
+            cursor: option('semantic'),
+        }),
+    }),
     repo_read_file_chunks: Object.freeze({
         mode: Object.freeze({ kind: 'constant', mode: 'read' }),
         options: Object.freeze({
@@ -239,6 +280,8 @@ const OPTION_CONTRACTS = Object.freeze({
             startLine: option('semantic'),
             endLine: option('semantic'),
             chunkLines: option('result', undefined, undefined, 'literal'),
+            maxChunks: option('result', undefined, undefined, 'literal'),
+            maxOutputBytes: option('result', undefined, undefined, 'literal'),
             cursor: option('semantic'),
             highWaterMark: option('tuning', undefined, undefined, 'runtime'),
         }),

@@ -10,7 +10,7 @@
  * @module copilot/mcp/protocol/tools/contracts/operation-context
  */
 
-export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
+export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.2.0';
 
 /**
  * @typedef {'2025' | '2026' | 'unknown'} McpProtocolEra
@@ -39,6 +39,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
  *     requestMeta?: Readonly<Record<string, unknown>>;
  *     requestEnvelope?: Readonly<Record<string, unknown>>;
  *     authInfo?: import('@modelcontextprotocol/server').AuthInfo;
+ *     principal?: import('#copilot/mcp/public/auth').McpPrincipalIdentity;
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
  *     config: McpToolConfigProjection;
  *     capabilities: McpToolCapabilityProjection;
@@ -97,6 +98,7 @@ export const MCP_TOOL_OPERATION_CONTEXT_VERSION = '1.1.0';
  * @typedef {{
  *     workspace: import('#copilot/mcp/public/workspace').McpWorkspaceCapability;
  *     callId?: string;
+ *     principal?: import('#copilot/mcp/public/auth').McpPrincipalIdentity;
  *     config?: McpToolConfigProjection;
  *     capabilities?: McpToolCapabilityProjection;
  *     timeoutMs?: number;
@@ -140,6 +142,7 @@ export function createMcpToolOperationContext(serverContext, options) {
         ...(requestMeta ? { requestMeta } : {}),
         ...(requestEnvelope ? { requestEnvelope } : {}),
         ...(serverContext.http?.authInfo ? { authInfo: serverContext.http.authInfo } : {}),
+        ...(options.principal ? { principal: options.principal } : {}),
         workspace: options.workspace,
         config: freezeToolConfig(options.config),
         capabilities: freezeToolCapabilities(options.capabilities),
@@ -152,6 +155,29 @@ export function createMcpToolOperationContext(serverContext, options) {
             return null;
         },
     });
+}
+
+/**
+ * Bind an authorization-derived principal after the registry has completed authorization without resetting the
+ * invocation deadline, cancellation signals or audit identity.
+ *
+ * @param {McpToolOperationContext} operationContext
+ * @param {import('#copilot/mcp/public/auth').McpPrincipalIdentity} principal
+ * @returns {McpToolOperationContext}
+ */
+export function withMcpToolPrincipal(operationContext, principal) {
+    if (!principal?.key) throw new TypeError('MCP tool principal identity requires a stable key.');
+    return Object.freeze({ ...operationContext, principal });
+}
+
+/**
+ * @param {McpToolOperationContext | undefined} operationContext
+ * @returns {import('#copilot/mcp/public/auth').McpPrincipalIdentity}
+ */
+export function requireMcpToolPrincipal(operationContext) {
+    const principal = operationContext?.principal;
+    if (!principal?.key) throw new TypeError('MCP tool operation requires an authorization-derived principal identity.');
+    return principal;
 }
 
 /**

@@ -77,6 +77,14 @@ async function createFixture() {
     return {
         sqliteFingerprintReads: () => sqliteFingerprintReads,
         operationContext: /** @type {any} */ ({
+            principal: {
+                version: 'mcp-principal-v1',
+                key: 'test-llmb-wire-principal',
+                mode: 'test',
+                verified: true,
+                resource: 'workspace:test',
+                audience: 'workspace:test',
+            },
             workspace: {
                 workspaceRoot: root,
                 io: {
@@ -140,8 +148,13 @@ describe('LLM-B readiness MCP wire contract', () => {
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['schema'], 'model-gateway-live-runs');
         assert.equal(result.structuredContent?.['limit'], 7);
-        assert.deepEqual(result.structuredContent?.['runs'], [{ runId: 'fixture-run', status: 'completed' }]);
-        assert.ok(Array.isArray(result.structuredContent?.['detachedRuns']));
+        assert.deepEqual(result.structuredContent?.['runs'], []);
+        assert.deepEqual(result.structuredContent?.['detachedRuns'], []);
+        assert.equal(result.structuredContent?.['count'], 0);
+        assert.equal(result.structuredContent?.['visibility'], 'principal-owned-detached-runs');
+        assert.equal(result.structuredContent?.['ownerProvenance'], 'detached-manifest');
+        assert.equal(result.structuredContent?.['completeness'], 'bounded-global-source-window');
+        assert.equal(result.structuredContent?.['sourceWindowLimit'], 100);
         assert.equal(fixture.sqliteFingerprintReads(), 0, 'runs view must not enter readiness fingerprint/cache path');
     });
 
