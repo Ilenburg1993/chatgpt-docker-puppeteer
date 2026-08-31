@@ -114,7 +114,7 @@ jobs:
       # rollback de commits durante a sessão do agente.
       # ═══════════════════════════════════════════════════════════════════════
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           lfs: false
@@ -155,7 +155,7 @@ jobs:
       # de dependências invalidam o cache.
       # ═══════════════════════════════════════════════════════════════════════
       - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: "npm"
@@ -186,7 +186,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: global npm tools"
         id: cache-npm-global
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/npm-global
           key: ${{ runner.os }}-npm-global-v4-${{ hashFiles('.github/workflows/copilot-setup-steps.yml') }}
@@ -200,7 +200,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: dashboard-ui node_modules"
         id: cache-dashboard-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: src/dashboard-ui/node_modules
           key: ${{ runner.os }}-dashboard-ui-v3-${{ hashFiles('src/dashboard-ui/package-lock.json') }}
@@ -211,7 +211,7 @@ jobs:
       # 6. CACHE — packages Python (camada 4 de cache)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: Python pip"
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt', 'agents/**/*.py') }}
