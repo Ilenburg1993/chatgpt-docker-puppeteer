@@ -1101,7 +1101,7 @@
   "devDependencies": {
     "@babel/traverse": "^8.0.4",
     "@babel/types": "^8.0.4",
-    "@eslint/css": "^1.4.0",
+    "@eslint/css": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "@eslint/markdown": "^8.0.3",
     "@faker-js/faker": "^10.6.0",
@@ -1145,7 +1145,7 @@
     "prettier": "^3.9.6",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",
-    "prettier-plugin-sh": "^0.19.0",
+    "prettier-plugin-sh": "^0.20.2",
     "puppeteer-core": "^25.9.0",
     "sinon": "^22.1.0",
     "supertest": "^7.2.2",
